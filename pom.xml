@@ -3,14 +3,6 @@
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <!-- This will not introduce any runtime Spring Boot dependencies. -->
-  <parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>4.1.1</version>
-    <relativePath />
-  </parent>
-
   <groupId>io.github.synapse4j</groupId>
   <artifactId>synapse4j-parent</artifactId>
   <version>${revision}</version>
@@ -19,9 +11,14 @@
   <properties>
     <revision>0.0.1-SNAPSHOT</revision>
 
-    <java.version>21</java.version>
+    <maven.compiler.release>21</maven.compiler.release>
+
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <jsonschema-generator.version>5.0.0</jsonschema-generator.version>
+    <jackson-bom.version>3.1.6</jackson-bom.version>
+    <lombok.version>1.18.48</lombok.version>
   </properties>
 
   <modules>
@@ -37,10 +34,85 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <!-- lombok is declared without a version in synapse4j-core, so it has to be managed here. -->
+      <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <version>${lombok.version}</version>
+      </dependency>
+      <!-- The library references Jackson directly (and will ship a Jackson-based codec module), so
+           its version is managed here rather than left to whatever victools happens to pull in.
+           victools' other transitive dependencies (classmate, slf4j) are deliberately not pinned:
+           they are internals of a dependency we do not own, and pinning them would mean chasing
+           victools' upgrades by hand. -->
+      <dependency>
+        <groupId>tools.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson-bom.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
   <build>
+    <pluginManagement>
+      <plugins>
+        <!-- Pin the lifecycle plugins this build runs (mvn clean verify). Maven's own defaults are
+             Maven-2 era on Maven 3.x: clean 2.5, resources 2.6, compiler 3.1, surefire 2.12.4,
+             jar 2.4, install 2.4, deploy 2.7 — and compiler 3.1 cannot even build on JDK 21. -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-clean-plugin</artifactId>
+          <version>3.5.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-resources-plugin</artifactId>
+          <version>3.5.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.16.0</version>
+          <configuration>
+            <!-- Keep parameter names in the bytecode: the JSON codecs this library plugs in resolve
+                 constructor parameters reflectively, so dropping them would change behaviour for
+                 users even though this build itself never reads them. -->
+            <parameters>true</parameters>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>3.6.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>3.5.1</version>
+          <configuration>
+            <!-- Keeps the Implementation-Title/Version manifest entries the Spring Boot parent
+                 used to add. -->
+            <archive>
+              <manifest>
+                <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+              </manifest>
+            </archive>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-install-plugin</artifactId>
+          <version>3.2.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-deploy-plugin</artifactId>
+          <version>3.2.0</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
     <plugins>
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
