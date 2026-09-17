@@ -84,7 +84,6 @@ one would block extension by users and providers.
 
 - No agent orchestration or workflow engine.
 - No conversation memory (the kind of abstraction LangChain4j's `AiService` represents).
-- No SPI auto-discovery and no DI.
 - No binding to a particular JSON library, HTTP client or LLM provider.
 
 ## Code conventions
