@@ -1,0 +1,6 @@
+target/
+.flattened-pom.xml
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/eclipse-formatter.xml
