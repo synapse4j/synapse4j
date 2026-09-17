@@ -19,6 +19,7 @@
     <jsonschema-generator.version>5.0.0</jsonschema-generator.version>
     <jackson-bom.version>3.1.6</jackson-bom.version>
     <lombok.version>1.18.48</lombok.version>
+    <junit-bom.version>6.1.3</junit-bom.version>
   </properties>
 
   <modules>
@@ -27,6 +28,13 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit-bom.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <dependency>
         <groupId>com.github.victools</groupId>
         <artifactId>jsonschema-generator-bom</artifactId>
@@ -126,15 +134,16 @@
                  exactly the editor/build inconsistency this configuration exists to prevent. Unused
                  imports are still removed on both sides. -->
             <eclipse>
-              <!-- Resolved from the directory mvn is invoked in (the repo root), so the same
-                   absolute path applies to every module; a module-relative path would resolve
-                   against each child's basedir. -->
+              <!-- The root, where the profile lives. mvn sets this property from its launcher
+                   script, m2e does not, hence the ignore below. -->
               <file>${maven.multiModuleProjectDirectory}/.vscode/eclipse-formatter.xml</file>
             </eclipse>
           </java>
         </configuration>
         <executions>
           <execution>
+            <!-- m2e would fail to resolve the path above; the editor formats on save instead. -->
+            <?m2e ignore?>
             <id>spotless-check</id>
             <phase>verify</phase>
             <goals>
