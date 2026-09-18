@@ -6,9 +6,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import lombok.EqualsAndHashCode;
+
 /**
  * Extra, provider-specific fields attached to a single node of a request (the request itself, a
- * message, a content block or a tool declaration) and merged into the outgoing payload when the
+ * message, a content part or a tool declaration) and merged into the outgoing payload when the
  * request is sent.
  *
  * <p>
@@ -25,23 +27,24 @@ import java.util.Objects;
  *
  * <p>
  * Instances are mutable: this is an accumulating bag, in the spirit of {@link Map}, not a value
- * object. The caller owns the instance and is responsible for populating it. A node that holds a
- * bag holds it by reference, so mutating a bag after attaching it changes the node it was attached
- * to; a bag that is meant to be shared between nodes should be copied explicitly. Instances are not
- * thread-safe.
+ * object. The caller owns the instance and is responsible for populating it. A node that carries a
+ * bag never shares it — each node creates its own — so content moves between bags by copying
+ * ({@link #putAll(ProviderExtras)}). Instances are not thread-safe.
  *
  * <p>
  * Values are kept by reference and are never copied when stored: mutating a stored value (a
  * collection, say) afterwards is visible to whoever reads the bag back, including the
  * serialization path.
  */
+@EqualsAndHashCode
 public class ProviderExtras {
 
     private static final char SEPARATOR = '.';
     private static final char ESCAPE = '\\';
 
     /**
-     * Flat storage. The key is the already-escaped path; values are opaque.
+     * Flat storage. The key is the already-escaped path; values are opaque. Not exposed: the key
+     * syntax is an implementation detail.
      */
     private final Map<String, Object> values = new LinkedHashMap<>();
 
@@ -160,23 +163,9 @@ public class ProviderExtras {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (obj == null || getClass() != obj.getClass()) {
-            return false;
-        }
-        return values.equals(((ProviderExtras) obj).values);
-    }
-
-    @Override
-    public int hashCode() {
-        return values.hashCode();
-    }
-
-    @Override
     public String toString() {
+        // Rendered as the nested view, which is what a reader wants; @ToString cannot produce it,
+        // because it always prints the member name next to the value.
         return "ProviderExtras" + toNestedMap();
     }
 
