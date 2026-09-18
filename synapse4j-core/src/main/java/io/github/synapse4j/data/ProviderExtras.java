@@ -87,6 +87,22 @@ public class ProviderExtras {
     }
 
     /**
+     * Removes the entry set at the given path.
+     *
+     * <p>
+     * Only that exact path goes: an entry set deeper (removing {@code a} while {@code a.b} is set) is
+     * a separate entry and stays. The two never coexist in the first place, because setting one while
+     * the other is present is rejected.
+     *
+     * @param path one or more path segments; must not be empty
+     * @return this bag
+     */
+    public ProviderExtras remove(String... path) {
+        values.remove(encode(path));
+        return this;
+    }
+
+    /**
      * Sets a value at a single-segment path, i.e. at the top level of the node, replacing any value
      * set there before.
      *

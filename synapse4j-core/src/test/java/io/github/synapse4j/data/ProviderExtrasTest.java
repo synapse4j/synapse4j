@@ -264,4 +264,68 @@ class ProviderExtrasTest {
         assertEquals("ProviderExtras{a={b=1}}", extras.toString());
     }
 
+    @Test
+    void removeDropsTheEntry() {
+        ProviderExtras extras = new ProviderExtras().put("a", 1);
+
+        assertSame(extras, extras.remove("a"));
+
+        assertTrue(extras.isEmpty());
+        assertFalse(extras.contains("a"));
+        assertNull(extras.get("a"));
+    }
+
+    @Test
+    void removeOfAnUnsetPathChangesNothing() {
+        ProviderExtras extras = new ProviderExtras().put("a", 1);
+
+        extras.remove("b");
+
+        assertEquals(1, extras.size());
+        assertEquals(1, extras.get("a"));
+    }
+
+    @Test
+    void removeTakesAPathOfSegments() {
+        ProviderExtras extras = new ProviderExtras().put(List.of("metadata", "trace_id"), "abc");
+
+        extras.remove("metadata", "trace_id");
+
+        assertTrue(extras.isEmpty());
+    }
+
+    @Test
+    void removeOnlyTouchesTheExactPath() {
+        ProviderExtras extras = new ProviderExtras().put(List.of("metadata", "trace_id"), "abc");
+
+        extras.remove("metadata");
+
+        assertEquals("abc", extras.get("metadata", "trace_id"));
+        assertEquals(1, extras.size());
+    }
+
+    @Test
+    void removeRejectsAnEmptyOrInvalidPath() {
+        ProviderExtras extras = new ProviderExtras().put("a", 1);
+
+        assertThrows(IllegalArgumentException.class, () -> extras.remove());
+        assertThrows(IllegalArgumentException.class, () -> extras.remove((String[]) null));
+        assertThrows(IllegalArgumentException.class, () -> extras.remove(""));
+        assertThrows(IllegalArgumentException.class, () -> extras.remove("a", null));
+
+        assertEquals(1, extras.size());
+    }
+
+    @Test
+    void copyingABagAndRemovingIsHowInheritedValuesAreDropped() {
+        ProviderExtras defaults = new ProviderExtras().put("service_tier", "flex").put("temperature", 1.0).put("top_p",
+                0.5);
+        ProviderExtras effective = new ProviderExtras().putAll(defaults);
+
+        effective.remove("service_tier").remove("top_p");
+
+        assertEquals(3, defaults.size());
+        assertEquals(Map.of("temperature", 1.0), effective.toNestedMap());
+    }
+
 }
