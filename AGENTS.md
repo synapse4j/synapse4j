@@ -114,15 +114,3 @@ one would block extension by users and providers.
 - Tests only: `mvn test`
 - There is no Maven wrapper; use `mvn` directly. Run Maven from the repository root: Spotless
   resolves its config file relative to the directory Maven was invoked from.
-
-## Known violations pending refactor
-
-The current implementation predates these principles and must be refactored to conform. Known items:
-
-- `JsonSchemaCodec.getJsonSchema` returns Jackson's `ObjectNode`, leaking a third-party type into
-  the public API (violates principle 1). The public schema contract should expose neutral types only
-  (for example `String`).
-- `SchemaGeneratorConfigBuilderCustomizer` exposes victools types in a public signature (violates
-  principle 1).
-
-Remove entries from this section once they are fixed, so the document does not go stale.
