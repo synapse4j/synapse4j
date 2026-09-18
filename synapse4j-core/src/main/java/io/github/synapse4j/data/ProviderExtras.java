@@ -26,6 +26,11 @@ import lombok.EqualsAndHashCode;
  * rejected, because the resulting structure would be ambiguous.
  *
  * <p>
+ * A path segment becomes a key of the outgoing object exactly as written: the caller spells the
+ * provider's own wire name, so nothing is renamed, case-converted or otherwise adapted to the shape
+ * of this library. The only structure the merge adds is the nesting the path describes.
+ *
+ * <p>
  * Instances are mutable: this is an accumulating bag, in the spirit of {@link Map}, not a value
  * object. The caller owns the instance and is responsible for populating it. A node that carries a
  * bag never shares it — each node creates its own — so content moves between bags by copying
