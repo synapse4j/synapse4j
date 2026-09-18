@@ -20,6 +20,7 @@ class ChatRequestTest {
 
         assertTrue(request.getMessages().isEmpty());
         assertTrue(request.getTools().isEmpty());
+        assertNull(request.getResponseFormat().getType());
         assertNull(request.getOptions().getModel());
         assertNull(request.getOptions().getTemperature());
     }
@@ -38,9 +39,10 @@ class ChatRequestTest {
     }
 
     @Test
-    void optionsCannotBeSetToNull() {
+    void responseFormatAndOptionsCannotBeSetToNull() {
         ChatRequest request = new ChatRequest();
 
+        assertThrows(NullPointerException.class, () -> request.setResponseFormat(null));
         assertThrows(NullPointerException.class, () -> request.setOptions(null));
     }
 
@@ -60,13 +62,16 @@ class ChatRequestTest {
         messages.add(new ChatMessage(ChatRole.USER, new ArrayList<>()));
         List<ToolDefinition> tools = new ArrayList<>();
         tools.add(new ToolDefinition("get_weather", "Looks up the weather", "{}"));
+        ChatResponseFormat responseFormat = new ChatResponseFormat();
+        responseFormat.setType(ChatResponseFormat.TYPE_JSON);
         ChatOptions options = new ChatOptions();
         options.setModel("gpt-4o");
 
-        ChatRequest request = new ChatRequest(messages, tools, options);
+        ChatRequest request = new ChatRequest(messages, tools, responseFormat, options);
 
         assertSame(messages, request.getMessages());
         assertSame(tools, request.getTools());
+        assertSame(responseFormat, request.getResponseFormat());
         assertSame(options, request.getOptions());
     }
 
@@ -87,6 +92,10 @@ class ChatRequestTest {
         two.getTools().clear();
 
         two.getOptions().setModel("gpt-4o");
+        assertNotEquals(one, two);
+        two.getOptions().setModel(null);
+
+        two.getResponseFormat().setType(ChatResponseFormat.TYPE_JSON);
         assertNotEquals(one, two);
     }
 

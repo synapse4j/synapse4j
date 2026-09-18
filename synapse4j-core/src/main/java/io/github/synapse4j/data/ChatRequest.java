@@ -9,7 +9,8 @@ import lombok.NoArgsConstructor;
 import lombok.NonNull;
 
 /**
- * One call: the conversation so far, what the model may call, and how to run it.
+ * One call: the conversation so far, what the model may call, the shape the answer should take, and
+ * how to run it.
  *
  * <p>
  * Nothing here is nullable and the collections start empty, so a caller fills in what it needs and
@@ -34,6 +35,10 @@ public class ChatRequest {
     /** Tools the model may call. Never {@code null}; empty means none. */
     @NonNull
     private List<ToolDefinition> tools = new ArrayList<>();
+
+    /** The shape the answer should take. Never {@code null}; with nothing set, nothing is asked. */
+    @NonNull
+    private ChatResponseFormat responseFormat = new ChatResponseFormat();
 
     /** How to run this call. Never {@code null}; with nothing set, the defaults stand. */
     @NonNull
