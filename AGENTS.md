@@ -102,6 +102,8 @@ one would block extension by users and providers.
   rather than from the profile. Import ordering is deliberately not enforced by either side.
 - **All comments are in English** — Javadoc (including on private members), inline comments and
   TODOs. Comments explain *why*; do not restate what the code does.
+- **Use Lombok instead of hand-writing boilerplate**, and only its stable annotations — nothing from
+  `lombok.experimental`.
 - Package names are `io.github.synapse4j.*`. Implementation classes live in a `.<vendor>` subpackage
   naming their technology origin (for example `...victools`, `...jackson`).
 
