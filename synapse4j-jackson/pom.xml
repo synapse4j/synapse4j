@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.github.synapse4j</groupId>
+    <artifactId>synapse4j-parent</artifactId>
+    <version>${revision}</version>
+  </parent>
+
+  <artifactId>synapse4j-jackson</artifactId>
+
+  <!-- The JSON codec that binds this library to Jackson and victools. Every dependency here is
+       declared as what it is — a direct one — rather than optional: a user who pulls this module in
+       is asking for Jackson, so nothing is hidden behind an opt-in that would leave the classes it
+       implements unusable. -->
+  <dependencies>
+    <dependency>
+      <groupId>io.github.synapse4j</groupId>
+      <artifactId>synapse4j-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.github.victools</groupId>
+      <artifactId>jsonschema-generator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.github.victools</groupId>
+      <artifactId>jsonschema-module-jackson</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>tools.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+</project>

@@ -18,16 +18,6 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>com.github.victools</groupId>
-      <artifactId>jsonschema-generator</artifactId>
-      <optional>true</optional>
-    </dependency>
-    <dependency>
-      <groupId>com.github.victools</groupId>
-      <artifactId>jsonschema-module-jackson</artifactId>
-      <optional>true</optional>
-    </dependency>
-    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>

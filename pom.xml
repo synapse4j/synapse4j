@@ -24,6 +24,7 @@
 
   <modules>
     <module>synapse4j-core</module>
+    <module>synapse4j-jackson</module>
   </modules>
 
   <dependencyManagement>
@@ -42,17 +43,11 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-      <!-- lombok is declared without a version in synapse4j-core, so it has to be managed here. -->
       <dependency>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
         <version>${lombok.version}</version>
       </dependency>
-      <!-- The library references Jackson directly (and will ship a Jackson-based codec module), so
-           its version is managed here rather than left to whatever victools happens to pull in.
-           victools' other transitive dependencies (classmate, slf4j) are deliberately not pinned:
-           they are internals of a dependency we do not own, and pinning them would mean chasing
-           victools' upgrades by hand. -->
       <dependency>
         <groupId>tools.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
