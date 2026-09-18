@@ -1,5 +1,8 @@
 package io.github.synapse4j.data;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import lombok.Data;
 import lombok.NonNull;
 
@@ -14,6 +17,10 @@ import lombok.NonNull;
  * <p>
  * Everything the provider may not report is nullable, and a field with nothing behind it stays
  * {@code null} rather than being filled with a guess.
+ *
+ * <p>
+ * Transport metadata stays out of {@link #getExtras()}: headers have their own field, so the open part
+ * holds only what came out of the response body.
  */
 @Data
 public class ChatResponse {
@@ -33,6 +40,12 @@ public class ChatResponse {
 
     /** The provider's identifier for this response, or {@code null} when it gives none. */
     private String id;
+
+    /**
+     * Headers the transport reported for this response — a request id, rate-limit counts — and empty
+     * when it exposed none. Filled by the adapter; an application has no business writing here.
+     */
+    private final Map<String, String> headers = new LinkedHashMap<>();
 
     /** Provider-specific fields of the response itself, as opposed to one of its parts. */
     private final ProviderExtras extras = new ProviderExtras();

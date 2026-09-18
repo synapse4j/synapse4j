@@ -20,6 +20,7 @@ class ChatResponseTest {
         assertNull(response.getUsage());
         assertNull(response.getModel());
         assertNull(response.getId());
+        assertTrue(response.getHeaders().isEmpty());
         assertTrue(response.getExtras().isEmpty());
     }
 
@@ -96,6 +97,10 @@ class ChatResponseTest {
         two.setId(null);
 
         two.getExtras().put("service_tier", "flex");
+        assertNotEquals(one, two);
+        two.getExtras().remove("service_tier");
+
+        two.getHeaders().put("x-request-id", "abc");
         assertNotEquals(one, two);
     }
 
