@@ -25,9 +25,9 @@ import io.github.synapse4j.exception.SynapseException;
  *
  * <p>
  * Implementations must be stateless and safe to share across threads. A request-level
- * {@link HttpRequest#getTimeout() timeout}, when set, overrides the implementation's default;
- * implementations need not support every feature a request can express and should say so rather
- * than silently ignore.
+ * {@link HttpRequest#getResponseTimeout() response timeout}, when set, overrides the implementation's
+ * default; implementations need not support every feature a request can express and should say so
+ * rather than silently ignore.
  */
 public interface HttpClient {
 

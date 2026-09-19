@@ -51,9 +51,11 @@ public class HttpRequest {
     private byte[] body;
 
     /**
-     * How long the whole exchange may take, or {@code null} to stand by the implementation's
-     * default. Covers connect and reading the response; it is not an idle-between-events timeout.
+     * How long to wait for the response to start arriving (its headers), measured by the
+     * implementation from when the request is sent. Does not bound reading the body — body stalls
+     * are the caller's or a higher layer's concern. {@code null} stands by the implementation's
+     * default.
      */
-    private Duration timeout;
+    private Duration responseTimeout;
 
 }
