@@ -38,6 +38,17 @@ class AbstractJsonCodecTest {
     }
 
     @Test
+    void readsAViewOverTheDocument() {
+        StubCodec codec = new StubCodec();
+        codec.decoded = Map.of("choices", List.of(Map.of("message", Map.of("content", "hi"))));
+
+        JsonView view = codec.decode("{}", JsonView.class);
+
+        assertEquals(Object.class, codec.decodedType);
+        assertEquals("hi", view.get("choices").get(0).get("message").get("content").asText());
+    }
+
+    @Test
     void handsEverythingElseToTheSubclass() {
         StubCodec codec = new StubCodec();
 

@@ -15,6 +15,11 @@ import java.util.Map;
  * its document form, so that is what gets written.
  *
  * <p>
+ * On the way in, {@link JsonView} gets its own branch: the document is decoded generically (any
+ * root) and wrapped, so callers navigate provider responses without each codec re-implementing the
+ * wrapping.
+ *
+ * <p>
  * A subclass implements the two hooks below and the two schema generators of {@link JsonCodec}.
  * Extending this class is a convenience, not a requirement: implementing {@link JsonCodec} directly is
  * equally valid — the special case above is then the implementer's to repeat, and an implementation
@@ -43,15 +48,21 @@ public abstract class AbstractJsonCodec implements JsonCodec {
      * {@inheritDoc}
      *
      * <p>
-     * Reading into {@link JsonSchema} reads the document it describes; anything else is handed to
-     * {@link #decodeValue(String, Type)} untouched. The check is on the type asked for rather than on
-     * the value, so a {@code JsonSchema} nested in a collection is read as the collection's element
-     * type would have it, not as a schema this method recognises.
+     * Reading into {@link JsonSchema} reads the document it describes; reading into {@link JsonView}
+     * reads the document generically (any root — object, array, or scalar) and hands the caller a
+     * null-safe view over it. Anything else is handed to {@link #decodeValue(String, Type)}
+     * untouched. The checks are on the type asked for rather than on the value, so a
+     * {@code JsonSchema} nested in a collection is read as the collection's element type would have
+     * it, not as a schema this method recognises. {@code JsonView} is a read-side type; passing one
+     * to {@link #encode(Object)} is not supported.
      */
     @Override
     public <T> T decode(String json, Type type) {
         if (JsonSchema.class.equals(type)) {
             return cast(JsonSchema.fromMap(decodeValue(json, Map.class)));
+        }
+        if (JsonView.class.equals(type)) {
+            return cast(JsonView.of(decodeValue(json, Object.class)));
         }
         return decodeValue(json, type);
     }
@@ -75,8 +86,8 @@ public abstract class AbstractJsonCodec implements JsonCodec {
     protected abstract <T> T decodeValue(String json, Type type);
 
     @SuppressWarnings("unchecked")
-    private static <T> T cast(JsonSchema schema) {
-        return (T) schema;
+    private static <T> T cast(Object value) {
+        return (T) value;
     }
 
 }
