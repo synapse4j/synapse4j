@@ -25,6 +25,7 @@
   <modules>
     <module>synapse4j-core</module>
     <module>synapse4j-jackson</module>
+    <module>synapse4j-http-jdk</module>
   </modules>
 
   <dependencyManagement>

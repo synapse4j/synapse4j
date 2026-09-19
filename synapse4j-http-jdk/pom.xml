@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.github.synapse4j</groupId>
+    <artifactId>synapse4j-parent</artifactId>
+    <version>${revision}</version>
+  </parent>
+
+  <artifactId>synapse4j-http-jdk</artifactId>
+
+  <!-- The HTTP transport built on the JDK's java.net.http.HttpClient, so that this module needs no
+       dependencies at all: a caller who does not want to pick an HTTP library gets one that ships
+       with the JDK. Socket-level configuration (connect timeout, executor, SSL, proxy) stays in
+       JDK-land and is reachable through the constructor that takes a pre-built delegate. -->
+  <dependencies>
+    <dependency>
+      <groupId>io.github.synapse4j</groupId>
+      <artifactId>synapse4j-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+</project>
