@@ -1,47 +1,73 @@
 package io.github.synapse4j.schema;
 
 import java.lang.reflect.Type;
-import java.util.Map;
 
 /**
- * Writes Java values as JSON text, reads JSON text back into Java values, and derives the
- * {@link JsonSchema} that says what shape that JSON has to have.
+ * Writes Java values as JSON text, reads JSON text back into Java values, and derives the schema of
+ * the JSON that crosses in either direction.
  *
  * <p>
- * Schema generation and binding live behind one interface on purpose. They have to agree: a schema
- * that describes a shape the binder does not produce is worse than no schema at all, and letting an
- * application mix a generator from one JSON ecosystem with a binder from another is exactly how that
- * happens. One implementation, one answer.
+ * A schema has a direction, because the two directions do not always describe the same JSON. A binder
+ * may write a property it cannot read back, and read one it never writes: a getter with no setter is
+ * written but not read, a property marked read-only is written but never read, one marked write-only
+ * is read but never written. So there are two methods, each named after the operation whose JSON it
+ * describes:
+ *
+ * <ul>
+ * <li>{@link #generateEncodeSchema(Type)} describes what {@link #encode(Object)} writes — the JSON
+ * this codec hands out;</li>
+ * <li>{@link #generateDecodeSchema(Type)} describes what {@link #decode(String, Type)} accepts — the
+ * JSON this codec takes in.</li>
+ * </ul>
+ *
+ * <p>
+ * A schema is only worth generating if it describes JSON the codec really moves, so both must be
+ * derived from the same settings that bind values, and neither may describe a property the codec does
+ * not move in that direction. Nothing here requires the two directions to agree: where a binder is
+ * asymmetric, a schema that claimed to describe both would be describing one of them wrongly.
  *
  * <p>
  * No JSON library appears in these signatures — only {@link Object}, {@link String}, {@link Type} and
- * this library's own {@link JsonSchema}. An implementation is where the dependency on Jackson, Gson
- * or whatever else belongs, and an application picks the implementation it wants by instantiating it.
+ * this library's own {@link JsonSchema}. An implementation is where the dependency on Jackson, Gson or
+ * whatever else belongs, and an application picks the implementation it wants by instantiating it.
  * Implementations are stateless and therefore shareable between threads.
  *
  * <p>
- * {@link #generateSchema(Type)} takes a {@link Type} rather than a {@link Class} so that a generic type
- * arrives with its type arguments — {@code List<Order>} has to describe an array of orders, not an
- * array of anything.
+ * {@link #generateDecodeSchema(Type)} takes a {@link Type} rather than a {@link Class} so that a
+ * generic type arrives with its type arguments: {@code List<Order>} has to describe an array of
+ * orders, not an array of anything.
  *
  * <p>
- * A schema and its JSON text are bridged through {@link JsonSchema#toMap()} and
- * {@link JsonSchema#fromMap(Map)} in the default methods below rather than through the codec's own
- * object binding. Keyword names are fixed by the JSON Schema specification, so they must not travel
- * through a codec's naming strategy: a codec configured for {@code snake_case} would silently turn
- * {@code additionalProperties} into {@code additional_properties} and the schema would stop meaning
- * anything. An implementation may override these two methods when it can do better directly, but it
- * then owes the same keyword names.
+ * {@link JsonSchema} is a value like any other here: {@link #encode(Object)} writes one as the JSON
+ * document it describes rather than as the fields of its class, and
+ * {@code decode(json, JsonSchema.class)} reads one back. {@link AbstractJsonCodec} takes care of that
+ * for an implementation; an implementation that does not extend it carries the same obligation.
  */
 public interface JsonCodec {
 
     /**
-     * Generates the schema that describes values of the given type.
+     * Generates the schema of the JSON that writing a value of the given type produces.
+     *
+     * <p>
+     * This is the schema to hand to whoever reads that JSON: a model being asked to call a tool whose
+     * result is this type, a client being told what a call returns.
      *
      * @param type the type to describe, type arguments included; must not be {@code null}
      * @return the schema; never {@code null}
      */
-    JsonSchema generateSchema(Type type);
+    JsonSchema generateEncodeSchema(Type type);
+
+    /**
+     * Generates the schema of the JSON that reading a value of the given type accepts.
+     *
+     * <p>
+     * This is the schema to hand to whoever produces that JSON: a model being asked for arguments to a
+     * tool taking this type, or for a structured response parsed into it.
+     *
+     * @param type the type to describe, type arguments included; must not be {@code null}
+     * @return the schema; never {@code null}
+     */
+    JsonSchema generateDecodeSchema(Type type);
 
     /**
      * Writes a value as JSON text.
@@ -60,26 +86,5 @@ public interface JsonCodec {
      * @return the value; may be {@code null}
      */
     <T> T decode(String json, Type type);
-
-    /**
-     * Writes a schema as JSON text.
-     *
-     * @param schema the schema to write; must not be {@code null}
-     * @return the JSON text; never {@code null}
-     */
-    default String encodeSchema(JsonSchema schema) {
-        return encode(schema.toMap());
-    }
-
-    /**
-     * Reads a schema from JSON text.
-     *
-     * @param json the JSON text to read; must not be {@code null}
-     * @return the schema; never {@code null}
-     */
-    @SuppressWarnings("unchecked")
-    default JsonSchema decodeSchema(String json) {
-        return JsonSchema.fromMap((Map<String, Object>) decode(json, Map.class));
-    }
 
 }
