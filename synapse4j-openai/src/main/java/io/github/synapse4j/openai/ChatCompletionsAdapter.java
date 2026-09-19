@@ -1,6 +1,7 @@
 package io.github.synapse4j.openai;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,20 +16,17 @@ import io.github.synapse4j.data.ToolDefinition;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.data.Usage;
 import io.github.synapse4j.exception.SynapseException;
-import io.github.synapse4j.openai.wire.ChatCompletionRequest;
-import io.github.synapse4j.openai.wire.ChatCompletionResponse;
-import io.github.synapse4j.openai.wire.Choice;
-import io.github.synapse4j.openai.wire.Message;
-import io.github.synapse4j.openai.wire.ResponseFormat;
-import io.github.synapse4j.openai.wire.Tool;
-import io.github.synapse4j.openai.wire.ToolCall;
-import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.core.JacksonException;
+import io.github.synapse4j.schema.JsonCodec;
+import io.github.synapse4j.schema.JsonView;
 
 /**
- * Translates between the shared chat model and the chat-completions wire model. Stateless; holds
- * only the mapper, for parsing schema strings into nodes.
+ * Translates between the shared chat model and the chat-completions wire document. Stateless; holds
+ * only the application's codec, for embedding schema strings as parsed maps.
+ *
+ * <p>
+ * The wire document is built as plain maps and lists with literal keys: a map key cannot be
+ * renamed by a codec's naming strategy and absent entries are never emitted, so the bytes that
+ * leave here are exactly the protocol's spelling regardless of which JSON library binds them.
  *
  * <p>
  * Part types this cut does not support (reasoning, media, ...) fail loudly here rather than being
@@ -36,53 +34,59 @@ import tools.jackson.core.JacksonException;
  */
 class ChatCompletionsAdapter {
 
-    private final JsonMapper mapper;
+    private final JsonCodec codec;
 
-    ChatCompletionsAdapter(JsonMapper mapper) {
-        this.mapper = mapper;
+    ChatCompletionsAdapter(JsonCodec codec) {
+        this.codec = codec;
     }
 
-    ChatCompletionRequest toWire(ChatRequest request) {
-        ChatCompletionRequest wire = new ChatCompletionRequest();
-        wire.setModel(request.getOptions().getModel());
-        List<Message> messages = new ArrayList<>();
+    Map<String, Object> toWire(ChatRequest request) {
+        Map<String, Object> wire = new LinkedHashMap<>();
+        wire.put("model", request.getOptions().getModel());
+        List<Object> messages = new ArrayList<>();
         for (ChatMessage message : request.getMessages()) {
             messages.addAll(toWireMessages(message));
         }
-        wire.setMessages(messages);
+        wire.put("messages", messages);
         if (!request.getTools().isEmpty()) {
-            wire.setTools(request.getTools().stream().map(this::toWireTool).toList());
+            wire.put("tools", request.getTools().stream().map(this::toWireTool).toList());
         }
-        wire.setTemperature(request.getOptions().getTemperature());
-        wire.setMaxTokens(request.getOptions().getMaxOutputTokens());
-        wire.setTopP(request.getOptions().getTopP());
-        wire.setResponseFormat(toWireResponseFormat(request.getResponseFormat()));
-        wire.getExtras().putAll(request.getOptions().getExtras().toNestedMap());
+        putIfNotNull(wire, "temperature", request.getOptions().getTemperature());
+        putIfNotNull(wire, "max_tokens", request.getOptions().getMaxOutputTokens());
+        putIfNotNull(wire, "top_p", request.getOptions().getTopP());
+        Map<String, Object> responseFormat = toWireResponseFormat(request.getResponseFormat());
+        if (responseFormat != null) {
+            wire.put("response_format", responseFormat);
+        }
+        wire.putAll(request.getOptions().getExtras().toNestedMap());
         return wire;
     }
 
-    ChatResponse fromWire(ChatCompletionResponse wire, Map<String, List<String>> httpHeaders) {
-        if (wire.getChoices() == null || wire.getChoices().isEmpty()) {
+    ChatResponse fromWire(JsonView root, Map<String, List<String>> httpHeaders) {
+        JsonView choices = root.get("choices");
+        if (!choices.isArray() || choices.size() == 0) {
             throw new SynapseException("OpenAI chat completion contained no choices");
         }
-        Choice choice = wire.getChoices().get(0);
+        JsonView choice = choices.get(0);
         ChatResponse response = new ChatResponse();
-        response.setId(wire.getId());
-        response.setModel(wire.getModel());
-        response.setFinishReason(choice.getFinishReason());
-        if (choice.getMessage() != null) {
-            response.getMessage().setRole(choice.getMessage().getRole());
-            fromWireContent(choice.getMessage().getContent(), response);
-            fromWireToolCalls(choice.getMessage().getToolCalls(), response);
+        response.setId(root.get("id").asText());
+        response.setModel(root.get("model").asText());
+        response.setFinishReason(choice.get("finish_reason").asText());
+        JsonView message = choice.get("message");
+        if (message.isObject()) {
+            response.getMessage().setRole(message.get("role").asText());
+            fromWireContent(message.get("content"), response);
+            fromWireToolCalls(message.get("tool_calls"), response);
         }
-        if (wire.getUsage() != null) {
-            response.setUsage(fromWireUsage(wire.getUsage()));
+        JsonView usage = root.get("usage");
+        if (usage.isObject()) {
+            response.setUsage(fromWireUsage(usage));
         }
         httpHeaders.forEach((name, values) -> response.getHeaders().put(name, String.join(", ", values)));
         return response;
     }
 
-    private List<Message> toWireMessages(ChatMessage message) {
+    private List<Map<String, Object>> toWireMessages(ChatMessage message) {
         boolean hasToolResult = message.getParts().stream().anyMatch(ToolResultPart.class::isInstance);
         if (hasToolResult) {
             if (!message.getParts().stream().allMatch(ToolResultPart.class::isInstance)) {
@@ -91,10 +95,10 @@ class ChatCompletionsAdapter {
             }
             return message.getParts().stream().map(part -> toWireToolResult((ToolResultPart) part)).toList();
         }
-        Message wire = new Message();
-        wire.setRole(message.getRole());
+        Map<String, Object> wire = new LinkedHashMap<>();
+        wire.put("role", message.getRole());
         StringBuilder text = new StringBuilder();
-        List<ToolCall> toolCalls = new ArrayList<>();
+        List<Object> toolCalls = new ArrayList<>();
         boolean arrayForm = false;
         for (ContentPart part : message.getParts()) {
             if (part instanceof TextPart textPart) {
@@ -109,131 +113,142 @@ class ChatCompletionsAdapter {
             }
         }
         if (arrayForm) {
-            List<io.github.synapse4j.openai.wire.ContentPart> content = new ArrayList<>();
+            List<Object> content = new ArrayList<>();
             if (text.length() > 0) {
-                io.github.synapse4j.openai.wire.ContentPart contentPart = new io.github.synapse4j.openai.wire.ContentPart();
-                contentPart.setType("text");
-                contentPart.setText(text.toString());
+                Map<String, Object> contentPart = new LinkedHashMap<>();
+                contentPart.put("type", "text");
+                contentPart.put("text", text.toString());
                 content.add(contentPart);
             }
-            wire.setContent(content);
+            wire.put("content", content);
         } else if (text.length() > 0) {
-            wire.setContent(text.toString());
+            wire.put("content", text.toString());
         }
         if (!toolCalls.isEmpty()) {
-            wire.setToolCalls(toolCalls);
+            wire.put("tool_calls", toolCalls);
         }
         return List.of(wire);
     }
 
-    private Message toWireToolResult(ToolResultPart result) {
-        Message wire = new Message();
-        wire.setRole("tool");
-        wire.setToolCallId(result.getCallId());
-        wire.setContent(textOf(result.getParts()));
+    private Map<String, Object> toWireToolResult(ToolResultPart result) {
+        Map<String, Object> wire = new LinkedHashMap<>();
+        wire.put("role", "tool");
+        wire.put("content", textOf(result.getParts()));
+        wire.put("tool_call_id", result.getCallId());
         return wire;
     }
 
-    private ToolCall toWireToolCall(ToolCallPart part) {
-        ToolCall wire = new ToolCall();
-        wire.setId(part.getCallId());
-        wire.setType("function");
-        ToolCall.Function function = new ToolCall.Function();
-        function.setName(part.getName());
-        function.setArguments(part.getArgumentsJson());
-        wire.setFunction(function);
+    private Map<String, Object> toWireToolCall(ToolCallPart part) {
+        Map<String, Object> function = new LinkedHashMap<>();
+        function.put("name", part.getName());
+        function.put("arguments", part.getArgumentsJson());
+        Map<String, Object> wire = new LinkedHashMap<>();
+        wire.put("id", part.getCallId());
+        wire.put("type", "function");
+        wire.put("function", function);
         return wire;
     }
 
-    private Tool toWireTool(ToolDefinition definition) {
-        Tool tool = new Tool();
-        tool.setType("function");
-        Tool.Function function = new Tool.Function();
-        function.setName(definition.getName());
-        function.setDescription(definition.getDescription());
-        function.setParameters(parseSchema(definition.getInputSchema()));
-        tool.setFunction(function);
-        return tool;
+    private Map<String, Object> toWireTool(ToolDefinition definition) {
+        Map<String, Object> function = new LinkedHashMap<>();
+        function.put("name", definition.getName());
+        function.put("description", definition.getDescription());
+        Map<String, Object> parameters = parseSchema(definition.getInputSchema());
+        if (parameters != null) {
+            function.put("parameters", parameters);
+        }
+        Map<String, Object> wire = new LinkedHashMap<>();
+        wire.put("type", "function");
+        wire.put("function", function);
+        return wire;
     }
 
-    private JsonNode parseSchema(String schema) {
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseSchema(String schema) {
         if (schema == null) {
             return null;
         }
         try {
-            return mapper.readTree(schema);
-        } catch (JacksonException e) {
+            return codec.decode(schema, Map.class);
+        } catch (RuntimeException e) {
             throw new SynapseException("tool input schema is not valid JSON", e);
         }
     }
 
-    private ResponseFormat toWireResponseFormat(ChatResponseFormat format) {
+    private Map<String, Object> toWireResponseFormat(ChatResponseFormat format) {
         if (format.getType() == null) {
             return null;
         }
+        Map<String, Object> wire = new LinkedHashMap<>();
         if (ChatResponseFormat.TYPE_JSON_SCHEMA.equals(format.getType())) {
-            ResponseFormat wire = new ResponseFormat();
-            wire.setType("json_schema");
+            wire.put("type", "json_schema");
             String name = format.getName() != null ? format.getName() : "response";
             // "strict" is deliberately not sent in this cut: it changes how strictly the provider
             // enforces the schema, and choosing that for the caller would be a silent behaviour
             // decision. It stays reachable through the format's extras.
-            ResponseFormat.JsonSchema jsonSchema = new ResponseFormat.JsonSchema();
-            jsonSchema.setName(name);
-            jsonSchema.setSchema(parseSchema(format.getSchema()));
-            wire.setJsonSchema(jsonSchema);
+            Map<String, Object> jsonSchema = new LinkedHashMap<>();
+            jsonSchema.put("name", name);
+            Map<String, Object> schema = parseSchema(format.getSchema());
+            if (schema != null) {
+                jsonSchema.put("schema", schema);
+            }
+            wire.put("json_schema", jsonSchema);
             return wire;
         }
-        ResponseFormat wire = new ResponseFormat();
-        wire.setType(ChatResponseFormat.TYPE_JSON.equals(format.getType()) ? "json_object" : format.getType());
+        wire.put("type", ChatResponseFormat.TYPE_JSON.equals(format.getType()) ? "json_object" : format.getType());
         return wire;
     }
 
-    private void fromWireContent(Object content, ChatResponse response) {
-        if (content == null) {
+    private void fromWireContent(JsonView content, ChatResponse response) {
+        if (content.isMissing() || content.isNull()) {
             return;
         }
-        if (content instanceof String text) {
+        if (content.isText()) {
+            String text = content.asText();
             if (!text.isEmpty()) {
                 response.getMessage().getParts().add(new TextPart(text));
             }
             return;
         }
-        if (content instanceof List<?> parts) {
-            for (Object part : parts) {
-                io.github.synapse4j.openai.wire.ContentPart wire = mapper.convertValue(part,
-                        io.github.synapse4j.openai.wire.ContentPart.class);
-                if (!"text".equals(wire.getType())) {
-                    throw new SynapseException(
-                            "unsupported content part in OpenAI response: " + wire.getType());
+        if (content.isArray()) {
+            for (JsonView part : content.elements()) {
+                String type = part.get("type").asText();
+                if (type == null) {
+                    // Not a typed part object — the previous binding cast blindly and died here.
+                    // An element with no type carries nothing mappable, so it is skipped.
+                    continue;
                 }
-                response.getMessage().getParts().add(new TextPart(wire.getText()));
+                if (!"text".equals(type)) {
+                    throw new SynapseException(
+                            "unsupported content part in OpenAI response: " + type);
+                }
+                response.getMessage().getParts().add(new TextPart(part.get("text").asText()));
             }
             return;
         }
-        throw new SynapseException(
-                "unsupported content shape in OpenAI response: " + content.getClass().getSimpleName());
+        throw new SynapseException("unsupported content shape in OpenAI response: " + describe(content));
     }
 
-    private void fromWireToolCalls(List<ToolCall> toolCalls, ChatResponse response) {
-        if (toolCalls == null) {
+    private void fromWireToolCalls(JsonView toolCalls, ChatResponse response) {
+        if (!toolCalls.isArray()) {
             return;
         }
-        for (ToolCall wire : toolCalls) {
-            response.getMessage().getParts().add(
-                    new ToolCallPart(wire.getId(), wire.getFunction().getName(),
-                            wire.getFunction().getArguments()));
+        for (JsonView call : toolCalls.elements()) {
+            JsonView function = call.get("function");
+            response.getMessage().getParts().add(new ToolCallPart(call.get("id").asText(),
+                    function.get("name").asText(), function.get("arguments").asText()));
         }
     }
 
-    private Usage fromWireUsage(io.github.synapse4j.openai.wire.Usage wire) {
-        Usage usage = new Usage();
-        usage.setInputTokens(wire.getPromptTokens());
-        usage.setOutputTokens(wire.getCompletionTokens());
-        if (wire.getPromptTokensDetails() != null) {
-            usage.setCachedInputTokens(wire.getPromptTokensDetails().getCachedTokens());
+    private Usage fromWireUsage(JsonView usage) {
+        Usage result = new Usage();
+        result.setInputTokens(asInteger(usage.get("prompt_tokens")));
+        result.setOutputTokens(asInteger(usage.get("completion_tokens")));
+        JsonView details = usage.get("prompt_tokens_details");
+        if (details.isObject()) {
+            result.setCachedInputTokens(asInteger(details.get("cached_tokens")));
         }
-        return usage;
+        return result;
     }
 
     private String textOf(List<ContentPart> parts) {
@@ -245,6 +260,27 @@ class ChatCompletionsAdapter {
             text.append(textPart.getText());
         }
         return text.toString();
+    }
+
+    private static void putIfNotNull(Map<String, Object> wire, String key, Object value) {
+        if (value != null) {
+            wire.put(key, value);
+        }
+    }
+
+    private static Integer asInteger(JsonView node) {
+        Long value = node.asLong();
+        return value == null ? null : value.intValue();
+    }
+
+    private static String describe(JsonView node) {
+        if (node.isNumber()) {
+            return "Number";
+        }
+        if (node.isBoolean()) {
+            return "Boolean";
+        }
+        return "unexpected";
     }
 
     private SynapseException unsupportedPart(ContentPart part) {

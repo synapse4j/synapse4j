@@ -28,13 +28,10 @@ import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpResponse;
-import io.github.synapse4j.schema.JsonCodec;
-import tools.jackson.core.JacksonException;
+import io.github.synapse4j.jackson.JacksonJsonCodec;
 import tools.jackson.databind.json.JsonMapper;
 
 class OpenAiChatClientTest {
-
-    private static final JsonMapper MAPPER = OpenAiJson.newMapper();
 
     /** Captures the outgoing request and replays a canned response. */
     static class StubHttpClient implements HttpClient {
@@ -49,37 +46,15 @@ class OpenAiChatClientTest {
         }
     }
 
-    /** Never used; the client under test must not touch it. */
-    static class NoopCodec implements JsonCodec {
-
-        @Override
-        public io.github.synapse4j.schema.JsonSchema generateEncodeSchema(java.lang.reflect.Type type) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public io.github.synapse4j.schema.JsonSchema generateDecodeSchema(java.lang.reflect.Type type) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public String encode(Object value) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public <T> T decode(String json, java.lang.reflect.Type type) {
-            throw new UnsupportedOperationException();
-        }
-    }
-
     private StubHttpClient stub;
+    private JacksonJsonCodec codec;
     private OpenAiChatClient client;
 
     @BeforeEach
     void setUp() {
         stub = new StubHttpClient();
-        client = new OpenAiChatClient(stub, new NoopCodec());
+        codec = new JacksonJsonCodec(JsonMapper.builder().build());
+        client = new OpenAiChatClient(stub, codec);
         OpenAiConfig config = new OpenAiConfig();
         config.setApiKey("sk-test");
         client.setConfig(config);
@@ -359,12 +334,11 @@ class OpenAiChatClientTest {
         assertEquals(List.of("yes"), stub.captured.getHeaders().get("X-Custom"));
     }
 
+    @SuppressWarnings("unchecked")
     private Map<String, Object> parseCaptured() {
         try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> wire = MAPPER.readerFor(Map.class).readValue(stub.captured.getBody());
-            return wire;
-        } catch (JacksonException e) {
+            return codec.decode(new String(stub.captured.getBody(), UTF_8), Map.class);
+        } catch (RuntimeException e) {
             throw new AssertionError("captured wire body is not JSON", e);
         }
     }

@@ -42,6 +42,12 @@ import java.lang.reflect.Type;
  * document it describes rather than as the fields of its class, and
  * {@code decode(json, JsonSchema.class)} reads one back. {@link AbstractJsonCodec} takes care of that
  * for an implementation; an implementation that does not extend it carries the same obligation.
+ *
+ * <p>
+ * Decoding has one more library-mandated target: {@code decode(json, JsonView.class)} must read any
+ * JSON document generically — object, array or scalar — into the null-safe {@link JsonView}, the way
+ * provider modules navigate responses. An implementation that extends {@link AbstractJsonCodec}
+ * gets this for free; a direct implementation of this interface carries the same obligation.
  */
 public interface JsonCodec {
 

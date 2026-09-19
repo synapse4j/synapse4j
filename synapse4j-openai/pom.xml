@@ -11,9 +11,9 @@
 
   <artifactId>synapse4j-openai</artifactId>
 
-  <!-- The OpenAI provider module. Protocol bytes go through the private Jackson owned here — never
-       through the application's JsonCodec — so the wire shape is fixed regardless of which JSON
-       library the application picked. -->
+  <!-- The OpenAI provider module. Protocol documents are plain Map/List structures bound by the
+       application's own JsonCodec — the module depends on no JSON library of its own. The codec
+       implementation is only needed by the tests. -->
   <dependencies>
     <dependency>
       <groupId>io.github.synapse4j</groupId>
@@ -21,8 +21,10 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>tools.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
+      <groupId>io.github.synapse4j</groupId>
+      <artifactId>synapse4j-jackson</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.projectlombok</groupId>
