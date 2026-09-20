@@ -11,6 +11,8 @@ provider chat and streaming.
 It is aimed at developers who want to assemble their own stack (pick the JSON library, pick the
 HTTP client, pick the provider) rather than be locked into a framework.
 
+Baseline: **Java 21**.
+
 ## Design principles
 
 These are hard constraints. When new code or a refactor conflicts with one of them, change the
@@ -39,7 +41,17 @@ Rationale: keep it lightweight and predictable; wiring stays in the caller's han
 - Do not abstract beyond what is needed. An abstraction should grow out of at least two real
   implementations rather than be designed up front.
 
-### 4. Stateless
+### 4. Efficient by default
+
+Where the other principles leave a choice, take the cheaper one: less memory, fewer intermediate
+representations, fewer passes over the same data. Do not materialize what can be passed through.
+
+It never outranks an earlier principle, and it shapes designs rather than inviting hand-tuning.
+
+Rationale: being lightweight and dependency-free is why someone may pick this library over a
+framework; efficiency is why it would be better.
+
+### 5. Stateless
 
 - The library does not store or persist conversation history, and holds no state across calls. Every
   call receives all of its input explicitly.
@@ -47,7 +59,7 @@ Rationale: keep it lightweight and predictable; wiring stays in the caller's han
   session id). The library only passes it through; it does not store it.
 - Corollary: implementations must be thread-safe and shareable.
 
-### 5. Provider-neutral
+### 6. Provider-neutral
 
 - The model exposed to users is unified and provider-neutral.
 - Protocol differences between providers (OpenAI chat completions / Responses, Anthropic messages,
@@ -56,7 +68,7 @@ Rationale: keep it lightweight and predictable; wiring stays in the caller's han
 - Fields that are not modeled — or not yet known — must be preservable and passable through. The
   library's own structures must never block them.
 
-### 6. Extensible core structures
+### 7. Extensible core structures
 
 - Data structures in this library **do not use `enum`, `record`, `final` classes** or other closed
   forms, so that users and providers can extend them.
@@ -68,17 +80,15 @@ Rationale: keep it lightweight and predictable; wiring stays in the caller's han
 Rationale: an `enum` cannot gain values; a `record` is final and cannot carry extra fields. Either
 one would block extension by users and providers.
 
-### 7. Streaming and non-streaming are equal citizens
+### 8. Streaming and non-streaming are equal citizens
 
 - Both are first-class.
 - They share one public request model; their results are modeled separately.
 
-### 8. No reactive libraries
+### 9. No reactive libraries
 
 - Asynchrony relies on JDK facilities (Java 21 virtual threads). Do not bind the library to Reactor,
   RxJava or similar.
-
-### 9. Baseline: Java 21
 
 ## Non-goals
 
