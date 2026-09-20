@@ -137,10 +137,10 @@ class OpenAiChatClientTest {
         assertEquals(Integer.valueOf(7), response.getUsage().getOutputTokens());
         assertEquals(Integer.valueOf(3), response.getUsage().getCachedInputTokens());
 
-        assertEquals(1700000000L, response.getExtras().get("created"));
+        assertEquals(1700000000, response.getExtras().get("created"));
         assertEquals("fp_1", response.getExtras().get("system_fingerprint"));
         // A choice-level field has no bag of its own, so it keeps the path it came from.
-        assertEquals(0L, response.getExtras().get("choices", "0", "index"));
+        assertEquals(0, response.getExtras().get("choices", "0", "index"));
         assertTrue(response.getExtras().contains("choices", "0", "logprobs"));
 
         assertEquals(List.of(Map.of("type", "url_citation")),
@@ -149,10 +149,10 @@ class OpenAiChatClientTest {
         // presence, since the value is null either way.
         assertTrue(response.getMessage().getExtras().contains("refusal"));
 
-        assertEquals(18L, response.getUsage().getExtras().get("total_tokens"));
-        assertEquals(Map.of("reasoning_tokens", 4L),
+        assertEquals(18, response.getUsage().getExtras().get("total_tokens"));
+        assertEquals(Map.of("reasoning_tokens", 4),
                 response.getUsage().getExtras().get("completion_tokens_details"));
-        assertEquals(2L, response.getUsage().getExtras().get("prompt_tokens_details", "audio_tokens"));
+        assertEquals(2, response.getUsage().getExtras().get("prompt_tokens_details", "audio_tokens"));
     }
 
     @Test

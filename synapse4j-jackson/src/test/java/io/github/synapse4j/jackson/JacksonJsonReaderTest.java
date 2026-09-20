@@ -123,21 +123,33 @@ class JacksonJsonReaderTest {
 
     @Test
     void capturesScalarsInTheShapeADecodedDocumentHas() {
-        JsonReader reader = codec.reader(source("[\"Ada\",3,2.5,9223372036854775808,true,false,null]"));
+        JsonReader reader = codec.reader(source(
+                "[\"Ada\",3,2147483647,2147483648,9223372036854775807,9223372036854775808,2.5,true,false,null]"));
 
         assertEquals(Token.START_ARRAY, reader.nextToken());
 
         assertEquals(Token.STRING, reader.nextToken());
         assertEquals("Ada", reader.captureValue());
 
+        // One of every shape an untyped document hands back, the whole numbers included: what each
+        // number becomes is pinned by the test below, and this one that all of them survive a walk.
         assertEquals(Token.NUMBER, reader.nextToken());
-        assertEquals(3L, reader.captureValue());
+        assertEquals(3, reader.captureValue());
 
         assertEquals(Token.NUMBER, reader.nextToken());
-        assertEquals(2.5, reader.captureValue());
+        assertEquals(2147483647, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(2147483648L, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(9223372036854775807L, reader.captureValue());
 
         assertEquals(Token.NUMBER, reader.nextToken());
         assertEquals(new BigInteger("9223372036854775808"), reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(2.5, reader.captureValue());
 
         assertEquals(Token.TRUE, reader.nextToken());
         assertEquals(Boolean.TRUE, reader.captureValue());
@@ -147,6 +159,95 @@ class JacksonJsonReaderTest {
 
         assertEquals(Token.NULL, reader.nextToken());
         assertNull(reader.captureValue());
+
+        assertEquals(Token.END_ARRAY, reader.nextToken());
+        assertEquals(Token.END_DOCUMENT, reader.nextToken());
+    }
+
+    @Test
+    void capturesAnObjectAndAnArrayWithNothingInThem() {
+        JsonReader reader = codec.reader(source("{\"empty\":{},\"list\":[],\"dup\":1,\"dup\":2}"));
+
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+
+        Object captured = reader.captureValue();
+
+        // A key the document wrote twice is there once, holding the last value it was given and
+        // keeping the place the first of them had.
+        assertEquals(Map.of("empty", Map.of(), "list", List.of(), "dup", 2), captured);
+        // Map equality ignores order, so the place the key kept is checked on its own.
+        assertIterableEquals(List.of("empty", "list", "dup"), ((Map<?, ?>) captured).keySet());
+    }
+
+    @Test
+    void capturesANumberInTheNarrowestTypeThatHoldsIt() {
+        JsonReader reader = codec.reader(source("[0,-0,999999999,1000000000,2147483647,-2147483648,"
+                + "2147483648,-2147483649,999999999999999999,1000000000000000000,9223372036854775807,"
+                + "-9223372036854775808,9223372036854775808,-9223372036854775809,2.5,1.0,1e2,1e309,1e-400]"));
+
+        assertEquals(Token.START_ARRAY, reader.nextToken());
+
+        // Up to nine digits an int holds whatever the digits say, and the tenth is where the value
+        // starts to decide — 1000000000 still fits, so it stays an int while the next one cannot.
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(0, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(0, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(999_999_999, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(1_000_000_000, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(Integer.MAX_VALUE, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(Integer.MIN_VALUE, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(2147483648L, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(-2147483649L, reader.captureValue());
+
+        // Nineteen digits is the same question one size up, and a long answers it as long as it fits.
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(999_999_999_999_999_999L, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(1_000_000_000_000_000_000L, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(Long.MAX_VALUE, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(Long.MIN_VALUE, reader.captureValue());
+
+        // Past that a number is kept as it was written rather than rounded into one that fits.
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(new BigInteger("9223372036854775808"), reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(new BigInteger("-9223372036854775809"), reader.captureValue());
+
+        // Anything spelled with a fraction or an exponent is a double, whatever it evaluates to.
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(2.5, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(1.0, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(100.0, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(Double.POSITIVE_INFINITY, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(0.0, reader.captureValue());
 
         assertEquals(Token.END_ARRAY, reader.nextToken());
         assertEquals(Token.END_DOCUMENT, reader.nextToken());
@@ -163,7 +264,7 @@ class JacksonJsonReaderTest {
 
         Object captured = reader.captureValue();
 
-        assertEquals(Map.of("b", 1L, "a", "two", "nested", Map.of("x", true)), captured);
+        assertEquals(Map.of("b", 1, "a", "two", "nested", Map.of("x", true)), captured);
         // Map equality ignores order, so the order the document wrote is checked on its own.
         assertIterableEquals(List.of("b", "a", "nested"), ((Map<?, ?>) captured).keySet());
 
@@ -179,8 +280,7 @@ class JacksonJsonReaderTest {
         assertEquals(Token.NAME, reader.nextToken());
         assertEquals(Token.START_ARRAY, reader.nextToken());
 
-        assertEquals(Arrays.asList(1L, "two", Map.of("three", 3L), List.of(4L), null),
-                reader.captureValue());
+        assertEquals(Arrays.asList(1, "two", Map.of("three", 3), List.of(4), null), reader.captureValue());
 
         assertEquals(Token.END_OBJECT, reader.nextToken());
         assertEquals(Token.END_DOCUMENT, reader.nextToken());
@@ -196,7 +296,7 @@ class JacksonJsonReaderTest {
         assertEquals("kept", reader.name());
         assertEquals(Token.START_OBJECT, reader.nextToken());
 
-        assertEquals(Map.of("deep", Arrays.asList(1L, Map.of("deeper", 2L))), reader.captureValue());
+        assertEquals(Map.of("deep", Arrays.asList(1, Map.of("deeper", 2))), reader.captureValue());
 
         // The whole subtree was consumed, so the walk resumes on what follows it.
         assertEquals(Token.NAME, reader.nextToken());
@@ -214,11 +314,11 @@ class JacksonJsonReaderTest {
         assertEquals(Token.START_OBJECT, reader.nextToken());
         assertEquals(Token.NAME, reader.nextToken());
         assertEquals(Token.NUMBER, reader.nextToken());
-        assertEquals(1L, reader.captureValue());
+        assertEquals(1, reader.captureValue());
         assertEquals(Token.NAME, reader.nextToken());
         assertEquals(Token.START_OBJECT, reader.nextToken());
 
-        assertEquals(Map.of("b", List.of(2L)), reader.captureValue());
+        assertEquals(Map.of("b", List.of(2)), reader.captureValue());
 
         assertEquals(Token.END_OBJECT, reader.nextToken());
         assertEquals(Token.END_DOCUMENT, reader.nextToken());
@@ -235,7 +335,7 @@ class JacksonJsonReaderTest {
         assertThrows(IllegalStateException.class, reader::captureValue);
 
         assertEquals(Token.NUMBER, reader.nextToken());
-        assertEquals(1L, reader.captureValue());
+        assertEquals(1, reader.captureValue());
 
         assertEquals(Token.END_OBJECT, reader.nextToken());
         assertThrows(IllegalStateException.class, reader::captureValue);
@@ -289,13 +389,102 @@ class JacksonJsonReaderTest {
     }
 
     @Test
+    void stringAnswersOnlyForTokensThatCarryText() {
+        JsonReader reader = codec.reader(source("{\"text\":\"value\",\"int\":7,\"float\":1e2,\"yes\":true,"
+                + "\"no\":false,\"none\":null,\"object\":{},\"array\":[]}"));
+
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+        assertNull(reader.string());
+
+        assertEquals(Token.NAME, reader.nextToken());
+        assertNull(reader.string());
+        assertEquals(Token.STRING, reader.nextToken());
+        assertEquals("value", reader.string());
+
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals("7", reader.string());
+
+        // A number answers with the form the document spelled, not with a re-rendering of the value.
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals("1e2", reader.string());
+
+        // Jackson's own getString() answers "true", "false", "{" and "[" on the tokens below — answers
+        // that read like text and cannot be told apart from a string that really carries it — so a
+        // token with no text of its own answers null here instead.
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals(Token.TRUE, reader.nextToken());
+        assertNull(reader.string());
+        assertTrue(reader.booleanValue());
+
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals(Token.FALSE, reader.nextToken());
+        assertNull(reader.string());
+
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals(Token.NULL, reader.nextToken());
+        assertNull(reader.string());
+
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+        assertNull(reader.string());
+        assertEquals(Token.END_OBJECT, reader.nextToken());
+        assertNull(reader.string());
+
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals(Token.START_ARRAY, reader.nextToken());
+        assertNull(reader.string());
+        assertEquals(Token.END_ARRAY, reader.nextToken());
+        assertNull(reader.string());
+
+        assertEquals(Token.END_OBJECT, reader.nextToken());
+        assertNull(reader.string());
+    }
+
+    @Test
+    void nameAnswersOnlyOnAPropertyName() {
+        JsonReader reader = codec.reader(source("{\"outer\":{\"inner\":1}}"));
+
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+        assertNull(reader.name());
+
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals("outer", reader.name());
+
+        // Jackson's currentName() goes on answering "outer" here and on every token until the next
+        // name, since it answers from where the parser is. This one answers from the token.
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+        assertNull(reader.name());
+
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals("inner", reader.name());
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertNull(reader.name());
+        assertEquals(1L, reader.longValue());
+        assertNull(reader.name());
+
+        assertEquals(Token.END_OBJECT, reader.nextToken());
+        assertNull(reader.name());
+        assertEquals(Token.END_OBJECT, reader.nextToken());
+        assertNull(reader.name());
+    }
+
+    @Test
     void aNumberTooLargeForALongIsNeverTruncated() {
         JsonReader reader = codec.reader(source("[9223372036854775808]"));
 
         assertEquals(Token.START_ARRAY, reader.nextToken());
         assertEquals(Token.NUMBER, reader.nextToken());
 
-        assertThrows(SynapseException.class, reader::longValue);
+        SynapseException failure = assertThrows(SynapseException.class, reader::longValue);
+
+        // The message says what was being done, and the cause Jackson reported carries the range and
+        // the value, so repeating either here would only be a second place to keep in step.
+        assertEquals("Reading the JSON document failed", failure.getMessage());
+        assertTrue(failure.getCause().getMessage().contains("9223372036854775808"));
+        // The number is still on the token, so a caller that wants its text can read it.
+        assertEquals("9223372036854775808", reader.string());
     }
 
     @Test
@@ -307,7 +496,10 @@ class JacksonJsonReaderTest {
         assertEquals(11L, reader.longValue());
 
         assertEquals(Token.NUMBER, reader.nextToken());
-        assertThrows(SynapseException.class, reader::longValue);
+
+        SynapseException failure = assertThrows(SynapseException.class, reader::longValue);
+
+        assertEquals("the number is not an integer: 11.5", failure.getMessage());
         assertEquals(11.5, reader.doubleValue());
     }
 

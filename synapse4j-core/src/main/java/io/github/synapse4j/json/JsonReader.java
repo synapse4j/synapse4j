@@ -160,9 +160,9 @@ public interface JsonReader extends AutoCloseable {
     /**
      * Reads the value the reader is positioned on — a scalar, or an object or array together with
      * everything under it — and returns it in the shape a decoded document has: a {@code Map} with
-     * its keys in document order, a {@code List}, a {@code String}, a {@code Long} — a
-     * {@code BigInteger} when it does not fit — a {@code Double}, a {@code Boolean}, or
-     * {@code null}.
+     * its keys in document order, a {@code List}, a {@code String}, a whole number as the narrowest
+     * of {@code Integer}, {@code Long} and {@code BigInteger} that holds it, anything else numeric as
+     * a {@code Double}, a {@code Boolean}, or {@code null}.
      *
      * <p>
      * This is how a caller keeps a value it does not model, where {@link #skipValue()} throws it

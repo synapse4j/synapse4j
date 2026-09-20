@@ -69,22 +69,37 @@ public abstract class AbstractJsonReader implements JsonReader {
     }
 
     /**
-     * Turns a number's text into the number it denotes, keeping whole numbers whole.
+     * Turns a number's text into the number it denotes: the narrowest integral type that holds a whole
+     * number, and a {@code Double} for anything else.
      *
      * <p>
-     * Whole numbers become a {@code Long}, or a {@link BigInteger} when they do not fit — a number
-     * this library never read into a field of its own is kept as the document spelled it rather than
-     * rounded into a {@code double}. Everything else becomes a {@code Double}.
+     * A whole number is classified by how many digits it is spelled with, which is how a JSON library
+     * decides the type to keep a number in: up to nine digits fits an {@code int} whatever it says, up
+     * to eighteen a {@code long} with the tenth checked against the {@code int} range, and a longer one
+     * is a {@code BigInteger} only when it is past the {@code long} range as well. Nothing here throws:
+     * a number too big for a {@code long} is still a number, and keeping it as one is the point.
      */
     private static Object captureNumber(String text) {
-        if (text.indexOf('.') < 0 && text.indexOf('e') < 0 && text.indexOf('E') < 0) {
-            try {
-                return Long.valueOf(text);
-            } catch (NumberFormatException doesNotFit) {
-                return new BigInteger(text);
-            }
+        if (text.indexOf('.') >= 0 || text.indexOf('e') >= 0 || text.indexOf('E') >= 0) {
+            return Double.valueOf(text);
         }
-        return Double.valueOf(text);
+        int digits = text.charAt(0) == '-' ? text.length() - 1 : text.length();
+        if (digits < 10) {
+            return Integer.valueOf(text);
+        }
+        if (digits < 19) {
+            long value = Long.parseLong(text);
+            if (value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE) {
+                return Integer.valueOf((int) value);
+            }
+            return Long.valueOf(value);
+        }
+        BigInteger whole = new BigInteger(text);
+        if (whole.compareTo(BigInteger.valueOf(Long.MIN_VALUE)) >= 0
+                && whole.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) <= 0) {
+            return Long.valueOf(whole.longValue());
+        }
+        return whole;
     }
 
 }
