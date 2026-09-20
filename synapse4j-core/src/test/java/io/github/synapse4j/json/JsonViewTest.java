@@ -1,4 +1,4 @@
-package io.github.synapse4j.schema;
+package io.github.synapse4j.json;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

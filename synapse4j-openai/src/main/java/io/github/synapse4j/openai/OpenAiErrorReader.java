@@ -1,8 +1,8 @@
 package io.github.synapse4j.openai;
 
 import io.github.synapse4j.exception.SynapseException;
-import io.github.synapse4j.schema.JsonCodec;
-import io.github.synapse4j.schema.JsonView;
+import io.github.synapse4j.json.JsonCodec;
+import io.github.synapse4j.json.JsonView;
 
 /**
  * Turns a non-2xx response body into the single {@code SynapseException} this module throws for any

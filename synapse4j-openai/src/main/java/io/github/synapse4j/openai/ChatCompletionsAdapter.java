@@ -16,8 +16,8 @@ import io.github.synapse4j.data.ToolDefinition;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.data.Usage;
 import io.github.synapse4j.exception.SynapseException;
-import io.github.synapse4j.schema.JsonCodec;
-import io.github.synapse4j.schema.JsonView;
+import io.github.synapse4j.json.JsonCodec;
+import io.github.synapse4j.json.JsonView;
 
 /**
  * Translates between the shared chat model and the chat-completions wire document. Stateless; holds

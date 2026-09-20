@@ -16,8 +16,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.github.victools.jsonschema.generator.SchemaGenerator;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 
-import io.github.synapse4j.schema.JsonSchema;
-import io.github.synapse4j.schema.JsonView;
+import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonView;
 import lombok.Data;
 import org.junit.jupiter.api.Test;
 import tools.jackson.core.type.TypeReference;

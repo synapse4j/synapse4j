@@ -1,4 +1,4 @@
-package io.github.synapse4j.schema;
+package io.github.synapse4j.json;
 
 import java.util.Iterator;
 import java.util.List;

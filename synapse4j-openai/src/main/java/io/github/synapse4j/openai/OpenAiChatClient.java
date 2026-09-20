@@ -10,8 +10,8 @@ import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.HttpClient;
-import io.github.synapse4j.schema.JsonCodec;
-import io.github.synapse4j.schema.JsonView;
+import io.github.synapse4j.json.JsonCodec;
+import io.github.synapse4j.json.JsonView;
 
 /**
  * The OpenAI chat-completions client: speaks {@code POST /chat/completions} and answers in the
