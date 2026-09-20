@@ -70,10 +70,12 @@ framework; efficiency is why it would be better.
 
 ### 7. Extensible core structures
 
-- Data structures in this library **do not use `enum`, `record`, `final` classes** or other closed
-  forms, so that users and providers can extend them.
-- This is a deliberate exception to idiomatic Java 21. Do not "tidy up" a `record` or `enum` back
-  into the code.
+- Structures that users or providers extend **do not use `enum`, `record`, `final` classes** or
+  other closed forms.
+- A closed form is allowed where the set is fixed by a specification and nothing extends it — the
+  token kinds a JSON reader returns, for instance. Say why where it is defined.
+- This is a deliberate exception to idiomatic Java 21. Do not "tidy up" an extensible structure into
+  a `record` or an `enum`.
 - Values known to grow (role, finish reason, ...) are expressed as `String` plus `static final`
   constants.
 
