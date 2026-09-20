@@ -1,5 +1,7 @@
 package io.github.synapse4j.jackson;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Type;
 import java.util.Map;
 import java.util.Objects;
@@ -7,7 +9,12 @@ import java.util.Objects;
 import com.github.victools.jsonschema.generator.SchemaGenerator;
 
 import io.github.synapse4j.json.AbstractJsonCodec;
+import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonWriter;
+import tools.jackson.core.StreamReadFeature;
+import tools.jackson.core.StreamWriteFeature;
+import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -28,6 +35,12 @@ import tools.jackson.databind.node.ObjectNode;
  * {@link #JacksonJsonCodec(JsonMapper, SchemaGenerator, SchemaGenerator)}.
  *
  * <p>
+ * The token-level {@link JsonWriter} and {@link JsonReader} are built on a factory derived from the
+ * same mapper's, so a document written or read token by token is parsed and encoded under the same
+ * features as one bound through the mapper — only the two auto-close features differ, and
+ * deliberately so.
+ *
+ * <p>
  * Every dependency on Jackson and victools lives here, not in the core: the codec is the module's whole
  * reason to exist, and an application that wants another JSON library implements
  * {@link io.github.synapse4j.json.JsonCodec} against a module of its own instead. Instances hold no
@@ -41,6 +54,19 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
     private final SchemaGenerator encodeSchemaGenerator;
 
     private final SchemaGenerator decodeSchemaGenerator;
+
+    /**
+     * The factory the token-level writer and reader come from: the mapper's own, with the two
+     * auto-close features turned off.
+     *
+     * <p>
+     * The sink and the source belong to the caller of {@link #writer(OutputStream)} and
+     * {@link #reader(InputStream)}, so neither adapter may close them — and since a
+     * {@code JsonParser} has no per-instance configuration, the factory is the only place the setting
+     * can be made. The mapper's factory is rebuilt rather than configured in place, so a mapper the
+     * application passed in is left as it was.
+     */
+    private final JsonFactory tokenStreamFactory;
 
     /**
      * Creates a codec with a default mapper and generators over it.
@@ -80,6 +106,21 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
                 .requireNonNull(encodeSchemaGenerator, "encodeSchemaGenerator must not be null");
         this.decodeSchemaGenerator = Objects
                 .requireNonNull(decodeSchemaGenerator, "decodeSchemaGenerator must not be null");
+        this.tokenStreamFactory = jsonMapper.tokenStreamFactory()
+                .rebuild()
+                .disable(StreamReadFeature.AUTO_CLOSE_SOURCE)
+                .disable(StreamWriteFeature.AUTO_CLOSE_TARGET)
+                .build();
+    }
+
+    @Override
+    public JsonWriter writer(OutputStream out) {
+        return JacksonJsonWriter.open(tokenStreamFactory, out);
+    }
+
+    @Override
+    public JsonReader reader(InputStream in) {
+        return JacksonJsonReader.open(tokenStreamFactory, in);
     }
 
     @Override

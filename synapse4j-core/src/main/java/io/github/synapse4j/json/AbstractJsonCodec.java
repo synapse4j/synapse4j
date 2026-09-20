@@ -4,26 +4,15 @@ import java.lang.reflect.Type;
 import java.util.Map;
 
 /**
- * A {@link JsonCodec} that leaves the binding itself to a subclass, and takes care of the types of
- * this library whose document form is not the shape of their class.
+ * A {@link JsonCodec} that leaves the binding itself to a subclass and takes care of this library's
+ * own types in both directions — the ones whose document form is not the shape of their class.
  *
  * <p>
- * Today that is one type: {@link JsonSchema}. Written as the class it is, a schema would come out with
- * the wrong keywords — {@code enumValues} instead of {@code enum}, {@code defs} instead of
- * {@code $defs}, an {@code extras} object standing where its keywords belong — and nothing would fail
- * loudly: the document would parse, be sent, and mean something else. {@link JsonSchema#toMap()} is
- * its document form, so that is what gets written.
- *
- * <p>
- * On the way in, {@link JsonView} gets its own branch: the document is decoded generically (any
- * root) and wrapped, so callers navigate provider responses without each codec re-implementing the
- * wrapping.
- *
- * <p>
- * A subclass implements the two hooks below and the two schema generators of {@link JsonCodec}.
- * Extending this class is a convenience, not a requirement: implementing {@link JsonCodec} directly is
- * equally valid — the special case above is then the implementer's to repeat, and an implementation
- * that gets it wrong fails silently, which is why this class exists.
+ * A subclass implements the hooks below and the parts of {@link JsonCodec} that only the JSON library
+ * can supply: binding a value, and opening a writer or a reader. Extending this class is a
+ * convenience, not a requirement: implementing {@link JsonCodec} directly is equally valid — those
+ * types are then the implementer's to handle, and getting them wrong fails silently rather than
+ * loudly, which is why this class exists.
  *
  * <p>
  * Nothing here is final. A subclass that has another type to treat specially can override

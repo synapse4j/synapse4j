@@ -31,8 +31,7 @@ import io.github.synapse4j.exception.SynapseIOException;
  * A failure of the sink is a {@link SynapseIOException} whose cause is the original
  * {@link IOException}: one family to catch, with the transport detail still there for whoever needs
  * it. Whether the tokens written form a well-formed document is not something this interface
- * requires an implementation to check; one that does check reports a violation as an
- * {@link IllegalStateException}, which is the caller's bug rather than a broken transport.
+ * requires an implementation to check.
  */
 public interface JsonWriter extends Flushable, AutoCloseable {
 

@@ -1,10 +1,13 @@
 package io.github.synapse4j.json;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Type;
 
 /**
- * Writes Java values as JSON text, reads JSON text back into Java values, and derives the schema of
- * the JSON that crosses in either direction.
+ * Writes Java values as JSON text, reads JSON text back into Java values, derives the schema of the
+ * JSON that crosses in either direction, and opens the writer and reader that move a document token
+ * by token instead of building it.
  *
  * <p>
  * A schema has a direction, because the two directions do not always describe the same JSON. A binder
@@ -27,10 +30,10 @@ import java.lang.reflect.Type;
  * asymmetric, a schema that claimed to describe both would be describing one of them wrongly.
  *
  * <p>
- * No JSON library appears in these signatures — only {@link Object}, {@link String}, {@link Type} and
- * this library's own {@link JsonSchema}. An implementation is where the dependency on Jackson, Gson or
- * whatever else belongs, and an application picks the implementation it wants by instantiating it.
- * Implementations are stateless and therefore shareable between threads.
+ * No JSON library appears in these signatures — only JDK types and types owned by this library. An
+ * implementation is where the dependency on Jackson, Gson or whatever else belongs, and an
+ * application picks the implementation it wants by instantiating it. The codec itself is stateless
+ * and therefore shareable between threads; the writers and readers it opens are not.
  *
  * <p>
  * {@link #generateDecodeSchema(Type)} takes a {@link Type} rather than a {@link Class} so that a
@@ -92,5 +95,40 @@ public interface JsonCodec {
      * @return the value; may be {@code null}
      */
     <T> T decode(String json, Type type);
+
+    /**
+     * Opens a writer that puts one JSON document into the given sink.
+     *
+     * <p>
+     * This is how a provider module sends a request without building it first: the document is
+     * written token by token, so the payload is held once rather than three times over. The returned
+     * writer carries one document and belongs to one thread — unlike this codec, it is not
+     * shareable.
+     *
+     * <p>
+     * The sink belongs to the caller: closing the writer releases its own buffers and never closes
+     * the sink.
+     *
+     * @param out the sink to write to; must not be {@code null}
+     * @return a writer bound to it; never {@code null}
+     */
+    JsonWriter writer(OutputStream out);
+
+    /**
+     * Opens a reader that takes one JSON document from the given source.
+     *
+     * <p>
+     * The counterpart of {@link #writer(OutputStream)}: a response is walked token by token, so
+     * nothing is built that the caller does not ask for. The returned reader carries one document
+     * and belongs to one thread — unlike this codec, it is not shareable.
+     *
+     * <p>
+     * The source belongs to the caller: closing the reader releases its own buffers and never closes
+     * the source.
+     *
+     * @param in the source to read from; must not be {@code null}
+     * @return a reader bound to it; never {@code null}
+     */
+    JsonReader reader(InputStream in);
 
 }

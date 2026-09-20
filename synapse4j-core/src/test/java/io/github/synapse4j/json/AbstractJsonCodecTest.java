@@ -3,6 +3,8 @@ package io.github.synapse4j.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
@@ -103,6 +105,19 @@ class AbstractJsonCodecTest {
         protected <T> T decodeValue(String json, Type type) {
             this.decodedType = type;
             return (T) decoded;
+        }
+
+        // The streaming side is the library's business, not this class's: a codec over a JSON library
+        // supplies it, and these tests are about the special cases above.
+
+        @Override
+        public JsonWriter writer(OutputStream out) {
+            throw new UnsupportedOperationException("these tests never write a document");
+        }
+
+        @Override
+        public JsonReader reader(InputStream in) {
+            throw new UnsupportedOperationException("these tests never read a document");
         }
 
     }

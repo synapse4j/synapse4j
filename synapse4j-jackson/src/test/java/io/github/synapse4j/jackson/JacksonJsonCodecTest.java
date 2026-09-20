@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +20,7 @@ import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonView;
+import io.github.synapse4j.json.JsonWriter;
 import lombok.Data;
 import org.junit.jupiter.api.Test;
 import tools.jackson.core.type.TypeReference;
@@ -146,6 +149,25 @@ class JacksonJsonCodecTest {
         assertEquals(2, order.getQuantity());
         assertEquals("Hangzhou", order.getShipTo().getCity());
         assertEquals(Map.of("channel", "web"), order.getLabels());
+    }
+
+    @Test
+    void writesADocumentTokenByTokenAndReadsItBack() {
+        ByteArrayOutputStream sink = new ByteArrayOutputStream();
+
+        JsonWriter writer = codec.writer(sink);
+        writer.writeStartObject()
+                .writeName("id").writeString("a-1")
+                .writeName("quantity").writeNumber(2)
+                .writeName("shipTo").writeStartObject().writeName("city").writeString("Hangzhou").writeEndObject()
+                .writeEndObject();
+        writer.close();
+
+        Order order = codec.decode(sink.toString(StandardCharsets.UTF_8), Order.class);
+
+        assertEquals("a-1", order.getId());
+        assertEquals(2, order.getQuantity());
+        assertEquals("Hangzhou", order.getShipTo().getCity());
     }
 
     @Test
