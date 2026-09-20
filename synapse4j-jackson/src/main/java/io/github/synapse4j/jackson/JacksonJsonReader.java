@@ -2,11 +2,13 @@ package io.github.synapse4j.jackson;
 
 import java.io.InputStream;
 import java.io.Writer;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.function.Supplier;
 
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
+import io.github.synapse4j.json.AbstractJsonReader;
 import io.github.synapse4j.json.JsonReader;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -34,9 +36,16 @@ import tools.jackson.core.json.JsonFactory;
  * wrong answer.
  */
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-class JacksonJsonReader implements JsonReader {
+class JacksonJsonReader extends AbstractJsonReader {
 
     private final JsonParser parser;
+
+    /**
+     * The token the last {@link #nextToken()} answered with, which is what {@link #token()} returns.
+     * Kept here rather than asked of the parser, because Jackson reports the same {@code null} both
+     * before a document starts and after it has ended.
+     */
+    private Token current;
 
     /**
      * Opens a reader over the given source.
@@ -54,7 +63,13 @@ class JacksonJsonReader implements JsonReader {
 
     @Override
     public Token nextToken() {
-        return toToken(read(parser::nextToken));
+        this.current = toToken(read(parser::nextToken));
+        return current;
+    }
+
+    @Override
+    public Token token() {
+        return current;
     }
 
     @Override
@@ -74,8 +89,18 @@ class JacksonJsonReader implements JsonReader {
 
     @Override
     public long longValue() {
-        require("longValue()", JsonToken.VALUE_NUMBER_INT);
-        return read(parser::getLongValue);
+        require("longValue()", JsonToken.VALUE_NUMBER_INT, JsonToken.VALUE_NUMBER_FLOAT);
+        if (parser.currentToken() == JsonToken.VALUE_NUMBER_INT) {
+            return read(parser::getLongValue);
+        }
+        // A number spelled with a fraction can still be whole — "11.0" is the number eleven — so it
+        // is read exactly when it is, and refused as a failed read, not as a misuse, when it is not.
+        String text = read(parser::getString);
+        try {
+            return new BigDecimal(text).longValueExact();
+        } catch (ArithmeticException notWhole) {
+            throw new SynapseException("the number is not an integer: " + text);
+        }
     }
 
     @Override

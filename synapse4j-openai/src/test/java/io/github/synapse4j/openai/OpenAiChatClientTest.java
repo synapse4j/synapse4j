@@ -113,6 +113,122 @@ class OpenAiChatClientTest {
     }
 
     @Test
+    void unknownFieldsAreKeptOnTheNodeTheyCameFrom() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-2\",\"model\":\"gpt-test\","
+                + "\"created\":1700000000,\"system_fingerprint\":\"fp_1\","
+                + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"logprobs\":null,"
+                + "\"message\":{\"role\":\"assistant\",\"content\":\"Hi\",\"refusal\":null,"
+                + "\"annotations\":[{\"type\":\"url_citation\"}]}}],"
+                + "\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7,\"total_tokens\":18,"
+                + "\"completion_tokens_details\":{\"reasoning_tokens\":4},"
+                + "\"prompt_tokens_details\":{\"cached_tokens\":3,\"audio_tokens\":2}}}").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        ChatResponse response = client.chat(request);
+
+        // What the module still models is set as before.
+        assertEquals("chatcmpl-2", response.getId());
+        assertEquals("gpt-test", response.getModel());
+        assertEquals(ChatFinishReason.STOP, response.getFinishReason());
+        assertEquals(Integer.valueOf(11), response.getUsage().getInputTokens());
+        assertEquals(Integer.valueOf(7), response.getUsage().getOutputTokens());
+        assertEquals(Integer.valueOf(3), response.getUsage().getCachedInputTokens());
+
+        assertEquals(1700000000L, response.getExtras().get("created"));
+        assertEquals("fp_1", response.getExtras().get("system_fingerprint"));
+        // A choice-level field has no bag of its own, so it keeps the path it came from.
+        assertEquals(0L, response.getExtras().get("choices", "0", "index"));
+        assertTrue(response.getExtras().contains("choices", "0", "logprobs"));
+
+        assertEquals(List.of(Map.of("type", "url_citation")),
+                response.getMessage().getExtras().get("annotations"));
+        // A field whose value is JSON null is captured too; there is nothing to assert beyond its
+        // presence, since the value is null either way.
+        assertTrue(response.getMessage().getExtras().contains("refusal"));
+
+        assertEquals(18L, response.getUsage().getExtras().get("total_tokens"));
+        assertEquals(Map.of("reasoning_tokens", 4L),
+                response.getUsage().getExtras().get("completion_tokens_details"));
+        assertEquals(2L, response.getUsage().getExtras().get("prompt_tokens_details", "audio_tokens"));
+    }
+
+    @Test
+    void anUnknownFieldOfAContentPartStaysOnThatPart() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
+                + "\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"hi\","
+                + "\"annotations\":[{\"type\":\"url_citation\"}]}]}}]}").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        ChatResponse response = client.chat(request);
+
+        assertEquals(1, response.getMessage().getParts().size());
+        TextPart part = assertInstanceOf(TextPart.class, response.getMessage().getParts().get(0));
+        assertEquals("hi", part.getText());
+        assertEquals(List.of(Map.of("type", "url_citation")), part.getExtras().get("annotations"));
+    }
+
+    @Test
+    void theFirstChoiceIsReadAndAFurtherChoiceIsSkipped() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-3\",\"model\":\"gpt-test\","
+                + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
+                + "\"content\":\"first\"}},{\"index\":1,\"finish_reason\":\"length\","
+                + "\"message\":{\"role\":\"assistant\",\"content\":\"second\"}}],"
+                + "\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2}}").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        ChatResponse response = client.chat(request);
+
+        assertEquals(1, response.getMessage().getParts().size());
+        assertEquals("first", assertInstanceOf(TextPart.class, response.getMessage().getParts().get(0)).getText());
+        assertEquals(ChatFinishReason.STOP, response.getFinishReason());
+        assertFalse(response.getExtras().contains("choices", "1", "index"));
+        // The fields after the skipped choice were still read, so the walk stayed in step.
+        assertEquals(Integer.valueOf(1), response.getUsage().getInputTokens());
+        assertEquals(Integer.valueOf(2), response.getUsage().getOutputTokens());
+    }
+
+    @Test
+    void responseHeadersAreCopiedOntoTheResponse() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setHeaders(Map.of("x-request-id", List.of("req_1"), "Retry-After", List.of("1", "2")));
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
+                        + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        ChatResponse response = client.chat(request);
+
+        assertEquals("req_1", response.getHeaders().get("x-request-id"));
+        // One value per name in the shared model, so several values of a header are joined.
+        assertEquals("1, 2", response.getHeaders().get("Retry-After"));
+    }
+
+    @Test
+    void anUnsupportedContentPartInTheResponseFailsLoudly() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
+                + "\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"visible\"},"
+                + "{\"type\":\"audio\",\"id\":\"a_1\"}]}}]}").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
+        assertTrue(thrown.getMessage().contains("audio"), thrown.getMessage());
+    }
+
+    @Test
     void toolDefinitionsGoOutAndToolCallsComeBack() throws Exception {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,"
@@ -153,6 +269,8 @@ class OpenAiChatClientTest {
         assertEquals("call_1", call.getCallId());
         assertEquals("get_weather", call.getName());
         assertEquals("{\"city\":\"Paris\"}", call.getArgumentsJson());
+        // "type" is not modelled on a tool call and stays on it rather than being dropped.
+        assertEquals("function", call.getExtras().get("type"));
     }
 
     @Test
@@ -334,7 +452,6 @@ class OpenAiChatClientTest {
         assertEquals(List.of("yes"), stub.captured.getHeaders().get("X-Custom"));
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> parseCaptured() {
         try {
             return codec.decode(new String(stub.captured.getBody(), UTF_8), Map.class);

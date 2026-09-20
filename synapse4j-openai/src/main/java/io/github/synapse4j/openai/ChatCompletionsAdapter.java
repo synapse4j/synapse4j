@@ -10,6 +10,7 @@ import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolDefinition;
@@ -17,7 +18,9 @@ import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.data.Usage;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
-import io.github.synapse4j.json.JsonView;
+import io.github.synapse4j.json.JsonReader;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Translates between the shared chat model and the chat-completions wire document. Stateless; holds
@@ -29,16 +32,19 @@ import io.github.synapse4j.json.JsonView;
  * leave here are exactly the protocol's spelling regardless of which JSON library binds them.
  *
  * <p>
+ * Responses are read token by token through {@link JsonReader} rather than decoded into a tree: the
+ * fields this module models are mapped as they go by, and the ones it does not are captured into the
+ * extras bag of the node they belong to, under the path they came from. So a field the provider adds
+ * is neither dropped nor able to break the parse, and the body is decoded once instead of twice.
+ *
+ * <p>
  * Part types this cut does not support (reasoning, media, ...) fail loudly here rather than being
  * dropped: a request that arrived at the provider incomplete would look like success from above.
  */
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class ChatCompletionsAdapter {
 
     private final JsonCodec codec;
-
-    ChatCompletionsAdapter(JsonCodec codec) {
-        this.codec = codec;
-    }
 
     Map<String, Object> toWire(ChatRequest request) {
         Map<String, Object> wire = new LinkedHashMap<>();
@@ -62,28 +68,228 @@ class ChatCompletionsAdapter {
         return wire;
     }
 
-    ChatResponse fromWire(JsonView root, Map<String, List<String>> httpHeaders) {
-        JsonView choices = root.get("choices");
-        if (!choices.isArray() || choices.size() == 0) {
-            throw new SynapseException("OpenAI chat completion contained no choices");
+    /**
+     * Builds the shared response from the wire document the reader is positioned on. Every field
+     * this module does not model is kept rather than dropped: it goes into the extras bag of the node
+     * it belongs to, under the path it came from.
+     *
+     * @param reader      the reader, before its first token; the caller owns it
+     * @param httpHeaders the response headers, copied onto the response
+     * @return the response
+     */
+    ChatResponse fromWire(JsonReader reader, Map<String, List<String>> httpHeaders) {
+        if (reader.nextToken() != JsonReader.Token.START_OBJECT) {
+            throw new SynapseException("OpenAI chat completion was not a JSON object");
         }
-        JsonView choice = choices.get(0);
         ChatResponse response = new ChatResponse();
-        response.setId(root.get("id").asText());
-        response.setModel(root.get("model").asText());
-        response.setFinishReason(choice.get("finish_reason").asText());
-        JsonView message = choice.get("message");
-        if (message.isObject()) {
-            response.getMessage().setRole(message.get("role").asText());
-            fromWireContent(message.get("content"), response);
-            fromWireToolCalls(message.get("tool_calls"), response);
+        boolean choicesRead = false;
+        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
+            String field = reader.name();
+            reader.nextToken();
+            switch (field) {
+                case "id" -> response.setId(reader.string());
+                case "model" -> response.setModel(reader.string());
+                case "choices" -> {
+                    readChoices(reader, response);
+                    choicesRead = true;
+                }
+                case "usage" -> readUsage(reader, response);
+                default -> response.getExtras().put(field, reader.captureValue());
+            }
         }
-        JsonView usage = root.get("usage");
-        if (usage.isObject()) {
-            response.setUsage(fromWireUsage(usage));
+        if (!choicesRead) {
+            throw new SynapseException("OpenAI chat completion contained no choices");
         }
         httpHeaders.forEach((name, values) -> response.getHeaders().put(name, String.join(", ", values)));
         return response;
+    }
+
+    private void readChoices(JsonReader reader, ChatResponse response) {
+        // The reader is on the value the "choices" name introduced, so the array's own start token
+        // is the current one rather than the next.
+        if (reader.token() != JsonReader.Token.START_ARRAY
+                || reader.nextToken() == JsonReader.Token.END_ARRAY) {
+            throw new SynapseException("OpenAI chat completion contained no choices");
+        }
+        // The reader is on the first choice's START_OBJECT here.
+        readChoice(reader, response, 0);
+        while (reader.nextToken() != JsonReader.Token.END_ARRAY) {
+            // The shared model carries a single message, so a further choice is not modelled and
+            // there is nowhere to put it.
+            reader.skipValue();
+        }
+    }
+
+    private void readChoice(JsonReader reader, ChatResponse response, int position) {
+        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
+            String field = reader.name();
+            reader.nextToken();
+            switch (field) {
+                case "finish_reason" -> response.setFinishReason(reader.string());
+                case "message" -> readMessage(reader, response.getMessage());
+                // A choice field this module does not model keeps the path it came from, so a
+                // provider's addition stays readable even though it belongs to a choice.
+                default -> response.getExtras().put(List.of("choices", String.valueOf(position), field),
+                        reader.captureValue());
+            }
+        }
+    }
+
+    private void readMessage(JsonReader reader, ChatMessage message) {
+        if (reader.token() != JsonReader.Token.START_OBJECT) {
+            reader.skipValue();
+            return;
+        }
+        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
+            String field = reader.name();
+            reader.nextToken();
+            switch (field) {
+                case "role" -> message.setRole(reader.string());
+                case "content" -> readContent(reader, message);
+                case "tool_calls" -> readToolCalls(reader, message);
+                default -> message.getExtras().put(field, reader.captureValue());
+            }
+        }
+    }
+
+    private void readContent(JsonReader reader, ChatMessage message) {
+        JsonReader.Token token = reader.token();
+        if (token == JsonReader.Token.STRING) {
+            String text = reader.string();
+            if (!text.isEmpty()) {
+                message.getParts().add(new TextPart(text));
+            }
+            return;
+        }
+        if (token == JsonReader.Token.START_ARRAY) {
+            readContentParts(reader, message);
+            return;
+        }
+        if (token == JsonReader.Token.NULL) {
+            // An assistant turn with nothing to say, which is what a tool call looks like.
+            return;
+        }
+        throw new SynapseException("unsupported content shape in OpenAI response: " + describe(token));
+    }
+
+    private void readContentParts(JsonReader reader, ChatMessage message) {
+        while (reader.nextToken() != JsonReader.Token.END_ARRAY) {
+            if (reader.token() != JsonReader.Token.START_OBJECT) {
+                // Not a typed part object — the previous binding cast blindly and died here. An
+                // element with no type carries nothing mappable, so it is skipped.
+                reader.skipValue();
+                continue;
+            }
+            readContentPart(reader, message);
+        }
+    }
+
+    private void readContentPart(JsonReader reader, ChatMessage message) {
+        String type = null;
+        String text = null;
+        ProviderExtras extras = new ProviderExtras();
+        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
+            String field = reader.name();
+            reader.nextToken();
+            switch (field) {
+                case "type" -> type = reader.string();
+                case "text" -> text = reader.string();
+                default -> extras.put(field, reader.captureValue());
+            }
+        }
+        if (type == null) {
+            return;
+        }
+        if (!"text".equals(type)) {
+            throw new SynapseException("unsupported content part in OpenAI response: " + type);
+        }
+        TextPart part = new TextPart(text);
+        // The type that decides what the part is may come after the fields it does not model, so
+        // the part is built here and the fields collected on the way move into its own bag.
+        part.getExtras().putAll(extras);
+        message.getParts().add(part);
+    }
+
+    private void readToolCalls(JsonReader reader, ChatMessage message) {
+        if (reader.token() != JsonReader.Token.START_ARRAY) {
+            reader.skipValue();
+            return;
+        }
+        while (reader.nextToken() != JsonReader.Token.END_ARRAY) {
+            if (reader.token() != JsonReader.Token.START_OBJECT) {
+                reader.skipValue();
+                continue;
+            }
+            readToolCall(reader, message);
+        }
+    }
+
+    private void readToolCall(JsonReader reader, ChatMessage message) {
+        ToolCallPart call = new ToolCallPart();
+        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
+            String field = reader.name();
+            reader.nextToken();
+            switch (field) {
+                case "id" -> call.setCallId(reader.string());
+                case "function" -> readToolCallFunction(reader, call);
+                default -> call.getExtras().put(field, reader.captureValue());
+            }
+        }
+        message.getParts().add(call);
+    }
+
+    private void readToolCallFunction(JsonReader reader, ToolCallPart call) {
+        if (reader.token() != JsonReader.Token.START_OBJECT) {
+            reader.skipValue();
+            return;
+        }
+        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
+            String field = reader.name();
+            reader.nextToken();
+            switch (field) {
+                case "name" -> call.setName(reader.string());
+                case "arguments" -> call.setArgumentsJson(reader.string());
+                // Kept under the path it came from, the way every other extras entry is spelled.
+                default -> call.getExtras().put(List.of("function", field), reader.captureValue());
+            }
+        }
+    }
+
+    private void readUsage(JsonReader reader, ChatResponse response) {
+        if (reader.token() != JsonReader.Token.START_OBJECT) {
+            reader.skipValue();
+            return;
+        }
+        Usage usage = new Usage();
+        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
+            String field = reader.name();
+            reader.nextToken();
+            switch (field) {
+                case "prompt_tokens" -> usage.setInputTokens(asInteger(reader));
+                case "completion_tokens" -> usage.setOutputTokens(asInteger(reader));
+                case "prompt_tokens_details" -> readPromptTokenDetails(reader, usage);
+                default -> usage.getExtras().put(field, reader.captureValue());
+            }
+        }
+        response.setUsage(usage);
+    }
+
+    private void readPromptTokenDetails(JsonReader reader, Usage usage) {
+        if (reader.token() != JsonReader.Token.START_OBJECT) {
+            reader.skipValue();
+            return;
+        }
+        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
+            String field = reader.name();
+            reader.nextToken();
+            if ("cached_tokens".equals(field)) {
+                usage.setCachedInputTokens(asInteger(reader));
+            } else {
+                // A count this module does not model stays under the details object it was nested
+                // in, rather than being lifted to the usage level and losing where it came from.
+                usage.getExtras().put(List.of("prompt_tokens_details", field), reader.captureValue());
+            }
+        }
     }
 
     private List<Map<String, Object>> toWireMessages(ChatMessage message) {
@@ -163,7 +369,6 @@ class ChatCompletionsAdapter {
         return wire;
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> parseSchema(String schema) {
         if (schema == null) {
             return null;
@@ -199,58 +404,6 @@ class ChatCompletionsAdapter {
         return wire;
     }
 
-    private void fromWireContent(JsonView content, ChatResponse response) {
-        if (content.isMissing() || content.isNull()) {
-            return;
-        }
-        if (content.isText()) {
-            String text = content.asText();
-            if (!text.isEmpty()) {
-                response.getMessage().getParts().add(new TextPart(text));
-            }
-            return;
-        }
-        if (content.isArray()) {
-            for (JsonView part : content.elements()) {
-                String type = part.get("type").asText();
-                if (type == null) {
-                    // Not a typed part object — the previous binding cast blindly and died here.
-                    // An element with no type carries nothing mappable, so it is skipped.
-                    continue;
-                }
-                if (!"text".equals(type)) {
-                    throw new SynapseException(
-                            "unsupported content part in OpenAI response: " + type);
-                }
-                response.getMessage().getParts().add(new TextPart(part.get("text").asText()));
-            }
-            return;
-        }
-        throw new SynapseException("unsupported content shape in OpenAI response: " + describe(content));
-    }
-
-    private void fromWireToolCalls(JsonView toolCalls, ChatResponse response) {
-        if (!toolCalls.isArray()) {
-            return;
-        }
-        for (JsonView call : toolCalls.elements()) {
-            JsonView function = call.get("function");
-            response.getMessage().getParts().add(new ToolCallPart(call.get("id").asText(),
-                    function.get("name").asText(), function.get("arguments").asText()));
-        }
-    }
-
-    private Usage fromWireUsage(JsonView usage) {
-        Usage result = new Usage();
-        result.setInputTokens(asInteger(usage.get("prompt_tokens")));
-        result.setOutputTokens(asInteger(usage.get("completion_tokens")));
-        JsonView details = usage.get("prompt_tokens_details");
-        if (details.isObject()) {
-            result.setCachedInputTokens(asInteger(details.get("cached_tokens")));
-        }
-        return result;
-    }
-
     private String textOf(List<ContentPart> parts) {
         StringBuilder text = new StringBuilder();
         for (ContentPart part : parts) {
@@ -268,16 +421,22 @@ class ChatCompletionsAdapter {
         }
     }
 
-    private static Integer asInteger(JsonView node) {
-        Long value = node.asLong();
-        return value == null ? null : value.intValue();
+    private static Integer asInteger(JsonReader reader) {
+        if (reader.token() != JsonReader.Token.NUMBER) {
+            // A count spelled some other way is left alone rather than guessed at; the value still
+            // has to be consumed, or the walk would lose its place.
+            reader.skipValue();
+            return null;
+        }
+        // The shared model keeps counts in an int, and a token count beyond that is not a real one.
+        return (int) reader.longValue();
     }
 
-    private static String describe(JsonView node) {
-        if (node.isNumber()) {
+    private static String describe(JsonReader.Token token) {
+        if (token == JsonReader.Token.NUMBER) {
             return "Number";
         }
-        if (node.isBoolean()) {
+        if (token == JsonReader.Token.TRUE || token == JsonReader.Token.FALSE) {
             return "Boolean";
         }
         return "unexpected";

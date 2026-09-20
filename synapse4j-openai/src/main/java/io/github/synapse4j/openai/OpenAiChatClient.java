@@ -11,7 +11,7 @@ import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.json.JsonCodec;
-import io.github.synapse4j.json.JsonView;
+import io.github.synapse4j.json.JsonReader;
 
 /**
  * The OpenAI chat-completions client: speaks {@code POST /chat/completions} and answers in the
@@ -24,9 +24,11 @@ import io.github.synapse4j.json.JsonView;
  * application chose, the bytes on the wire are exactly the protocol's spelling. The mapper-config
  * rationale (方案一) still holds for the same reason it always did: with the application's codec
  * doing the binding, any codec-level setting (a naming strategy among them) would have changed the
- * wire shape; literal keys take that knob away. Responses are read through the codec's
- * {@code JsonView} support into a null-safe view, so the provider adding a field never breaks
- * parsing.
+ * wire shape; literal keys take that knob away. Responses are walked token by token through the
+ * codec's {@code JsonReader} instead of being decoded into a tree first, and a field this module
+ * does not model is kept in the extras of the node it came from rather than dropped. The status is
+ * read before the body is touched, because the body is a stream and reaches the caller once: a
+ * non-2xx answer is buffered for the error reader, a 2xx one is streamed into the adapter.
  *
  * <p>
  * The client is stateless apart from the configuration and safe to share across threads.
@@ -91,12 +93,15 @@ public class OpenAiChatClient implements ChatClient {
         httpRequest.setBody(codec.encode(wireRequest).getBytes(StandardCharsets.UTF_8));
 
         try (io.github.synapse4j.http.HttpResponse httpResponse = http.send(httpRequest)) {
-            String body = readBody(httpResponse);
+            // The body is a stream and can be read once, so the status decides how it is read
+            // before anything is consumed.
             int status = httpResponse.getStatusCode();
             if (status >= 200 && status < 300) {
-                return adapter.fromWire(decode(body), httpResponse.getHeaders());
+                try (JsonReader reader = codec.reader(httpResponse.getBody())) {
+                    return adapter.fromWire(reader, httpResponse.getHeaders());
+                }
             }
-            throw errorReader.read(status, body);
+            throw errorReader.read(status, readBody(httpResponse));
         } catch (IOException e) {
             throw new SynapseException("OpenAI chat completion failed: response could not be read", e);
         }
@@ -104,14 +109,6 @@ public class OpenAiChatClient implements ChatClient {
 
     private String readBody(io.github.synapse4j.http.HttpResponse httpResponse) throws IOException {
         return new String(httpResponse.getBody().readAllBytes(), StandardCharsets.UTF_8);
-    }
-
-    private JsonView decode(String body) {
-        try {
-            return codec.decode(body, JsonView.class);
-        } catch (RuntimeException e) {
-            throw new SynapseException("OpenAI response could not be decoded", e);
-        }
     }
 
     private static void require(boolean condition, String message) {

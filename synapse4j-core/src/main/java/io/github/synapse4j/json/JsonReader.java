@@ -11,8 +11,8 @@ import io.github.synapse4j.exception.SynapseIOException;
  *
  * <p>
  * This interface exists so that reading does not have to go through a tree. A provider module can
- * walk a response and build the shared model in a single pass, skip what it does not model, and
- * stream out a value too large to hold — the response side of the same trade {@link JsonWriter}
+ * walk a response and build the shared model in a single pass, keep or skip what it does not model,
+ * and stream out a value too large to hold — the response side of the same trade {@link JsonWriter}
  * makes on the way out.
  *
  * <p>
@@ -40,7 +40,8 @@ public interface JsonReader extends AutoCloseable {
      * The kinds are fixed by the JSON grammar and nobody extends them, which is why a closed form is
      * right here while the rest of this library's structures avoid one: the rule against {@code enum}
      * exists so that callers and providers can extend the structures they pass around, and a token
-     * kind is not one of those.
+     * kind is not one of those. The reader being positioned on nothing at all is not a kind of token
+     * and is not in here: {@link #token()} answers {@code null} for it.
      */
     enum Token {
 
@@ -90,6 +91,18 @@ public interface JsonReader extends AutoCloseable {
      * @return the token now current, or {@link Token#END_DOCUMENT}
      */
     Token nextToken();
+
+    /**
+     * Returns the token the reader is on — the one the last {@link #nextToken()} answered with.
+     *
+     * <p>
+     * A caller that reads a value in one call does not need this: it already holds the token that
+     * call returned. One that reads a value in several calls does, and {@link #captureValue()} is
+     * the operation in this interface that does.
+     *
+     * @return the current token, or {@code null} before the first {@link #nextToken()} call
+     */
+    Token token();
 
     /**
      * Returns the name of the property whose value comes next.
@@ -143,6 +156,32 @@ public interface JsonReader extends AutoCloseable {
      * over without building anything for it.
      */
     void skipValue();
+
+    /**
+     * Reads the value the reader is positioned on — a scalar, or an object or array together with
+     * everything under it — and returns it in the shape a decoded document has: a {@code Map} with
+     * its keys in document order, a {@code List}, a {@code String}, a {@code Long} — a
+     * {@code BigInteger} when it does not fit — a {@code Double}, a {@code Boolean}, or
+     * {@code null}.
+     *
+     * <p>
+     * This is how a caller keeps a value it does not model, where {@link #skipValue()} throws it
+     * away — the two are the whole choice a provider module makes about the fields it does not read
+     * into its own model. It is also the one operation here that costs memory proportional to what it
+     * reads, which is the price of keeping it.
+     *
+     * <p>
+     * The value is consumed, exactly as with {@link #skipValue()}: an object or array is read through
+     * its matching end token.
+     *
+     * <p>
+     * Reading it over the primitives above is what {@link AbstractJsonReader} does, so an
+     * implementation that extends that class does not write it.
+     *
+     * @return the value; {@code null} for JSON {@code null}
+     * @throws IllegalStateException if the reader is not positioned on a value
+     */
+    Object captureValue();
 
     /**
      * Returns the current string token's characters, writing them to the given writer instead of

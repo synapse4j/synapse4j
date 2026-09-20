@@ -2,6 +2,8 @@ package io.github.synapse4j.jackson;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -9,7 +11,11 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -94,6 +100,150 @@ class JacksonJsonReaderTest {
     }
 
     @Test
+    void answersWithTheTokenTheLastAdvanceReturned() {
+        JsonReader reader = codec.reader(source("{\"a\":1}"));
+
+        assertNull(reader.token());
+
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+        assertEquals(Token.START_OBJECT, reader.token());
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals(Token.NAME, reader.token());
+        assertEquals("a", reader.name());
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(Token.NUMBER, reader.token());
+        assertEquals(1L, reader.longValue());
+        assertEquals(Token.END_OBJECT, reader.nextToken());
+        assertEquals(Token.END_OBJECT, reader.token());
+        assertEquals(Token.END_DOCUMENT, reader.nextToken());
+        assertEquals(Token.END_DOCUMENT, reader.token());
+        assertEquals(Token.END_DOCUMENT, reader.nextToken());
+        assertEquals(Token.END_DOCUMENT, reader.token());
+    }
+
+    @Test
+    void capturesScalarsInTheShapeADecodedDocumentHas() {
+        JsonReader reader = codec.reader(source("[\"Ada\",3,2.5,9223372036854775808,true,false,null]"));
+
+        assertEquals(Token.START_ARRAY, reader.nextToken());
+
+        assertEquals(Token.STRING, reader.nextToken());
+        assertEquals("Ada", reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(3L, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(2.5, reader.captureValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(new BigInteger("9223372036854775808"), reader.captureValue());
+
+        assertEquals(Token.TRUE, reader.nextToken());
+        assertEquals(Boolean.TRUE, reader.captureValue());
+
+        assertEquals(Token.FALSE, reader.nextToken());
+        assertEquals(Boolean.FALSE, reader.captureValue());
+
+        assertEquals(Token.NULL, reader.nextToken());
+        assertNull(reader.captureValue());
+
+        assertEquals(Token.END_ARRAY, reader.nextToken());
+        assertEquals(Token.END_DOCUMENT, reader.nextToken());
+    }
+
+    @Test
+    void capturesAnObjectKeepingItsKeysInDocumentOrder() {
+        JsonReader reader = codec
+                .reader(source("{\"object\":{\"b\":1,\"a\":\"two\",\"nested\":{\"x\":true}}}"));
+
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+
+        Object captured = reader.captureValue();
+
+        assertEquals(Map.of("b", 1L, "a", "two", "nested", Map.of("x", true)), captured);
+        // Map equality ignores order, so the order the document wrote is checked on its own.
+        assertIterableEquals(List.of("b", "a", "nested"), ((Map<?, ?>) captured).keySet());
+
+        assertEquals(Token.END_OBJECT, reader.nextToken());
+        assertEquals(Token.END_DOCUMENT, reader.nextToken());
+    }
+
+    @Test
+    void capturesAnArrayOfMixedElements() {
+        JsonReader reader = codec.reader(source("{\"list\":[1,\"two\",{\"three\":3},[4],null]}"));
+
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals(Token.START_ARRAY, reader.nextToken());
+
+        assertEquals(Arrays.asList(1L, "two", Map.of("three", 3L), List.of(4L), null),
+                reader.captureValue());
+
+        assertEquals(Token.END_OBJECT, reader.nextToken());
+        assertEquals(Token.END_DOCUMENT, reader.nextToken());
+    }
+
+    @Test
+    void capturingASubtreeLeavesTheEnclosingWalkInPlace() {
+        JsonReader reader = codec
+                .reader(source("{\"kept\":{\"deep\":[1,{\"deeper\":2}]},\"after\":\"value\"}"));
+
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals("kept", reader.name());
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+
+        assertEquals(Map.of("deep", Arrays.asList(1L, Map.of("deeper", 2L))), reader.captureValue());
+
+        // The whole subtree was consumed, so the walk resumes on what follows it.
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals("after", reader.name());
+        assertEquals(Token.STRING, reader.nextToken());
+        assertEquals("value", reader.string());
+        assertEquals(Token.END_OBJECT, reader.nextToken());
+        assertEquals(Token.END_DOCUMENT, reader.nextToken());
+    }
+
+    @Test
+    void capturingTheLastValueOfAnObjectLeavesTheWalkOnItsEndToken() {
+        JsonReader reader = codec.reader(source("{\"a\":1,\"kept\":{\"b\":[2]}}"));
+
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(1L, reader.captureValue());
+        assertEquals(Token.NAME, reader.nextToken());
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+
+        assertEquals(Map.of("b", List.of(2L)), reader.captureValue());
+
+        assertEquals(Token.END_OBJECT, reader.nextToken());
+        assertEquals(Token.END_DOCUMENT, reader.nextToken());
+    }
+
+    @Test
+    void captureValueNeedsAValueToStandOn() {
+        JsonReader reader = codec.reader(source("{\"a\":1}"));
+
+        assertThrows(IllegalStateException.class, reader::captureValue);
+
+        assertEquals(Token.START_OBJECT, reader.nextToken());
+        assertEquals(Token.NAME, reader.nextToken());
+        assertThrows(IllegalStateException.class, reader::captureValue);
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(1L, reader.captureValue());
+
+        assertEquals(Token.END_OBJECT, reader.nextToken());
+        assertThrows(IllegalStateException.class, reader::captureValue);
+        assertEquals(Token.END_DOCUMENT, reader.nextToken());
+        assertThrows(IllegalStateException.class, reader::captureValue);
+    }
+
+    @Test
     void streamsAStringValueIntoTheGivenWriter() {
         String value = "0123456789".repeat(50_000);
         JsonReader reader = codec.reader(source("{\"payload\":\"" + value + "\"}"));
@@ -128,7 +278,9 @@ class JacksonJsonReaderTest {
 
         assertEquals(Token.NUMBER, reader.nextToken());
         assertEquals(2.5, reader.doubleValue());
-        assertThrows(IllegalStateException.class, reader::longValue);
+        // A number the document spelled with a fraction: the caller asked for something a number
+        // token can carry, so this is a failed read rather than a misuse.
+        assertThrows(SynapseException.class, reader::longValue);
 
         assertEquals(Token.TRUE, reader.nextToken());
         assertTrue(reader.booleanValue());
@@ -144,6 +296,19 @@ class JacksonJsonReaderTest {
         assertEquals(Token.NUMBER, reader.nextToken());
 
         assertThrows(SynapseException.class, reader::longValue);
+    }
+
+    @Test
+    void aNumberSpelledWithAFractionIsReadAsALongOnlyWhenItIsWhole() {
+        JsonReader reader = codec.reader(source("[11.0,11.5]"));
+
+        assertEquals(Token.START_ARRAY, reader.nextToken());
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertEquals(11L, reader.longValue());
+
+        assertEquals(Token.NUMBER, reader.nextToken());
+        assertThrows(SynapseException.class, reader::longValue);
+        assertEquals(11.5, reader.doubleValue());
     }
 
     @Test
