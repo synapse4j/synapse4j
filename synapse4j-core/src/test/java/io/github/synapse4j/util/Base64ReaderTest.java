@@ -63,10 +63,11 @@ class Base64ReaderTest {
     void onlyAsMuchOfTheSourceIsReadAsIsBeingAskedFor() throws IOException {
         byte[] bytes = new byte[10_000];
         CountingSource source = new CountingSource(bytes);
-        Base64Reader reader = new Base64Reader(source);
 
         char[] first = new char[8];
-        assertEquals(8, reader.read(first, 0, 8));
+        try (Base64Reader reader = new Base64Reader(source)) {
+            assertEquals(8, reader.read(first, 0, 8));
+        }
 
         assertTrue(source.bytesRead < bytes.length,
                 "read " + source.bytesRead + " bytes of " + bytes.length);
@@ -75,7 +76,9 @@ class Base64ReaderTest {
     @Test
     void theSourceIsOpenedOnlyWhenTheFirstCharacterIsAskedFor() throws IOException {
         CountingSource source = new CountingSource("ping".getBytes(UTF_8));
-        new Base64Reader(source);
+        try (Base64Reader ignored = new Base64Reader(source)) {
+            // Nothing is read; the assertion is that opening the source was deferred.
+        }
 
         assertEquals(0, source.opened);
     }
@@ -104,15 +107,16 @@ class Base64ReaderTest {
     }
 
     @Test
-    void aSourceThatFailsToOpenFailsWhenTheFirstCharacterIsAskedFor() {
+    void aSourceThatFailsToOpenFailsWhenTheFirstCharacterIsAskedFor() throws IOException {
         InputStreamSupplier source = () -> {
             throw new IOException("no bytes today");
         };
         Base64Reader reader = new Base64Reader(source);
+        try (reader) {
+            IOException thrown = assertThrows(IOException.class, () -> reader.read(new char[1], 0, 1));
 
-        IOException thrown = assertThrows(IOException.class, () -> reader.read(new char[1], 0, 1));
-
-        assertEquals("no bytes today", thrown.getMessage());
+            assertEquals("no bytes today", thrown.getMessage());
+        }
     }
 
     private static String read(Reader reader) throws IOException {
