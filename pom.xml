@@ -13,6 +13,11 @@
 
   <properties>
     <revision>0.0.1-SNAPSHOT</revision>
+
+    <!-- The versions of the build's own plugins, kept here so the poms that declare those plugins
+         a second time — the BOM's flatten, this file's spotless — reference one place. -->
+    <flatten-maven-plugin.version>1.7.3</flatten-maven-plugin.version>
+    <spotless-maven-plugin.version>3.10.2</spotless-maven-plugin.version>
   </properties>
 
   <modules>
@@ -23,5 +28,18 @@
     <module>synapse4j-http-jdk</module>
     <module>synapse4j-openai</module>
   </modules>
+
+  <build>
+    <plugins>
+      <!-- Declared here with no configuration of its own so that a direct `spotless:apply` invocation
+           from the root runs for every module in the reactor instead of failing on the ones without
+           the plugin. The build parent carries the real configuration the leaf modules format with. -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>${spotless-maven-plugin.version}</version>
+      </plugin>
+    </plugins>
+  </build>
 
 </project>
