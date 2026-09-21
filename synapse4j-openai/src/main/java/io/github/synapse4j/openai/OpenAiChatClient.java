@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import io.github.synapse4j.chat.ChatClient;
+import io.github.synapse4j.chat.ChatStream;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.exception.SynapseException;
@@ -110,6 +111,11 @@ public class OpenAiChatClient implements ChatClient {
         } catch (IOException e) {
             throw new SynapseException("OpenAI chat completion failed: response could not be read", e);
         }
+    }
+
+    @Override
+    public ChatStream stream(ChatRequest request) {
+        throw new UnsupportedOperationException("streaming is not implemented for OpenAI chat completions yet");
     }
 
     private String readBody(io.github.synapse4j.http.HttpResponse httpResponse) throws IOException {
