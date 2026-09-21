@@ -95,13 +95,13 @@ class ContentPartTest {
     }
 
     @Test
-    void mediaPartEqualityComparesArrayContents() {
-        MediaPart one = new MediaPart("image/png", null, new byte[] { 1, 2 }, null);
-        MediaPart two = new MediaPart("image/png", null, new byte[] { 1, 2 }, null);
-        MediaPart other = new MediaPart("image/png", null, new byte[] { 3, 4 }, null);
+    void mediaPartEqualityComparesTheFieldsItWasBuiltWith() {
+        MediaPart one = new MediaPart("image/png", "https://example.test/a.png", null, null);
+        MediaPart same = new MediaPart("image/png", "https://example.test/a.png", null, null);
+        MediaPart other = new MediaPart("image/png", "https://example.test/b.png", null, null);
 
-        assertEquals(one, two);
-        assertEquals(one.hashCode(), two.hashCode());
+        assertEquals(one, same);
+        assertEquals(one.hashCode(), same.hashCode());
         assertNotEquals(one, other);
     }
 

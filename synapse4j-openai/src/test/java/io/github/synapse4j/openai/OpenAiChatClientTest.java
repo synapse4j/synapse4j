@@ -1,6 +1,7 @@
 package io.github.synapse4j.openai;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -12,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
@@ -24,6 +26,7 @@ import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ChatRole;
+import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolDefinition;
@@ -32,6 +35,7 @@ import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpResponse;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
+import io.github.synapse4j.util.InputStreamSupplier;
 import tools.jackson.databind.json.JsonMapper;
 
 class OpenAiChatClientTest {
@@ -315,6 +319,137 @@ class OpenAiChatClientTest {
     }
 
     @Test
+    void imageBytesGoOutInlinedAsADataUrl() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
+                        + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
+
+        byte[] bytes = { (byte) 0x89, 'P', 'N', 'G', 0, 1, 2, (byte) 0xff, 0x7f };
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatMessage message = new ChatMessage();
+        message.setRole(ChatRole.USER);
+        message.getParts().add(new MediaPart("image/png", null, InputStreamSupplier.of(bytes), null));
+        request.getMessages().add(message);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        assertNoNullValues(wire);
+        List<Map<String, Object>> content = contentOf(wire);
+        assertEquals(1, content.size());
+        assertEquals("image_url", content.get(0).get("type"));
+        String url = imageUrlOf(content.get(0));
+        assertEquals("data:image/png;base64," + Base64.getEncoder().encodeToString(bytes), url);
+        // The payload is encoded as it is handed to the writer, so what follows the comma has to
+        // decode back to the bytes that went in.
+        assertArrayEquals(bytes, Base64.getDecoder().decode(url.substring(url.indexOf(',') + 1)));
+    }
+
+    @Test
+    void anImageUriGoesOutAsTheUrlItself() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
+                        + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatMessage message = new ChatMessage();
+        message.setRole(ChatRole.USER);
+        message.getParts().add(new MediaPart("image/png", "https://example.test/cat.png", null, null));
+        request.getMessages().add(message);
+
+        client.chat(request);
+
+        List<Map<String, Object>> content = contentOf(parseCaptured());
+        assertEquals(1, content.size());
+        assertEquals("image_url", content.get(0).get("type"));
+        assertEquals("https://example.test/cat.png", imageUrlOf(content.get(0)));
+    }
+
+    @Test
+    void textAndImagePartsBecomeOrderedContentEntries() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
+                        + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
+
+        byte[] bytes = { 1, 2, 3 };
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatMessage message = new ChatMessage();
+        message.setRole(ChatRole.USER);
+        message.getParts().add(new TextPart("what is this?"));
+        message.getParts().add(new MediaPart("image/png", null, InputStreamSupplier.of(bytes), null));
+        request.getMessages().add(message);
+
+        client.chat(request);
+
+        List<Map<String, Object>> content = contentOf(parseCaptured());
+        assertEquals(2, content.size());
+        assertEquals(Map.of("type", "text", "text", "what is this?"), content.get(0));
+        assertEquals("image_url", content.get(1).get("type"));
+        assertEquals("data:image/png;base64," + Base64.getEncoder().encodeToString(bytes),
+                imageUrlOf(content.get(1)));
+    }
+
+    @Test
+    void mediaThatIsNotAnImageIsRejected() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
+                        + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatMessage message = new ChatMessage();
+        message.setRole(ChatRole.USER);
+        message.getParts().add(new MediaPart("audio/wav", null, InputStreamSupplier.of(new byte[] { 1 }), null));
+        request.getMessages().add(message);
+
+        SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
+        assertTrue(thrown.getMessage().contains("audio/wav"), thrown.getMessage());
+    }
+
+    @Test
+    void mediaWithNeitherAUriNorASourceIsRejected() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
+                        + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatMessage message = new ChatMessage();
+        message.setRole(ChatRole.USER);
+        message.getParts().add(new MediaPart("image/png", null, null, null));
+        request.getMessages().add(message);
+
+        SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
+        assertTrue(thrown.getMessage().contains("neither uri nor source"), thrown.getMessage());
+    }
+
+    @Test
+    void inliningAPayloadWithoutAMediaTypeIsRejected() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
+                        + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatMessage message = new ChatMessage();
+        message.setRole(ChatRole.USER);
+        message.getParts().add(new MediaPart(null, null, InputStreamSupplier.of(new byte[] { 1 }), null));
+        request.getMessages().add(message);
+
+        SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
+        assertTrue(thrown.getMessage().contains("mediaType"), thrown.getMessage());
+    }
+
+    @Test
     void toolResultMessagesBecomeToolRoleEntries() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
@@ -498,6 +633,20 @@ class OpenAiChatClientTest {
 
     private static void assertNoNullValues(Map<String, Object> map) {
         map.forEach((key, value) -> assertNotNull(value, "wire field '" + key + "' was serialized as null"));
+    }
+
+    /** The content of the one message the wire carries, as the tests that send one message read it. */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> contentOf(Map<String, Object> wire) {
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) wire.get("messages");
+        return (List<Map<String, Object>>) messages.get(0).get("content");
+    }
+
+    /** The URL of one {@code image_url} content entry. */
+    @SuppressWarnings("unchecked")
+    private static String imageUrlOf(Map<String, Object> entry) {
+        Map<String, Object> imageUrl = (Map<String, Object>) entry.get("image_url");
+        return (String) imageUrl.get("url");
     }
 
     private static ChatMessage message(String role, String text) {

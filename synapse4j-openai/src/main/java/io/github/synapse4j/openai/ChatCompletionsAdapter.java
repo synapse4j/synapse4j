@@ -11,6 +11,7 @@ import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -21,6 +22,7 @@ import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonWriter;
+import io.github.synapse4j.util.Base64Reader;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 
@@ -42,11 +44,18 @@ import lombok.RequiredArgsConstructor;
  * is neither dropped nor able to break the parse, and the body is decoded once instead of twice.
  *
  * <p>
- * Part types this cut does not support (reasoning, media, ...) fail loudly here rather than being
- * dropped: a request that arrived at the provider incomplete would look like success from above.
+ * A media part is rendered as the protocol's image content: a URL the provider fetches, or the
+ * payload itself inlined as a data URL. The inlined form is written through a {@link Base64Reader},
+ * so the bytes are encoded as they are handed to the writer and a payload larger than memory still
+ * goes out. Audio, video and documents take a different shape in this protocol and fail loudly here,
+ * along with every other part type this cut does not support: a request that arrived at the provider
+ * incomplete would look like success from above.
  */
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class ChatCompletionsAdapter {
+
+    /** The type prefix of the media this module renders; the protocol's image shape takes nothing else. */
+    private static final String IMAGE_TYPE_PREFIX = "image/";
 
     private final JsonCodec codec;
 
@@ -331,36 +340,36 @@ class ChatCompletionsAdapter {
         writer.writeStartObject();
         writer.writeName("role");
         writeValue(message.getRole(), writer);
-        StringBuilder text = new StringBuilder();
         List<ToolCallPart> toolCalls = new ArrayList<>();
-        boolean arrayForm = false;
-        for (ContentPart part : message.getParts()) {
-            if (part instanceof TextPart textPart) {
-                text.append(textPart.getText());
-            } else if (part instanceof ToolCallPart toolCall) {
-                // A tool call in a request is the model's earlier turn being replayed; it forces
-                // the array form, since the message is no longer text-only.
-                arrayForm = true;
-                toolCalls.add(toolCall);
-            } else {
-                throw unsupportedPart(part);
-            }
-        }
-        if (arrayForm) {
+        if (arrayContent(message)) {
             writer.writeName("content");
             writer.writeStartArray();
-            if (text.length() > 0) {
-                writer.writeStartObject();
-                writer.writeName("type");
-                writer.writeString("text");
-                writer.writeName("text");
-                writer.writeString(text.toString());
-                writer.writeEndObject();
+            for (ContentPart part : message.getParts()) {
+                if (part instanceof TextPart textPart) {
+                    writeTextPart(textPart, writer);
+                } else if (part instanceof MediaPart mediaPart) {
+                    writeMediaPart(mediaPart, writer);
+                } else if (part instanceof ToolCallPart toolCall) {
+                    // A tool call is a member of the message rather than an entry of its content,
+                    // so it is held back and written beside the array.
+                    toolCalls.add(toolCall);
+                } else {
+                    throw unsupportedPart(part);
+                }
             }
             writer.writeEndArray();
-        } else if (text.length() > 0) {
-            writer.writeName("content");
-            writer.writeString(text.toString());
+        } else {
+            StringBuilder text = new StringBuilder();
+            for (ContentPart part : message.getParts()) {
+                if (!(part instanceof TextPart textPart)) {
+                    throw unsupportedPart(part);
+                }
+                text.append(textPart.getText());
+            }
+            if (text.length() > 0) {
+                writer.writeName("content");
+                writer.writeString(text.toString());
+            }
         }
         if (!toolCalls.isEmpty()) {
             writer.writeName("tool_calls");
@@ -370,6 +379,62 @@ class ChatCompletionsAdapter {
             }
             writer.writeEndArray();
         }
+        writer.writeEndObject();
+    }
+
+    /**
+     * Whether the message takes the array form of content: it does as soon as it is not text alone,
+     * because neither an image nor a replayed tool call can be spelled inside a string.
+     */
+    private static boolean arrayContent(ChatMessage message) {
+        return message.getParts().stream()
+                .anyMatch(part -> part instanceof MediaPart || part instanceof ToolCallPart);
+    }
+
+    private static void writeTextPart(TextPart part, JsonWriter writer) {
+        if (part.getText() == null || part.getText().isEmpty()) {
+            return;
+        }
+        writer.writeStartObject();
+        writer.writeName("type");
+        writer.writeString("text");
+        writer.writeName("text");
+        writer.writeString(part.getText());
+        writer.writeEndObject();
+    }
+
+    /**
+     * Writes a media part in the protocol's image shape. A URL is passed through as it stands: the
+     * provider fetches it, and the payload's type is then the provider's to discover. A payload is
+     * inlined as a data URL instead, which is where the type has to be spelled out — a data URL is
+     * the only thing that declares it.
+     */
+    private static void writeMediaPart(MediaPart part, JsonWriter writer) {
+        String mediaType = part.getMediaType();
+        boolean typeStated = mediaType != null && !mediaType.isEmpty();
+        if (typeStated && !mediaType.startsWith(IMAGE_TYPE_PREFIX)) {
+            throw new SynapseException("unsupported media type for OpenAI: " + mediaType);
+        }
+        if (part.getUri() == null && part.getSource() == null) {
+            throw new SynapseException(
+                    "unsupported media part for OpenAI: neither uri nor source is set");
+        }
+        if (part.getUri() == null && !typeStated) {
+            throw new SynapseException(
+                    "unsupported media part for OpenAI: mediaType is required to inline the payload");
+        }
+        writer.writeStartObject();
+        writer.writeName("type");
+        writer.writeString("image_url");
+        writer.writeName("image_url");
+        writer.writeStartObject();
+        writer.writeName("url");
+        if (part.getUri() != null) {
+            writer.writeString(part.getUri());
+        } else {
+            writer.writeString(new Base64Reader("data:" + mediaType + ";base64,", part.getSource()));
+        }
+        writer.writeEndObject();
         writer.writeEndObject();
     }
 
