@@ -1,7 +1,8 @@
 package io.github.synapse4j.openai;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +20,7 @@ import io.github.synapse4j.data.Usage;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
+import io.github.synapse4j.json.JsonWriter;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 
@@ -27,9 +29,11 @@ import lombok.RequiredArgsConstructor;
  * only the application's codec, for embedding schema strings as parsed maps.
  *
  * <p>
- * The wire document is built as plain maps and lists with literal keys: a map key cannot be
- * renamed by a codec's naming strategy and absent entries are never emitted, so the bytes that
- * leave here are exactly the protocol's spelling regardless of which JSON library binds them.
+ * A request is written straight into the caller's {@link JsonWriter}, token by token: the document
+ * never exists as a structure, and every name is a literal spelled out here — no codec's naming
+ * strategy can rename one, and a member whose value is not set is never emitted. So the bytes that
+ * leave here are exactly the protocol's spelling whichever JSON library the application chose, and
+ * the payload is held once instead of being built and then serialized.
  *
  * <p>
  * Responses are read token by token through {@link JsonReader} rather than decoded into a tree: the
@@ -46,26 +50,38 @@ class ChatCompletionsAdapter {
 
     private final JsonCodec codec;
 
-    Map<String, Object> toWire(ChatRequest request) {
-        Map<String, Object> wire = new LinkedHashMap<>();
-        wire.put("model", request.getOptions().getModel());
-        List<Object> messages = new ArrayList<>();
+    /**
+     * Writes the request as the wire document, in the order the protocol spells it.
+     *
+     * @param request the request to translate
+     * @param writer  the writer to write into; owned by the caller, and left open
+     */
+    void writeTo(ChatRequest request, JsonWriter writer) {
+        writer.writeStartObject();
+        writer.writeName("model");
+        writeValue(request.getOptions().getModel(), writer);
+        writer.writeName("messages");
+        writer.writeStartArray();
         for (ChatMessage message : request.getMessages()) {
-            messages.addAll(toWireMessages(message));
+            writeMessages(message, writer);
         }
-        wire.put("messages", messages);
+        writer.writeEndArray();
         if (!request.getTools().isEmpty()) {
-            wire.put("tools", request.getTools().stream().map(this::toWireTool).toList());
+            writer.writeName("tools");
+            writer.writeStartArray();
+            for (ToolDefinition tool : request.getTools()) {
+                writeTool(tool, writer);
+            }
+            writer.writeEndArray();
         }
-        putIfNotNull(wire, "temperature", request.getOptions().getTemperature());
-        putIfNotNull(wire, "max_tokens", request.getOptions().getMaxOutputTokens());
-        putIfNotNull(wire, "top_p", request.getOptions().getTopP());
-        Map<String, Object> responseFormat = toWireResponseFormat(request.getResponseFormat());
-        if (responseFormat != null) {
-            wire.put("response_format", responseFormat);
-        }
-        wire.putAll(request.getOptions().getExtras().toNestedMap());
-        return wire;
+        writeMemberIfNotNull(writer, "temperature", request.getOptions().getTemperature());
+        writeMemberIfNotNull(writer, "max_tokens", request.getOptions().getMaxOutputTokens());
+        writeMemberIfNotNull(writer, "top_p", request.getOptions().getTopP());
+        writeResponseFormat(request.getResponseFormat(), writer);
+        // The extras of the request itself are its top-level members: a nested bag would nest the
+        // protocol's own fields one level too deep.
+        writeMembers(request.getOptions().getExtras().toNestedMap(), writer);
+        writer.writeEndObject();
     }
 
     /**
@@ -292,19 +308,31 @@ class ChatCompletionsAdapter {
         }
     }
 
-    private List<Map<String, Object>> toWireMessages(ChatMessage message) {
+    /**
+     * Writes one message into the open array of messages. A message of tool results becomes one
+     * entry per result, since the protocol has no message carrying several.
+     */
+    private void writeMessages(ChatMessage message, JsonWriter writer) {
         boolean hasToolResult = message.getParts().stream().anyMatch(ToolResultPart.class::isInstance);
         if (hasToolResult) {
             if (!message.getParts().stream().allMatch(ToolResultPart.class::isInstance)) {
                 throw new SynapseException(
                         "unsupported message for OpenAI: tool results mixed with other parts");
             }
-            return message.getParts().stream().map(part -> toWireToolResult((ToolResultPart) part)).toList();
+            for (ContentPart part : message.getParts()) {
+                writeToolResult((ToolResultPart) part, writer);
+            }
+            return;
         }
-        Map<String, Object> wire = new LinkedHashMap<>();
-        wire.put("role", message.getRole());
+        writeMessage(message, writer);
+    }
+
+    private void writeMessage(ChatMessage message, JsonWriter writer) {
+        writer.writeStartObject();
+        writer.writeName("role");
+        writeValue(message.getRole(), writer);
         StringBuilder text = new StringBuilder();
-        List<Object> toolCalls = new ArrayList<>();
+        List<ToolCallPart> toolCalls = new ArrayList<>();
         boolean arrayForm = false;
         for (ContentPart part : message.getParts()) {
             if (part instanceof TextPart textPart) {
@@ -313,60 +341,82 @@ class ChatCompletionsAdapter {
                 // A tool call in a request is the model's earlier turn being replayed; it forces
                 // the array form, since the message is no longer text-only.
                 arrayForm = true;
-                toolCalls.add(toWireToolCall(toolCall));
+                toolCalls.add(toolCall);
             } else {
                 throw unsupportedPart(part);
             }
         }
         if (arrayForm) {
-            List<Object> content = new ArrayList<>();
+            writer.writeName("content");
+            writer.writeStartArray();
             if (text.length() > 0) {
-                Map<String, Object> contentPart = new LinkedHashMap<>();
-                contentPart.put("type", "text");
-                contentPart.put("text", text.toString());
-                content.add(contentPart);
+                writer.writeStartObject();
+                writer.writeName("type");
+                writer.writeString("text");
+                writer.writeName("text");
+                writer.writeString(text.toString());
+                writer.writeEndObject();
             }
-            wire.put("content", content);
+            writer.writeEndArray();
         } else if (text.length() > 0) {
-            wire.put("content", text.toString());
+            writer.writeName("content");
+            writer.writeString(text.toString());
         }
         if (!toolCalls.isEmpty()) {
-            wire.put("tool_calls", toolCalls);
+            writer.writeName("tool_calls");
+            writer.writeStartArray();
+            for (ToolCallPart call : toolCalls) {
+                writeToolCall(call, writer);
+            }
+            writer.writeEndArray();
         }
-        return List.of(wire);
+        writer.writeEndObject();
     }
 
-    private Map<String, Object> toWireToolResult(ToolResultPart result) {
-        Map<String, Object> wire = new LinkedHashMap<>();
-        wire.put("role", "tool");
-        wire.put("content", textOf(result.getParts()));
-        wire.put("tool_call_id", result.getCallId());
-        return wire;
+    private void writeToolResult(ToolResultPart result, JsonWriter writer) {
+        writer.writeStartObject();
+        writer.writeName("role");
+        writer.writeString("tool");
+        writer.writeName("content");
+        writer.writeString(textOf(result.getParts()));
+        writer.writeName("tool_call_id");
+        writeValue(result.getCallId(), writer);
+        writer.writeEndObject();
     }
 
-    private Map<String, Object> toWireToolCall(ToolCallPart part) {
-        Map<String, Object> function = new LinkedHashMap<>();
-        function.put("name", part.getName());
-        function.put("arguments", part.getArgumentsJson());
-        Map<String, Object> wire = new LinkedHashMap<>();
-        wire.put("id", part.getCallId());
-        wire.put("type", "function");
-        wire.put("function", function);
-        return wire;
+    private void writeToolCall(ToolCallPart part, JsonWriter writer) {
+        writer.writeStartObject();
+        writer.writeName("id");
+        writeValue(part.getCallId(), writer);
+        writer.writeName("type");
+        writer.writeString("function");
+        writer.writeName("function");
+        writer.writeStartObject();
+        writer.writeName("name");
+        writeValue(part.getName(), writer);
+        writer.writeName("arguments");
+        writeValue(part.getArgumentsJson(), writer);
+        writer.writeEndObject();
+        writer.writeEndObject();
     }
 
-    private Map<String, Object> toWireTool(ToolDefinition definition) {
-        Map<String, Object> function = new LinkedHashMap<>();
-        function.put("name", definition.getName());
-        function.put("description", definition.getDescription());
+    private void writeTool(ToolDefinition definition, JsonWriter writer) {
+        writer.writeStartObject();
+        writer.writeName("type");
+        writer.writeString("function");
+        writer.writeName("function");
+        writer.writeStartObject();
+        writer.writeName("name");
+        writeValue(definition.getName(), writer);
+        writer.writeName("description");
+        writeValue(definition.getDescription(), writer);
         Map<String, Object> parameters = parseSchema(definition.getInputSchema());
         if (parameters != null) {
-            function.put("parameters", parameters);
+            writer.writeName("parameters");
+            writeValue(parameters, writer);
         }
-        Map<String, Object> wire = new LinkedHashMap<>();
-        wire.put("type", "function");
-        wire.put("function", function);
-        return wire;
+        writer.writeEndObject();
+        writer.writeEndObject();
     }
 
     private Map<String, Object> parseSchema(String schema) {
@@ -380,28 +430,36 @@ class ChatCompletionsAdapter {
         }
     }
 
-    private Map<String, Object> toWireResponseFormat(ChatResponseFormat format) {
+    /** Writes the response format, or nothing at all when the format states no type. */
+    private void writeResponseFormat(ChatResponseFormat format, JsonWriter writer) {
         if (format.getType() == null) {
-            return null;
+            return;
         }
-        Map<String, Object> wire = new LinkedHashMap<>();
+        writer.writeName("response_format");
+        writer.writeStartObject();
         if (ChatResponseFormat.TYPE_JSON_SCHEMA.equals(format.getType())) {
-            wire.put("type", "json_schema");
+            writer.writeName("type");
+            writer.writeString("json_schema");
             String name = format.getName() != null ? format.getName() : "response";
             // "strict" is deliberately not sent in this cut: it changes how strictly the provider
             // enforces the schema, and choosing that for the caller would be a silent behaviour
             // decision. It stays reachable through the format's extras.
-            Map<String, Object> jsonSchema = new LinkedHashMap<>();
-            jsonSchema.put("name", name);
+            writer.writeName("json_schema");
+            writer.writeStartObject();
+            writer.writeName("name");
+            writer.writeString(name);
             Map<String, Object> schema = parseSchema(format.getSchema());
             if (schema != null) {
-                jsonSchema.put("schema", schema);
+                writer.writeName("schema");
+                writeValue(schema, writer);
             }
-            wire.put("json_schema", jsonSchema);
-            return wire;
+            writer.writeEndObject();
+            writer.writeEndObject();
+            return;
         }
-        wire.put("type", ChatResponseFormat.TYPE_JSON.equals(format.getType()) ? "json_object" : format.getType());
-        return wire;
+        writer.writeName("type");
+        writer.writeString(ChatResponseFormat.TYPE_JSON.equals(format.getType()) ? "json_object" : format.getType());
+        writer.writeEndObject();
     }
 
     private String textOf(List<ContentPart> parts) {
@@ -415,10 +473,70 @@ class ChatCompletionsAdapter {
         return text.toString();
     }
 
-    private static void putIfNotNull(Map<String, Object> wire, String key, Object value) {
+    /** Writes a member, or nothing at all when the value is not set. */
+    private static void writeMemberIfNotNull(JsonWriter writer, String name, Object value) {
         if (value != null) {
-            wire.put(key, value);
+            writer.writeName(name);
+            writeValue(value, writer);
         }
+    }
+
+    /** Writes the members of a nested map into the object that is currently open. */
+    private static void writeMembers(Map<String, Object> members, JsonWriter writer) {
+        for (Map.Entry<String, Object> member : members.entrySet()) {
+            writer.writeName(member.getKey());
+            writeValue(member.getValue(), writer);
+        }
+    }
+
+    /**
+     * Writes a value that came from outside this module — an extra, or a schema parsed out of its
+     * text. Only the JSON shapes are accepted; anything else is a value this module cannot spell and
+     * fails loudly rather than being dropped from the request.
+     */
+    private static void writeValue(Object value, JsonWriter writer) {
+        if (value == null) {
+            writer.writeNull();
+        } else if (value instanceof String text) {
+            writer.writeString(text);
+        } else if (value instanceof Boolean flag) {
+            writer.writeBoolean(flag);
+        } else if (value instanceof Map<?, ?> object) {
+            writer.writeStartObject();
+            for (Map.Entry<?, ?> member : object.entrySet()) {
+                writer.writeName(String.valueOf(member.getKey()));
+                writeValue(member.getValue(), writer);
+            }
+            writer.writeEndObject();
+        } else if (value instanceof List<?> array) {
+            writer.writeStartArray();
+            for (Object element : array) {
+                writeValue(element, writer);
+            }
+            writer.writeEndArray();
+        } else if (value instanceof Number number) {
+            writeNumber(number, writer);
+        } else {
+            throw new SynapseException(
+                    "unsupported value type for OpenAI: " + value.getClass().getName());
+        }
+    }
+
+    private static void writeNumber(Number number, JsonWriter writer) {
+        if (number instanceof Double || number instanceof Float || number instanceof BigDecimal) {
+            writer.writeNumber(number.doubleValue());
+            return;
+        }
+        if (number instanceof BigInteger integer) {
+            try {
+                writer.writeNumber(integer.longValueExact());
+            } catch (ArithmeticException e) {
+                // longValue() would truncate silently and put a different number on the wire.
+                throw new SynapseException("integer value does not fit in a JSON number: " + integer, e);
+            }
+            return;
+        }
+        writer.writeNumber(number.longValue());
     }
 
     private static Integer asInteger(JsonReader reader) {

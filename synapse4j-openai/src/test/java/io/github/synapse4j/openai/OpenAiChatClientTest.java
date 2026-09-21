@@ -5,10 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -42,6 +45,13 @@ class OpenAiChatClientTest {
         @Override
         public HttpResponse send(io.github.synapse4j.http.HttpRequest request) {
             this.captured = request;
+            // A transport asks for the body before it answers, so this one does too: a request the
+            // module cannot spell fails here, the way it would fail on the way out.
+            try {
+                request.getBody().writeTo(java.io.OutputStream.nullOutputStream());
+            } catch (IOException e) {
+                throw new SynapseException("the request body could not be written", e);
+            }
             return canned;
         }
     }
@@ -452,11 +462,36 @@ class OpenAiChatClientTest {
         assertEquals(List.of("yes"), stub.captured.getHeaders().get("X-Custom"));
     }
 
+    @Test
+    void theRequestBodyIsStreamedRatherThanMaterialized() throws Exception {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
+                        + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        request.getMessages().add(message(ChatRole.USER, "Hello"));
+
+        client.chat(request);
+
+        // A streamed body produces its bytes on demand, so there is no buffer holding them.
+        assertNull(stub.captured.getBody().buffer());
+        assertEquals("gpt-test", parseCaptured().get("model"));
+
+        // Producing them again, which is what a retry or a redirect does, gives the same document.
+        ByteArrayOutputStream retry = new ByteArrayOutputStream();
+        stub.captured.getBody().writeTo(retry);
+        assertEquals(parseCaptured(), codec.decode(retry.toString(UTF_8), Map.class));
+    }
+
     private Map<String, Object> parseCaptured() {
         try {
-            // The client sends a wire body it already holds, so the captured body has its bytes.
-            return codec.decode(new String(stub.captured.getBody().buffer().array(), UTF_8), Map.class);
-        } catch (RuntimeException e) {
+            // The client streams its body, so the captured body has to be written out to be read.
+            ByteArrayOutputStream body = new ByteArrayOutputStream();
+            stub.captured.getBody().writeTo(body);
+            return codec.decode(body.toString(UTF_8), Map.class);
+        } catch (IOException | RuntimeException e) {
             throw new AssertionError("captured wire body is not JSON", e);
         }
     }

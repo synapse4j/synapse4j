@@ -328,7 +328,10 @@ public class JdkHttpClient implements HttpClient {
                 try {
                     body.writeTo(chunkSink);
                     subscriber.onComplete();
-                } catch (IOException failure) {
+                } catch (Throwable failure) {
+                    // Whatever the body throws has to reach the subscriber, down to an Error: this
+                    // thread exists to give the subscriber an answer, and a producer that dies quietly
+                    // would leave the request waiting for a chunk that never comes.
                     if (!cancelled) {
                         subscriber.onError(failure);
                     }

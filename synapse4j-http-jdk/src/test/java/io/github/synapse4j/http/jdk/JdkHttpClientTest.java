@@ -212,6 +212,45 @@ class JdkHttpClientTest {
         assertTrue(causeChainContains(thrown, "no bytes today"), thrown::toString);
     }
 
+    @Test
+    void aStreamedBodyThatFailsWithARuntimeExceptionIsReportedRatherThanLeftWaiting() throws IOException {
+        server.createContext("/failing", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            exchange.sendResponseHeaders(200, -1);
+            exchange.close();
+        });
+
+        HttpRequest request = new HttpRequest(baseUrl + "/failing");
+        request.setMethod(HttpRequest.POST);
+        request.setBody(out -> {
+            throw new IllegalStateException("no bytes today");
+        });
+
+        Exception thrown = assertThrows(Exception.class, () -> client.send(request));
+
+        assertTrue(causeChainContains(thrown, "no bytes today"), thrown::toString);
+    }
+
+    @Test
+    void aStreamedBodyThatFailsWithAnErrorIsReportedRatherThanLeftWaiting() throws IOException {
+        server.createContext("/failing", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            exchange.sendResponseHeaders(200, -1);
+            exchange.close();
+        });
+
+        HttpRequest request = new HttpRequest(baseUrl + "/failing");
+        request.setMethod(HttpRequest.POST);
+        request.setBody(out -> {
+            throw new AssertionError("no bytes today");
+        });
+
+        // Reported whether it arrives as itself or wrapped: what matters is that the call ends.
+        Throwable thrown = assertThrows(Throwable.class, () -> client.send(request));
+
+        assertTrue(causeChainContains(thrown, "no bytes today"), thrown::toString);
+    }
+
     private static boolean causeChainContains(Throwable thrown, String message) {
         for (Throwable cause = thrown; cause != null; cause = cause.getCause()) {
             if (message.equals(cause.getMessage())) {
