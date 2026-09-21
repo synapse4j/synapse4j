@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import com.sun.net.httpserver.HttpServer;
 
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.http.HttpRequest;
 import io.github.synapse4j.http.HttpResponse;
 
@@ -202,9 +203,33 @@ class JdkHttpClientTest {
         });
 
         HttpRequest request = new HttpRequest(baseUrl + "/slow");
-        request.setResponseTimeout(Duration.ofMillis(300));
+        HttpOptions options = new HttpOptions();
+        options.setResponseTimeout(Duration.ofMillis(300));
+        request.setOptions(options);
 
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.send(request));
+        assertTrue(thrown.getCause() instanceof HttpTimeoutException, thrown::toString);
+    }
+
+    @Test
+    void theClientsOwnOptionsApplyWhenTheRequestSetsNone() throws IOException {
+        HttpOptions options = HttpOptions.defaults();
+        options.setResponseTimeout(Duration.ofMillis(300));
+        JdkHttpClient withDefaults = new JdkHttpClient(java.net.http.HttpClient.newHttpClient(), options);
+        server.createContext("/slow", exchange -> {
+            try {
+                Thread.sleep(3000);
+                exchange.sendResponseHeaders(200, -1);
+            } catch (IOException | InterruptedException ignored) {
+                // The client already gave up; nothing useful left to do.
+            } finally {
+                exchange.close();
+            }
+        });
+
+        SynapseException thrown = assertThrows(SynapseException.class,
+                () -> withDefaults.send(new HttpRequest(baseUrl + "/slow")));
+
         assertTrue(thrown.getCause() instanceof HttpTimeoutException, thrown::toString);
     }
 

@@ -1,6 +1,5 @@
 package io.github.synapse4j.http;
 
-import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,15 +11,14 @@ import lombok.NonNull;
  * One HTTP request: method, URL, headers, body bytes, and an optional per-request timeout.
  *
  * <p>
- * Nothing here is nullable except {@link #body} and {@link #timeout}, whose {@code null} means "no
- * body" and "the implementation's default" — the two conditions a caller cannot express with a
- * value. Headers are multi-valued because the wire is; repeated header lines are the norm, not the
- * exception.
+ * Nothing here is nullable except {@link #body} and {@link #options}, whose {@code null} means "no body"
+ * and "no opinions of its own" — the two conditions a caller cannot express with a value. Headers are
+ * multi-valued because the wire is; repeated header lines are the norm, not the exception.
  *
  * <p>
- * The method is a plain string with common constants, not an enum: HTTP methods are a registry
- * that keeps growing (RFC 9110 §9.1 plus extensions like QUERY) and a closed type would block a
- * caller from using one this library has not heard of.
+ * The method is a plain string with common constants, not an enum: HTTP methods are a registry that keeps
+ * growing (RFC 9110 §9.1 plus extensions like QUERY) and a closed type would block a caller from using
+ * one this library has not heard of.
  */
 @Data
 public class HttpRequest {
@@ -51,11 +49,10 @@ public class HttpRequest {
     private byte[] body;
 
     /**
-     * How long to wait for the response to start arriving (its headers), measured by the
-     * implementation from when the request is sent. Does not bound reading the body — body stalls
-     * are the caller's or a higher layer's concern. {@code null} stands by the implementation's
-     * default.
+     * What this request wants from the HTTP layer, or {@code null} when it has no opinion and the
+     * implementation's own {@link HttpOptions} are to be used as they are. {@link HttpOptions#effective}
+     * is how the two come together.
      */
-    private Duration responseTimeout;
+    private HttpOptions options;
 
 }

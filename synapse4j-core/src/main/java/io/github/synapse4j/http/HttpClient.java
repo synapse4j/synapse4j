@@ -24,10 +24,11 @@ import io.github.synapse4j.exception.SynapseException;
  * connection and cancels an in-flight body; it must be safe to call from any thread.
  *
  * <p>
- * Implementations must be stateless and safe to share across threads. A request-level
- * {@link HttpRequest#getResponseTimeout() response timeout}, when set, overrides the implementation's
- * default; implementations need not support every feature a request can express and should say so
- * rather than silently ignore.
+ * Implementations must be stateless and safe to share across threads. A request carries its own
+ * {@link HttpRequest#getOptions() options} where it has opinions of its own, and the implementation
+ * falls back to its own defaults for the rest — {@link HttpOptions#effective} is where the two come
+ * together. An implementation need not support every setting a request can carry, and must say so
+ * rather than silently ignore it.
  */
 public interface HttpClient {
 

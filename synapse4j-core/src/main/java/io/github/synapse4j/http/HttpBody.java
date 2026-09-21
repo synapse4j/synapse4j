@@ -2,26 +2,32 @@ package io.github.synapse4j.http;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Objects;
 
 /**
- * The bytes of one request body, written into the sink an {@link HttpClient} implementation hands
- * over.
+ * The bytes of one request body: written into the sink an {@link HttpClient} implementation hands
+ * over, or handed over as a buffer when they are already in hand.
  *
  * <p>
- * The body is pushed, not pulled: writing is what produces it, whether that is a serializer
- * emitting into a stream or a caller handing over bytes it already has. An implementation whose HTTP
- * library pulls instead adapts on its own side, and nothing here promises how the bytes travel.
+ * The body is pushed, not pulled: writing is what produces it, whether that is a serializer emitting
+ * into a stream or a caller handing over bytes it already has. An implementation whose HTTP library
+ * pulls instead adapts on its own side, and nothing here promises how the bytes travel.
  *
  * <p>
  * {@link #writeTo(OutputStream)} may be called more than once, and every call has to produce the same
  * bytes: a request is sent again on a retry, on a redirect, and after an authentication challenge. A
  * source that can only be read once — a socket, a one-shot pipe — is therefore something the caller
  * buffers before handing it in. Calls are sequential: one call at a time, never two at once.
+ *
+ * <p>
+ * {@link #buffer()} is the same content where producing it would be work already done. An
+ * implementation may take it instead of asking for a write, which is what keeps bytes a caller already
+ * holds from being written out and read back — and it is where a length comes from when there is one:
+ * the buffer knows how much it holds, while a body that can only be written is a body whose length is
+ * not known until it has been.
  *
  * <p>
  * The sink belongs to the implementation, so {@link #writeTo(OutputStream)} never closes it.
@@ -38,20 +44,23 @@ public interface HttpBody {
     void writeTo(OutputStream out) throws IOException;
 
     /**
-     * The number of bytes, or {@code -1} when that is not known until they are written.
+     * The body's bytes, when they are already in hand; {@code null} when writing is the only way to
+     * produce them.
      *
      * <p>
-     * Unknown is the honest answer and the usual one here: a request body is normally a serialization
-     * that is still being produced, so its length is not there to be asked for. An implementation
-     * takes the answer as a hint — it decides whether the request goes out with a
-     * {@code Content-Length} or is framed some other way — and must not require it to be known. The
-     * factories below answer with their length because they hold the bytes already, which is what
-     * lets those go out without being gathered first.
+     * Every call answers with a fresh buffer — for a body that holds one, a duplicate of it — reading
+     * from its first byte to its last, so a caller may consume the buffer it was given without the body
+     * noticing and without a second attempt seeing a moved position. What the buffer wraps is not to be
+     * modified while a request carrying it is in flight.
      *
-     * @return the length in bytes, or {@code -1} if it is not known
+     * <p>
+     * Answering {@code null} is the default and is always correct: a body answers here only because it
+     * can save the work of writing itself out.
+     *
+     * @return the content, or {@code null} when this body has to be written to be read
      */
-    default long length() {
-        return -1;
+    default ByteBuffer buffer() {
+        return null;
     }
 
     /**
@@ -70,8 +79,8 @@ public interface HttpBody {
             }
 
             @Override
-            public long length() {
-                return bytes.length;
+            public ByteBuffer buffer() {
+                return ByteBuffer.wrap(bytes);
             }
         };
     }
@@ -95,53 +104,6 @@ public interface HttpBody {
         Objects.requireNonNull(text, "text must not be null");
         Objects.requireNonNull(charset, "charset must not be null");
         return of(text.getBytes(charset));
-    }
-
-    /**
-     * A body of a file's content, so that a large one need never be held in memory.
-     *
-     * <p>
-     * The length is the file's, read once when this body is created — the only moment there is to read
-     * it, since an implementation decides how to frame a request before a byte of it is written. A file
-     * that changes size in between would therefore make the request disagree with itself, so a write
-     * that does not deliver exactly that many bytes fails instead of passing for a complete body. A
-     * size that cannot be read at all is answered as unknown, and the file failing for real surfaces
-     * when it is written — where a failing read belongs.
-     *
-     * <p>
-     * The file is expected to hold still while a request carrying it is in flight: a change that keeps
-     * the size is not something a count can catch, and a body answering with other bytes on a second
-     * attempt breaks the rule this interface is built on.
-     *
-     * @param file the file to send; never {@code null}
-     */
-    static HttpBody ofFile(Path file) {
-        Objects.requireNonNull(file, "file must not be null");
-        long size = sizeOrUnknown(file);
-        return new HttpBody() {
-
-            @Override
-            public void writeTo(OutputStream out) throws IOException {
-                long written = Files.copy(file, out);
-                if (size >= 0 && written != size) {
-                    throw new IOException("the file changed while it was being sent: " + file + " was "
-                            + size + " bytes, " + written + " bytes were written");
-                }
-            }
-
-            @Override
-            public long length() {
-                return size;
-            }
-        };
-    }
-
-    private static long sizeOrUnknown(Path file) {
-        try {
-            return Files.size(file);
-        } catch (IOException unknown) {
-            return -1;
-        }
     }
 
 }

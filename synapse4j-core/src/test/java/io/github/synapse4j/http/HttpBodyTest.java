@@ -5,32 +5,31 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.ByteBuffer;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 class HttpBodyTest {
 
     @Test
-    void aLambdaBodyWritesWhatItWritesAndKnowsNoLength() throws IOException {
+    void aLambdaBodyWritesWhatItWritesAndHasNoBuffer() throws IOException {
         HttpBody body = out -> out.write("hello".getBytes(UTF_8));
 
         assertArrayEquals("hello".getBytes(UTF_8), written(body));
-        assertEquals(-1, body.length());
+        assertNull(body.buffer());
     }
 
     @Test
-    void aBodyOfBytesWritesThemAndAnswersTheirLength() throws IOException {
+    void aBodyOfBytesWritesThemAndAnswersWithABuffer() throws IOException {
         HttpBody body = HttpBody.of("{\"a\":1}".getBytes(UTF_8));
 
         assertArrayEquals("{\"a\":1}".getBytes(UTF_8), written(body));
-        assertEquals(7, body.length());
+        assertArrayEquals("{\"a\":1}".getBytes(UTF_8), buffered(body));
+        assertEquals(7, body.buffer().remaining());
     }
 
     @Test
@@ -41,14 +40,15 @@ class HttpBodyTest {
         bytes[1] = 9;
 
         assertArrayEquals(new byte[] { 1, 9, 3 }, written(body));
+        assertArrayEquals(new byte[] { 1, 9, 3 }, buffered(body));
     }
 
     @Test
-    void aBodyOfTextIsWrittenInUtf8AndCountedInBytes() throws IOException {
+    void aBodyOfTextIsWrittenInUtf8() throws IOException {
         HttpBody body = HttpBody.of("héllo");
 
         assertArrayEquals("h\u00E9llo".getBytes(UTF_8), written(body));
-        assertEquals(6, body.length());
+        assertEquals(6, body.buffer().remaining());
     }
 
     @Test
@@ -56,87 +56,53 @@ class HttpBodyTest {
         HttpBody body = HttpBody.of("héllo", ISO_8859_1);
 
         assertArrayEquals("h\u00E9llo".getBytes(ISO_8859_1), written(body));
-        assertEquals(5, body.length());
+        assertEquals(5, body.buffer().remaining());
     }
 
     @Test
-    void aBodyOfAFileWritesItsContentAndAnswersItsSize(@TempDir Path directory) throws IOException {
-        Path file = directory.resolve("request.json");
-        Files.writeString(file, "{\"a\":1}");
+    void everyCallAnswersWithABufferOfItsOwn() {
+        HttpBody body = HttpBody.of("{\"a\":1}");
 
-        HttpBody body = HttpBody.ofFile(file);
+        ByteBuffer first = body.buffer();
+        first.position(first.limit()); // a caller consumes what it was given
 
-        assertArrayEquals("{\"a\":1}".getBytes(UTF_8), written(body));
-        assertEquals(7, body.length());
+        ByteBuffer second = body.buffer();
+
+        assertEquals(0, second.position());
+        assertEquals(first.limit(), second.limit());
+        assertArrayEquals("{\"a\":1}".getBytes(UTF_8), buffered(body));
     }
 
     @Test
-    void aFileThatCannotBeReadIsUnknownLengthAndFailsWhereItIsWritten(@TempDir Path directory) {
-        HttpBody body = HttpBody.ofFile(directory.resolve("missing.json"));
-
-        assertEquals(-1, body.length());
-        assertThrows(IOException.class, () -> body.writeTo(new ByteArrayOutputStream()));
-    }
-
-    @Test
-    void aFileThatGrewAfterItsLengthWasTakenFailsRatherThanPassingForAWholeBody(@TempDir Path directory)
-            throws IOException {
-        Path file = directory.resolve("request.json");
-        Files.writeString(file, "{\"a\":1}");
-        HttpBody body = HttpBody.ofFile(file);
-
-        Files.writeString(file, "{\"a\":1,\"b\":2}");
-
-        IOException failure = assertThrows(IOException.class, () -> body.writeTo(new ByteArrayOutputStream()));
-
-        assertEquals(7, body.length());
-        assertEquals("the file changed while it was being sent: " + file + " was 7 bytes, "
-                + "13 bytes were written", failure.getMessage());
-    }
-
-    @Test
-    void aFileThatShrankAfterItsLengthWasTakenFailsRatherThanPassingForAWholeBody(@TempDir Path directory)
-            throws IOException {
-        Path file = directory.resolve("request.json");
-        Files.writeString(file, "{\"a\":1}");
-        HttpBody body = HttpBody.ofFile(file);
-
-        Files.writeString(file, "{}");
-
-        IOException failure = assertThrows(IOException.class, () -> body.writeTo(new ByteArrayOutputStream()));
-
-        assertEquals("the file changed while it was being sent: " + file + " was 7 bytes, "
-                + "2 bytes were written", failure.getMessage());
-    }
-
-    @Test
-    void aBodyWritesTheSameBytesEveryTimeItIsAsked(@TempDir Path directory) throws IOException {
-        Path file = directory.resolve("request.json");
-        Files.writeString(file, "{\"a\":1}");
-
+    void aBodyProducesTheSameBytesEveryTimeItIsAsked() throws IOException {
         // A request is sent again on a retry, on a redirect, and after an authentication challenge.
-        for (HttpBody body : new HttpBody[] { HttpBody.of("{\"a\":1}"), HttpBody.ofFile(file) }) {
-            assertArrayEquals(written(body), written(body));
-        }
+        HttpBody body = HttpBody.of("{\"a\":1}");
+
+        assertArrayEquals(written(body), written(body));
+        assertArrayEquals(buffered(body), buffered(body));
     }
 
     @Test
-    void aBodyLeavesTheSinkItWritesToOpen(@TempDir Path directory) throws IOException {
-        Path file = directory.resolve("request.json");
-        Files.writeString(file, "{}");
-
+    void aBodyLeavesTheSinkItWritesToOpen() throws IOException {
         RecordingOutputStream out = new RecordingOutputStream();
+
         HttpBody.of("{}").writeTo(out);
-        HttpBody.ofFile(file).writeTo(out);
 
         assertFalse(out.closed);
-        assertEquals("{}" + "{}", out.toString(UTF_8));
+        assertEquals("{}", out.toString(UTF_8));
     }
 
     private static byte[] written(HttpBody body) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         body.writeTo(out);
         return out.toByteArray();
+    }
+
+    private static byte[] buffered(HttpBody body) {
+        ByteBuffer buffer = body.buffer();
+        byte[] content = new byte[buffer.remaining()];
+        buffer.get(content);
+        return content;
     }
 
     /** A sink that remembers being closed, so that the ownership rule can be checked. */
