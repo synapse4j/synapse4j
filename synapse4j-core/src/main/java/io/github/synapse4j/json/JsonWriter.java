@@ -3,6 +3,7 @@ package io.github.synapse4j.json;
 import java.io.Flushable;
 import java.io.IOException;
 import java.io.Reader;
+import java.math.BigDecimal;
 
 import io.github.synapse4j.exception.SynapseIOException;
 
@@ -67,9 +68,10 @@ public interface JsonWriter extends Flushable, AutoCloseable {
      * an inlined media payload, a long tool result — need not be held.
      *
      * <p>
-     * The reader is read to its end and is not closed. Holding less is the point, not a promise: an
-     * implementation whose library cannot write a string incrementally may read it into memory first,
-     * and the contract is the same either way.
+     * The reader is read to its end and then closed — also when writing fails, since it typically
+     * holds an open file or stream the caller has no other handle on. Holding less is the point, not
+     * a promise: an implementation whose library cannot write a string incrementally may read it
+     * into memory first, and the contract is the same either way.
      *
      * @param text the characters of the value; must not be {@code null}
      */
@@ -89,6 +91,25 @@ public interface JsonWriter extends Flushable, AutoCloseable {
      * @param value the number
      */
     JsonWriter writeNumber(double value);
+
+    /**
+     * Writes a number value that the primitive {@code writeNumber} methods cannot hold exactly — a
+     * {@link java.math.BigInteger}, or a decimal with more precision than a {@code double} keeps.
+     * This is how a number {@link JsonReader#captureValue()} preserved is handed back without loss:
+     * through a {@code double} it would be rounded, through a {@code long} it would overflow.
+     *
+     * @param value the number; must not be {@code null}
+     */
+    JsonWriter writeNumber(BigDecimal value);
+
+    /**
+     * Writes a number whose text is already the JSON spelling of it — the escape hatch for a number
+     * this interface has no other method for. The text is written as given and must be a valid JSON
+     * number: locale-independent, no surrounding whitespace.
+     *
+     * @param encoded the number's JSON text; must not be {@code null}
+     */
+    JsonWriter writeNumber(String encoded);
 
     /**
      * Writes a boolean value.

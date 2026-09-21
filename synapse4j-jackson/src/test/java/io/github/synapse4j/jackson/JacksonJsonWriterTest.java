@@ -2,10 +2,12 @@ package io.github.synapse4j.jackson;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringReader;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
@@ -49,7 +51,32 @@ class JacksonJsonWriterTest {
         writer.close();
 
         assertEquals("{\"payload\":\"" + value + "\"}", sink.text());
-        assertFalse(text.closed);
+        assertTrue(text.closed);
+    }
+
+    @Test
+    void writesABigNumberExactly() {
+        RecordingOutputStream sink = new RecordingOutputStream();
+
+        JsonWriter writer = codec.writer(sink);
+        writer.writeStartArray()
+                .writeNumber(new BigDecimal("123456789012345678901234567890.5"))
+                .writeNumber(new BigDecimal("99999999999999999999"))
+                .writeEndArray();
+        writer.close();
+
+        assertEquals("[123456789012345678901234567890.5,99999999999999999999]", sink.text());
+    }
+
+    @Test
+    void writesAPreEncodedNumberAsGiven() {
+        RecordingOutputStream sink = new RecordingOutputStream();
+
+        JsonWriter writer = codec.writer(sink);
+        writer.writeNumber("1e5");
+        writer.close();
+
+        assertEquals("1e5", sink.text());
     }
 
     @Test
@@ -93,7 +120,7 @@ class JacksonJsonWriterTest {
 
     }
 
-    /** A reader that remembers being closed: writing from it must consume it, not close it. */
+    /** A reader that remembers being closed: writing from it must consume it and close it. */
     private static class TrackingReader extends StringReader {
 
         private boolean closed;

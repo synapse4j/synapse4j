@@ -160,9 +160,17 @@ public interface JsonReader extends AutoCloseable {
     /**
      * Reads the value the reader is positioned on — a scalar, or an object or array together with
      * everything under it — and returns it in the shape a decoded document has: a {@code Map} with
-     * its keys in document order, a {@code List}, a {@code String}, a whole number as the narrowest
-     * of {@code Integer}, {@code Long} and {@code BigInteger} that holds it, anything else numeric as
-     * a {@code Double}, a {@code Boolean}, or {@code null}.
+     * its keys in document order, a {@code List}, a {@code String}, a whole number spelled without
+     * {@code .}, {@code e} or {@code E} as the narrowest of {@code Integer}, {@code Long} and
+     * {@code BigInteger} that holds it, anything else numeric as a {@code Double}, a {@code Boolean},
+     * or {@code null}.
+     *
+     * <p>
+     * How a number is spelled decides its type, not the number it denotes: {@code 1e5} keeps its
+     * exponent and comes back as a {@code Double} even though it is a whole number, which is the
+     * classification JSON libraries make. A number past the {@code long} range is kept as a
+     * {@link java.math.BigInteger} — write it back through
+     * {@link JsonWriter#writeNumber(java.math.BigDecimal)}.
      *
      * <p>
      * This is how a caller keeps a value it does not model, where {@link #skipValue()} throws it

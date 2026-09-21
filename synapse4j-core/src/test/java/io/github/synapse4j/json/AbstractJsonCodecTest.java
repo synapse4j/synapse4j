@@ -1,6 +1,7 @@
 package io.github.synapse4j.json;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
@@ -51,6 +52,24 @@ class AbstractJsonCodecTest {
     }
 
     @Test
+    void refusesToEncodeAView() {
+        StubCodec codec = new StubCodec();
+
+        assertThrows(IllegalArgumentException.class, () -> codec.encode(JsonView.of(Map.of("a", 1))));
+    }
+
+    @Test
+    void readsASchemaAskedForAsASubclassTheSameWay() {
+        StubCodec codec = new StubCodec();
+        codec.decoded = Map.of("type", "string");
+
+        JsonSchema schema = codec.decode("{}", ExtendedSchema.class);
+
+        assertEquals(Map.class, codec.decodedType);
+        assertEquals(List.of("string"), schema.getType());
+    }
+
+    @Test
     void handsEverythingElseToTheSubclass() {
         StubCodec codec = new StubCodec();
 
@@ -74,6 +93,11 @@ class AbstractJsonCodecTest {
         JsonSchema schema = new JsonSchema();
         schema.setType(type);
         return schema;
+    }
+
+    /** Providers extend the schema model; decoding must treat a subclass like the base type. */
+    private static class ExtendedSchema extends JsonSchema {
+
     }
 
     private static class StubCodec extends AbstractJsonCodec {

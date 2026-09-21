@@ -1,7 +1,9 @@
 package io.github.synapse4j.jackson;
 
+import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Reader;
+import java.math.BigDecimal;
 import java.util.function.Supplier;
 
 import io.github.synapse4j.exception.SynapseException;
@@ -73,8 +75,17 @@ class JacksonJsonWriter implements JsonWriter {
 
     @Override
     public JsonWriter writeString(Reader text) {
-        // A negative length is Jackson's "read the reader to its end"; it does not close the reader.
-        return write(() -> generator.writeString(text, -1));
+        try {
+            // A negative length is Jackson's "read the reader to its end"; it does not close the
+            // reader, so this method does — also when the write fails, see the interface contract.
+            return write(() -> generator.writeString(text, -1));
+        } finally {
+            try {
+                text.close();
+            } catch (IOException failure) {
+                throw new SynapseIOException("Closing the string source failed", failure);
+            }
+        }
     }
 
     @Override
@@ -85,6 +96,16 @@ class JacksonJsonWriter implements JsonWriter {
     @Override
     public JsonWriter writeNumber(double value) {
         return write(() -> generator.writeNumber(value));
+    }
+
+    @Override
+    public JsonWriter writeNumber(BigDecimal value) {
+        return write(() -> generator.writeNumber(value));
+    }
+
+    @Override
+    public JsonWriter writeNumber(String encoded) {
+        return write(() -> generator.writeNumber(encoded));
     }
 
     @Override
