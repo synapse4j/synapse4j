@@ -7,6 +7,7 @@
     <groupId>io.github.synapse4j</groupId>
     <artifactId>synapse4j-parent</artifactId>
     <version>${revision}</version>
+    <relativePath>../synapse4j-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>synapse4j-http-jdk</artifactId>
