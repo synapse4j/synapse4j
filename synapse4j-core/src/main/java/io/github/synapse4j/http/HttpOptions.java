@@ -77,18 +77,16 @@ public class HttpOptions {
      *
      * @param options  the options the request carries; may be {@code null}
      * @param defaults the implementation's own options; never {@code null}
-     * @return the request's options with their gaps filled in, or {@code defaults} itself when the
-     *         request carries none — treat the answer as read-only either way, since it may be an
-     *         instance the caller did not create
+     * @return a new instance holding the request's options with their gaps filled in from the
+     *         defaults — never {@code defaults} itself or {@code options} itself, so the caller may
+     *         change the answer without touching either
      */
     public static HttpOptions effective(HttpOptions options, HttpOptions defaults) {
         Objects.requireNonNull(defaults, "defaults must not be null");
-        if (options == null) {
-            return defaults;
-        }
+        HttpOptions carried = options == null ? new HttpOptions() : options;
         HttpOptions effective = new HttpOptions();
-        effective.bodyWriteMode = options.bodyWriteMode != null ? options.bodyWriteMode : defaults.bodyWriteMode;
-        effective.responseTimeout = options.responseTimeout != null ? options.responseTimeout
+        effective.bodyWriteMode = carried.bodyWriteMode != null ? carried.bodyWriteMode : defaults.bodyWriteMode;
+        effective.responseTimeout = carried.responseTimeout != null ? carried.responseTimeout
                 : defaults.responseTimeout;
         return effective;
     }
