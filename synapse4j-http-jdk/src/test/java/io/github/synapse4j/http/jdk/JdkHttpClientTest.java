@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import com.sun.net.httpserver.HttpServer;
 
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.http.HttpBody;
 import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.http.HttpRequest;
 import io.github.synapse4j.http.HttpResponse;
@@ -81,7 +82,7 @@ class JdkHttpClientTest {
         HttpRequest request = new HttpRequest(baseUrl + "/echo");
         request.setMethod(HttpRequest.POST);
         request.getHeaders().put("X-Test", List.of("one", "two"));
-        request.setBody("ping".getBytes(UTF_8));
+        request.setBody(HttpBody.of("ping".getBytes(UTF_8)));
 
         try (HttpResponse response = client.send(request)) {
             assertEquals(200, response.getStatusCode());
@@ -94,6 +95,130 @@ class JdkHttpClientTest {
         assertEquals("/echo", seenPath.get());
         assertEquals(List.of("one", "two"), seenHeaders.get().get("X-test"));
         assertEquals("ping", new String(seenBody.get(), UTF_8));
+    }
+
+    @Test
+    void aBodyThatHoldsItsBytesGoesOutWithALength() throws Exception {
+        AtomicReference<byte[]> seenBody = new AtomicReference<>();
+        AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
+        server.createContext("/ready", exchange -> {
+            seenBody.set(exchange.getRequestBody().readAllBytes());
+            seenHeaders.set(new LinkedHashMap<>(exchange.getRequestHeaders()));
+            exchange.sendResponseHeaders(200, -1);
+            exchange.close();
+        });
+
+        HttpRequest request = new HttpRequest(baseUrl + "/ready");
+        request.setMethod(HttpRequest.POST);
+        request.setBody(HttpBody.of("ping".getBytes(UTF_8)));
+
+        try (HttpResponse response = client.send(request)) {
+            assertEquals(200, response.getStatusCode());
+        }
+
+        assertEquals("ping", new String(seenBody.get(), UTF_8));
+        // The bytes were there to be handed over, so the request has a length rather than a chunked
+        // framing — which is what a body that had to be written would have got.
+        assertEquals(List.of("4"), seenHeaders.get().get("Content-length"));
+    }
+
+    @Test
+    void aBodyThatCanOnlyBeWrittenIsStreamed() throws Exception {
+        AtomicReference<byte[]> seenBody = new AtomicReference<>();
+        AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
+        server.createContext("/streamed", exchange -> {
+            seenBody.set(exchange.getRequestBody().readAllBytes());
+            seenHeaders.set(new LinkedHashMap<>(exchange.getRequestHeaders()));
+            exchange.sendResponseHeaders(200, -1);
+            exchange.close();
+        });
+
+        HttpRequest request = new HttpRequest(baseUrl + "/streamed");
+        request.setMethod(HttpRequest.POST);
+        request.setBody(out -> {
+            out.write("pi".getBytes(UTF_8));
+            out.write("ng".getBytes(UTF_8));
+        });
+
+        try (HttpResponse response = client.send(request)) {
+            assertEquals(200, response.getStatusCode());
+        }
+
+        assertEquals("ping", new String(seenBody.get(), UTF_8));
+        // Nobody knows how long it is until it has been written, so it goes out chunked.
+        assertEquals(List.of("chunked"), seenHeaders.get().get("Transfer-encoding"));
+    }
+
+    @Test
+    void aBufferedBodyIsGatheredBeforeItIsSent() throws Exception {
+        AtomicReference<byte[]> seenBody = new AtomicReference<>();
+        AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
+        server.createContext("/buffered", exchange -> {
+            seenBody.set(exchange.getRequestBody().readAllBytes());
+            seenHeaders.set(new LinkedHashMap<>(exchange.getRequestHeaders()));
+            exchange.sendResponseHeaders(200, -1);
+            exchange.close();
+        });
+
+        HttpOptions options = HttpOptions.defaults();
+        options.setBodyWriteMode(HttpOptions.BUFFERED);
+        HttpRequest request = new HttpRequest(baseUrl + "/buffered");
+        request.setMethod(HttpRequest.POST);
+        request.setOptions(options);
+        request.setBody(out -> {
+            out.write("pi".getBytes(UTF_8));
+            out.write("ng".getBytes(UTF_8));
+        });
+
+        try (HttpResponse response = client.send(request)) {
+            assertEquals(200, response.getStatusCode());
+        }
+
+        assertEquals("ping", new String(seenBody.get(), UTF_8));
+        assertEquals(List.of("4"), seenHeaders.get().get("Content-length"));
+    }
+
+    @Test
+    void aBodyWriteModeThisImplementationDoesNotKnowIsRefused() {
+        HttpOptions options = HttpOptions.defaults();
+        options.setBodyWriteMode("spooled");
+        HttpRequest request = new HttpRequest(baseUrl + "/nowhere");
+        request.setMethod(HttpRequest.POST);
+        request.setOptions(options);
+        request.setBody(HttpBody.of("ping"));
+
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+                () -> client.send(request));
+
+        assertTrue(thrown.getMessage().contains("spooled"), thrown::toString);
+    }
+
+    @Test
+    void aStreamedBodyThatFailsIsReported() throws IOException {
+        server.createContext("/failing", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            exchange.sendResponseHeaders(200, -1);
+            exchange.close();
+        });
+
+        HttpRequest request = new HttpRequest(baseUrl + "/failing");
+        request.setMethod(HttpRequest.POST);
+        request.setBody(out -> {
+            throw new IOException("no bytes today");
+        });
+
+        SynapseException thrown = assertThrows(SynapseException.class, () -> client.send(request));
+
+        assertTrue(causeChainContains(thrown, "no bytes today"), thrown::toString);
+    }
+
+    private static boolean causeChainContains(Throwable thrown, String message) {
+        for (Throwable cause = thrown; cause != null; cause = cause.getCause()) {
+            if (message.equals(cause.getMessage())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Test

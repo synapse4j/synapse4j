@@ -90,7 +90,8 @@ public class OpenAiChatClient implements ChatClient {
         // Applied last, so a caller's header wins over any of the module's own.
         request.getOptions().getHeaders().forEach((name, value) -> httpRequest.getHeaders()
                 .put(name, List.of(value)));
-        httpRequest.setBody(codec.encode(wireRequest).getBytes(StandardCharsets.UTF_8));
+        byte[] wireBody = codec.encode(wireRequest).getBytes(StandardCharsets.UTF_8);
+        httpRequest.setBody(io.github.synapse4j.http.HttpBody.of(wireBody));
 
         try (io.github.synapse4j.http.HttpResponse httpResponse = http.send(httpRequest)) {
             // The body is a stream and can be read once, so the status decides how it is read

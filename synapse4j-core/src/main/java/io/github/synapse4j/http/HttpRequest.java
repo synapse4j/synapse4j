@@ -45,8 +45,12 @@ public class HttpRequest {
     @NonNull
     private Map<String, List<String>> headers = new LinkedHashMap<>();
 
-    /** The body bytes, or {@code null} when the request has no body (typical for {@link #GET}). */
-    private byte[] body;
+    /**
+     * The body, or {@code null} when the request has no body (typical for {@link #GET}). An empty body
+     * is not the same as no body: one goes out as a request with an empty body, while {@code null} sends
+     * none at all.
+     */
+    private HttpBody body;
 
     /**
      * What this request wants from the HTTP layer, or {@code null} when it has no opinion and the

@@ -454,7 +454,8 @@ class OpenAiChatClientTest {
 
     private Map<String, Object> parseCaptured() {
         try {
-            return codec.decode(new String(stub.captured.getBody(), UTF_8), Map.class);
+            // The client sends a wire body it already holds, so the captured body has its bytes.
+            return codec.decode(new String(stub.captured.getBody().buffer().array(), UTF_8), Map.class);
         } catch (RuntimeException e) {
             throw new AssertionError("captured wire body is not JSON", e);
         }
