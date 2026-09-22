@@ -41,7 +41,9 @@ import lombok.RequiredArgsConstructor;
  * Responses are read token by token through {@link JsonReader} rather than decoded into a tree: the
  * fields this module models are mapped as they go by, and the ones it does not are captured into the
  * extras bag of the node they belong to, under the path they came from. So a field the provider adds
- * is neither dropped nor able to break the parse, and the body is decoded once instead of twice.
+ * is neither dropped nor able to break the parse, and the body is decoded once instead of twice. In
+ * the other direction, every node's extras are merged into the object that node sits in, so a field
+ * a caller adds goes out where it was added.
  *
  * <p>
  * A media part is rendered as the protocol's image content: a URL the provider fetches, or the
@@ -116,7 +118,7 @@ class ChatCompletionsAdapter {
         // The extras of the request itself are its top-level members: a nested bag would nest the
         // protocol's own fields one level too deep. They come last, so a caller's own member of the
         // same name is the one that wins.
-        writeMembers(request.getOptions().getExtras().toNestedMap(), writer);
+        writeExtras(request.getOptions().getExtras().toNestedMap(), writer);
         writer.writeEndObject();
     }
 
@@ -374,8 +376,11 @@ class ChatCompletionsAdapter {
                 throw new SynapseException(
                         "unsupported message for OpenAI: tool results mixed with other parts");
             }
+            // One message becomes one entry per result, so a field set on the message goes onto
+            // every entry it turns into.
+            Map<String, Object> messageExtras = message.getExtras().toNestedMap();
             for (ContentPart part : message.getParts()) {
-                writeToolResult((ToolResultPart) part, writer);
+                writeToolResult((ToolResultPart) part, messageExtras, writer);
             }
             return;
         }
@@ -425,27 +430,34 @@ class ChatCompletionsAdapter {
             }
             writer.writeEndArray();
         }
+        writeExtras(message.getExtras().toNestedMap(), writer);
         writer.writeEndObject();
     }
 
     /**
      * Whether the message takes the array form of content: it does as soon as it is not text alone,
-     * because neither an image nor a replayed tool call can be spelled inside a string.
+     * because neither an image nor a replayed tool call can be spelled inside a string — nor can a
+     * field this module does not model.
      */
     private static boolean arrayContent(ChatMessage message) {
-        return message.getParts().stream()
-                .anyMatch(part -> part instanceof MediaPart || part instanceof ToolCallPart);
+        return message.getParts().stream().anyMatch(
+                part -> part instanceof MediaPart || part instanceof ToolCallPart || !part.getExtras().isEmpty());
     }
 
     private static void writeTextPart(TextPart part, JsonWriter writer) {
-        if (part.getText() == null || part.getText().isEmpty()) {
+        if ((part.getText() == null || part.getText().isEmpty()) && part.getExtras().isEmpty()) {
+            // A part with neither text nor extras carries nothing, and the protocol has no place
+            // for it.
             return;
         }
         writer.writeStartObject();
         writer.writeName("type");
         writer.writeString("text");
-        writer.writeName("text");
-        writer.writeString(part.getText());
+        if (part.getText() != null && !part.getText().isEmpty()) {
+            writer.writeName("text");
+            writer.writeString(part.getText());
+        }
+        writeExtras(part.getExtras().toNestedMap(), writer);
         writer.writeEndObject();
     }
 
@@ -469,6 +481,7 @@ class ChatCompletionsAdapter {
             throw new SynapseException(
                     "unsupported media part for OpenAI: mediaType is required to inline the payload");
         }
+        Map<String, Object> extras = part.getExtras().toNestedMap();
         writer.writeStartObject();
         writer.writeName("type");
         writer.writeString("image_url");
@@ -480,11 +493,15 @@ class ChatCompletionsAdapter {
         } else {
             writer.writeString(new Base64Reader("data:" + mediaType + ";base64,", part.getSource()));
         }
+        // "detail", or anything else this module does not model, belongs inside the image_url
+        // object rather than beside it.
+        writeExtras(takeNested(extras, "image_url"), writer);
         writer.writeEndObject();
+        writeExtras(extras, writer);
         writer.writeEndObject();
     }
 
-    private void writeToolResult(ToolResultPart result, JsonWriter writer) {
+    private void writeToolResult(ToolResultPart result, Map<String, Object> messageExtras, JsonWriter writer) {
         writer.writeStartObject();
         writer.writeName("role");
         writer.writeString("tool");
@@ -492,10 +509,15 @@ class ChatCompletionsAdapter {
         writer.writeString(textOf(result.getParts()));
         writer.writeName("tool_call_id");
         writeValue(result.getCallId(), writer);
+        // The message's extras first, the result's own after: where both set the same member, the
+        // more specific node is the one that wins.
+        writeExtras(messageExtras, writer);
+        writeExtras(result.getExtras().toNestedMap(), writer);
         writer.writeEndObject();
     }
 
     private void writeToolCall(ToolCallPart part, JsonWriter writer) {
+        Map<String, Object> extras = part.getExtras().toNestedMap();
         writer.writeStartObject();
         writer.writeName("id");
         writeValue(part.getCallId(), writer);
@@ -507,11 +529,15 @@ class ChatCompletionsAdapter {
         writeValue(part.getName(), writer);
         writer.writeName("arguments");
         writeValue(part.getArgumentsJson(), writer);
+        // A field the response carried inside the function object comes back to the same place.
+        writeExtras(takeNested(extras, "function"), writer);
         writer.writeEndObject();
+        writeExtras(extras, writer);
         writer.writeEndObject();
     }
 
     private void writeTool(ToolDefinition definition, JsonWriter writer) {
+        Map<String, Object> extras = definition.getExtras().toNestedMap();
         writer.writeStartObject();
         writer.writeName("type");
         writer.writeString("function");
@@ -526,7 +552,10 @@ class ChatCompletionsAdapter {
             writer.writeName("parameters");
             writeValue(parameters, writer);
         }
+        // "strict" lives inside the function object, so it is reached by that path.
+        writeExtras(takeNested(extras, "function"), writer);
         writer.writeEndObject();
+        writeExtras(extras, writer);
         writer.writeEndObject();
     }
 
@@ -541,11 +570,12 @@ class ChatCompletionsAdapter {
         }
     }
 
-    /** Writes the response format, or nothing at all when the format states no type. */
+    /** Writes the response format, or nothing at all when the format states nothing. */
     private void writeResponseFormat(ChatResponseFormat format, JsonWriter writer) {
-        if (format.getType() == null) {
+        if (format.getType() == null && format.getExtras().isEmpty()) {
             return;
         }
+        Map<String, Object> extras = format.getExtras().toNestedMap();
         writer.writeName("response_format");
         writer.writeStartObject();
         if (ChatResponseFormat.TYPE_JSON_SCHEMA.equals(format.getType())) {
@@ -554,7 +584,7 @@ class ChatCompletionsAdapter {
             String name = format.getName() != null ? format.getName() : "response";
             // "strict" is deliberately not sent in this cut: it changes how strictly the provider
             // enforces the schema, and choosing that for the caller would be a silent behaviour
-            // decision. It stays reachable through the format's extras.
+            // decision. It stays reachable through the format's extras, under the json_schema path.
             writer.writeName("json_schema");
             writer.writeStartObject();
             writer.writeName("name");
@@ -564,12 +594,14 @@ class ChatCompletionsAdapter {
                 writer.writeName("schema");
                 writeValue(schema, writer);
             }
+            writeExtras(takeNested(extras, "json_schema"), writer);
             writer.writeEndObject();
-            writer.writeEndObject();
-            return;
+        } else if (format.getType() != null) {
+            writer.writeName("type");
+            writer.writeString(
+                    ChatResponseFormat.TYPE_JSON.equals(format.getType()) ? "json_object" : format.getType());
         }
-        writer.writeName("type");
-        writer.writeString(ChatResponseFormat.TYPE_JSON.equals(format.getType()) ? "json_object" : format.getType());
+        writeExtras(extras, writer);
         writer.writeEndObject();
     }
 
@@ -578,6 +610,10 @@ class ChatCompletionsAdapter {
         for (ContentPart part : parts) {
             if (!(part instanceof TextPart textPart)) {
                 throw unsupportedPart(part);
+            }
+            if (!textPart.getExtras().isEmpty()) {
+                throw new SynapseException(
+                        "unsupported part for OpenAI: a tool result's content is a string, which cannot carry extras");
             }
             text.append(textPart.getText());
         }
@@ -592,12 +628,29 @@ class ChatCompletionsAdapter {
         }
     }
 
-    /** Writes the members of a nested map into the object that is currently open. */
-    private static void writeMembers(Map<String, Object> members, JsonWriter writer) {
-        for (Map.Entry<String, Object> member : members.entrySet()) {
-            writer.writeName(member.getKey());
+    /**
+     * Writes the extras of a node as members of the object that is currently open. They go last, so
+     * a caller's own member of the same name is the one that wins, and a field this module does not
+     * model still goes out.
+     */
+    private static void writeExtras(Map<?, ?> extras, JsonWriter writer) {
+        for (Map.Entry<?, ?> member : extras.entrySet()) {
+            writer.writeName(String.valueOf(member.getKey()));
             writeValue(member.getValue(), writer);
         }
+    }
+
+    /**
+     * Takes the extras that belong inside a member this module models itself — the function object
+     * of a tool, the image_url of a media part — out of the node's own extras, so both are written
+     * as members of one object instead of two members of the same name.
+     */
+    private static Map<?, ?> takeNested(Map<String, Object> extras, String name) {
+        if (extras.get(name) instanceof Map<?, ?> nested) {
+            extras.remove(name);
+            return nested;
+        }
+        return Map.of();
     }
 
     /**

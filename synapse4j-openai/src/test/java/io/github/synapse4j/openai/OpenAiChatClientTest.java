@@ -649,6 +649,232 @@ class OpenAiChatClientTest {
     }
 
     @Test
+    void extrasGoOutOnTheNodeTheyWereAddedTo() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        request.getOptions().getExtras().put("seed", 7);
+        ChatMessage user = message(ChatRole.USER, "Hello");
+        user.getExtras().put("name", "roger");
+        user.getParts().get(0).getExtras().put("cache_control", Map.of("type", "ephemeral"));
+        request.getMessages().add(user);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        assertEquals(7, wire.get("seed"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) wire.get("messages");
+        assertEquals("roger", messages.get(0).get("name"));
+        // A part that carries extras cannot be spelled inside a string, so the array form is taken.
+        List<Map<String, Object>> content = contentOf(wire);
+        assertEquals(1, content.size());
+        assertEquals("text", content.get(0).get("type"));
+        assertEquals("Hello", content.get(0).get("text"));
+        assertEquals(Map.of("type", "ephemeral"), content.get(0).get("cache_control"));
+    }
+
+    @Test
+    void aToolDefinitionCarriesItsFunctionExtras() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
+        tool.getExtras().put(List.of("function", "strict"), true);
+        request.getTools().add(tool);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> tools = (List<Map<String, Object>>) wire.get("tools");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> function = (Map<String, Object>) tools.get(0).get("function");
+        // Both members have to sit in one function object: a second "function" member beside it
+        // would leave only the last one standing, and "name" would be gone.
+        assertEquals("get_weather", function.get("name"));
+        assertEquals(Boolean.TRUE, function.get("strict"));
+    }
+
+    @Test
+    void aReplayedToolCallCarriesItsFunctionExtras() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatMessage replay = new ChatMessage();
+        replay.setRole(ChatRole.ASSISTANT);
+        ToolCallPart call = new ToolCallPart("call_1", "get_weather", "{}");
+        call.getExtras().put(List.of("function", "provider_field"), "x");
+        replay.getParts().add(call);
+        request.getMessages().add(replay);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) wire.get("messages");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> toolCalls = (List<Map<String, Object>>) messages.get(0).get("tool_calls");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> function = (Map<String, Object>) toolCalls.get(0).get("function");
+        assertEquals("get_weather", function.get("name"));
+        assertEquals("{}", function.get("arguments"));
+        assertEquals("x", function.get("provider_field"));
+    }
+
+    @Test
+    void aMediaPartCarriesItsImageUrlExtras() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatMessage user = new ChatMessage();
+        user.setRole(ChatRole.USER);
+        MediaPart image = new MediaPart("image/png", "https://example.com/a.png", null, null);
+        image.getExtras().put(List.of("image_url", "detail"), "high");
+        user.getParts().add(image);
+        request.getMessages().add(user);
+
+        client.chat(request);
+
+        List<Map<String, Object>> content = contentOf(parseCaptured());
+        assertEquals(1, content.size());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> imageUrl = (Map<String, Object>) content.get(0).get("image_url");
+        assertEquals("https://example.com/a.png", imageUrl.get("url"));
+        assertEquals("high", imageUrl.get("detail"));
+    }
+
+    @Test
+    void aResponseFormatCarriesItsJsonSchemaExtras() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatResponseFormat format = request.getResponseFormat();
+        format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
+        format.setName("answer");
+        format.setSchema("{\"type\":\"object\"}");
+        format.getExtras().put(List.of("json_schema", "strict"), true);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> responseFormat = (Map<String, Object>) wire.get("response_format");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> jsonSchema = (Map<String, Object>) responseFormat.get("json_schema");
+        assertEquals("answer", jsonSchema.get("name"));
+        assertEquals(Map.of("type", "object"), jsonSchema.get("schema"));
+        assertEquals(Boolean.TRUE, jsonSchema.get("strict"));
+    }
+
+    @Test
+    void aToolResultCarriesItsOwnExtras() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatMessage result = new ChatMessage();
+        result.setRole(ChatRole.TOOL);
+        ToolResultPart part = new ToolResultPart("call_1", "get_weather", List.of(new TextPart("sunny")), false);
+        part.getExtras().put("cache_control", Map.of("type", "ephemeral"));
+        result.getParts().add(part);
+        request.getMessages().add(result);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) wire.get("messages");
+        assertEquals(1, messages.size());
+        assertEquals("tool", messages.get(0).get("role"));
+        assertEquals("call_1", messages.get(0).get("tool_call_id"));
+        assertEquals("sunny", messages.get(0).get("content"));
+        assertEquals(Map.of("type", "ephemeral"), messages.get(0).get("cache_control"));
+    }
+
+    @Test
+    void aToolRoleMessageCarriesItsOwnExtrasOntoEveryEntryItBecomes() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatMessage results = new ChatMessage();
+        results.setRole(ChatRole.TOOL);
+        results.getExtras().put("cache_control", Map.of("type", "ephemeral"));
+        results.getParts().add(new ToolResultPart("call_1", "get_weather", List.of(new TextPart("sunny")), false));
+        results.getParts().add(new ToolResultPart("call_2", "get_time", List.of(new TextPart("noon")), false));
+        request.getMessages().add(results);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) wire.get("messages");
+        assertEquals(2, messages.size());
+        assertEquals("call_1", messages.get(0).get("tool_call_id"));
+        assertEquals("call_2", messages.get(1).get("tool_call_id"));
+        assertEquals(Map.of("type", "ephemeral"), messages.get(0).get("cache_control"));
+        assertEquals(Map.of("type", "ephemeral"), messages.get(1).get("cache_control"));
+    }
+
+    @Test
+    void anEmptyTextPartWithExtrasStillGoesOut() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatMessage user = new ChatMessage();
+        user.setRole(ChatRole.USER);
+        TextPart part = new TextPart("");
+        part.getExtras().put("cache_control", Map.of("type", "ephemeral"));
+        user.getParts().add(part);
+        request.getMessages().add(user);
+
+        client.chat(request);
+
+        List<Map<String, Object>> content = contentOf(parseCaptured());
+        assertEquals(1, content.size());
+        assertEquals("text", content.get(0).get("type"));
+        assertEquals(Map.of("type", "ephemeral"), content.get(0).get("cache_control"));
+        // There is nothing to say, so no text member goes out: an empty string would be a value the
+        // caller never set.
+        assertFalse(content.get(0).containsKey("text"));
+    }
+
+    @Test
+    void aToolResultContentPartWithExtrasFailsLoudly() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatMessage result = new ChatMessage();
+        result.setRole(ChatRole.TOOL);
+        TextPart text = new TextPart("sunny");
+        text.getExtras().put("cache_control", Map.of("type", "ephemeral"));
+        result.getParts().add(new ToolResultPart("call_1", "get_weather", List.of(text), false));
+        request.getMessages().add(result);
+
+        // The tool message's content is a plain string, so a part carrying extras would have them
+        // dropped on the way out without a word.
+        SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
+        assertTrue(thrown.getMessage().contains("extras"), thrown.getMessage());
+    }
+
+    @Test
     void unsupportedPartsFailLoudly() {
         ChatRequest request = new ChatRequest();
         request.getOptions().setModel("gpt-test");
@@ -1066,6 +1292,13 @@ class OpenAiChatClientTest {
         message.setRole(role);
         message.getParts().add(new TextPart(text));
         return message;
+    }
+
+    /** A canned 200 body the request-writing tests answer with, since none of them read it. */
+    private static ByteArrayInputStream okBody() {
+        return new ByteArrayInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
+                        + "\"content\":\"ok\"}}]}").getBytes(UTF_8));
     }
 
 }
