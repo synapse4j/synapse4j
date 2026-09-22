@@ -129,9 +129,14 @@ public class OpenAiChatClient implements ChatClient {
                     : io.github.synapse4j.http.HttpOptions.defaults().getMaxFrameBytes();
             // The response is deliberately left open: the stream owns it from here, and closing
             // the stream is what cancels an answer that is still in flight.
-            return new DefaultChatStream(
+            DefaultChatStream stream = new DefaultChatStream(
                     streamAdapter.events(new SseReader(httpResponse.getBody(), maxFrameBytes)),
                     streamAdapter.aggregation(), httpResponse::close);
+            // The headers arrive with the response, before any frame does, so they go onto the
+            // answer now: aggregatedResponse() carries them the moment the stream exists, the
+            // same way the answer of a blocking call does.
+            ChatCompletionsAdapter.copyHeaders(stream.aggregatedResponse(), httpResponse.getHeaders());
+            return stream;
         }
         throw refusal(httpResponse, status);
     }

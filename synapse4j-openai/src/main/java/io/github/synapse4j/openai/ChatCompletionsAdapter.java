@@ -152,8 +152,20 @@ class ChatCompletionsAdapter {
         if (!choicesRead) {
             throw new SynapseException("OpenAI chat completion contained no choices");
         }
-        httpHeaders.forEach((name, values) -> response.getHeaders().put(name, String.join(", ", values)));
+        copyHeaders(response, httpHeaders);
         return response;
+    }
+
+    /**
+     * Copies the HTTP response headers onto the shared response. The shared model holds one value
+     * per name, so several values of a header are joined the way a blocking call joins them — the
+     * transport metadata of an answer must not depend on which way it was asked for.
+     *
+     * @param response    the response to carry the headers
+     * @param httpHeaders the response headers, as the transport reports them
+     */
+    static void copyHeaders(ChatResponse response, Map<String, List<String>> httpHeaders) {
+        httpHeaders.forEach((name, values) -> response.getHeaders().put(name, String.join(", ", values)));
     }
 
     private void readChoices(JsonReader reader, ChatResponse response) {

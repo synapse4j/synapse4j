@@ -46,9 +46,9 @@ public interface ChatStream extends Iterable<ChatStreamEvent>, AutoCloseable {
     Iterator<ChatStreamEvent> iterator();
 
     /**
-     * The answer assembled from every event consumed so far. Before consumption this is an empty
-     * response; after the loop runs to its end it is the complete one. This method never blocks
-     * and never drives consumption — it reports what the iterator has already folded.
+     * The answer assembled from every event consumed so far. Before consumption this carries no
+     * part of the answer yet; after the loop runs to its end it is the complete one. This method
+     * never blocks and never drives consumption — it reports what the iterator has already folded.
      *
      * @return the aggregated response; never {@code null}
      */

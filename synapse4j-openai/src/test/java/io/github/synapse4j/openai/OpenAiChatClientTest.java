@@ -255,6 +255,32 @@ class OpenAiChatClientTest {
     }
 
     @Test
+    void streamResponseHeadersAreCopiedOntoTheAggregatedResponse() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setHeaders(Map.of("x-request-id", List.of("req_1"), "Retry-After", List.of("1", "2")));
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"},"
+                        + "\"finish_reason\":\"stop\"}]}",
+                "[DONE]").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        ChatStream stream = client.stream(request);
+        // The headers are on the response before a single frame has been consumed, the way they
+        // are on the answer of a blocking call.
+        assertEquals("req_1", stream.aggregatedResponse().getHeaders().get("x-request-id"));
+        assertEquals("1, 2", stream.aggregatedResponse().getHeaders().get("Retry-After"));
+
+        List<ChatStreamEvent> events = new ArrayList<>();
+        for (ChatStreamEvent event : stream) {
+            events.add(event);
+        }
+        assertEquals(2, events.size());
+    }
+
+    @Test
     void anUnsupportedContentPartInTheResponseFailsLoudly() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
