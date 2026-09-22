@@ -66,6 +66,21 @@ class ChatCompletionsAdapter {
      * @param writer  the writer to write into; owned by the caller, and left open
      */
     void writeTo(ChatRequest request, JsonWriter writer) {
+        writeDocument(request, false, writer);
+    }
+
+    /**
+     * Writes the request for an answer that comes back as a stream. This protocol asks for that
+     * with members of the request document rather than with another endpoint or content type.
+     *
+     * @param request the request to translate
+     * @param writer  the writer to write into; owned by the caller, and left open
+     */
+    void writeStreamingTo(ChatRequest request, JsonWriter writer) {
+        writeDocument(request, true, writer);
+    }
+
+    private void writeDocument(ChatRequest request, boolean stream, JsonWriter writer) {
         writer.writeStartObject();
         writer.writeName("model");
         writeValue(request.getOptions().getModel(), writer);
@@ -87,8 +102,20 @@ class ChatCompletionsAdapter {
         writeMemberIfNotNull(writer, "max_tokens", request.getOptions().getMaxOutputTokens());
         writeMemberIfNotNull(writer, "top_p", request.getOptions().getTopP());
         writeResponseFormat(request.getResponseFormat(), writer);
+        if (stream) {
+            writer.writeName("stream");
+            writer.writeBoolean(true);
+            writer.writeName("stream_options");
+            writer.writeStartObject();
+            // A streamed answer reports what it consumed in a frame of its own, and only when the
+            // request asks for it; without this the assembled answer would carry no counts at all.
+            writer.writeName("include_usage");
+            writer.writeBoolean(true);
+            writer.writeEndObject();
+        }
         // The extras of the request itself are its top-level members: a nested bag would nest the
-        // protocol's own fields one level too deep.
+        // protocol's own fields one level too deep. They come last, so a caller's own member of the
+        // same name is the one that wins.
         writeMembers(request.getOptions().getExtras().toNestedMap(), writer);
         writer.writeEndObject();
     }
@@ -118,7 +145,7 @@ class ChatCompletionsAdapter {
                     readChoices(reader, response);
                     choicesRead = true;
                 }
-                case "usage" -> readUsage(reader, response);
+                case "usage" -> response.setUsage(readUsage(reader));
                 default -> response.getExtras().put(field, reader.captureValue());
             }
         }
@@ -280,10 +307,17 @@ class ChatCompletionsAdapter {
         }
     }
 
-    private void readUsage(JsonReader reader, ChatResponse response) {
+    /**
+     * Reads a usage object into the shared model. The same object arrives in a whole response and in
+     * the frame that ends a streamed one, so both directions read it here.
+     *
+     * @param reader the reader, positioned on the usage value
+     * @return the usage
+     */
+    static Usage readUsage(JsonReader reader) {
         if (reader.token() != JsonReader.Token.START_OBJECT) {
             reader.skipValue();
-            return;
+            return null;
         }
         Usage usage = new Usage();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
@@ -296,10 +330,10 @@ class ChatCompletionsAdapter {
                 default -> usage.getExtras().put(field, reader.captureValue());
             }
         }
-        response.setUsage(usage);
+        return usage;
     }
 
-    private void readPromptTokenDetails(JsonReader reader, Usage usage) {
+    private static void readPromptTokenDetails(JsonReader reader, Usage usage) {
         if (reader.token() != JsonReader.Token.START_OBJECT) {
             reader.skipValue();
             return;

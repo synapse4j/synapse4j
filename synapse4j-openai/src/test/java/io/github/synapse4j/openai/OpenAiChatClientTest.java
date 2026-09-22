@@ -13,19 +13,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.github.synapse4j.chat.ChatStream;
 import io.github.synapse4j.data.ChatFinishReason;
 import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ChatRole;
+import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -45,6 +49,12 @@ class OpenAiChatClientTest {
 
         io.github.synapse4j.http.HttpRequest captured;
         HttpResponse canned = new HttpResponse();
+        io.github.synapse4j.http.HttpOptions options = io.github.synapse4j.http.HttpOptions.defaults();
+
+        @Override
+        public io.github.synapse4j.http.HttpOptions options() {
+            return options;
+        }
 
         @Override
         public HttpResponse send(io.github.synapse4j.http.HttpRequest request) {
@@ -57,6 +67,22 @@ class OpenAiChatClientTest {
                 throw new SynapseException("the request body could not be written", e);
             }
             return canned;
+        }
+    }
+
+    /** A response body that remembers being closed, which is how a cancelled stream shows. */
+    static class RecordedInputStream extends ByteArrayInputStream {
+
+        boolean closed;
+
+        RecordedInputStream(byte[] bytes) {
+            super(bytes);
+        }
+
+        @Override
+        public void close() throws IOException {
+            closed = true;
+            super.close();
         }
     }
 
@@ -620,6 +646,286 @@ class OpenAiChatClientTest {
         assertEquals(parseCaptured(), codec.decode(retry.toString(UTF_8), Map.class));
     }
 
+    @Test
+    void aTextStreamBecomesOneEventPerFrameAndAggregatesToTheSameAnswer() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},"
+                        + "\"finish_reason\":null}]}",
+                "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hi\"},\"finish_reason\":null}]}",
+                "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[{\"index\":0,\"delta\":{\"content\":\" there\"},"
+                        + "\"finish_reason\":\"stop\"}]}",
+                "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7}}",
+                "[DONE]").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        request.getMessages().add(message(ChatRole.USER, "Hello"));
+
+        ChatStream stream = client.stream(request);
+        List<ChatStreamEvent> events = new ArrayList<>();
+        for (ChatStreamEvent event : stream) {
+            events.add(event);
+        }
+
+        // One event per frame, the frame that ends the answer included.
+        assertEquals(5, events.size());
+        assertEquals(OpenAiEventTypes.CHUNK, events.get(0).getEventType());
+        assertEquals(ChatRole.ASSISTANT, events.get(0).getDelta().getRole());
+        // The empty fragment that opens a turn adds nothing to it.
+        assertTrue(events.get(0).getDelta().getParts().isEmpty());
+        assertEquals("Hi", textOf(events.get(1)));
+        assertEquals(" there", textOf(events.get(2)));
+        assertEquals(ChatFinishReason.STOP, events.get(2).getFinishReason());
+        assertEquals(Integer.valueOf(11), events.get(3).getUsage().getInputTokens());
+        assertEquals(Integer.valueOf(7), events.get(3).getUsage().getOutputTokens());
+        assertEquals(OpenAiEventTypes.DONE, events.get(4).getEventType());
+        assertNull(events.get(4).getDelta());
+
+        ChatResponse aggregated = stream.aggregatedResponse();
+        assertEquals(ChatRole.ASSISTANT, aggregated.getMessage().getRole());
+        assertEquals(1, aggregated.getMessage().getParts().size());
+        assertEquals("Hi there",
+                assertInstanceOf(TextPart.class, aggregated.getMessage().getParts().get(0)).getText());
+        assertEquals(ChatFinishReason.STOP, aggregated.getFinishReason());
+        assertEquals("chatcmpl-1", aggregated.getId());
+        assertEquals("gpt-test", aggregated.getModel());
+        assertEquals(Integer.valueOf(11), aggregated.getUsage().getInputTokens());
+        assertEquals(Integer.valueOf(7), aggregated.getUsage().getOutputTokens());
+
+        // The same answer asked for in one piece has to come back the same way.
+        stub.canned = new HttpResponse();
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-1\",\"model\":\"gpt-test\","
+                + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
+                + "\"message\":{\"role\":\"assistant\",\"content\":\"Hi there\"}}],"
+                + "\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7}}").getBytes(UTF_8)));
+        ChatResponse blocking = client.chat(request);
+
+        assertEquals(blocking.getMessage().getRole(), aggregated.getMessage().getRole());
+        assertEquals(blocking.getMessage().getParts(), aggregated.getMessage().getParts());
+        assertEquals(blocking.getFinishReason(), aggregated.getFinishReason());
+        assertEquals(blocking.getId(), aggregated.getId());
+        assertEquals(blocking.getModel(), aggregated.getModel());
+        assertEquals(blocking.getUsage().getInputTokens(), aggregated.getUsage().getInputTokens());
+        assertEquals(blocking.getUsage().getOutputTokens(), aggregated.getUsage().getOutputTokens());
+    }
+
+    @Test
+    void toolCallFragmentsMergeIntoOneCall() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                "{\"id\":\"chatcmpl-2\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":null,"
+                        + "\"tool_calls\":[{\"index\":0,\"id\":\"call_1\",\"type\":\"function\","
+                        + "\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null}]}",
+                "{\"id\":\"chatcmpl-2\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":"
+                        + "{\"arguments\":\"{\\\"city\\\":\"}}]},\"finish_reason\":null}]}",
+                "{\"id\":\"chatcmpl-2\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":"
+                        + "{\"arguments\":\"\\\"Paris\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}",
+                "[DONE]").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        ChatStream stream = client.stream(request);
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        int frames = 0;
+        while (events.hasNext()) {
+            events.next();
+            frames++;
+        }
+        assertEquals(4, frames);
+
+        ChatResponse aggregated = stream.aggregatedResponse();
+        // The arguments were split across three chunks and the call named only once.
+        assertEquals(1, aggregated.getMessage().getParts().size());
+        ToolCallPart call = assertInstanceOf(ToolCallPart.class, aggregated.getMessage().getParts().get(0));
+        assertEquals("call_1", call.getCallId());
+        assertEquals("get_weather", call.getName());
+        assertEquals("{\"city\":\"Paris\"}", call.getArgumentsJson());
+        // A field the module does not model travelled with the fragments it came in on.
+        assertEquals("function", call.getExtras().get("type"));
+        assertEquals(ChatFinishReason.TOOL_CALLS, aggregated.getFinishReason());
+    }
+
+    @Test
+    void parallelToolCallFragmentsMergeIntoTheirOwnCalls() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                // Both calls are named in the chunk that opens them, and their arguments then stream
+                // one after the other, each fragment carrying only the position of its call.
+                "{\"id\":\"chatcmpl-4\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"tool_calls\":["
+                        + "{\"index\":0,\"id\":\"call_1\",\"type\":\"function\","
+                        + "\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}},"
+                        + "{\"index\":1,\"id\":\"call_2\",\"type\":\"function\","
+                        + "\"function\":{\"name\":\"get_time\",\"arguments\":\"\"}}]},\"finish_reason\":null}]}",
+                "{\"id\":\"chatcmpl-4\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":"
+                        + "{\"arguments\":\"{\\\"city\\\":\"}}]},\"finish_reason\":null}]}",
+                "{\"id\":\"chatcmpl-4\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":1,\"function\":"
+                        + "{\"arguments\":\"{\\\"zone\\\":\"}}]},\"finish_reason\":null}]}",
+                "{\"id\":\"chatcmpl-4\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":"
+                        + "{\"arguments\":\"\\\"Paris\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}",
+                "[DONE]").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        ChatStream stream = client.stream(request);
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        int frames = 0;
+        while (events.hasNext()) {
+            events.next();
+            frames++;
+        }
+        assertEquals(5, frames);
+
+        ChatResponse aggregated = stream.aggregatedResponse();
+        assertEquals(2, aggregated.getMessage().getParts().size());
+        ToolCallPart first = assertInstanceOf(ToolCallPart.class, aggregated.getMessage().getParts().get(0));
+        ToolCallPart second = assertInstanceOf(ToolCallPart.class, aggregated.getMessage().getParts().get(1));
+        assertEquals("call_1", first.getCallId());
+        assertEquals("get_weather", first.getName());
+        assertEquals("{\"city\":\"Paris\"}", first.getArgumentsJson());
+        assertEquals("call_2", second.getCallId());
+        assertEquals("get_time", second.getName());
+        assertEquals("{\"zone\":", second.getArgumentsJson());
+    }
+
+    @Test
+    void anErrorFrameFailsWhileIterating() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                "{\"id\":\"chatcmpl-3\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Hi\"},"
+                        + "\"finish_reason\":null}]}",
+                "{\"error\":{\"message\":\"Rate limit reached\",\"type\":\"rate_limit_exceeded\","
+                        + "\"code\":\"rpm\"}}")
+                .getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        Iterator<ChatStreamEvent> events = client.stream(request).iterator();
+        // The answer had already started, so the failure arrives with the frame that reports it.
+        assertEquals("Hi", textOf(events.next()));
+        SynapseException thrown = assertThrows(SynapseException.class, events::next);
+        assertTrue(thrown.getMessage().contains("Rate limit reached"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("rate_limit_exceeded"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("rpm"), thrown.getMessage());
+    }
+
+    @Test
+    void aRefusedStreamFailsBeforeAnyEventIsHandedOut() {
+        stub.canned.setStatusCode(429);
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"error\":{\"message\":\"Rate limit reached\",\"type\":\"rate_limit_exceeded\","
+                        + "\"code\":\"rpm\",\"param\":null}}").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        SynapseException thrown = assertThrows(SynapseException.class, () -> client.stream(request));
+        assertTrue(thrown.getMessage().contains("429"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("Rate limit reached"), thrown.getMessage());
+    }
+
+    @Test
+    void closingTheStreamClosesTheResponse() {
+        RecordedInputStream body = new RecordedInputStream(
+                sse("[DONE]").getBytes(UTF_8));
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(body);
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        ChatStream stream = client.stream(request);
+        assertFalse(body.closed);
+        // Cancelling an answer in flight is closing the connection behind it.
+        stream.close();
+        assertTrue(body.closed);
+    }
+
+    @Test
+    void theStreamingRequestAsksForTheUsageFrame() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(sse("[DONE]").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        client.stream(request).close();
+
+        Map<String, Object> wire = parseCaptured();
+        assertEquals(Boolean.TRUE, wire.get("stream"));
+        // A streamed answer reports its usage in a frame of its own, and only when asked to.
+        assertEquals(Map.of("include_usage", true), wire.get("stream_options"));
+    }
+
+    @Test
+    void aRequestLevelFrameBudgetAppliesToTheStream() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(sse(bigChunk(), "[DONE]").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        io.github.synapse4j.http.HttpOptions http = new io.github.synapse4j.http.HttpOptions();
+        http.setMaxFrameBytes(64);
+        request.getOptions().setHttpOptions(http);
+
+        Iterator<ChatStreamEvent> events = client.stream(request).iterator();
+
+        SynapseException thrown = assertThrows(SynapseException.class, events::hasNext);
+        assertTrue(thrown.getMessage().contains("64"), thrown.getMessage());
+    }
+
+    @Test
+    void theStandardFrameBudgetAppliesWhenNothingIsSet() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(sse("x".repeat(300 * 1024), "[DONE]").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        Iterator<ChatStreamEvent> events = client.stream(request).iterator();
+
+        SynapseException thrown = assertThrows(SynapseException.class, events::hasNext);
+        assertTrue(thrown.getMessage().contains("262144"), thrown.getMessage());
+    }
+
+    @Test
+    void theClientOwnFrameBudgetAppliesWhenTheRequestSetsNothing() {
+        stub.options.setMaxFrameBytes(64);
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(sse(bigChunk(), "[DONE]").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        Iterator<ChatStreamEvent> events = client.stream(request).iterator();
+
+        SynapseException thrown = assertThrows(SynapseException.class, events::hasNext);
+        assertTrue(thrown.getMessage().contains("64"), thrown.getMessage());
+    }
+
+    /** One chunk frame with a content long enough to blow any small frame budget. */
+    private static String bigChunk() {
+        return "{\"id\":\"chatcmpl-9\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                + "\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\""
+                + "x".repeat(100) + "\"},\"finish_reason\":null}]}";
+    }
+
     private Map<String, Object> parseCaptured() {
         try {
             // The client streams its body, so the captured body has to be written out to be read.
@@ -647,6 +953,26 @@ class OpenAiChatClientTest {
     private static String imageUrlOf(Map<String, Object> entry) {
         Map<String, Object> imageUrl = (Map<String, Object>) entry.get("image_url");
         return (String) imageUrl.get("url");
+    }
+
+    /**
+     * An SSE body of the given frames: one {@code data:} line each, followed by the blank line that
+     * dispatches it.
+     */
+    private static String sse(String... frames) {
+        StringBuilder body = new StringBuilder();
+        for (String frame : frames) {
+            body.append("data: ").append(frame).append("\n\n");
+        }
+        return body.toString();
+    }
+
+    /** The text one event contributes, or {@code null} when it contributes none. */
+    private static String textOf(ChatStreamEvent event) {
+        if (event.getDelta() == null || event.getDelta().getParts().isEmpty()) {
+            return null;
+        }
+        return ((TextPart) event.getDelta().getParts().get(0)).getText();
     }
 
     private static ChatMessage message(String role, String text) {
