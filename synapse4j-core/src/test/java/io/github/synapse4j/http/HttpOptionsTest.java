@@ -72,6 +72,9 @@ class HttpOptionsTest {
         if (type == Duration.class) {
             return Duration.ofSeconds(1);
         }
+        if (type == Integer.class) {
+            return 64 * 1024;
+        }
         throw new IllegalStateException("this test needs a marker for " + type.getName());
     }
 
@@ -109,6 +112,11 @@ class HttpOptionsTest {
     @Test
     void defaultsAreRequired() {
         assertThrows(NullPointerException.class, () -> HttpOptions.effective(new HttpOptions(), null));
+    }
+
+    @Test
+    void defaultsCarryTheStandardFrameBudget() {
+        assertEquals(256 * 1024, HttpOptions.defaults().getMaxFrameBytes());
     }
 
 }

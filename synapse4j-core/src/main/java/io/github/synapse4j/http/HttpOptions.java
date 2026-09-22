@@ -59,15 +59,34 @@ public class HttpOptions {
     private Duration responseTimeout;
 
     /**
+     * The most bytes one server-sent event frame may accumulate before the blank line that
+     * dispatches it. A frame is only complete once that blank line arrives, so without a cap a
+     * server that keeps sending {@code data:} lines would pin an ever-growing buffer. The count
+     * is in the wire's terms — a character costs its UTF-8 length — and it covers every line of
+     * the frame, comments included.
+     *
+     * <p>
+     * Enforced where the frames are read, above any particular HTTP implementation, so the same
+     * budget holds for every transport. Exceeding it fails the read; it never truncates, since
+     * half a frame is worse than none. The default {@link #defaults()} carries is generous enough
+     * for the payloads providers actually stream — tool calls with big arguments, reasoning
+     * traces — and small enough that a server which never dispatches a frame cannot pin an
+     * unbounded buffer.
+     */
+    private Integer maxFrameBytes;
+
+    /**
      * The defaults every implementation starts from, written down once so that what this library does
-     * when nobody configures anything is the same everywhere: {@link #STREAMED} bodies, and no response
-     * timeout of its own — an implementation that sets none leaves that to its HTTP library.
+     * when nobody configures anything is the same everywhere: {@link #STREAMED} bodies, no response
+     * timeout of its own — an implementation that sets none leaves that to its HTTP library — and
+     * a 256 KiB frame budget.
      *
      * @return a new instance holding those defaults
      */
     public static HttpOptions defaults() {
         HttpOptions defaults = new HttpOptions();
         defaults.bodyWriteMode = STREAMED;
+        defaults.maxFrameBytes = 256 * 1024;
         return defaults;
     }
 
@@ -88,6 +107,7 @@ public class HttpOptions {
         effective.bodyWriteMode = carried.bodyWriteMode != null ? carried.bodyWriteMode : defaults.bodyWriteMode;
         effective.responseTimeout = carried.responseTimeout != null ? carried.responseTimeout
                 : defaults.responseTimeout;
+        effective.maxFrameBytes = carried.maxFrameBytes != null ? carried.maxFrameBytes : defaults.maxFrameBytes;
         return effective;
     }
 

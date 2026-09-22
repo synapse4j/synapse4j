@@ -3,6 +3,8 @@ package io.github.synapse4j.data;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import io.github.synapse4j.http.HttpOptions;
+
 import lombok.Data;
 
 /**
@@ -38,6 +40,13 @@ public class ChatOptions {
 
     /** Nucleus sampling threshold. */
     private Double topP;
+
+    /**
+     * HTTP-level settings for this call's request, or {@code null} to leave every one of them to
+     * the {@link io.github.synapse4j.http.HttpClient} in use. Set it when one call needs different
+     * HTTP behavior than the client's defaults — a longer response timeout, a larger frame budget.
+     */
+    private HttpOptions httpOptions;
 
     /** Headers for this call's HTTP request. */
     private final Map<String, String> headers = new LinkedHashMap<>();

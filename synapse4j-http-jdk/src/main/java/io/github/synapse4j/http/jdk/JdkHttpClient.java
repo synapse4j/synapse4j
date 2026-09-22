@@ -102,6 +102,11 @@ public class JdkHttpClient implements HttpClient {
     }
 
     @Override
+    public HttpOptions options() {
+        return options;
+    }
+
+    @Override
     public HttpResponse send(HttpRequest request) {
         HttpOptions effective = HttpOptions.effective(request.getOptions(), this.options);
         java.net.http.HttpRequest.Builder builder = java.net.http.HttpRequest.newBuilder()

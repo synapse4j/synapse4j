@@ -43,4 +43,13 @@ public interface HttpClient {
      */
     HttpResponse send(HttpRequest request);
 
+    /**
+     * The options this client defaults to: usually {@link HttpOptions#defaults()}, or those with
+     * what construction set applied over them. Where a request carries an opinion of its own it
+     * wins; everywhere else, these apply.
+     *
+     * @return this client's default options; never {@code null}
+     */
+    HttpOptions options();
+
 }

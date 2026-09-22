@@ -70,25 +70,26 @@ class AbstractJsonReaderTest {
                 number("2"),
                 new Entry(JsonReader.Token.END_OBJECT, null));
 
-        Iterator<String> keys = ((Map<String, Object>) captured).keySet().iterator();
+        Iterator<?> keys = ((Map<?, ?>) captured).keySet().iterator();
         assertEquals("first", keys.next());
         assertEquals("second", keys.next());
     }
 
     @Test
     void refusesToCaptureBeforeTheReaderHasAdvanced() {
-        StubReader reader = new StubReader();
-
-        assertThrows(IllegalStateException.class, reader::captureValue);
+        try (StubReader reader = new StubReader()) {
+            assertThrows(IllegalStateException.class, reader::captureValue);
+        }
     }
 
     private static Object capture(Entry... script) {
-        StubReader reader = new StubReader();
-        for (Entry entry : script) {
-            reader.script.add(entry);
+        try (StubReader reader = new StubReader()) {
+            for (Entry entry : script) {
+                reader.script.add(entry);
+            }
+            reader.nextToken();
+            return reader.captureValue();
         }
-        reader.nextToken();
-        return reader.captureValue();
     }
 
     private static Entry number(String text) {

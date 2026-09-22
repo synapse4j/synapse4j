@@ -84,4 +84,17 @@ class ChatOptionsTest {
         assertTrue(rendered.contains("extras="));
     }
 
+    @Test
+    void httpOptionsIsAbsentUntilAssociated() {
+        ChatOptions options = new ChatOptions();
+
+        assertNull(options.getHttpOptions());
+
+        io.github.synapse4j.http.HttpOptions http = new io.github.synapse4j.http.HttpOptions();
+        http.setMaxFrameBytes(4096);
+        options.setHttpOptions(http);
+
+        assertEquals(http, options.getHttpOptions());
+    }
+
 }
