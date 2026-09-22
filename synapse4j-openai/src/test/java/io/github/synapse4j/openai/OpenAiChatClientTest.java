@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import io.github.synapse4j.chat.ChatStream;
 import io.github.synapse4j.data.ChatFinishReason;
 import io.github.synapse4j.data.ChatMessage;
+import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatResponseFormat;
@@ -150,6 +151,33 @@ class OpenAiChatClientTest {
         assertEquals(Integer.valueOf(11), response.getUsage().getInputTokens());
         assertEquals(Integer.valueOf(7), response.getUsage().getOutputTokens());
         assertEquals(Integer.valueOf(3), response.getUsage().getCachedInputTokens());
+    }
+
+    @Test
+    void aCustomizerPreparesTheRequestBeforeItIsWritten() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-3\",\"model\":\"gpt-test\","
+                + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
+                + "\"message\":{\"role\":\"assistant\",\"content\":\"Hi\"}}]}").getBytes(UTF_8)));
+        // The shape a preset takes: a shared field this endpoint spells differently moves into the
+        // extras under the name it wants, and the shared field is cleared so it does not go out as
+        // well.
+        client.addChatRequestCustomizer(request -> {
+            ChatOptions options = request.getOptions();
+            options.getExtras().put("max_completion_tokens", options.getMaxOutputTokens());
+            options.setMaxOutputTokens(null);
+            return request;
+        });
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        request.getOptions().setMaxOutputTokens(64);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        assertEquals(64, wire.get("max_completion_tokens"));
+        assertFalse(wire.containsKey("max_tokens"));
     }
 
     @Test

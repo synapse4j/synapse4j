@@ -20,6 +20,12 @@ import io.github.synapse4j.exception.SynapseException;
  * same {@link ChatResponse} as it goes. Implementations must provide both.
  *
  * <p>
+ * A client may also carry {@link ChatRequestCustomizer}s, which prepare every request before it is
+ * validated and sent. That is where an application corrects a shared field whose mapping does not
+ * fit the endpoint it is talking to. {@link AbstractChatClient} implements this part for an
+ * implementation; a client that implements this interface directly carries the same obligation.
+ *
+ * <p>
  * The calls carry nothing between calls: every input arrives on the request, and there is no
  * conversation state the implementation is expected to remember. Implementations must be stateless
  * and safe to share across threads; failures are thrown as {@code SynapseException} and its
@@ -52,5 +58,26 @@ public interface ChatClient {
      * @throws SynapseException the request was refused before the stream could open
      */
     ChatStream stream(ChatRequest request);
+
+    /**
+     * Adds a customizer that prepares every request before this client validates and sends it.
+     *
+     * <p>
+     * Customizers run in the order they were added, on the calling thread. The same customizer may
+     * be added more than once, and then runs once per addition. A client shared across threads
+     * hands each call a consistent list, so a customizer must itself be safe to run concurrently.
+     *
+     * @param customizer the customizer to add; never {@code null}
+     */
+    void addChatRequestCustomizer(ChatRequestCustomizer customizer);
+
+    /**
+     * Removes the first customizer equal to the given one. Since a lambda equals only itself, the
+     * caller has to keep the reference it added.
+     *
+     * @param customizer the customizer to remove; never {@code null}
+     * @return whether one was removed
+     */
+    boolean removeChatRequestCustomizer(ChatRequestCustomizer customizer);
 
 }

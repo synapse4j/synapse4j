@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-import io.github.synapse4j.chat.ChatClient;
+import io.github.synapse4j.chat.AbstractChatClient;
 import io.github.synapse4j.chat.ChatStream;
 import io.github.synapse4j.chat.DefaultChatStream;
 import io.github.synapse4j.data.ChatRequest;
@@ -50,7 +50,7 @@ import io.github.synapse4j.json.JsonWriter;
  * {@link IllegalArgumentException} before anything goes out, matching the restricted-header
  * precedent — the call never happened, so it is a caller bug, not a transport failure.
  */
-public class OpenAiChatClient implements ChatClient {
+public class OpenAiChatClient extends AbstractChatClient {
 
     private final HttpClient http;
     private final JsonCodec codec;
@@ -81,7 +81,7 @@ public class OpenAiChatClient implements ChatClient {
     }
 
     @Override
-    public ChatResponse chat(ChatRequest request) {
+    protected ChatResponse doChat(ChatRequest request) {
         requireCallable(request);
 
         io.github.synapse4j.http.HttpRequest httpRequest = httpRequest(request, out -> {
@@ -109,7 +109,7 @@ public class OpenAiChatClient implements ChatClient {
     }
 
     @Override
-    public ChatStream stream(ChatRequest request) {
+    protected ChatStream doStream(ChatRequest request) {
         requireCallable(request);
 
         io.github.synapse4j.http.HttpRequest httpRequest = httpRequest(request, out -> {
