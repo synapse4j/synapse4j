@@ -131,17 +131,23 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void aPathConflictingWithAnExistingLeafIsRejected() {
+    void settingAPathUnderAStoredLeafClearsTheLeaf() {
         ProviderExtras extras = new ProviderExtras().put("a", 1);
 
-        assertThrows(IllegalArgumentException.class, () -> extras.put(List.of("a", "b"), 2));
+        extras.put(List.of("a", "b"), 2);
+
+        assertEquals(Map.of("a", Map.of("b", 2)), extras.toNestedMap());
+        assertNull(extras.get("a"));
     }
 
     @Test
-    void aPathConflictingWithAnExistingNestedPathIsRejected() {
+    void settingAPathOverStoredDescendantsClearsThem() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 2);
 
-        assertThrows(IllegalArgumentException.class, () -> extras.put("a", 1));
+        extras.put("a", 1);
+
+        assertEquals(Map.of("a", 1), extras.toNestedMap());
+        assertNull(extras.get("a", "b"));
     }
 
     @Test
@@ -192,11 +198,13 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void putAllRejectsAConflictingPath() {
+    void putAllWinsWhereThePathsOverlap() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
         ProviderExtras other = new ProviderExtras().put("a", 2);
 
-        assertThrows(IllegalArgumentException.class, () -> extras.putAll(other));
+        extras.putAll(other);
+
+        assertEquals(Map.of("a", 2), extras.toNestedMap());
     }
 
     @Test

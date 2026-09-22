@@ -22,13 +22,25 @@ import lombok.EqualsAndHashCode;
  * <p>
  * A path may address either a leaf or a whole subtree: the value is stored opaquely and never
  * inspected, so it may be a scalar, a collection or an arbitrary object to be serialized by the
- * configured JSON codec. Setting a path that is a prefix of an already-set path (or vice versa) is
- * rejected, because the resulting structure would be ambiguous.
+ * configured JSON codec. The names inside such an object are whatever that codec produces, so a
+ * value the protocol spells differently belongs in a map instead.
+ *
+ * <p>
+ * Setting a path clears whatever stands in the way of it — the entries it would contain, and the
+ * entry it would sit inside — so a path replaces that position in the tree, the way a map's put
+ * replaces a key, rather than being refused for overlapping what is already there.
  *
  * <p>
  * A path segment becomes a key of the outgoing object exactly as written: the caller spells the
  * provider's own wire name, so nothing is renamed, case-converted or otherwise adapted to the shape
  * of this library. The only structure the merge adds is the nesting the path describes.
+ *
+ * <p>
+ * Where the payload's own fields land is the module's business, not this bag's: a provider module
+ * writes the fields it models first and these after, and this library does not arbitrate a name
+ * both of them set. Which names a protocol uses is the protocol's to know, so a path set here
+ * should avoid one the module writes itself — two members of one name leave the document in the
+ * hands of whoever reads it.
  *
  * <p>
  * Instances are mutable: this is an accumulating bag, in the spirit of {@link Map}, not a value
@@ -96,8 +108,7 @@ public class ProviderExtras {
      *
      * <p>
      * Only that exact path goes: an entry set deeper (removing {@code a} while {@code a.b} is set) is
-     * a separate entry and stays. The two never coexist in the first place, because setting one while
-     * the other is present is rejected.
+     * a separate entry and stays.
      *
      * @param path one or more path segments; must not be empty
      * @return this bag
@@ -124,7 +135,8 @@ public class ProviderExtras {
     }
 
     /**
-     * Sets a value at a path of one or more segments, replacing any value set there before.
+     * Sets a value at a path of one or more segments, replacing any value set there before. An
+     * ancestor stored as a leaf, or descendants under this path, are cleared in the same call.
      *
      * @param path  the path segments; must not be {@code null} or empty, and no segment may be
      *                  {@code null} or empty
@@ -136,7 +148,8 @@ public class ProviderExtras {
     }
 
     /**
-     * Merges another bag into this one. Entries of the other bag win on equal paths.
+     * Merges another bag into this one. Entries of the other bag win where the paths are equal or
+     * overlap.
      *
      * @param other the bag to merge in; must not be {@code null}
      * @return this bag
@@ -147,7 +160,7 @@ public class ProviderExtras {
             return this;
         }
         for (Map.Entry<String, Object> entry : other.values.entrySet()) {
-            requireNoConflict(values, entry.getKey());
+            clearAround(entry.getKey());
             values.put(entry.getKey(), entry.getValue());
         }
         return this;
@@ -158,8 +171,8 @@ public class ProviderExtras {
      *
      * <p>
      * This is the form consumed by provider adapters when merging the extras into the outgoing
-     * payload. The result is a fresh, mutable copy owned by the caller; changing it does not affect
-     * this instance.
+     * payload. The result is a fresh, mutable structure owned by the caller; changing the structure
+     * does not affect this instance. The values in it are the ones stored, by reference.
      *
      * @return the nested view; never {@code null}, empty if nothing is set
      */
@@ -169,8 +182,11 @@ public class ProviderExtras {
             List<String> segments = decode(entry.getKey());
             Map<String, Object> node = root;
             for (int i = 0; i < segments.size() - 1; i++) {
+                // The bag never holds a path and something under it — put clears what stands in the
+                // way — so what is here is absent or the container this path continues through; an
+                // entry where a container should be fails, rather than being quietly replaced.
                 Object child = node.get(segments.get(i));
-                if (!(child instanceof Map)) {
+                if (child == null) {
                     child = new LinkedHashMap<String, Object>();
                     node.put(segments.get(i), child);
                 }
@@ -193,26 +209,21 @@ public class ProviderExtras {
     private ProviderExtras putPath(Object value, List<String> path) {
         Objects.requireNonNull(path, "path must not be null");
         String key = encode(path.toArray(new String[0]));
-        requireNoConflict(values, key);
+        clearAround(key);
         values.put(key, value);
         return this;
     }
 
     /**
-     * Rejects a path that would make the structure ambiguous, i.e. one that is an ancestor or a
-     * descendant of an already-set path.
+     * Clears whatever stands in the way of a path being set: the entries it would contain, and the
+     * entry it would sit inside. Setting a path replaces that position in the tree the way a map's
+     * put replaces a key, rather than being refused for overlapping what is already there.
      */
-    private static void requireNoConflict(Map<String, Object> existing, String key) {
+    private void clearAround(String key) {
         String descendants = key + SEPARATOR;
-        for (String other : existing.keySet()) {
-            if (other.equals(key)) {
-                continue;
-            }
-            if (other.startsWith(descendants) || key.startsWith(other + SEPARATOR)) {
-                throw new IllegalArgumentException("path " + decode(key)
-                        + " conflicts with the already-set path " + decode(other));
-            }
-        }
+        values.keySet()
+                .removeIf(other -> !other.equals(key)
+                        && (other.startsWith(descendants) || key.startsWith(other + SEPARATOR)));
     }
 
     private static String encode(String[] path) {
