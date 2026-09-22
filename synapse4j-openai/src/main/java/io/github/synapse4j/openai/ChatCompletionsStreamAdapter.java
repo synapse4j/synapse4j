@@ -16,7 +16,7 @@ import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.SseEvent;
-import io.github.synapse4j.http.SseReader;
+import io.github.synapse4j.http.SseEventStream;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import lombok.AccessLevel;
@@ -69,7 +69,7 @@ class ChatCompletionsStreamAdapter {
      * @param sse the frames, in arrival order; the caller owns the reader and its body
      * @return the events; never {@code null}
      */
-    Iterator<ChatStreamEvent> events(SseReader sse) {
+    Iterator<ChatStreamEvent> events(SseEventStream sse) {
         return new Iterator<ChatStreamEvent>() {
 
             private ChatStreamEvent pending;

@@ -11,7 +11,7 @@ import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.HttpClient;
-import io.github.synapse4j.http.SseReader;
+import io.github.synapse4j.http.SseEventStream;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonWriter;
@@ -121,17 +121,21 @@ public class OpenAiChatClient implements ChatClient {
         io.github.synapse4j.http.HttpResponse httpResponse = http.send(httpRequest);
         int status = httpResponse.getStatusCode();
         if (status >= 200 && status < 300) {
-            // The frame budget rides the same merge the transport applies: what the call sets,
-            // then the client's own options, then the library default.
-            io.github.synapse4j.http.HttpOptions effective = io.github.synapse4j.http.HttpOptions
-                    .effective(request.getOptions().getHttpOptions(), http.options());
-            int maxFrameBytes = effective.getMaxFrameBytes() != null ? effective.getMaxFrameBytes()
-                    : io.github.synapse4j.http.HttpOptions.defaults().getMaxFrameBytes();
+            // The response decides whether it carries an event stream, and frames it with the budget
+            // the call asked for: the transport merged the options, so nothing here merges again.
+            SseEventStream events = httpResponse.sseEventStream();
+            if (events == null) {
+                try (io.github.synapse4j.http.HttpResponse notAnEventStream = httpResponse) {
+                    throw new SynapseException("OpenAI answered " + status
+                            + " to a streamed request, but not with a text/event-stream");
+                } catch (IOException e) {
+                    throw new SynapseException("OpenAI chat completion failed: response could not be read", e);
+                }
+            }
             // The response is deliberately left open: the stream owns it from here, and closing
             // the stream is what cancels an answer that is still in flight.
             DefaultChatStream stream = new DefaultChatStream(
-                    streamAdapter.events(new SseReader(httpResponse.getBody(), maxFrameBytes)),
-                    streamAdapter.aggregation(), httpResponse::close);
+                    streamAdapter.events(events), streamAdapter.aggregation(), httpResponse::close);
             // The headers arrive with the response, before any frame does, so they go onto the
             // answer now: aggregatedResponse() carries them the moment the stream exists, the
             // same way the answer of a blocking call does.

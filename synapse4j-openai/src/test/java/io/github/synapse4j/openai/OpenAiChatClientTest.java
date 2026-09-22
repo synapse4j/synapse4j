@@ -36,6 +36,7 @@ import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolDefinition;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.http.DefaultHttpResponse;
 import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpResponse;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
@@ -48,13 +49,8 @@ class OpenAiChatClientTest {
     static class StubHttpClient implements HttpClient {
 
         io.github.synapse4j.http.HttpRequest captured;
-        HttpResponse canned = new HttpResponse();
+        DefaultHttpResponse canned = new DefaultHttpResponse();
         io.github.synapse4j.http.HttpOptions options = io.github.synapse4j.http.HttpOptions.defaults();
-
-        @Override
-        public io.github.synapse4j.http.HttpOptions options() {
-            return options;
-        }
 
         @Override
         public HttpResponse send(io.github.synapse4j.http.HttpRequest request) {
@@ -66,6 +62,10 @@ class OpenAiChatClientTest {
             } catch (IOException e) {
                 throw new SynapseException("the request body could not be written", e);
             }
+            // A transport is where a request's options meet its own, so the response it hands back
+            // carries the result: whatever the exchange was configured with is what frames its
+            // event stream.
+            canned.setOptions(io.github.synapse4j.http.HttpOptions.effective(request.getOptions(), options));
             return canned;
         }
     }
@@ -239,7 +239,7 @@ class OpenAiChatClientTest {
     @Test
     void responseHeadersAreCopiedOntoTheResponse() {
         stub.canned.setStatusCode(200);
-        stub.canned.setHeaders(Map.of("x-request-id", List.of("req_1"), "Retry-After", List.of("1", "2")));
+        stub.canned.getHeaders().putAll(Map.of("x-request-id", List.of("req_1"), "Retry-After", List.of("1", "2")));
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
@@ -257,7 +257,8 @@ class OpenAiChatClientTest {
     @Test
     void streamResponseHeadersAreCopiedOntoTheAggregatedResponse() {
         stub.canned.setStatusCode(200);
-        stub.canned.setHeaders(Map.of("x-request-id", List.of("req_1"), "Retry-After", List.of("1", "2")));
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream"), "x-request-id",
+                List.of("req_1"), "Retry-After", List.of("1", "2")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
                 "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
                         + "\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"},"
@@ -675,6 +676,7 @@ class OpenAiChatClientTest {
     @Test
     void aTextStreamBecomesOneEventPerFrameAndAggregatesToTheSameAnswer() {
         stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
                 "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
                         + "\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},"
@@ -724,7 +726,7 @@ class OpenAiChatClientTest {
         assertEquals(Integer.valueOf(7), aggregated.getUsage().getOutputTokens());
 
         // The same answer asked for in one piece has to come back the same way.
-        stub.canned = new HttpResponse();
+        stub.canned = new DefaultHttpResponse();
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-1\",\"model\":\"gpt-test\","
                 + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
@@ -744,6 +746,7 @@ class OpenAiChatClientTest {
     @Test
     void toolCallFragmentsMergeIntoOneCall() {
         stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
                 "{\"id\":\"chatcmpl-2\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
                         + "\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":null,"
@@ -784,6 +787,7 @@ class OpenAiChatClientTest {
     @Test
     void parallelToolCallFragmentsMergeIntoTheirOwnCalls() {
         stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
                 // Both calls are named in the chunk that opens them, and their arguments then stream
                 // one after the other, each fragment carrying only the position of its call.
@@ -831,6 +835,7 @@ class OpenAiChatClientTest {
     @Test
     void anErrorFrameFailsWhileIterating() {
         stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
                 "{\"id\":\"chatcmpl-3\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
                         + "\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Hi\"},"
@@ -867,10 +872,33 @@ class OpenAiChatClientTest {
     }
 
     @Test
+    void anAcceptedAnswerThatIsNotAnEventStreamFailsLoudly() {
+        RecordedInputStream body = new RecordedInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
+                        + "\"content\":\"an answer, not a stream\"}}]}").getBytes(UTF_8));
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("application/json")));
+        stub.canned.setBody(body);
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        // A streamed request answered with something other than an event stream is a provider
+        // contradicting itself; parsing the body as frames would only produce nonsense.
+        SynapseException thrown = assertThrows(SynapseException.class, () -> client.stream(request));
+
+        assertTrue(thrown.getMessage().contains("200"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("text/event-stream"), thrown.getMessage());
+        // Nothing is left holding the connection.
+        assertTrue(body.closed);
+    }
+
+    @Test
     void closingTheStreamClosesTheResponse() {
         RecordedInputStream body = new RecordedInputStream(
                 sse("[DONE]").getBytes(UTF_8));
         stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(body);
 
         ChatRequest request = new ChatRequest();
@@ -886,6 +914,7 @@ class OpenAiChatClientTest {
     @Test
     void theStreamingRequestAsksForTheUsageFrame() {
         stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse("[DONE]").getBytes(UTF_8)));
 
         ChatRequest request = new ChatRequest();
@@ -902,6 +931,7 @@ class OpenAiChatClientTest {
     @Test
     void aRequestLevelFrameBudgetAppliesToTheStream() {
         stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(bigChunk(), "[DONE]").getBytes(UTF_8)));
 
         ChatRequest request = new ChatRequest();
@@ -919,6 +949,7 @@ class OpenAiChatClientTest {
     @Test
     void theStandardFrameBudgetAppliesWhenNothingIsSet() {
         stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse("x".repeat(300 * 1024), "[DONE]").getBytes(UTF_8)));
 
         ChatRequest request = new ChatRequest();
@@ -934,6 +965,7 @@ class OpenAiChatClientTest {
     void theClientOwnFrameBudgetAppliesWhenTheRequestSetsNothing() {
         stub.options.setMaxFrameBytes(64);
         stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(bigChunk(), "[DONE]").getBytes(UTF_8)));
 
         ChatRequest request = new ChatRequest();

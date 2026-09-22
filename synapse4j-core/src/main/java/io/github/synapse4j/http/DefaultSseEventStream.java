@@ -6,28 +6,14 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PushbackInputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
 
 /**
- * Reads a {@code text/event-stream} body as a sequence of {@link SseEvent} frames.
- *
- * <p>
- * The format is cut by its own rules, not by a protocol's: lines end with CR, LF or CRLF, a line
- * starting with {@code :} is a comment, a blank line dispatches the frame that accumulated before
- * it, and a frame with no {@code data:} line at all is not an event and is skipped — the same
- * rule that makes a keep-alive comment free. Field names other than {@code event} and {@code data}
- * are ignored here; a protocol that needs them reads them from the payload or not at all. One
- * UTF-8 byte order mark at the very start, which the format's grammar permits once, is dropped.
- *
- * <p>
- * The event name travels exactly as the wire carries it: {@code null} when a frame names none,
- * the empty string when it names an empty one. The specification's default of {@code "message"}
- * is a browser EventSource concept; this reader stays faithful to what arrives and leaves any
- * defaulting to the consumer.
+ * The default {@link SseEventStream}: reads the body as UTF-8, the encoding every mainstream
+ * provider streams, and caps how much one frame may accumulate.
  *
  * <p>
  * One frame may buffer no more than {@code maxFrameBytes} bytes: a frame completes only when a
@@ -37,17 +23,10 @@ import io.github.synapse4j.exception.SynapseIOException;
  * the budget fails the read; it never truncates, since half a frame is worse than none.
  *
  * <p>
- * Reading is lazy and blocking: {@link #hasNext()} waits for the next frame to arrive on the
- * calling thread, so a caller that stops pulling stops the provider — the same backpressure the
- * body stream itself has. The frames arrive over one body, and the caller owns that body: closing
- * this reader closes it, which is how a streaming response is cancelled. Nothing touches the
- * body before the first pull, so constructing a reader never starts a conversation.
- *
- * <p>
- * One instance reads one body, on one thread. A failure of the source is a
- * {@link SynapseIOException} whose cause is the original {@link IOException}.
+ * The body is not touched before the first pull, so constructing a reader never starts a
+ * conversation.
  */
-public class SseReader implements Iterator<SseEvent>, AutoCloseable {
+public class DefaultSseEventStream implements SseEventStream {
 
     private final PushbackInputStream source;
 
@@ -74,7 +53,7 @@ public class SseReader implements Iterator<SseEvent>, AutoCloseable {
      * @param maxFrameBytes the most bytes one frame may accumulate before the blank line that
      *                          dispatches it; must be positive
      */
-    public SseReader(InputStream body, int maxFrameBytes) {
+    public DefaultSseEventStream(InputStream body, int maxFrameBytes) {
         if (maxFrameBytes <= 0) {
             throw new IllegalArgumentException("maxFrameBytes must be positive: " + maxFrameBytes);
         }
@@ -106,16 +85,13 @@ public class SseReader implements Iterator<SseEvent>, AutoCloseable {
     }
 
     /**
-     * Closes the body this reader was given. Idempotent, and the reason a streaming response ends
-     * early when a caller closes it.
+     * Closes the body this stream was given. Idempotent, and the reason a streaming response ends
+     * early when a caller closes it. A failure of the close is the transport's own, so it travels
+     * as an {@link IOException} rather than being wrapped.
      */
     @Override
-    public void close() {
-        try {
-            lines.close();
-        } catch (IOException failure) {
-            throw new SynapseIOException("Closing the event stream failed", failure);
-        }
+    public void close() throws IOException {
+        lines.close();
     }
 
     /** Reads lines until one frame is complete, or the body ends. */

@@ -2,14 +2,8 @@ package io.github.synapse4j.http;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.NonNull;
-import lombok.Setter;
 
 /**
  * One HTTP response: status, headers, and the body as a stream.
@@ -24,32 +18,41 @@ import lombok.Setter;
  * The status is whatever the server returned. This type has no opinion about 4xx or 5xx and no
  * error subtype: whether a status means failure belongs to the layer that knows what was being
  * asked.
+ *
+ * <p>
+ * Applications receive implementations from the HTTP client they chose. {@link DefaultHttpResponse}
+ * is the one every transport reuses; a transport that can hand over a response another way
+ * implements this interface itself.
  */
-@Getter
-@Setter
-@NoArgsConstructor
-public class HttpResponse implements AutoCloseable {
+public interface HttpResponse extends AutoCloseable {
 
     /** The HTTP status code, exactly as received. */
-    private int statusCode;
+    int getStatusCode();
 
     /** The response header lines, multiple values per name. Never {@code null}. */
-    @NonNull
-    private Map<String, List<String>> headers = new LinkedHashMap<>();
+    Map<String, List<String>> getHeaders();
 
     /** The body stream. Read on the caller's thread; closed by {@link #close()}. */
-    @NonNull
-    private InputStream body;
+    InputStream getBody();
+
+    /**
+     * The event stream of this response, when it is one: {@code null} unless the response is a
+     * {@code text/event-stream}.
+     *
+     * <p>
+     * Every call answers with the same stream, because the body it reads can be consumed only once:
+     * the response holds one event stream, not a new one per call. Consuming it is the caller's
+     * business, and closing it closes the body.
+     *
+     * @return the event stream, or {@code null} when this response carries none
+     */
+    SseEventStream sseEventStream();
 
     /**
      * Releases the connection backing this response, cancelling the body if it is still in flight.
      * Idempotent and safe to call from any thread, including without having read anything.
      */
     @Override
-    public void close() throws IOException {
-        if (body != null) {
-            body.close();
-        }
-    }
+    void close() throws IOException;
 
 }

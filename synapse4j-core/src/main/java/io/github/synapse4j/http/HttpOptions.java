@@ -76,6 +76,13 @@ public class HttpOptions {
     private Integer maxFrameBytes;
 
     /**
+     * The frame budget nothing states otherwise: what {@link #defaults()} carries, and what a
+     * response falls back to when it was handed no options to read a budget from. Written down once
+     * so the number lives in a single place.
+     */
+    static final int DEFAULT_MAX_FRAME_BYTES = 256 * 1024;
+
+    /**
      * The defaults every implementation starts from, written down once so that what this library does
      * when nobody configures anything is the same everywhere: {@link #STREAMED} bodies, no response
      * timeout of its own — an implementation that sets none leaves that to its HTTP library — and
@@ -86,7 +93,7 @@ public class HttpOptions {
     public static HttpOptions defaults() {
         HttpOptions defaults = new HttpOptions();
         defaults.bodyWriteMode = STREAMED;
-        defaults.maxFrameBytes = 256 * 1024;
+        defaults.maxFrameBytes = DEFAULT_MAX_FRAME_BYTES;
         return defaults;
     }
 

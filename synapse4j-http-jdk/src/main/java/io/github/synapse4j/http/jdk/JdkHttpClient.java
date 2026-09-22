@@ -10,15 +10,13 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.http.DefaultHttpResponse;
 import io.github.synapse4j.http.HttpBody;
 import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpOptions;
@@ -102,11 +100,6 @@ public class JdkHttpClient implements HttpClient {
     }
 
     @Override
-    public HttpOptions options() {
-        return options;
-    }
-
-    @Override
     public HttpResponse send(HttpRequest request) {
         HttpOptions effective = HttpOptions.effective(request.getOptions(), this.options);
         java.net.http.HttpRequest.Builder builder = java.net.http.HttpRequest.newBuilder()
@@ -120,13 +113,16 @@ public class JdkHttpClient implements HttpClient {
         try {
             java.net.http.HttpResponse<InputStream> jdkResponse = delegate.send(builder.build(),
                     BodyHandlers.ofInputStream());
-            HttpResponse response = new HttpResponse();
+            DefaultHttpResponse response = new DefaultHttpResponse();
             response.setStatusCode(jdkResponse.statusCode());
             // The JDK's own header map is already mutable and case-normalized, but it is this
-            // implementation's type — copy it so callers own a plain map.
-            Map<String, List<String>> headers = new LinkedHashMap<>(jdkResponse.headers().map());
-            response.setHeaders(headers);
+            // implementation's type — copy it into the response's own map, which is never replaced.
+            response.getHeaders().putAll(jdkResponse.headers().map());
             response.setBody(jdkResponse.body());
+            // The options the exchange ran under travel with the response, so the event stream it
+            // hands out is framed with the budget this call asked for — and no caller has to merge
+            // the request's options with this client's own a second time.
+            response.setOptions(effective);
             return response;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

@@ -19,11 +19,11 @@ import org.junit.jupiter.api.Test;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
 
-class SseReaderTest {
+class DefaultSseEventStreamTest {
 
     @Test
     void readsFramesInOrderWithTheirEventNames() {
-        SseReader reader = reader("""
+        DefaultSseEventStream reader = reader("""
                 event: message_start
                 data: {"type":"message_start"}
 
@@ -43,7 +43,7 @@ class SseReaderTest {
 
     @Test
     void aFrameWithoutAnEventFieldHasNoName() {
-        SseReader reader = reader("data: {\"id\":\"chunk\"}\n\n");
+        DefaultSseEventStream reader = reader("data: {\"id\":\"chunk\"}\n\n");
 
         SseEvent event = reader.next();
 
@@ -53,7 +53,7 @@ class SseReaderTest {
 
     @Test
     void severalDataLinesArriveJoinedByNewlines() {
-        SseReader reader = reader("event: multi\ndata: first\ndata: second\ndata: third\n\n");
+        DefaultSseEventStream reader = reader("event: multi\ndata: first\ndata: second\ndata: third\n\n");
 
         SseEvent event = reader.next();
 
@@ -62,7 +62,7 @@ class SseReaderTest {
 
     @Test
     void commentsAndUnknownFieldsAreNotEvents() {
-        SseReader reader = reader("""
+        DefaultSseEventStream reader = reader("""
                 : keep-alive
                 id: 42
                 retry: 3000
@@ -80,7 +80,7 @@ class SseReaderTest {
 
     @Test
     void aFrameWithNoDataIsNotAnEvent() {
-        SseReader reader = reader("event: empty\n\ndata: real\n\n");
+        DefaultSseEventStream reader = reader("event: empty\n\ndata: real\n\n");
 
         SseEvent event = reader.next();
 
@@ -90,7 +90,7 @@ class SseReaderTest {
 
     @Test
     void handlesCarriageReturnAndCarriageReturnLineFeed() {
-        SseReader reader = reader("event: crlf\r\ndata: one\r\n\r\nevent: cr\rdata: two\r\r");
+        DefaultSseEventStream reader = reader("event: crlf\r\ndata: one\r\n\r\nevent: cr\rdata: two\r\r");
 
         List<SseEvent> events = drain(reader);
 
@@ -103,14 +103,14 @@ class SseReaderTest {
 
     @Test
     void stripsOnlyOneSpaceAfterTheColon() {
-        SseReader reader = reader("data:  two spaces\n\n");
+        DefaultSseEventStream reader = reader("data:  two spaces\n\n");
 
         assertEquals(" two spaces", reader.next().getData());
     }
 
     @Test
     void anIncompleteTrailingFrameIsDiscarded() {
-        SseReader reader = reader("data: complete\n\ndata: never dispatched\n");
+        DefaultSseEventStream reader = reader("data: complete\n\ndata: never dispatched\n");
 
         assertEquals("complete", reader.next().getData());
         assertFalse(reader.hasNext());
@@ -118,7 +118,7 @@ class SseReaderTest {
 
     @Test
     void readingPastTheEndFollowsIteratorContract() {
-        SseReader reader = reader("data: one\n\n");
+        DefaultSseEventStream reader = reader("data: one\n\n");
 
         assertEquals("one", reader.next().getData());
         assertFalse(reader.hasNext());
@@ -126,9 +126,9 @@ class SseReaderTest {
     }
 
     @Test
-    void closingClosesTheBody() {
+    void closingClosesTheBody() throws IOException {
         TrackingStream body = new TrackingStream("data: one\n\n");
-        SseReader reader = new SseReader(body, HttpOptions.defaults().getMaxFrameBytes());
+        DefaultSseEventStream reader = new DefaultSseEventStream(body, HttpOptions.defaults().getMaxFrameBytes());
 
         reader.close();
         reader.close();
@@ -137,7 +137,7 @@ class SseReaderTest {
     }
 
     @Test
-    void aFailingSourceIsReportedAsTheLibraryOwns() {
+    void aFailingSourceIsReportedAsTheLibraryOwns() throws IOException {
         InputStream body = new InputStream() {
 
             @Override
@@ -145,7 +145,8 @@ class SseReaderTest {
                 throw new IOException("connection reset");
             }
         };
-        try (SseReader reader = new SseReader(body, HttpOptions.defaults().getMaxFrameBytes())) {
+        try (DefaultSseEventStream reader = new DefaultSseEventStream(body,
+                HttpOptions.defaults().getMaxFrameBytes())) {
             SynapseIOException thrown = assertThrows(SynapseIOException.class, reader::hasNext);
 
             assertEquals("connection reset", thrown.getCause().getMessage());
@@ -154,7 +155,7 @@ class SseReaderTest {
 
     @Test
     void aFrameOverTheBudgetFailsTheRead() {
-        SseReader reader = reader("data: " + "x".repeat(100) + "\n\n", 32);
+        DefaultSseEventStream reader = reader("data: " + "x".repeat(100) + "\n\n", 32);
 
         SynapseException thrown = assertThrows(SynapseException.class, reader::hasNext);
 
@@ -164,7 +165,7 @@ class SseReaderTest {
     @Test
     void theBudgetCountsUtf8BytesRatherThanCharacters() {
         // "data: 中文" is eight characters but twelve bytes on the wire.
-        SseReader reader = reader("data: 中文\n\n", 10);
+        DefaultSseEventStream reader = reader("data: 中文\n\n", 10);
 
         assertThrows(SynapseException.class, reader::hasNext);
     }
@@ -172,7 +173,7 @@ class SseReaderTest {
     @Test
     void dataLinesOfOneFrameAddUpAgainstTheBudget() {
         // Two lines of thirty bytes each: either alone is fine, together they cross a fifty-byte budget.
-        SseReader reader = reader("data: " + "x".repeat(24) + "\ndata: " + "x".repeat(24) + "\n\n", 50);
+        DefaultSseEventStream reader = reader("data: " + "x".repeat(24) + "\ndata: " + "x".repeat(24) + "\n\n", 50);
 
         assertThrows(SynapseException.class, reader::hasNext);
     }
@@ -180,7 +181,7 @@ class SseReaderTest {
     @Test
     void everyFrameGetsTheBudgetBack() {
         String frame = "data: " + "x".repeat(40) + "\n\n";
-        SseReader reader = reader(frame + frame, 64);
+        DefaultSseEventStream reader = reader(frame + frame, 64);
 
         assertEquals(40, reader.next().getData().length());
         assertEquals(40, reader.next().getData().length());
@@ -190,14 +191,14 @@ class SseReaderTest {
     @Test
     void theBudgetMustBePositive() {
         assertThrows(IllegalArgumentException.class,
-                () -> new SseReader(new ByteArrayInputStream(new byte[0]), 0));
+                () -> new DefaultSseEventStream(new ByteArrayInputStream(new byte[0]), 0));
     }
 
     @Test
     void aLeadingUtf8BomIsSkipped() {
         // The grammar allows one BOM at the very start; the reader must drop it, or the first
         // field name would carry it and the opening frame would be misread.
-        SseReader reader = reader("\uFEFFdata: first\n\ndata: second\n\n");
+        DefaultSseEventStream reader = reader("\uFEFFdata: first\n\ndata: second\n\n");
 
         assertEquals("first", reader.next().getData());
         assertEquals("second", reader.next().getData());
@@ -205,7 +206,7 @@ class SseReaderTest {
     }
 
     @Test
-    void aTruncatedBomIsPushedBackOntoTheStream() {
+    void aTruncatedBomIsPushedBackOntoTheStream() throws IOException {
         // EF BB without the third byte is not a BOM. Pushed back, the two bytes decode to
         // replacement characters that corrupt the first field name — which is exactly how the
         // test observes they were not dropped: a dropped pair would leave "data: real" intact.
@@ -214,28 +215,29 @@ class SseReaderTest {
         byte[] framed = new byte[head.length + text.length];
         System.arraycopy(head, 0, framed, 0, head.length);
         System.arraycopy(text, 0, framed, head.length, text.length);
-        SseReader reader = new SseReader(new ByteArrayInputStream(framed),
-                HttpOptions.defaults().getMaxFrameBytes());
 
-        assertFalse(reader.hasNext());
+        try (DefaultSseEventStream reader = new DefaultSseEventStream(new ByteArrayInputStream(framed),
+                HttpOptions.defaults().getMaxFrameBytes())) {
+            assertFalse(reader.hasNext());
+        }
     }
 
     @Test
     void anEmptyEventNameIsPreservedAsEmpty() {
-        SseReader reader = reader("event:\ndata: x\n\n");
+        DefaultSseEventStream reader = reader("event:\ndata: x\n\n");
 
         assertEquals("", reader.next().getEvent());
     }
 
-    private static SseReader reader(String text) {
+    private static DefaultSseEventStream reader(String text) {
         return reader(text, HttpOptions.defaults().getMaxFrameBytes());
     }
 
-    private static SseReader reader(String text, int maxFrameBytes) {
-        return new SseReader(new ByteArrayInputStream(text.getBytes(UTF_8)), maxFrameBytes);
+    private static DefaultSseEventStream reader(String text, int maxFrameBytes) {
+        return new DefaultSseEventStream(new ByteArrayInputStream(text.getBytes(UTF_8)), maxFrameBytes);
     }
 
-    private static List<SseEvent> drain(SseReader reader) {
+    private static List<SseEvent> drain(DefaultSseEventStream reader) {
         List<SseEvent> events = new ArrayList<>();
         while (reader.hasNext()) {
             events.add(reader.next());
