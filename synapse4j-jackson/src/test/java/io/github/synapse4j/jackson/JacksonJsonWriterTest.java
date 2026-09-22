@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -101,6 +102,45 @@ class JacksonJsonWriterTest {
 
         assertEquals("[false]", sink.text());
         assertFalse(sink.closed);
+    }
+
+    @Test
+    void writesAnObjectNoneOfTheTokenMethodsCovers() {
+        RecordingOutputStream sink = new RecordingOutputStream();
+
+        JsonWriter writer = codec.writer(sink);
+        writer.writeStartObject()
+                .writeName("settings")
+                .writeValue(new Settings())
+                .writeName("after")
+                .writeString("still here")
+                .writeEndObject();
+        writer.close();
+
+        // The order of the members inside the object is the library's to choose, so what came out is
+        // compared as the structure it is rather than as text.
+        assertEquals(Map.of("settings", Map.of("model", "gpt-test", "maxTokens", 64), "after", "still here"),
+                codec.decode(sink.text(), Map.class));
+    }
+
+    @Test
+    void writesNullForANullValue() {
+        RecordingOutputStream sink = new RecordingOutputStream();
+
+        JsonWriter writer = codec.writer(sink);
+        writer.writeStartObject().writeName("nothing").writeValue(null).writeEndObject();
+        writer.close();
+
+        assertEquals("{\"nothing\":null}", sink.text());
+    }
+
+    /** A value only the JSON library behind this writer can turn into JSON. */
+    static class Settings {
+
+        public String model = "gpt-test";
+
+        public int maxTokens = 64;
+
     }
 
     /** A sink that remembers being closed, so that the ownership rule can be checked. */

@@ -16,6 +16,7 @@ import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.ObjectWriteContext;
 import tools.jackson.core.exc.JacksonIOException;
 import tools.jackson.core.json.JsonFactory;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * A {@link JsonWriter} that writes through a Jackson {@link JsonGenerator}.
@@ -24,11 +25,18 @@ import tools.jackson.core.json.JsonFactory;
  * Internal to this module: an application gets one from {@link JacksonJsonCodec#writer} and never
  * names this class. The generator comes from a factory that leaves the sink alone, so
  * {@link #close()} is Jackson's own "flush and release", not a stream close.
+ *
+ * <p>
+ * The mapper is carried alongside for {@link #writeValue(Object)}, the one method here that writes a
+ * whole value rather than a token.
  */
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 class JacksonJsonWriter implements JsonWriter {
 
     private final JsonGenerator generator;
+
+    /** Writes the values the token methods cannot; a generator on its own knows only tokens. */
+    private final JsonMapper jsonMapper;
 
     /**
      * Opens a writer over the given sink.
@@ -38,9 +46,9 @@ class JacksonJsonWriter implements JsonWriter {
      * otherwise the caller would have to catch a Jackson exception from a method that promises this
      * library's own.
      */
-    static JacksonJsonWriter open(JsonFactory factory, OutputStream out) {
+    static JacksonJsonWriter open(JsonFactory factory, JsonMapper mapper, OutputStream out) {
         return translate("Opening the JSON writer failed",
-                () -> new JacksonJsonWriter(factory.createGenerator(ObjectWriteContext.empty(), out)));
+                () -> new JacksonJsonWriter(factory.createGenerator(ObjectWriteContext.empty(), out), mapper));
     }
 
     @Override
@@ -116,6 +124,13 @@ class JacksonJsonWriter implements JsonWriter {
     @Override
     public JsonWriter writeNull() {
         return write(generator::writeNull);
+    }
+
+    @Override
+    public JsonWriter writeValue(Object value) {
+        // The mapper writes into the open generator, so the value reaches the sink as it is
+        // serialized rather than being turned into text first.
+        return write(() -> jsonMapper.writeValue(generator, value));
     }
 
     @Override

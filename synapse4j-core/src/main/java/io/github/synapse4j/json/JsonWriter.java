@@ -122,6 +122,24 @@ public interface JsonWriter extends Flushable, AutoCloseable {
     JsonWriter writeNull();
 
     /**
+     * Writes a value as the JSON library this writer came from serializes it.
+     *
+     * <p>
+     * This is the way out for a value none of the methods above covers: an object handed over as it
+     * is — the kind of value an extras bag holds — written straight into the document rather than
+     * turned into a map first.
+     *
+     * <p>
+     * What that object becomes is that library's business, not this interface's: its naming strategy
+     * and its modules decide the field names inside it. A value whose fields the protocol spells
+     * differently belongs in a map instead. Nothing this library owns is special-cased here — how
+     * its own types appear on the wire is the caller's to decide.
+     *
+     * @param value the value to write; {@code null} writes JSON {@code null}
+     */
+    JsonWriter writeValue(Object value);
+
+    /**
      * Pushes what is buffered into the sink and flushes it.
      *
      * @throws SynapseIOException if the sink fails

@@ -115,7 +115,7 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
 
     @Override
     public JsonWriter writer(OutputStream out) {
-        return JacksonJsonWriter.open(tokenStreamFactory, out);
+        return JacksonJsonWriter.open(tokenStreamFactory, jsonMapper, out);
     }
 
     @Override
