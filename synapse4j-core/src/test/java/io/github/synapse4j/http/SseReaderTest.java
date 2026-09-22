@@ -193,6 +193,40 @@ class SseReaderTest {
                 () -> new SseReader(new ByteArrayInputStream(new byte[0]), 0));
     }
 
+    @Test
+    void aLeadingUtf8BomIsSkipped() {
+        // The grammar allows one BOM at the very start; the reader must drop it, or the first
+        // field name would carry it and the opening frame would be misread.
+        SseReader reader = reader("\uFEFFdata: first\n\ndata: second\n\n");
+
+        assertEquals("first", reader.next().getData());
+        assertEquals("second", reader.next().getData());
+        assertFalse(reader.hasNext());
+    }
+
+    @Test
+    void aTruncatedBomIsPushedBackOntoTheStream() {
+        // EF BB without the third byte is not a BOM. Pushed back, the two bytes decode to
+        // replacement characters that corrupt the first field name — which is exactly how the
+        // test observes they were not dropped: a dropped pair would leave "data: real" intact.
+        byte[] head = new byte[] { (byte) 0xEF, (byte) 0xBB };
+        byte[] text = "data: real\n\n".getBytes(UTF_8);
+        byte[] framed = new byte[head.length + text.length];
+        System.arraycopy(head, 0, framed, 0, head.length);
+        System.arraycopy(text, 0, framed, head.length, text.length);
+        SseReader reader = new SseReader(new ByteArrayInputStream(framed),
+                HttpOptions.defaults().getMaxFrameBytes());
+
+        assertFalse(reader.hasNext());
+    }
+
+    @Test
+    void anEmptyEventNameIsPreservedAsEmpty() {
+        SseReader reader = reader("event:\ndata: x\n\n");
+
+        assertEquals("", reader.next().getEvent());
+    }
+
     private static SseReader reader(String text) {
         return reader(text, HttpOptions.defaults().getMaxFrameBytes());
     }

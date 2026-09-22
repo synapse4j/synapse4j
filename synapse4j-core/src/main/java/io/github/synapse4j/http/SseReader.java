@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PushbackInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -19,7 +20,14 @@ import io.github.synapse4j.exception.SynapseIOException;
  * starting with {@code :} is a comment, a blank line dispatches the frame that accumulated before
  * it, and a frame with no {@code data:} line at all is not an event and is skipped — the same
  * rule that makes a keep-alive comment free. Field names other than {@code event} and {@code data}
- * are ignored here; a protocol that needs them reads them from the payload or not at all.
+ * are ignored here; a protocol that needs them reads them from the payload or not at all. One
+ * UTF-8 byte order mark at the very start, which the format's grammar permits once, is dropped.
+ *
+ * <p>
+ * The event name travels exactly as the wire carries it: {@code null} when a frame names none,
+ * the empty string when it names an empty one. The specification's default of {@code "message"}
+ * is a browser EventSource concept; this reader stays faithful to what arrives and leaves any
+ * defaulting to the consumer.
  *
  * <p>
  * One frame may buffer no more than {@code maxFrameBytes} bytes: a frame completes only when a
@@ -32,13 +40,16 @@ import io.github.synapse4j.exception.SynapseIOException;
  * Reading is lazy and blocking: {@link #hasNext()} waits for the next frame to arrive on the
  * calling thread, so a caller that stops pulling stops the provider — the same backpressure the
  * body stream itself has. The frames arrive over one body, and the caller owns that body: closing
- * this reader closes it, which is how a streaming response is cancelled.
+ * this reader closes it, which is how a streaming response is cancelled. Nothing touches the
+ * body before the first pull, so constructing a reader never starts a conversation.
  *
  * <p>
  * One instance reads one body, on one thread. A failure of the source is a
  * {@link SynapseIOException} whose cause is the original {@link IOException}.
  */
 public class SseReader implements Iterator<SseEvent>, AutoCloseable {
+
+    private final PushbackInputStream source;
 
     private final BufferedReader lines;
 
@@ -48,12 +59,16 @@ public class SseReader implements Iterator<SseEvent>, AutoCloseable {
     /** Bytes accumulated for the frame in progress; every blank line starts the next one back at zero. */
     private int frameBytes;
 
+    /** Whether the stream's first bytes have been peeked at for a BOM. */
+    private boolean bomChecked;
+
     private SseEvent pending;
 
     private boolean finished;
 
     /**
-     * Reads the given body as UTF-8, the encoding every mainstream provider streams.
+     * Reads the given body as UTF-8, the encoding every mainstream provider streams. The body is
+     * not touched until the first frame is asked for.
      *
      * @param body          the response body; never {@code null}
      * @param maxFrameBytes the most bytes one frame may accumulate before the blank line that
@@ -63,7 +78,8 @@ public class SseReader implements Iterator<SseEvent>, AutoCloseable {
         if (maxFrameBytes <= 0) {
             throw new IllegalArgumentException("maxFrameBytes must be positive: " + maxFrameBytes);
         }
-        this.lines = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8));
+        this.source = new PushbackInputStream(body, 3);
+        this.lines = new BufferedReader(new InputStreamReader(source, StandardCharsets.UTF_8));
         this.maxFrameBytes = maxFrameBytes;
     }
 
@@ -147,8 +163,40 @@ public class SseReader implements Iterator<SseEvent>, AutoCloseable {
     }
 
     private String readLine() {
+        skipLeadingBom();
         try {
             return lines.readLine();
+        } catch (IOException failure) {
+            throw new SynapseIOException("Reading the event stream failed", failure);
+        }
+    }
+
+    /**
+     * The format's grammar begins with an optional BOM, and decoding is supposed to drop it;
+     * charset decoding alone would keep it as a stray character glued to the first line's field
+     * name. The first three bytes are peeked at before the first line is read, and only a complete
+     * {@code EF BB BF} is consumed — anything else, including a truncated sequence at the start
+     * of a very short body, is pushed back unread. Deferred to the first pull so that constructing
+     * a reader never touches the body.
+     */
+    private void skipLeadingBom() {
+        if (bomChecked) {
+            return;
+        }
+        bomChecked = true;
+        byte[] head = new byte[3];
+        try {
+            int read = 0;
+            while (read < 3) {
+                int count = source.read(head, read, 3 - read);
+                if (count < 0) {
+                    break;
+                }
+                read += count;
+            }
+            boolean bom = read == 3 && (head[0] & 0xFF) == 0xEF && (head[1] & 0xFF) == 0xBB
+                    && (head[2] & 0xFF) == 0xBF;
+            source.unread(head, 0, bom ? 0 : read);
         } catch (IOException failure) {
             throw new SynapseIOException("Reading the event stream failed", failure);
         }
