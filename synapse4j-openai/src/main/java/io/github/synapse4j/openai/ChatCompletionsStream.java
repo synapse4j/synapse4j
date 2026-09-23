@@ -5,8 +5,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.function.BiConsumer;
 
+import io.github.synapse4j.chat.DefaultChatStream;
 import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
@@ -18,35 +18,30 @@ import io.github.synapse4j.http.SseEvent;
 import io.github.synapse4j.http.SseEventStream;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
-import lombok.AccessLevel;
-import lombok.RequiredArgsConstructor;
 
 /**
- * Translates the chat-completions event stream into the shared streaming model, and folds the
- * events back into the answer they spell out.
+ * The chat-completions stream: one streamed exchange, pulled frame by frame, that assembles the
+ * answer as it is consumed.
  *
  * <p>
  * One SSE frame becomes one {@link ChatStreamEvent}, in arrival order, and no frame is dropped: a
  * frame that carries nothing this module models — the usage-only frame that ends a streamed answer,
- * say — is still handed out, because whether it is worth an event is the application's decision
- * rather than this adapter's. The event type is the payload's own {@code object} member, so a kind
- * of chunk this module has never heard of reaches the caller under the name the provider gave it.
+ * say — is still handed out, because whether it is worth an event is the application's decision.
+ * The event type is the payload's own {@code object} member, so a kind of chunk this module has
+ * never heard of reaches the caller under the name the provider gave it. Each payload's document is
+ * walked by {@link ChatCompletionsReader}; this class owns the frames around it — the reader opened
+ * over each payload's bytes, and the sentinel frame that ends the answer.
  *
  * <p>
- * Each payload's document is parsed by {@link ChatCompletionsReader}. This class owns the frame's
- * orchestration instead: the sentinel frame that ends the answer, and the reader opened over each
- * payload's bytes before the document inside it is walked into an event.
- *
- * <p>
- * The aggregation is what makes a streamed answer the same answer a blocking call returns: it sums
- * the fragments the way {@link ChatCompletionsReader} reads them, so a turn that arrived as twenty
+ * The fold is what makes a streamed answer the same answer a blocking call returns: it sums the
+ * fragments the way {@link ChatCompletionsReader} reads them, so a turn that arrived as twenty
  * chunks ends up as the one message, and the one tool call, a single response would have carried.
  *
  * <p>
- * Stateless; holds only the application's codec, for opening a reader over each frame.
+ * One instance per exchange, built by {@link OpenAiChatClient} while the response is open; closing
+ * it — or running out of events — releases the connection behind it.
  */
-@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-class ChatCompletionsStreamAdapter {
+class ChatCompletionsStream extends DefaultChatStream {
 
     /**
      * The member that says which entry of a chunk's {@code tool_calls} array a fragment belongs to.
@@ -55,20 +50,32 @@ class ChatCompletionsStreamAdapter {
      */
     private static final String TOOL_CALL_POSITION = "index";
 
-    private final JsonCodec codec;
+    /**
+     * A stream over the given frames.
+     *
+     * @param codec       the application's codec, for opening a reader over each frame's payload
+     * @param sse         the frames of the answer, in arrival order; the caller owns the body
+     * @param closeAction what releasing the stream does — typically closing the HTTP response
+     *                        behind it; never {@code null}
+     */
+    ChatCompletionsStream(JsonCodec codec, SseEventStream sse, AutoCloseable closeAction) {
+        super(events(codec, sse), ChatCompletionsStream::aggregate, closeAction);
+    }
 
     /**
-     * The events of one streamed answer, one per frame of the given reader.
+     * The events of one streamed answer, one per frame of the given stream.
      *
      * <p>
      * Pulling is what reads the body: this iterator asks the frames for their next event only when
      * one is asked of it, so a caller that stops pulling stops the provider. The frame that ends the
      * answer is handed out like any other, and the iterator ends after it.
      *
-     * @param sse the frames, in arrival order; the caller owns the reader and its body
+     * @param codec the codec, for opening a reader over each frame's payload
+     * @param sse   the frames, in arrival order; the response behind them is released by the
+     *                  stream's close action
      * @return the events; never {@code null}
      */
-    Iterator<ChatStreamEvent> events(SseEventStream sse) {
+    private static Iterator<ChatStreamEvent> events(JsonCodec codec, SseEventStream sse) {
         return new Iterator<ChatStreamEvent>() {
 
             private ChatStreamEvent pending;
@@ -83,7 +90,7 @@ class ChatCompletionsStreamAdapter {
                 if (ended || !sse.hasNext()) {
                     return false;
                 }
-                pending = toEvent(sse.next());
+                pending = toEvent(codec, sse.next());
                 // The frame that ends the answer is the last one there is: a provider that sent
                 // something after it would be contradicting itself, and nothing here waits for it.
                 ended = OpenAiEventTypes.DONE.equals(pending.getEventType());
@@ -102,19 +109,8 @@ class ChatCompletionsStreamAdapter {
         };
     }
 
-    /**
-     * How one consumed event updates the answer being assembled. The result is the same
-     * {@link ChatResponse} {@code chat()} returns for the same answer, built from the fragments
-     * instead of from one document.
-     *
-     * @return the fold; never {@code null}
-     */
-    BiConsumer<ChatResponse, ChatStreamEvent> aggregation() {
-        return ChatCompletionsStreamAdapter::aggregate;
-    }
-
     /** Maps one frame to its event. */
-    private ChatStreamEvent toEvent(SseEvent frame) {
+    private static ChatStreamEvent toEvent(JsonCodec codec, SseEvent frame) {
         if (OpenAiEventTypes.DONE.equals(frame.getData())) {
             ChatStreamEvent done = new ChatStreamEvent();
             done.setEventType(OpenAiEventTypes.DONE);

@@ -7,7 +7,6 @@ import java.util.Map;
 
 import io.github.synapse4j.chat.AbstractChatClient;
 import io.github.synapse4j.chat.ChatStream;
-import io.github.synapse4j.chat.DefaultChatStream;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.exception.SynapseException;
@@ -56,7 +55,6 @@ public class OpenAiChatClient extends AbstractChatClient {
     private final HttpClient http;
     private final JsonCodec codec;
     private final ChatCompletionsWriter requestWriter;
-    private final ChatCompletionsStreamAdapter streamAdapter;
     private final OpenAiErrorReader errorReader;
 
     private OpenAiConfig config = new OpenAiConfig();
@@ -65,7 +63,6 @@ public class OpenAiChatClient extends AbstractChatClient {
         this.http = http;
         this.codec = codec;
         this.requestWriter = new ChatCompletionsWriter(codec);
-        this.streamAdapter = new ChatCompletionsStreamAdapter(codec);
         this.errorReader = new OpenAiErrorReader(codec);
     }
 
@@ -137,8 +134,7 @@ public class OpenAiChatClient extends AbstractChatClient {
             }
             // The response is deliberately left open: the stream owns it from here, and closing
             // the stream is what cancels an answer that is still in flight.
-            DefaultChatStream stream = new DefaultChatStream(
-                    streamAdapter.events(events), streamAdapter.aggregation(), httpResponse::close);
+            ChatStream stream = new ChatCompletionsStream(codec, events, httpResponse::close);
             // The headers arrive with the response, before any frame does, so they go onto the
             // answer now: aggregatedResponse() carries them the moment the stream exists, the
             // same way the answer of a blocking call does.
