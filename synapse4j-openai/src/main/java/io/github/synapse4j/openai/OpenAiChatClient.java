@@ -1,5 +1,6 @@
 package io.github.synapse4j.openai;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -30,7 +31,7 @@ import io.github.synapse4j.json.JsonWriter;
  * writing the protocol's own names takes that knob away. A field this module does not model is kept
  * in the extras of the node it came from rather than dropped. The status is read before the body is
  * touched, because the body is a stream and reaches the caller once: a non-2xx answer is buffered
- * for the error reader, a 2xx one is streamed into the reader.
+ * for the detail it carries, a 2xx one is streamed into the reader.
  *
  * <p>
  * A streamed answer is the same exchange with a different response body: the request asks for it
@@ -52,10 +53,12 @@ import io.github.synapse4j.json.JsonWriter;
  */
 public class OpenAiChatClient extends AbstractChatClient {
 
+    /** Raw-body snippet kept in the message when the error body is not parseable JSON. */
+    private static final int SNIPPET_LIMIT = 500;
+
     private final HttpClient http;
     private final JsonCodec codec;
     private final ChatCompletionsWriter requestWriter;
-    private final OpenAiErrorReader errorReader;
 
     private OpenAiConfig config = new OpenAiConfig();
 
@@ -63,7 +66,6 @@ public class OpenAiChatClient extends AbstractChatClient {
         this.http = http;
         this.codec = codec;
         this.requestWriter = new ChatCompletionsWriter(codec);
-        this.errorReader = new OpenAiErrorReader(codec);
     }
 
     /**
@@ -102,7 +104,7 @@ public class OpenAiChatClient extends AbstractChatClient {
                     return response;
                 }
             }
-            throw errorReader.read(status, readBody(httpResponse));
+            throw failure(status, readBody(httpResponse));
         } catch (IOException e) {
             throw new SynapseException("OpenAI chat completion failed: response could not be read", e);
         }
@@ -190,7 +192,7 @@ public class OpenAiChatClient extends AbstractChatClient {
      */
     private SynapseException refusal(io.github.synapse4j.http.HttpResponse httpResponse, int status) {
         try (io.github.synapse4j.http.HttpResponse refused = httpResponse) {
-            return errorReader.read(status, readBody(refused));
+            return failure(status, readBody(refused));
         } catch (IOException e) {
             throw new SynapseException("OpenAI chat completion failed: response could not be read", e);
         }
@@ -203,8 +205,36 @@ public class OpenAiChatClient extends AbstractChatClient {
                 "options.model is required");
     }
 
-    private String readBody(io.github.synapse4j.http.HttpResponse httpResponse) throws IOException {
-        return new String(httpResponse.getBody().readAllBytes(), StandardCharsets.UTF_8);
+    private byte[] readBody(io.github.synapse4j.http.HttpResponse httpResponse) throws IOException {
+        return httpResponse.getBody().readAllBytes();
+    }
+
+    /**
+     * The exception for a call the provider refused: the status always, the provider's own detail
+     * when the body parses as the conventional error document, a snippet of the raw body when it
+     * does not. A walk that fails is not a second failure — it was only ever a chance to say more
+     * than the status already says.
+     *
+     * @param status the HTTP status the answer carried
+     * @param body   the whole response body, buffered by the caller
+     * @return the exception to throw
+     */
+    private SynapseException failure(int status, byte[] body) {
+        try (JsonReader reader = codec.reader(new ByteArrayInputStream(body))) {
+            String detail = ChatCompletionsReader.readError(reader);
+            if (detail != null) {
+                return new SynapseException("OpenAI request failed with HTTP " + status + detail);
+            }
+        } catch (RuntimeException ignored) {
+            // Not a JSON document at all — a proxy's HTML, say. The snippet below says what came.
+        }
+        return new SynapseException("OpenAI request failed with HTTP " + status + ": " + snippet(body));
+    }
+
+    private static String snippet(byte[] body) {
+        // One long line (a proxy's HTML, say) would otherwise fill the log; a prefix is enough.
+        String raw = new String(body, StandardCharsets.UTF_8);
+        return raw.length() <= SNIPPET_LIMIT ? raw : raw.substring(0, SNIPPET_LIMIT) + "...";
     }
 
     private static void require(boolean condition, String message) {

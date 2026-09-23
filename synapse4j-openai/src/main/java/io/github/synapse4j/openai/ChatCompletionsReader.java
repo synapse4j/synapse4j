@@ -1,7 +1,6 @@
 package io.github.synapse4j.openai;
 
 import java.util.List;
-import java.util.Map;
 
 import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatResponse;
@@ -16,8 +15,8 @@ import io.github.synapse4j.json.JsonReader;
 
 /**
  * Walks a protocol document from a caller-supplied {@link JsonReader} into the shared model.
- * Methods are opened by the shape of what comes out of them: a whole completion, or the payload of
- * one stream frame. Error documents are a matter for later. The document is walked token by token
+ * Methods are opened by the shape of what comes out of them: a whole completion, the payload of
+ * one stream frame, or a document that reports a failure. The document is walked token by token
  * rather than decoded into a tree: the fields this module models are mapped as they go by, the
  * ones it does not go into the extras bag of the node they belong to, under the path they came
  * from, so a field the provider adds is neither dropped nor able to break the parse, and the body
@@ -241,7 +240,7 @@ class ChatCompletionsReader {
                 case "usage" -> event.setUsage(readUsage(reader));
                 // A failure can arrive as a frame of its own after the answer was accepted, so
                 // it is raised here rather than left for the aggregation to notice.
-                case "error" -> throw streamError(reader.captureValue());
+                case "error" -> throw streamError(reader);
                 default -> event.getExtras().put(field, reader.captureValue());
             }
         }
@@ -386,26 +385,93 @@ class ChatCompletionsReader {
     }
 
     /**
+     * Reads the provider's error document into the detail a failure message carries — the part
+     * after its own prefix: {@code ": message [type] (code)}, each member the error object has, in
+     * that order, and nothing where it has none. A document that carries no error object answers
+     * {@code null}: what to say then belongs to the caller, as does everything about how the body
+     * reached a reader in the first place.
+     *
+     * @param reader the reader, before its first token; the caller owns it
+     * @return the detail after the caller's own prefix, or {@code null} when there is none to read
+     */
+    static String readError(JsonReader reader) {
+        if (reader.nextToken() != JsonReader.Token.START_OBJECT) {
+            return null;
+        }
+        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
+            String field = reader.name();
+            reader.nextToken();
+            if ("error".equals(field)) {
+                // A scalar where the conventional object belongs says less than the raw body does.
+                return reader.token() == JsonReader.Token.START_OBJECT ? errorSuffix(reader) : null;
+            }
+            reader.skipValue();
+        }
+        return null;
+    }
+
+    /**
      * The exception for a failure the provider reports inside the stream, where no HTTP status is
      * involved: the response was accepted, and the refusal arrives as a frame of its own. The
      * message keeps the provider's own detail, type and code, the way a refused call's does.
+     *
+     * @param reader the reader, positioned on the error value the frame carries
+     * @return the exception to raise
      */
-    private static SynapseException streamError(Object error) {
+    private static SynapseException streamError(JsonReader reader) {
         StringBuilder message = new StringBuilder("OpenAI stream failed");
-        if (error instanceof Map<?, ?> detail) {
-            appendDetail(message, detail.get("message"), ": ", "");
-            appendDetail(message, detail.get("type"), " [", "]");
-            appendDetail(message, detail.get("code"), " (", ")");
-        } else if (error != null) {
-            message.append(": ").append(error);
+        if (reader.token() == JsonReader.Token.START_OBJECT) {
+            message.append(errorSuffix(reader));
+        } else {
+            Object value = reader.captureValue();
+            if (value != null) {
+                message.append(": ").append(value);
+            }
         }
         return new SynapseException(message.toString());
     }
 
-    private static void appendDetail(StringBuilder message, Object detail, String prefix, String suffix) {
-        if (detail != null) {
-            message.append(prefix).append(detail).append(suffix);
+    /**
+     * The detail an error object spells out — {@code ": message [type] (code)}, only the members it
+     * has — with the reader positioned on the object's start.
+     */
+    private static String errorSuffix(JsonReader reader) {
+        String message = null;
+        String type = null;
+        String code = null;
+        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
+            String field = reader.name();
+            reader.nextToken();
+            switch (field) {
+                case "message" -> message = errorText(reader);
+                case "type" -> type = errorText(reader);
+                case "code" -> code = errorText(reader);
+                default -> reader.skipValue();
+            }
         }
+        StringBuilder detail = new StringBuilder();
+        if (message != null) {
+            detail.append(": ").append(message);
+        }
+        if (type != null) {
+            detail.append(" [").append(type).append(']');
+        }
+        if (code != null) {
+            detail.append(" (").append(code).append(')');
+        }
+        return detail.toString();
+    }
+
+    /** A member's text as the message spells it, or {@code null} where it carries no text. */
+    private static String errorText(JsonReader reader) {
+        JsonReader.Token token = reader.token();
+        if (token == JsonReader.Token.START_OBJECT || token == JsonReader.Token.START_ARRAY) {
+            // A structured member has no place in the message, and leaving it unread would lose
+            // the walk: skip it the way any unmodelled value is passed over.
+            reader.skipValue();
+            return null;
+        }
+        return reader.string();
     }
 
     /**
