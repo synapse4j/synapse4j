@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
+import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
 
 class DefaultChatStreamTest {
@@ -120,6 +121,32 @@ class DefaultChatStreamTest {
         assertEquals(1, closed.get());
         assertThrows(IllegalStateException.class, iterator::hasNext);
         assertThrows(IllegalStateException.class, iterator::next);
+    }
+
+    @Test
+    void aFailingSourceReleasesTheConnectionAndKeepsItsFailure() {
+        AtomicInteger closed = new AtomicInteger();
+        Iterator<ChatStreamEvent> failing = new Iterator<ChatStreamEvent>() {
+            @Override
+            public boolean hasNext() {
+                throw new SynapseException("the source failed");
+            }
+
+            @Override
+            public ChatStreamEvent next() {
+                throw new NoSuchElementException();
+            }
+        };
+        ChatStream stream = new DefaultChatStream(failing, (response, event) -> {
+        }, closed::incrementAndGet);
+        Iterator<ChatStreamEvent> iterator = stream.iterator();
+
+        SynapseException thrown = assertThrows(SynapseException.class, iterator::hasNext);
+
+        assertEquals("the source failed", thrown.getMessage());
+        assertEquals(1, closed.get(), "a failed source leaves nothing to read — release it");
+        stream.close();
+        assertEquals(1, closed.get(), "closing after the failure must not release a second time");
     }
 
     @Test

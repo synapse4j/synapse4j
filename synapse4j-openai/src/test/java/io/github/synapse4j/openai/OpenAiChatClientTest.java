@@ -1291,6 +1291,34 @@ class OpenAiChatClientTest {
     }
 
     @Test
+    void aBodyThatStopsWithoutDoneFailsAsTruncated() {
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        RecordedInputStream body = new RecordedInputStream(sse(
+                "{\"id\":\"chatcmpl-3\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Hi\"},"
+                        + "\"finish_reason\":null}]}")
+                .getBytes(UTF_8));
+        stub.canned.setBody(body);
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        ChatStream stream = client.stream(request);
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        assertEquals("Hi", textOf(events.next()));
+
+        SynapseException thrown = assertThrows(SynapseException.class, events::hasNext);
+        assertTrue(thrown.getMessage().contains("[DONE]"), thrown.getMessage());
+        assertTrue(body.closed, "a cut-short answer leaves nothing to read — the connection must go");
+        // What arrived before the cut is still the caller's: the failure reports the answer, it
+        // does not discard it.
+        assertEquals("Hi",
+                assertInstanceOf(TextPart.class, stream.aggregatedResponse().getMessage().getParts().get(0))
+                        .getText());
+    }
+
+    @Test
     void anErrorFrameFailsWhileIterating() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));

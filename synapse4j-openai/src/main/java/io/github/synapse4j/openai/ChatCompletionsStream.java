@@ -14,6 +14,7 @@ import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
+import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.SseEvent;
 import io.github.synapse4j.http.SseEventStream;
 import io.github.synapse4j.json.JsonCodec;
@@ -68,7 +69,8 @@ class ChatCompletionsStream extends DefaultChatStream {
      * <p>
      * Pulling is what reads the body: this iterator asks the frames for their next event only when
      * one is asked of it, so a caller that stops pulling stops the provider. The frame that ends the
-     * answer is handed out like any other, and the iterator ends after it.
+     * answer is handed out like any other; a body that stops without that frame fails the pull
+     * instead — half an answer must not pass for one.
      *
      * @param codec the codec, for opening a reader over each frame's payload
      * @param sse   the frames, in arrival order; the response behind them is released by the
@@ -87,8 +89,14 @@ class ChatCompletionsStream extends DefaultChatStream {
                 if (pending != null) {
                     return true;
                 }
-                if (ended || !sse.hasNext()) {
+                if (ended) {
                     return false;
+                }
+                if (!sse.hasNext()) {
+                    // OpenAI ends every answer with the sentinel: a body that just stops is an
+                    // answer cut short, not an answer. What was consumed before the cut stays
+                    // folded into the aggregated response the caller already holds.
+                    throw new SynapseException("OpenAI stream ended without [DONE]: the answer was cut short");
                 }
                 pending = toEvent(codec, sse.next());
                 // The frame that ends the answer is the last one there is: a provider that sent

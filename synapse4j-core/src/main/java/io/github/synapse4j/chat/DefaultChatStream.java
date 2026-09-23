@@ -73,9 +73,9 @@ public class DefaultChatStream implements ChatStream {
     }
 
     /**
-     * Runs the close action once, whoever asks first — a caller cancelling, or the iterator finding
-     * the sequence over. A stream that ran to its end is released the moment its last event is
-     * handed out, since nothing will read the connection again.
+     * Runs the close action once, whoever asks first — a caller cancelling, the iterator finding
+     * the sequence over, or its source failing. A stream that ran to its end is released the moment
+     * its last event is handed out, since nothing will read the connection again.
      */
     private synchronized void release() {
         if (released) {
@@ -100,7 +100,20 @@ public class DefaultChatStream implements ChatStream {
             if (exhausted) {
                 return false;
             }
-            boolean more = source.hasNext();
+            boolean more;
+            try {
+                more = source.hasNext();
+            } catch (RuntimeException failure) {
+                // A source that fails has ended the answer whether or not it says so, and nothing
+                // will read the connection again: release here, keeping any close failure beside
+                // the original rather than in its place.
+                try {
+                    release();
+                } catch (RuntimeException closeFailure) {
+                    failure.addSuppressed(closeFailure);
+                }
+                throw failure;
+            }
             if (!more) {
                 // The sequence is over: the answer is complete, and nothing will read the connection
                 // again, so it is released here rather than left for a close that may never come.
