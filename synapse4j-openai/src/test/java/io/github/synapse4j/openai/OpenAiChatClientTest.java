@@ -660,8 +660,8 @@ class OpenAiChatClientTest {
         request.getOptions().setModel("gpt-test");
         request.getOptions().getExtras().put("seed", 7);
         ChatMessage user = message(ChatRole.USER, "Hello");
-        user.getExtras().put("name", "roger");
-        user.getParts().get(0).getExtras().put("cache_control", Map.of("type", "ephemeral"));
+        user.setExtras(new ProviderExtras().put("name", "roger"));
+        user.getParts().get(0).setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
         request.getMessages().add(user);
 
         client.chat(request);
@@ -750,7 +750,7 @@ class OpenAiChatClientTest {
         ChatMessage replay = new ChatMessage();
         replay.setRole(ChatRole.ASSISTANT);
         ToolCallPart call = new ToolCallPart("call_1", "get_weather", "{}");
-        call.getExtras().put(List.of("function", "provider_field"), "x");
+        call.setExtras(new ProviderExtras().put(List.of("function", "provider_field"), "x"));
         replay.getParts().add(call);
         request.getMessages().add(replay);
 
@@ -778,7 +778,7 @@ class OpenAiChatClientTest {
         ChatMessage user = new ChatMessage();
         user.setRole(ChatRole.USER);
         MediaPart image = new MediaPart("image/png", "https://example.com/a.png", null, null);
-        image.getExtras().put(List.of("image_url", "detail"), "high");
+        image.setExtras(new ProviderExtras().put(List.of("image_url", "detail"), "high"));
         user.getParts().add(image);
         request.getMessages().add(user);
 
@@ -827,7 +827,7 @@ class OpenAiChatClientTest {
         ChatMessage result = new ChatMessage();
         result.setRole(ChatRole.TOOL);
         ToolResultPart part = new ToolResultPart("call_1", "get_weather", List.of(new TextPart("sunny")), false);
-        part.getExtras().put("cache_control", Map.of("type", "ephemeral"));
+        part.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
         result.getParts().add(part);
         request.getMessages().add(result);
 
@@ -852,7 +852,7 @@ class OpenAiChatClientTest {
         request.getOptions().setModel("gpt-test");
         ChatMessage results = new ChatMessage();
         results.setRole(ChatRole.TOOL);
-        results.getExtras().put("cache_control", Map.of("type", "ephemeral"));
+        results.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
         results.getParts().add(new ToolResultPart("call_1", "get_weather", List.of(new TextPart("sunny")), false));
         results.getParts().add(new ToolResultPart("call_2", "get_time", List.of(new TextPart("noon")), false));
         request.getMessages().add(results);
@@ -941,7 +941,7 @@ class OpenAiChatClientTest {
         ChatMessage user = new ChatMessage();
         user.setRole(ChatRole.USER);
         TextPart part = new TextPart("");
-        part.getExtras().put("cache_control", Map.of("type", "ephemeral"));
+        part.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
         user.getParts().add(part);
         request.getMessages().add(user);
 
@@ -966,7 +966,7 @@ class OpenAiChatClientTest {
         ChatMessage result = new ChatMessage();
         result.setRole(ChatRole.TOOL);
         TextPart text = new TextPart("sunny");
-        text.getExtras().put("cache_control", Map.of("type", "ephemeral"));
+        text.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
         result.getParts().add(new ToolResultPart("call_1", "get_weather", List.of(text), false));
         request.getMessages().add(result);
 

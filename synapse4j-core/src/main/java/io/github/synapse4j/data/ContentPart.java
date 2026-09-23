@@ -14,10 +14,10 @@ import lombok.ToString;
  * extends the model without touching it.
  *
  * <p>
- * Every part owns its {@link ProviderExtras} bag, so a provider-specific field can be attached to
- * exactly the part it belongs to. The bag is created with the part and never shared: it is mutated
- * in place through {@link #getExtras()}, and reusing the entries of another bag means copying them
- * in with {@link ProviderExtras#putAll(ProviderExtras)}.
+ * A part may carry a {@link ProviderExtras} bag, so a provider-specific field can be attached to
+ * exactly the part it belongs to. No bag is created until one is set, so a part nobody configures
+ * allocates nothing. Bags are never shared: each part holds its own, and reusing the entries of
+ * another bag means copying them in with {@link ProviderExtras#putAll(ProviderExtras)}.
  *
  * <p>
  * Subclasses must pass {@code callSuper = true} to {@code @ToString}, so a part's printout carries
@@ -29,9 +29,9 @@ import lombok.ToString;
 public abstract class ContentPart {
 
     /**
-     * Provider-specific fields to merge into this part when the request is sent. Created with the
-     * part, and never {@code null}.
+     * Provider-specific fields to merge into this part when the request is sent. Absent until one is
+     * set: a part nobody configures carries no bag at all.
      */
-    private final ProviderExtras extras = new ProviderExtras();
+    private ProviderExtras extras;
 
 }

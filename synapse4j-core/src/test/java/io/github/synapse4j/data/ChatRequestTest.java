@@ -2,12 +2,8 @@ package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.ArrayList;
-import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -25,16 +21,14 @@ class ChatRequestTest {
     }
 
     @Test
-    void messagesAndToolsAreMutableAndCannotBeSetToNull() {
+    void messagesAndToolsAreMutable() {
         ChatRequest request = new ChatRequest();
 
-        request.getMessages().add(new ChatMessage(ChatRole.USER, new ArrayList<>()));
-        request.getTools().add(new ToolDefinition("get_weather", "Looks up the weather", "{}"));
+        request.addMessage(new ChatMessage(ChatRole.USER));
+        request.addTool(new ToolDefinition("get_weather", "Looks up the weather", "{}"));
 
         assertEquals(1, request.getMessages().size());
         assertEquals(1, request.getTools().size());
-        assertThrows(NullPointerException.class, () -> request.setMessages(null));
-        assertThrows(NullPointerException.class, () -> request.setTools(null));
     }
 
     @Test
@@ -53,25 +47,6 @@ class ChatRequestTest {
         one.getOptions().setTemperature(0.7);
 
         assertNull(two.getOptions().getTemperature());
-    }
-
-    @Test
-    void theAllArgumentsConstructorCarriesEverything() {
-        List<ChatMessage> messages = new ArrayList<>();
-        messages.add(new ChatMessage(ChatRole.USER, new ArrayList<>()));
-        List<ToolDefinition> tools = new ArrayList<>();
-        tools.add(new ToolDefinition("get_weather", "Looks up the weather", "{}"));
-        ChatResponseFormat responseFormat = new ChatResponseFormat();
-        responseFormat.setType(ChatResponseFormat.TYPE_JSON);
-        ChatOptions options = new ChatOptions();
-        options.setModel("gpt-4o");
-
-        ChatRequest request = new ChatRequest(messages, tools, responseFormat, options);
-
-        assertSame(messages, request.getMessages());
-        assertSame(tools, request.getTools());
-        assertSame(responseFormat, request.getResponseFormat());
-        assertSame(options, request.getOptions());
     }
 
     @Test

@@ -2,22 +2,19 @@ package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.ArrayList;
 
 import org.junit.jupiter.api.Test;
 
 class ChatMessageTest {
 
     @Test
-    void newMessageHasNoRoleAndNoParts() {
+    void newMessageHasNoRoleNoPartsAndNoExtras() {
         ChatMessage message = new ChatMessage();
 
         assertNull(message.getRole());
         assertTrue(message.getParts().isEmpty());
-        assertTrue(message.getExtras().isEmpty());
+        assertNull(message.getExtras());
     }
 
     @Test
@@ -38,13 +35,12 @@ class ChatMessageTest {
     }
 
     @Test
-    void partsAreMutableAndCannotBeSetToNull() {
-        ChatMessage message = new ChatMessage(ChatRole.USER, new ArrayList<>());
+    void partsAreMutable() {
+        ChatMessage message = new ChatMessage(ChatRole.USER);
 
-        message.getParts().add(new TextPart("hello"));
+        message.addPart(new TextPart("hello"));
 
         assertEquals(1, message.getParts().size());
-        assertThrows(NullPointerException.class, () -> message.setParts(null));
     }
 
     @Test
@@ -52,15 +48,15 @@ class ChatMessageTest {
         ChatMessage one = new ChatMessage();
         ChatMessage two = new ChatMessage();
 
-        one.getExtras().put("service_tier", "standard");
+        one.setExtras(new ProviderExtras().put("service_tier", "standard"));
 
-        assertTrue(two.getExtras().isEmpty());
+        assertNull(two.getExtras());
     }
 
     @Test
     void toStringCoversRolePartsAndExtras() {
-        ChatMessage message = new ChatMessage(ChatRole.ASSISTANT, new ArrayList<>());
-        message.getParts().add(new TextPart("hello"));
+        ChatMessage message = new ChatMessage(ChatRole.ASSISTANT);
+        message.addPart(new TextPart("hello"));
 
         String rendered = message.toString();
 

@@ -54,8 +54,8 @@ import lombok.EqualsAndHashCode;
  * <p>
  * Instances are mutable: this is an accumulating bag, in the spirit of {@link Map}, not a value
  * object. The caller owns the instance and is responsible for populating it. A node that carries a
- * bag never shares it — each node creates its own — so content moves between bags by copying
- * ({@link #putAll(ProviderExtras)}). Instances are not thread-safe.
+ * bag never shares it with another — each one sets its own — so content moves between bags by
+ * copying ({@link #putAll(ProviderExtras)}). Instances are not thread-safe.
  *
  * <p>
  * Values are kept by reference and are never copied when stored: mutating a stored value (a

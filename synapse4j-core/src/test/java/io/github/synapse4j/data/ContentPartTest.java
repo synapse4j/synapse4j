@@ -2,6 +2,7 @@ package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,11 +14,10 @@ import org.junit.jupiter.api.Test;
 class ContentPartTest {
 
     @Test
-    void everyPartStartsWithAnEmptyExtrasBag() {
+    void everyPartStartsWithNoExtrasBag() {
         TextPart part = new TextPart("hello");
 
-        assertEquals(new ProviderExtras(), part.getExtras());
-        assertTrue(part.getExtras().isEmpty());
+        assertNull(part.getExtras());
     }
 
     @Test
@@ -25,18 +25,17 @@ class ContentPartTest {
         TextPart one = new TextPart("hello");
         TextPart two = new TextPart("hello");
 
-        one.getExtras().put("temperature", 0.5);
+        one.setExtras(new ProviderExtras().put("temperature", 0.5));
 
-        assertTrue(two.getExtras().isEmpty());
+        assertNull(two.getExtras());
     }
 
     @Test
     void extrasAreMutableThroughTheGetter() {
         TextPart part = new TextPart("hello");
+        part.setExtras(new ProviderExtras().put("temperature", 0.5));
 
         assertSame(part.getExtras(), part.getExtras());
-
-        part.getExtras().put("temperature", 0.5);
 
         assertEquals(0.5, part.getExtras().get("temperature"));
     }

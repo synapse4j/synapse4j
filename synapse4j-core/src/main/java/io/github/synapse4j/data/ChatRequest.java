@@ -3,7 +3,6 @@ package io.github.synapse4j.data;
 import java.util.ArrayList;
 import java.util.List;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
@@ -27,16 +26,13 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
 public class ChatRequest {
 
     /** The conversation so far, oldest first. Never {@code null}; empty means no messages yet. */
-    @NonNull
-    private List<ChatMessage> messages = new ArrayList<>();
+    private final List<ChatMessage> messages = new ArrayList<>();
 
     /** Tools the model may call. Never {@code null}; empty means none. */
-    @NonNull
-    private List<ToolDefinition> tools = new ArrayList<>();
+    private final List<ToolDefinition> tools = new ArrayList<>();
 
     /** The shape the answer should take. Never {@code null}; with nothing set, nothing is asked. */
     @NonNull
@@ -45,6 +41,28 @@ public class ChatRequest {
     /** How to run this call. Never {@code null}; with nothing set, the defaults stand. */
     @NonNull
     private ChatOptions options = new ChatOptions();
+
+    /**
+     * Adds a message to the conversation.
+     *
+     * @param message the message to add, oldest first
+     * @return this call
+     */
+    public ChatRequest addMessage(ChatMessage message) {
+        messages.add(message);
+        return this;
+    }
+
+    /**
+     * Adds a tool the model may call.
+     *
+     * @param tool the tool to add
+     * @return this call
+     */
+    public ChatRequest addTool(ToolDefinition tool) {
+        tools.add(tool);
+        return this;
+    }
 
     /**
      * The messages and tools are counted rather than printed: they grow with the conversation, and a

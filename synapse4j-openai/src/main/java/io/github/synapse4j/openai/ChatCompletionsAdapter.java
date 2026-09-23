@@ -178,7 +178,10 @@ class ChatCompletionsAdapter {
         if (!toolCalls.isEmpty()) {
             entry.put("tool_calls", toolCalls);
         }
-        entry.putAll(message.getExtras());
+        ProviderExtras messageExtras = message.getExtras();
+        if (messageExtras != null) {
+            entry.putAll(messageExtras);
+        }
         return entry;
     }
 
@@ -188,8 +191,9 @@ class ChatCompletionsAdapter {
      * field this module does not model.
      */
     private static boolean arrayContent(ChatMessage message) {
-        return message.getParts().stream().anyMatch(
-                part -> part instanceof MediaPart || part instanceof ToolCallPart || !part.getExtras().isEmpty());
+        return message.getParts().stream().anyMatch(part -> part instanceof MediaPart
+                || part instanceof ToolCallPart
+                || (part.getExtras() != null && !part.getExtras().isEmpty()));
     }
 
     /**
@@ -198,7 +202,7 @@ class ChatCompletionsAdapter {
      */
     private static ProviderExtras textPart(TextPart part) {
         boolean hasText = part.getText() != null && !part.getText().isEmpty();
-        if (!hasText && part.getExtras().isEmpty()) {
+        if (!hasText && (part.getExtras() == null || part.getExtras().isEmpty())) {
             return null;
         }
         ProviderExtras entry = new ProviderExtras();
@@ -206,7 +210,10 @@ class ChatCompletionsAdapter {
         if (hasText) {
             entry.put("text", part.getText());
         }
-        entry.putAll(part.getExtras());
+        ProviderExtras partExtras = part.getExtras();
+        if (partExtras != null) {
+            entry.putAll(partExtras);
+        }
         return entry;
     }
 
@@ -235,7 +242,10 @@ class ChatCompletionsAdapter {
         entry.put(List.of("image_url", "url"),
                 part.getUri() != null ? part.getUri()
                         : new Base64Reader("data:" + mediaType + ";base64,", part.getSource()));
-        entry.putAll(part.getExtras());
+        ProviderExtras partExtras = part.getExtras();
+        if (partExtras != null) {
+            entry.putAll(partExtras);
+        }
         return entry;
     }
 
@@ -246,8 +256,13 @@ class ChatCompletionsAdapter {
         entry.put("tool_call_id", result.getCallId());
         // The message's extras first, the result's own after: the more specific node is merged last,
         // so it wins where both set the same path.
-        entry.putAll(messageExtras);
-        entry.putAll(result.getExtras());
+        if (messageExtras != null) {
+            entry.putAll(messageExtras);
+        }
+        ProviderExtras resultExtras = result.getExtras();
+        if (resultExtras != null) {
+            entry.putAll(resultExtras);
+        }
         return entry;
     }
 
@@ -258,7 +273,10 @@ class ChatCompletionsAdapter {
         entry.put(List.of("function", "name"), part.getName());
         entry.put(List.of("function", "arguments"), part.getArgumentsJson());
         // A field the response carried inside the function object comes back to the same path.
-        entry.putAll(part.getExtras());
+        ProviderExtras partExtras = part.getExtras();
+        if (partExtras != null) {
+            entry.putAll(partExtras);
+        }
         return entry;
     }
 
@@ -313,6 +331,26 @@ class ChatCompletionsAdapter {
         if (value != null) {
             members.put(name, value);
         }
+    }
+
+    /** The bag to record into, created when the node carries none yet. */
+    private static ProviderExtras extras(ChatMessage message) {
+        ProviderExtras extras = message.getExtras();
+        if (extras == null) {
+            extras = new ProviderExtras();
+            message.setExtras(extras);
+        }
+        return extras;
+    }
+
+    /** The bag to record into, created when the node carries none yet. */
+    private static ProviderExtras extras(ContentPart part) {
+        ProviderExtras extras = part.getExtras();
+        if (extras == null) {
+            extras = new ProviderExtras();
+            part.setExtras(extras);
+        }
+        return extras;
     }
 
     /**
@@ -406,7 +444,7 @@ class ChatCompletionsAdapter {
                 case "role" -> message.setRole(reader.string());
                 case "content" -> readContent(reader, message);
                 case "tool_calls" -> readToolCalls(reader, message);
-                default -> message.getExtras().put(field, reader.captureValue());
+                default -> extras(message).put(field, reader.captureValue());
             }
         }
     }
@@ -446,14 +484,14 @@ class ChatCompletionsAdapter {
     private void readContentPart(JsonReader reader, ChatMessage message) {
         String type = null;
         String text = null;
-        ProviderExtras extras = new ProviderExtras();
+        ProviderExtras collected = new ProviderExtras();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
             String field = reader.name();
             reader.nextToken();
             switch (field) {
                 case "type" -> type = reader.string();
                 case "text" -> text = reader.string();
-                default -> extras.put(field, reader.captureValue());
+                default -> collected.put(field, reader.captureValue());
             }
         }
         if (type == null) {
@@ -465,7 +503,7 @@ class ChatCompletionsAdapter {
         TextPart part = new TextPart(text);
         // The type that decides what the part is may come after the fields it does not model, so
         // the part is built here and the fields collected on the way move into its own bag.
-        part.getExtras().putAll(extras);
+        extras(part).putAll(collected);
         message.getParts().add(part);
     }
 
@@ -491,7 +529,7 @@ class ChatCompletionsAdapter {
             switch (field) {
                 case "id" -> call.setCallId(reader.string());
                 case "function" -> readToolCallFunction(reader, call);
-                default -> call.getExtras().put(field, reader.captureValue());
+                default -> extras(call).put(field, reader.captureValue());
             }
         }
         message.getParts().add(call);
@@ -509,7 +547,7 @@ class ChatCompletionsAdapter {
                 case "name" -> call.setName(reader.string());
                 case "arguments" -> call.setArgumentsJson(reader.string());
                 // Kept under the path it came from, the way every other extras entry is spelled.
-                default -> call.getExtras().put(List.of("function", field), reader.captureValue());
+                default -> extras(call).put(List.of("function", field), reader.captureValue());
             }
         }
     }
@@ -575,7 +613,7 @@ class ChatCompletionsAdapter {
             if (!(part instanceof TextPart textPart)) {
                 throw unsupportedPart(part);
             }
-            if (!textPart.getExtras().isEmpty()) {
+            if (textPart.getExtras() != null && !textPart.getExtras().isEmpty()) {
                 throw new SynapseException(
                         "unsupported part for OpenAI: a tool result's content is a string, which cannot carry extras");
             }

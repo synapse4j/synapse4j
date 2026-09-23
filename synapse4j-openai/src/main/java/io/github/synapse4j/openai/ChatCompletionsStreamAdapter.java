@@ -12,6 +12,7 @@ import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.exception.SynapseException;
@@ -220,7 +221,7 @@ class ChatCompletionsStreamAdapter {
                 case "tool_calls" -> readDeltaToolCalls(reader, delta);
                 // Refusal and anything else the provider puts beside the content belongs to the
                 // message being built, so it stays on the delta rather than on the chunk.
-                default -> delta.getExtras().put(field, reader.captureValue());
+                default -> extras(delta).put(field, reader.captureValue());
             }
         }
         event.setDelta(delta);
@@ -261,7 +262,7 @@ class ChatCompletionsStreamAdapter {
             switch (field) {
                 case "id" -> call.setCallId(reader.string());
                 case "function" -> readDeltaToolCallFunction(reader, call);
-                default -> call.getExtras().put(field, reader.captureValue());
+                default -> extras(call).put(field, reader.captureValue());
             }
         }
         delta.getParts().add(call);
@@ -279,7 +280,7 @@ class ChatCompletionsStreamAdapter {
                 case "name" -> call.setName(reader.string());
                 case "arguments" -> call.setArgumentsJson(reader.string());
                 // Kept under the path it came from, the way every other extras entry is spelled.
-                default -> call.getExtras().put(List.of("function", field), reader.captureValue());
+                default -> extras(call).put(List.of("function", field), reader.captureValue());
             }
         }
     }
@@ -305,6 +306,26 @@ class ChatCompletionsStreamAdapter {
         if (detail != null) {
             message.append(prefix).append(detail).append(suffix);
         }
+    }
+
+    /** The bag to record into, created when the node carries none yet. */
+    private static ProviderExtras extras(ChatMessage message) {
+        ProviderExtras extras = message.getExtras();
+        if (extras == null) {
+            extras = new ProviderExtras();
+            message.setExtras(extras);
+        }
+        return extras;
+    }
+
+    /** The bag to record into, created when the node carries none yet. */
+    private static ProviderExtras extras(ContentPart part) {
+        ProviderExtras extras = part.getExtras();
+        if (extras == null) {
+            extras = new ProviderExtras();
+            part.setExtras(extras);
+        }
+        return extras;
     }
 
     /** Folds one event into the answer being assembled. */
@@ -333,7 +354,10 @@ class ChatCompletionsStreamAdapter {
         }
         // A field the provider put on a delta is a field of the answer's message, so it travels
         // with it rather than staying behind on the chunk that happened to carry it.
-        message.getExtras().putAll(delta.getExtras());
+        ProviderExtras deltaExtras = delta.getExtras();
+        if (deltaExtras != null) {
+            extras(message).putAll(deltaExtras);
+        }
         for (ContentPart part : delta.getParts()) {
             if (part instanceof TextPart text) {
                 appendText(message, text);
@@ -368,7 +392,10 @@ class ChatCompletionsStreamAdapter {
             call.setName(fragment.getName());
         }
         call.setArgumentsJson(join(call.getArgumentsJson(), fragment.getArgumentsJson()));
-        call.getExtras().putAll(fragment.getExtras());
+        ProviderExtras fragmentExtras = fragment.getExtras();
+        if (fragmentExtras != null) {
+            extras(call).putAll(fragmentExtras);
+        }
     }
 
     /** The call a fragment continues, or {@code null} when it opens a new one. */
@@ -386,10 +413,11 @@ class ChatCompletionsStreamAdapter {
         // is what tells two calls being spelled at the same time apart. It is read back out of the
         // extras the fragment kept it in: the shared model has no field for it, and the protocol's
         // own way of saying which call is meant is worth more than the order the fragments arrive in.
-        Object position = fragment.getExtras().get(TOOL_CALL_POSITION);
+        ProviderExtras fragmentExtras = fragment.getExtras();
+        Object position = fragmentExtras != null ? fragmentExtras.get(TOOL_CALL_POSITION) : null;
         if (position != null) {
             for (ContentPart part : parts) {
-                if (part instanceof ToolCallPart call
+                if (part instanceof ToolCallPart call && call.getExtras() != null
                         && position.equals(call.getExtras().get(TOOL_CALL_POSITION))) {
                     return call;
                 }

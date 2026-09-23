@@ -58,10 +58,10 @@ class ChatResponseTest {
         ChatResponse one = new ChatResponse();
         ChatResponse two = new ChatResponse();
 
-        one.getMessage().getExtras().put("cache_control", "ephemeral");
+        one.getMessage().setExtras(new ProviderExtras().put("cache_control", "ephemeral"));
         one.getExtras().put("service_tier", "flex");
 
-        assertTrue(two.getMessage().getExtras().isEmpty());
+        assertNull(two.getMessage().getExtras());
         assertTrue(two.getExtras().isEmpty());
     }
 

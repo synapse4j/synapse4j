@@ -3,10 +3,8 @@ package io.github.synapse4j.data;
 import java.util.ArrayList;
 import java.util.List;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.NonNull;
 import lombok.Setter;
 
 /**
@@ -26,18 +24,39 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
 public class ChatMessage {
 
     /** Who contributes this message: a {@link ChatRole} constant, or any other value. */
     private String role;
 
     /** What the message contributes. Never {@code null}; empty is allowed. */
-    @NonNull
-    private List<ContentPart> parts = new ArrayList<>();
+    private final List<ContentPart> parts = new ArrayList<>();
 
-    /** Provider-specific fields to merge into this message when the request is sent. */
-    private final ProviderExtras extras = new ProviderExtras();
+    /**
+     * Provider-specific fields to merge into this message when the request is sent. Absent until one
+     * is set: a message nobody configures carries no bag at all.
+     */
+    private ProviderExtras extras;
+
+    /**
+     * A message from the given speaker, with nothing said yet.
+     *
+     * @param role the {@link ChatRole} constant, or any other value
+     */
+    public ChatMessage(String role) {
+        this.role = role;
+    }
+
+    /**
+     * Adds a part to what this message contributes.
+     *
+     * @param part the part to add
+     * @return this message
+     */
+    public ChatMessage addPart(ContentPart part) {
+        parts.add(part);
+        return this;
+    }
 
     /**
      * The parts are counted rather than printed: they carry the content, and a printout that carried
