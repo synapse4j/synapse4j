@@ -104,7 +104,7 @@ class JacksonJsonCodecTest {
         JsonSchema schema = codec.generateEncodeSchema(Order.class);
 
         assertEquals(Boolean.FALSE, schema.getAdditionalProperties());
-        assertFalse(schema.getExtras().toNestedMap().containsKey("$schema"));
+        assertFalse(schema.getExtras().nestedMap().containsKey("$schema"));
     }
 
     @Test

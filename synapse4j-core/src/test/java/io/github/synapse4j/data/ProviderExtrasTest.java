@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,7 +24,7 @@ class ProviderExtrasTest {
 
         assertTrue(extras.isEmpty());
         assertEquals(0, extras.size());
-        assertEquals(Map.of(), extras.toNestedMap());
+        assertEquals(Map.of(), extras.nestedMap());
         assertFalse(extras.contains("anything"));
         assertNull(extras.get("anything"));
     }
@@ -38,7 +39,7 @@ class ProviderExtrasTest {
         assertTrue(extras.contains("temperature"));
         assertEquals(0.5, extras.get("temperature"));
         assertEquals(1, extras.size());
-        assertEquals(Map.of("temperature", 0.5), extras.toNestedMap());
+        assertEquals(Map.of("temperature", 0.5), extras.nestedMap());
     }
 
     @Test
@@ -50,7 +51,7 @@ class ProviderExtrasTest {
         assertTrue(extras.contains("metadata", "trace_id"));
         assertEquals("abc", extras.get("metadata", "trace_id"));
         assertEquals(1, extras.size());
-        assertEquals(Map.of("metadata", Map.of("trace_id", "abc")), extras.toNestedMap());
+        assertEquals(Map.of("metadata", Map.of("trace_id", "abc")), extras.nestedMap());
     }
 
     @Test
@@ -61,7 +62,7 @@ class ProviderExtrasTest {
         extras.put(List.of("a", "c"), 2);
 
         assertEquals(2, extras.size());
-        assertEquals(Map.of("a", Map.of("b", 1, "c", 2)), extras.toNestedMap());
+        assertEquals(Map.of("a", Map.of("b", 1, "c", 2)), extras.nestedMap());
     }
 
     @Test
@@ -72,7 +73,7 @@ class ProviderExtrasTest {
 
         assertEquals(1, extras.size());
         assertEquals(1, extras.get("a.b"));
-        assertEquals(Map.of("a.b", 1), extras.toNestedMap());
+        assertEquals(Map.of("a.b", 1), extras.nestedMap());
     }
 
     @Test
@@ -83,7 +84,7 @@ class ProviderExtrasTest {
         extras.put("a", 2);
 
         assertEquals(2, extras.size());
-        assertEquals(Map.of("a.b", 1, "a", 2), extras.toNestedMap());
+        assertEquals(Map.of("a.b", 1, "a", 2), extras.nestedMap());
     }
 
     @Test
@@ -93,7 +94,7 @@ class ProviderExtrasTest {
         extras.put("a\\b", 1);
 
         assertEquals(1, extras.get("a\\b"));
-        assertEquals(Map.of("a\\b", 1), extras.toNestedMap());
+        assertEquals(Map.of("a\\b", 1), extras.nestedMap());
     }
 
     @Test
@@ -116,7 +117,7 @@ class ProviderExtrasTest {
         assertEquals(1, extras.size());
         assertTrue(extras.contains("safety"));
         assertNull(extras.get("safety"));
-        assertTrue(extras.toNestedMap().containsKey("safety"));
+        assertTrue(extras.nestedMap().containsKey("safety"));
     }
 
     @Test
@@ -136,7 +137,7 @@ class ProviderExtrasTest {
 
         extras.put(List.of("a", "b"), 2);
 
-        assertEquals(Map.of("a", Map.of("b", 2)), extras.toNestedMap());
+        assertEquals(Map.of("a", Map.of("b", 2)), extras.nestedMap());
         assertNull(extras.get("a"));
     }
 
@@ -146,7 +147,7 @@ class ProviderExtrasTest {
 
         extras.put("a", 1);
 
-        assertEquals(Map.of("a", 1), extras.toNestedMap());
+        assertEquals(Map.of("a", 1), extras.nestedMap());
         assertNull(extras.get("a", "b"));
     }
 
@@ -193,8 +194,8 @@ class ProviderExtrasTest {
         ProviderExtras returned = extras.putAll(other);
 
         assertSame(extras, returned);
-        assertEquals(Map.of("a", 1, "b", 3, "c", 4), extras.toNestedMap());
-        assertEquals(Map.of("b", 3, "c", 4), other.toNestedMap());
+        assertEquals(Map.of("a", 1, "b", 3, "c", 4), extras.nestedMap());
+        assertEquals(Map.of("b", 3, "c", 4), other.nestedMap());
     }
 
     @Test
@@ -204,7 +205,7 @@ class ProviderExtrasTest {
 
         extras.putAll(other);
 
-        assertEquals(Map.of("a", 2), extras.toNestedMap());
+        assertEquals(Map.of("a", 2), extras.nestedMap());
     }
 
     @Test
@@ -213,7 +214,7 @@ class ProviderExtrasTest {
 
         extras.putAll(new ProviderExtras());
 
-        assertEquals(Map.of("a", 1), extras.toNestedMap());
+        assertEquals(Map.of("a", 1), extras.nestedMap());
     }
 
     @Test
@@ -235,10 +236,10 @@ class ProviderExtrasTest {
     void theNestedMapIsAFreshCopy() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
 
-        Map<String, Object> nested = extras.toNestedMap();
+        Map<String, Object> nested = extras.nestedMap();
         nested.put("c", 2);
 
-        assertEquals(Map.of("a", Map.of("b", 1)), extras.toNestedMap());
+        assertEquals(Map.of("a", Map.of("b", 1)), extras.nestedMap());
     }
 
     @Test
@@ -246,10 +247,10 @@ class ProviderExtrasTest {
     void theNestedMapOfANestedPathIsAFreshCopyToo() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
 
-        Map<String, Object> inner = (Map<String, Object>) extras.toNestedMap().get("a");
+        Map<String, Object> inner = (Map<String, Object>) extras.nestedMap().get("a");
         inner.put("c", 2);
 
-        assertEquals(Map.of("a", Map.of("b", 1)), extras.toNestedMap());
+        assertEquals(Map.of("a", Map.of("b", 1)), extras.nestedMap());
     }
 
     @Test
@@ -266,10 +267,10 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void toStringShowsTheNestedShape() {
+    void toStringShowsTheRawEntries() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
 
-        assertEquals("ProviderExtras{a={b=1}}", extras.toString());
+        assertEquals("ProviderExtras{a.b=1}", extras.toString());
     }
 
     @Test
@@ -325,6 +326,196 @@ class ProviderExtrasTest {
     }
 
     @Test
+    void putRawStoresAnAssembledKeyAsGiven() {
+        ProviderExtras extras = new ProviderExtras();
+
+        ProviderExtras returned = extras.putRaw("metadata.trace_id", "abc");
+
+        assertSame(extras, returned);
+        assertEquals(1, extras.size());
+        assertEquals("abc", extras.get("metadata", "trace_id"));
+        assertEquals(Map.of("metadata", Map.of("trace_id", "abc")), extras.nestedMap());
+    }
+
+    @Test
+    void putRawKeepsAnEscapedSeparatorInTheKey() {
+        ProviderExtras extras = new ProviderExtras();
+
+        extras.putRaw("a\\.b", 1);
+
+        assertEquals(1, extras.size());
+        assertEquals(Map.of("a.b", 1), extras.nestedMap());
+    }
+
+    @Test
+    void putRawClearsWhatItOverlaps() {
+        ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
+
+        extras.putRaw("a", 2);
+
+        assertEquals(1, extras.size());
+        assertEquals(Map.of("a", 2), extras.nestedMap());
+    }
+
+    @Test
+    void putRawRejectsANullKey() {
+        ProviderExtras extras = new ProviderExtras();
+
+        assertThrows(NullPointerException.class, () -> extras.putRaw(null, 1));
+    }
+
+    @Test
+    void rawMapExposesTheEntriesUnderTheirAssembledKeys() {
+        ProviderExtras extras = new ProviderExtras().put(List.of("metadata", "trace_id"), "abc").put("temperature",
+                0.5);
+
+        assertEquals(Map.of("metadata.trace_id", "abc", "temperature", 0.5), extras.rawMap());
+    }
+
+    @Test
+    void rawMapIsReadOnly() {
+        ProviderExtras extras = new ProviderExtras().put("a", 1);
+
+        Map<String, Object> raw = extras.rawMap();
+
+        assertThrows(UnsupportedOperationException.class, () -> raw.put("b", 2));
+        assertEquals(1, extras.size());
+    }
+
+    @Test
+    void rawMapIsLive() {
+        ProviderExtras extras = new ProviderExtras().put("a", 1);
+
+        Map<String, Object> raw = extras.rawMap();
+        extras.put("b", 2);
+
+        assertEquals(Map.of("a", 1, "b", 2), raw);
+    }
+
+    @Test
+    void aBagRoundTripsThroughItsRawMap() {
+        ProviderExtras extras = new ProviderExtras().put(List.of("metadata", "trace_id"), "abc").put("temperature",
+                0.5);
+        ProviderExtras restored = new ProviderExtras();
+
+        extras.rawMap().forEach(restored::putRaw);
+
+        assertEquals(extras, restored);
+    }
+
+    @Test
+    void mergeIntoSetsPathsTheMapDoesNotHaveYet() {
+        ProviderExtras extras = new ProviderExtras().put(List.of("metadata", "trace_id"), "abc");
+        Map<String, Object> members = new LinkedHashMap<>();
+
+        ProviderExtras returned = extras.mergeInto(members);
+
+        assertSame(extras, returned);
+        assertEquals(Map.of("metadata", Map.of("trace_id", "abc")), members);
+    }
+
+    @Test
+    void mergeIntoLetsTheBagWinOverAValueAtTheSamePosition() {
+        ProviderExtras extras = new ProviderExtras().put("temperature", 0.7);
+        Map<String, Object> members = new LinkedHashMap<>();
+        members.put("temperature", 0.3);
+
+        extras.mergeInto(members);
+
+        assertEquals(Map.of("temperature", 0.7), members);
+    }
+
+    @Test
+    void mergeIntoLeavesMembersTheBagNeverSets() {
+        ProviderExtras extras = new ProviderExtras().put("temperature", 0.7);
+        Map<String, Object> members = new LinkedHashMap<>();
+        members.put("model", "gpt-4o");
+        members.put("temperature", 0.3);
+
+        extras.mergeInto(members);
+
+        assertEquals(Map.of("model", "gpt-4o", "temperature", 0.7), members);
+    }
+
+    @Test
+    void mergeIntoWalksThroughAContainerAndKeepsItsOtherMembers() {
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("name", "response");
+        Map<String, Object> format = new LinkedHashMap<>();
+        format.put("type", "json_schema");
+        format.put("json_schema", schema);
+        Map<String, Object> members = new LinkedHashMap<>();
+        members.put("response_format", format);
+        ProviderExtras extras = new ProviderExtras().put(List.of("response_format", "json_schema", "strict"), true);
+
+        extras.mergeInto(members);
+
+        assertEquals(Map.of("type", "json_schema", "json_schema", Map.of("name", "response", "strict", true)),
+                members.get("response_format"));
+    }
+
+    @Test
+    void mergeIntoDiscardsALeafBlockingTheWay() {
+        ProviderExtras extras = new ProviderExtras().put(List.of("content", "cache_control"), "ephemeral");
+        Map<String, Object> members = new LinkedHashMap<>();
+        members.put("content", "hello");
+
+        extras.mergeInto(members);
+
+        assertEquals(Map.of("content", Map.of("cache_control", "ephemeral")), members);
+    }
+
+    @Test
+    void mergeIntoReplacesTheWholePositionWhenThePathStopsThere() {
+        ProviderExtras extras = new ProviderExtras().put("response_format", Map.of("type", "text"));
+        Map<String, Object> members = new LinkedHashMap<>();
+        members.put("response_format", Map.of("type", "json_schema", "name", "response"));
+
+        extras.mergeInto(members);
+
+        assertEquals(Map.of("response_format", Map.of("type", "text")), members);
+    }
+
+    @Test
+    void mergeIntoDiscardsAListBlockingTheWay() {
+        ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
+        Map<String, Object> members = new LinkedHashMap<>();
+        members.put("a", List.of(1, 2));
+
+        extras.mergeInto(members);
+
+        assertEquals(Map.of("a", Map.of("b", 1)), members);
+    }
+
+    @Test
+    void mergeIntoWithAnEmptyBagChangesNothing() {
+        Map<String, Object> members = new LinkedHashMap<>();
+        members.put("model", "gpt-4o");
+
+        new ProviderExtras().mergeInto(members);
+
+        assertEquals(Map.of("model", "gpt-4o"), members);
+    }
+
+    @Test
+    void mergeIntoAcceptsANullValue() {
+        ProviderExtras extras = new ProviderExtras().put("stop", null);
+        Map<String, Object> members = new LinkedHashMap<>();
+
+        extras.mergeInto(members);
+
+        assertTrue(members.containsKey("stop"));
+        assertNull(members.get("stop"));
+    }
+
+    @Test
+    void mergeIntoRejectsANullMap() {
+        ProviderExtras extras = new ProviderExtras().put("a", 1);
+
+        assertThrows(NullPointerException.class, () -> extras.mergeInto(null));
+    }
+
+    @Test
     void copyingABagAndRemovingIsHowInheritedValuesAreDropped() {
         ProviderExtras defaults = new ProviderExtras().put("service_tier", "flex").put("temperature", 1.0).put("top_p",
                 0.5);
@@ -333,7 +524,7 @@ class ProviderExtrasTest {
         effective.remove("service_tier").remove("top_p");
 
         assertEquals(3, defaults.size());
-        assertEquals(Map.of("temperature", 1.0), effective.toNestedMap());
+        assertEquals(Map.of("temperature", 1.0), effective.nestedMap());
     }
 
 }

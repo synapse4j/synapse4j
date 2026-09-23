@@ -251,7 +251,7 @@ public class JsonSchema {
             map.put(ALL_OF, nestedMaps(allOf));
         }
         // The open part fills only what no field claimed: a modelled keyword always wins.
-        extras.toNestedMap().forEach(map::putIfAbsent);
+        extras.nestedMap().forEach(map::putIfAbsent);
         return map;
     }
 

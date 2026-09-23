@@ -1,6 +1,7 @@
 package io.github.synapse4j.data;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,10 +15,19 @@ import lombok.EqualsAndHashCode;
  * request is sent.
  *
  * <p>
- * Values are addressed by a path of one or more segments. Segments are joined internally with a
- * separator and escaped where necessary, so callers never write the delimiter or the escaping
- * themselves. The internal key syntax is deliberately <em>not</em> part of the public contract and
- * may change.
+ * A provider module assembles its own payload with the same structure: one bag per node, the fields
+ * it models put by path, and the node's bag merged over it. Merging is where the two meet — an entry
+ * that overlaps one of the module's own replaces it, so the caller's value is the one that goes out,
+ * as one member of that name rather than two; a member the bag never sets is left as the module
+ * wrote it.
+ *
+ * <p>
+ * A value is addressed either by a path of one or more segments or by a key the caller has assembled
+ * itself, and the two are the same string. Segments are joined with {@code .}, and a segment that
+ * contains {@code .} or {@code \} escapes that character with {@code \}, so a segment holding a dot
+ * is written {@code a\.b}. {@link #rawMap()} hands the entries out under exactly that spelling and
+ * {@link #putRaw(String, Object)} takes one back as given, which is how a caller serializes a bag
+ * somewhere and restores it later.
  *
  * <p>
  * A path may address either a leaf or a whole subtree: the value is stored opaquely and never
@@ -36,11 +46,10 @@ import lombok.EqualsAndHashCode;
  * of this library. The only structure the merge adds is the nesting the path describes.
  *
  * <p>
- * Where the payload's own fields land is the module's business, not this bag's: a provider module
- * writes the fields it models first and these after, and this library does not arbitrate a name
- * both of them set. Which names a protocol uses is the protocol's to know, so a path set here
- * should avoid one the module writes itself — two members of one name leave the document in the
- * hands of whoever reads it.
+ * Where the payload's own fields land is the module's business, not this bag's: which names a
+ * protocol uses, and at which nesting, is the protocol's to know. A path set here addresses the same
+ * tree the module writes into, so a field of the provider's that sits inside one of the module's own
+ * objects is set by that path and lands there.
  *
  * <p>
  * Instances are mutable: this is an accumulating bag, in the spirit of {@link Map}, not a value
@@ -60,8 +69,7 @@ public class ProviderExtras {
     private static final char ESCAPE = '\\';
 
     /**
-     * Flat storage. The key is the already-escaped path; values are opaque. Not exposed: the key
-     * syntax is an implementation detail.
+     * Flat storage, keyed by the assembled path. Handed out read-only through {@link #rawMap()}.
      */
     private final Map<String, Object> values = new LinkedHashMap<>();
 
@@ -148,6 +156,25 @@ public class ProviderExtras {
     }
 
     /**
+     * Sets a value under a key the caller has already assembled, stored exactly as given: the key is
+     * neither split nor escaped, and its shape is not checked.
+     *
+     * <p>
+     * This is the writing counterpart of {@link #rawMap()}. An entry set at that key is replaced, and
+     * an ancestor or a descendant of it is cleared, as with the other {@code put} methods.
+     *
+     * @param key   the assembled key; must not be {@code null}
+     * @param value the value; stored as-is, may be {@code null}
+     * @return this bag
+     */
+    public ProviderExtras putRaw(String key, Object value) {
+        Objects.requireNonNull(key, "key must not be null");
+        clearAround(key);
+        values.put(key, value);
+        return this;
+    }
+
+    /**
      * Merges another bag into this one. Entries of the other bag win where the paths are equal or
      * overlap.
      *
@@ -167,6 +194,20 @@ public class ProviderExtras {
     }
 
     /**
+     * Returns a read-only view of the entries under their assembled keys, the form
+     * {@link #putRaw(String, Object)} accepts.
+     *
+     * <p>
+     * The view is live: entries set afterwards appear in it. Writing through it is refused, and the
+     * values in it are the ones stored, by reference.
+     *
+     * @return the read-only view; never {@code null}, empty if nothing is set
+     */
+    public Map<String, Object> rawMap() {
+        return Collections.unmodifiableMap(values);
+    }
+
+    /**
      * Returns this bag as a nested map, with one level per path segment.
      *
      * <p>
@@ -176,7 +217,7 @@ public class ProviderExtras {
      *
      * @return the nested view; never {@code null}, empty if nothing is set
      */
-    public Map<String, Object> toNestedMap() {
+    public Map<String, Object> nestedMap() {
         Map<String, Object> root = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : values.entrySet()) {
             List<String> segments = decode(entry.getKey());
@@ -199,11 +240,45 @@ public class ProviderExtras {
         return root;
     }
 
+    /**
+     * Merges this bag into a tree the caller already built. Each path finds its way down and sets
+     * itself, replacing whatever stands in the way of it: a leaf blocking the way is discarded, a
+     * container on the way is walked through, the position itself is overwritten.
+     *
+     * <p>
+     * The bag wins everywhere it sets a path and nowhere else: a member it never sets keeps the value
+     * already in the map. Paths {@code a} and {@code a.b} are distinct positions, so setting
+     * {@code a} replaces that whole value, while setting {@code a.b} reaches into it and leaves its
+     * other members alone.
+     *
+     * @param members the tree to write into; the containers it already holds must be mutable
+     * @return this bag
+     */
+    public ProviderExtras mergeInto(Map<String, Object> members) {
+        Objects.requireNonNull(members, "members must not be null");
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+            List<String> segments = decode(entry.getKey());
+            Map<String, Object> node = members;
+            for (int i = 0; i < segments.size() - 1; i++) {
+                Object child = node.get(segments.get(i));
+                if (!(child instanceof Map)) {
+                    child = new LinkedHashMap<String, Object>();
+                    node.put(segments.get(i), child);
+                }
+                @SuppressWarnings("unchecked")
+                Map<String, Object> childMap = (Map<String, Object>) child;
+                node = childMap;
+            }
+            node.put(segments.get(segments.size() - 1), entry.getValue());
+        }
+        return this;
+    }
+
     @Override
     public String toString() {
-        // Rendered as the nested view, which is what a reader wants; @ToString cannot produce it,
-        // because it always prints the member name next to the value.
-        return "ProviderExtras" + toNestedMap();
+        // Rendered as the raw entries, the spelling the caller assembles; @ToString cannot produce
+        // it, because it always prints the member name next to the value.
+        return "ProviderExtras" + rawMap();
     }
 
     private ProviderExtras putPath(Object value, List<String> path) {

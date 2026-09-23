@@ -75,7 +75,7 @@ public abstract class AbstractJsonWriter implements JsonWriter {
             return writeValue(schema.toMap());
         }
         if (value instanceof ProviderExtras extras) {
-            return writeValue(extras.toNestedMap());
+            return writeValue(extras.nestedMap());
         }
         return writeValueDirect(value);
     }
