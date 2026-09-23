@@ -23,8 +23,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Translates between the shared chat model and the chat-completions wire document. Stateless; holds
- * only the application's codec, for embedding schema strings as parsed maps.
+ * Writes the shared chat model as the chat-completions wire document. Stateless; holds only the
+ * application's codec, for embedding schema strings as parsed maps.
  *
  * <p>
  * A request is assembled as the object it goes out as — one map per node, the members this module
@@ -42,9 +42,14 @@ import lombok.RequiredArgsConstructor;
  * goes out. Audio, video and documents take a different shape in this protocol and fail loudly here,
  * along with every other part type this cut does not support: a request that arrived at the provider
  * incomplete would look like success from above.
+ *
+ * <p>
+ * The {@link JsonWriter} is handed in, and where its bytes go is the caller's affair — the sink,
+ * the retries that rewrite the document, the headers that ride beside it. This class knows the
+ * document and nothing about the exchange that carries it.
  */
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-class ChatCompletionsAdapter {
+class ChatCompletionsWriter {
 
     /** The type prefix of the media this module renders; the protocol's image shape takes nothing else. */
     private static final String IMAGE_TYPE_PREFIX = "image/";
@@ -57,7 +62,7 @@ class ChatCompletionsAdapter {
      * @param request the request to translate
      * @param writer  the writer to write into; owned by the caller, and left open
      */
-    void writeTo(ChatRequest request, JsonWriter writer) {
+    void write(ChatRequest request, JsonWriter writer) {
         writer.writeValue(document(request, false));
     }
 
@@ -68,7 +73,7 @@ class ChatCompletionsAdapter {
      * @param request the request to translate
      * @param writer  the writer to write into; owned by the caller, and left open
      */
-    void writeStreamingTo(ChatRequest request, JsonWriter writer) {
+    void writeStreaming(ChatRequest request, JsonWriter writer) {
         writer.writeValue(document(request, true));
     }
 

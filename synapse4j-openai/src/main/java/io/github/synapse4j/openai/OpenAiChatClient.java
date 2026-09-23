@@ -55,7 +55,7 @@ public class OpenAiChatClient extends AbstractChatClient {
 
     private final HttpClient http;
     private final JsonCodec codec;
-    private final ChatCompletionsAdapter adapter;
+    private final ChatCompletionsWriter requestWriter;
     private final ChatCompletionsStreamAdapter streamAdapter;
     private final OpenAiErrorReader errorReader;
 
@@ -64,7 +64,7 @@ public class OpenAiChatClient extends AbstractChatClient {
     public OpenAiChatClient(HttpClient http, JsonCodec codec) {
         this.http = http;
         this.codec = codec;
-        this.adapter = new ChatCompletionsAdapter(codec);
+        this.requestWriter = new ChatCompletionsWriter(codec);
         this.streamAdapter = new ChatCompletionsStreamAdapter(codec);
         this.errorReader = new OpenAiErrorReader(codec);
     }
@@ -90,7 +90,7 @@ public class OpenAiChatClient extends AbstractChatClient {
             // or redirect: the document goes into whatever sink the implementation hands over, so it
             // never exists as bytes here.
             try (JsonWriter writer = codec.writer(out)) {
-                adapter.writeTo(request, writer);
+                requestWriter.write(request, writer);
             }
         });
 
@@ -117,7 +117,7 @@ public class OpenAiChatClient extends AbstractChatClient {
 
         io.github.synapse4j.http.HttpRequest httpRequest = httpRequest(request, out -> {
             try (JsonWriter writer = codec.writer(out)) {
-                adapter.writeStreamingTo(request, writer);
+                requestWriter.writeStreaming(request, writer);
             }
         });
 

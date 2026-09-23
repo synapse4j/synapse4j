@@ -39,8 +39,8 @@ import lombok.RequiredArgsConstructor;
  *
  * <p>
  * The aggregation is what makes a streamed answer the same answer a blocking call returns: it sums
- * the fragments the way the blocking adapter reads them, so a turn that arrived as twenty chunks
- * ends up as the one message, and the one tool call, a single response would have carried.
+ * the fragments the way {@link ChatCompletionsReader} reads them, so a turn that arrived as twenty
+ * chunks ends up as the one message, and the one tool call, a single response would have carried.
  *
  * <p>
  * Stateless; holds only the application's codec, for opening a reader over each frame.
