@@ -1,9 +1,9 @@
 package io.github.synapse4j.data;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
 
 /**
@@ -19,10 +19,10 @@ import lombok.ToString;
  * not always belong to this part alone (one protocol attaches them to tool calls as well).
  * They therefore go in {@link #getExtras()}, keyed by provider, rather than into a typed field here.
  */
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
 public class ReasoningPart extends ContentPart {
 

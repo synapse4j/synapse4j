@@ -1,9 +1,9 @@
 package io.github.synapse4j.data;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
 
 /**
@@ -14,10 +14,10 @@ import lombok.ToString;
  * {@link ReasoningPart}: applications routinely hide it or render it differently, and it may have
  * to be replayed verbatim to the provider that produced it.
  */
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
 public class TextPart extends ContentPart {
 

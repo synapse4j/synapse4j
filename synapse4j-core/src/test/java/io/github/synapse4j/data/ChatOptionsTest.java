@@ -1,7 +1,6 @@
 package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -46,30 +45,6 @@ class ChatOptionsTest {
 
         assertTrue(two.getHeaders().isEmpty());
         assertTrue(two.getExtras().isEmpty());
-    }
-
-    @Test
-    void equalityAndHashCodeCoverEveryField() {
-        ChatOptions one = new ChatOptions();
-        one.setModel("gpt-4o");
-        one.setTemperature(0.2);
-        ChatOptions two = new ChatOptions();
-        two.setModel("gpt-4o");
-        two.setTemperature(0.2);
-
-        assertEquals(one, two);
-        assertEquals(one.hashCode(), two.hashCode());
-
-        two.setTopP(0.9);
-        assertNotEquals(one, two);
-        two.setTopP(null);
-
-        two.getHeaders().put("openai-beta", "responses=v1");
-        assertNotEquals(one, two);
-        two.getHeaders().clear();
-
-        two.getExtras().put("service_tier", "flex");
-        assertNotEquals(one, two);
     }
 
     @Test

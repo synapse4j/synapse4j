@@ -5,7 +5,9 @@ import java.util.Map;
 
 import io.github.synapse4j.http.HttpOptions;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 /**
  * The configuration of one call: which model, how to tune it, and the escape hatches.
@@ -26,7 +28,9 @@ import lombok.Data;
  * {@link ProviderExtras} bag instead: modelling it as a shared knob would silently do nothing on the
  * providers that do not have it.
  */
-@Data
+@Getter
+@Setter
+@ToString
 public class ChatOptions {
 
     /** Identifier of the model to call. */

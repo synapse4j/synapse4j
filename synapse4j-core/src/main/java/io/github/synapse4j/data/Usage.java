@@ -1,6 +1,8 @@
 package io.github.synapse4j.data;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 /**
  * What a call consumed and produced, normalised so that a count means the same thing whoever
@@ -20,7 +22,9 @@ import lombok.Data;
  * Every count is optional: not every provider reports them, and a streaming one usually reports them
  * only in the final frame.
  */
-@Data
+@Getter
+@Setter
+@ToString
 public class Usage {
 
     /** Every input token the request sent, cache reads and cache writes included. */

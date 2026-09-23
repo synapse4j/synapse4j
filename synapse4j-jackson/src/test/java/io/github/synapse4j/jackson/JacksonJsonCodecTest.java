@@ -124,7 +124,7 @@ class JacksonJsonCodecTest {
         SchemaGeneratorConfigBuilder configBuilder = JacksonSchemaGenerators.encodeSchemaConfigBuilder(jsonMapper);
         SchemaGenerator fromBuilder = new SchemaGenerator(configBuilder.build());
 
-        assertEquals(codec.generateEncodeSchema(Order.class), readSchema(fromBuilder, Order.class));
+        assertEquals(codec.generateEncodeSchema(Order.class).toMap(), readSchema(fromBuilder, Order.class).toMap());
     }
 
     @Test
@@ -175,9 +175,10 @@ class JacksonJsonCodecTest {
         JsonSchema schema = codec.generateEncodeSchema(Order.class);
 
         String json = codec.encode(schema);
+        JsonSchema decoded = codec.decode(json, JsonSchema.class);
 
         assertEquals(codec.encode(schema.toMap()), json);
-        assertEquals(schema, codec.decode(json, JsonSchema.class));
+        assertEquals(schema.toMap(), decoded.toMap());
     }
 
     @Test

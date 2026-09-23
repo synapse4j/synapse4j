@@ -1,7 +1,6 @@
 package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -73,30 +72,6 @@ class ChatRequestTest {
         assertSame(tools, request.getTools());
         assertSame(responseFormat, request.getResponseFormat());
         assertSame(options, request.getOptions());
-    }
-
-    @Test
-    void equalityAndHashCodeCoverEveryField() {
-        ChatRequest one = new ChatRequest();
-        ChatRequest two = new ChatRequest();
-
-        assertEquals(one, two);
-        assertEquals(one.hashCode(), two.hashCode());
-
-        two.getMessages().add(new ChatMessage(ChatRole.USER, new ArrayList<>()));
-        assertNotEquals(one, two);
-        two.getMessages().clear();
-
-        two.getTools().add(new ToolDefinition("get_weather", "Looks up the weather", "{}"));
-        assertNotEquals(one, two);
-        two.getTools().clear();
-
-        two.getOptions().setModel("gpt-4o");
-        assertNotEquals(one, two);
-        two.getOptions().setModel(null);
-
-        two.getResponseFormat().setType(ChatResponseFormat.TYPE_JSON);
-        assertNotEquals(one, two);
     }
 
     @Test

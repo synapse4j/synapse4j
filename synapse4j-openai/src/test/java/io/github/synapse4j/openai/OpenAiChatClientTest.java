@@ -1091,7 +1091,8 @@ class OpenAiChatClientTest {
         ChatResponse blocking = client.chat(request);
 
         assertEquals(blocking.getMessage().getRole(), aggregated.getMessage().getRole());
-        assertEquals(blocking.getMessage().getParts(), aggregated.getMessage().getParts());
+        assertEquals(blocking.getMessage().getParts().toString(),
+                aggregated.getMessage().getParts().toString());
         assertEquals(blocking.getFinishReason(), aggregated.getFinishReason());
         assertEquals(blocking.getId(), aggregated.getId());
         assertEquals(blocking.getModel(), aggregated.getModel());

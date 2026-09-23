@@ -1,7 +1,6 @@
 package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -53,30 +52,6 @@ class UsageTest {
         one.getExtras().put("cache_creation_input_tokens", 2008);
 
         assertTrue(two.getExtras().isEmpty());
-    }
-
-    @Test
-    void equalityAndHashCodeCoverEveryField() {
-        Usage one = new Usage();
-        Usage two = new Usage();
-
-        assertEquals(one, two);
-        assertEquals(one.hashCode(), two.hashCode());
-
-        two.setInputTokens(1);
-        assertNotEquals(one, two);
-        two.setInputTokens(null);
-
-        two.setOutputTokens(2);
-        assertNotEquals(one, two);
-        two.setOutputTokens(null);
-
-        two.setCachedInputTokens(3);
-        assertNotEquals(one, two);
-        two.setCachedInputTokens(null);
-
-        two.getExtras().put("cache_creation_input_tokens", 2008);
-        assertNotEquals(one, two);
     }
 
     @Test

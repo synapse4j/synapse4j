@@ -2,9 +2,9 @@ package io.github.synapse4j.data;
 
 import io.github.synapse4j.util.InputStreamSupplier;
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
 
 /**
@@ -22,10 +22,10 @@ import lombok.ToString;
  * every attempt; how the bytes reach the wire — inlined, encoded, uploaded — is the protocol module's
  * decision, and this model does not make it.
  */
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
 public class MediaPart extends ContentPart {
 

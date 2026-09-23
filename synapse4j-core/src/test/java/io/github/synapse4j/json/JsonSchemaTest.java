@@ -107,7 +107,6 @@ class JsonSchemaTest {
 
         JsonSchema read = JsonSchema.fromMap(schema.toMap());
 
-        assertEquals(schema, read);
         assertEquals(schema.toMap(), read.toMap());
     }
 

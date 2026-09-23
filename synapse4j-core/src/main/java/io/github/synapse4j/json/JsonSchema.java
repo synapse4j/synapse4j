@@ -9,9 +9,10 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 import io.github.synapse4j.data.ProviderExtras;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
+import lombok.Setter;
 
 /**
  * A JSON Schema: what shape a JSON document has to have.
@@ -55,7 +56,8 @@ import lombok.NonNull;
  * The class is open, not final: a provider or an application may extend it, as it may extend any
  * other structure here.
  */
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 public class JsonSchema {
 

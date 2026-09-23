@@ -1,6 +1,8 @@
 package io.github.synapse4j.data;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 /**
  * The shape the answer should take: prose, any JSON, or JSON that conforms to a given schema.
@@ -22,7 +24,9 @@ import lombok.Data;
  * where enforcement is optional — go in {@link #getExtras()}, like every other provider-specific
  * field.
  */
-@Data
+@Getter
+@Setter
+@ToString
 public class ChatResponseFormat {
 
     /** Answer in prose. The usual default, worth naming to override a default explicitly. */

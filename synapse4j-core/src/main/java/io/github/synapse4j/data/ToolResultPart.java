@@ -3,11 +3,10 @@ package io.github.synapse4j.data;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
-import lombok.ToString;
+import lombok.Setter;
 
 /**
  * The application's answer to a {@link ToolCallPart}.
@@ -18,11 +17,10 @@ import lombok.ToString;
  * only the string form would push an adapter into flattening the rest, and flattening loses content
  * silently instead of failing loudly.
  */
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
-@ToString(callSuper = true)
 public class ToolResultPart extends ContentPart {
 
     /** Identifier of the {@link ToolCallPart} being answered. */
@@ -37,5 +35,17 @@ public class ToolResultPart extends ContentPart {
 
     /** Whether the tool failed. Some protocols report this out of band rather than in the result. */
     private boolean error;
+
+    /**
+     * The parts are counted rather than printed: they carry the tool's answer, and a printout that
+     * carried it would be as long as the result.
+     *
+     * @return this result, in brief
+     */
+    @Override
+    public String toString() {
+        return "ToolResultPart(super=" + super.toString() + ", callId=" + callId + ", name=" + name + ", parts="
+                + parts.size() + ", error=" + error + ')';
+    }
 
 }

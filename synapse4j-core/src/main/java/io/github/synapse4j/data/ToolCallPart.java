@@ -1,9 +1,9 @@
 package io.github.synapse4j.data;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
 
 /**
@@ -13,10 +13,10 @@ import lombok.ToString;
  * The arguments stay JSON text instead of a parsed tree: this library does not bind a JSON library,
  * so turning them into the application's own type is the job of the codec the application chose.
  */
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
 public class ToolCallPart extends ContentPart {
 

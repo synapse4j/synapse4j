@@ -1,7 +1,6 @@
 package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -59,28 +58,6 @@ class ChatMessageTest {
     }
 
     @Test
-    void equalityCoversRolePartsAndExtras() {
-        ChatMessage one = new ChatMessage(ChatRole.USER, new ArrayList<>());
-        one.getParts().add(new TextPart("hello"));
-        ChatMessage two = new ChatMessage(ChatRole.USER, new ArrayList<>());
-        two.getParts().add(new TextPart("hello"));
-
-        assertEquals(one, two);
-        assertEquals(one.hashCode(), two.hashCode());
-
-        two.setRole(ChatRole.ASSISTANT);
-        assertNotEquals(one, two);
-
-        two.setRole(ChatRole.USER);
-        two.getParts().add(new TextPart("more"));
-        assertNotEquals(one, two);
-
-        two.getParts().remove(1);
-        two.getExtras().put("service_tier", "standard");
-        assertNotEquals(one, two);
-    }
-
-    @Test
     void toStringCoversRolePartsAndExtras() {
         ChatMessage message = new ChatMessage(ChatRole.ASSISTANT, new ArrayList<>());
         message.getParts().add(new TextPart("hello"));
@@ -88,7 +65,7 @@ class ChatMessageTest {
         String rendered = message.toString();
 
         assertTrue(rendered.contains("role=assistant"));
-        assertTrue(rendered.contains("text=hello"));
+        assertTrue(rendered.contains("parts=1"));
         assertTrue(rendered.contains("extras="));
     }
 

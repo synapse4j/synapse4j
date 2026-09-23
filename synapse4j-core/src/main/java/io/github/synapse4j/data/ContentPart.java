@@ -1,6 +1,8 @@
 package io.github.synapse4j.data;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 /**
  * One element of a message's content: a piece of text, the model's reasoning, a tool call, a tool
@@ -18,11 +20,12 @@ import lombok.Data;
  * in with {@link ProviderExtras#putAll(ProviderExtras)}.
  *
  * <p>
- * Subclasses must pass {@code callSuper = true} to both {@code @EqualsAndHashCode} and
- * {@code @ToString}. Without it the inherited {@code extras} silently drops out of equality, and
- * two parts that differ only in their provider-specific fields compare equal.
+ * Subclasses must pass {@code callSuper = true} to {@code @ToString}, so a part's printout carries
+ * the inherited {@code extras} along with its own fields.
  */
-@Data
+@Getter
+@Setter
+@ToString
 public abstract class ContentPart {
 
     /**

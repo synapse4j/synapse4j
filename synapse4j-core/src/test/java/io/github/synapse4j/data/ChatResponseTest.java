@@ -1,7 +1,6 @@
 package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -64,44 +63,6 @@ class ChatResponseTest {
 
         assertTrue(two.getMessage().getExtras().isEmpty());
         assertTrue(two.getExtras().isEmpty());
-    }
-
-    @Test
-    void equalityAndHashCodeCoverEveryField() {
-        ChatResponse one = new ChatResponse();
-        ChatResponse two = new ChatResponse();
-
-        assertEquals(one, two);
-        assertEquals(one.hashCode(), two.hashCode());
-
-        two.getMessage().getParts().add(new TextPart("hello"));
-        assertNotEquals(one, two);
-        two.setMessage(new ChatMessage());
-
-        two.setFinishReason(ChatFinishReason.STOP);
-        assertNotEquals(one, two);
-        two.setFinishReason(null);
-
-        Usage usage = new Usage();
-        usage.setOutputTokens(1);
-        two.setUsage(usage);
-        assertNotEquals(one, two);
-        two.setUsage(null);
-
-        two.setModel("gpt-4o");
-        assertNotEquals(one, two);
-        two.setModel(null);
-
-        two.setId("chatcmpl-1");
-        assertNotEquals(one, two);
-        two.setId(null);
-
-        two.getExtras().put("service_tier", "flex");
-        assertNotEquals(one, two);
-        two.getExtras().remove("service_tier");
-
-        two.getHeaders().put("x-request-id", "abc");
-        assertNotEquals(one, two);
     }
 
     @Test

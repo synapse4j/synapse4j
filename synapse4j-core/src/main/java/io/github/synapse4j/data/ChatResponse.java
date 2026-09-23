@@ -3,8 +3,10 @@ package io.github.synapse4j.data;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import lombok.Data;
+import lombok.Getter;
 import lombok.NonNull;
+import lombok.Setter;
+import lombok.ToString;
 
 /**
  * One answer: the assistant's turn, and what the provider reported about it.
@@ -22,7 +24,9 @@ import lombok.NonNull;
  * Transport metadata stays out of {@link #getExtras()}: headers have their own field, so the open part
  * holds only what came out of the response body.
  */
-@Data
+@Getter
+@Setter
+@ToString
 public class ChatResponse {
 
     /** The assistant's turn. Never {@code null}; its role is set by the adapter. */

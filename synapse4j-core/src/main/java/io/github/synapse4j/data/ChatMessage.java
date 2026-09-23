@@ -4,9 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
+import lombok.Setter;
 
 /**
  * One turn of a conversation: who is speaking, and what they contribute.
@@ -22,7 +23,8 @@ import lombok.NonNull;
  * instead of inheriting one from a common base: no library surveyed models a universal node base
  * class, and the cost of not having one is a single field per class.
  */
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChatMessage {
@@ -36,5 +38,16 @@ public class ChatMessage {
 
     /** Provider-specific fields to merge into this message when the request is sent. */
     private final ProviderExtras extras = new ProviderExtras();
+
+    /**
+     * The parts are counted rather than printed: they carry the content, and a printout that carried
+     * it would be as long as the message.
+     *
+     * @return this message, in brief
+     */
+    @Override
+    public String toString() {
+        return "ChatMessage(role=" + role + ", parts=" + parts.size() + ", extras=" + extras + ')';
+    }
 
 }

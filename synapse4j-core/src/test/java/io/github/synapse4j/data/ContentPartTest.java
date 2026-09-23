@@ -2,7 +2,6 @@ package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -43,25 +42,6 @@ class ContentPartTest {
     }
 
     @Test
-    void equalityAndHashCodeCoverTheInheritedExtras() {
-        TextPart one = new TextPart("hello");
-        TextPart two = new TextPart("hello");
-
-        assertEquals(one, two);
-        assertEquals(one.hashCode(), two.hashCode());
-
-        one.getExtras().put("temperature", 0.5);
-
-        assertNotEquals(one, two);
-    }
-
-    @Test
-    void equalityIsScopedToTheConcretePartType() {
-        assertNotEquals(new TextPart("hello"), new ReasoningPart("hello"));
-        assertEquals(new ReasoningPart("hello"), new ReasoningPart("hello"));
-    }
-
-    @Test
     void toolResultPartsStartEmptyAndAreMutable() {
         ToolResultPart result = new ToolResultPart();
 
@@ -92,17 +72,6 @@ class ContentPartTest {
         assertEquals("call-1", result.getCallId());
         assertEquals("weather", result.getName());
         assertEquals(parts, result.getParts());
-    }
-
-    @Test
-    void mediaPartEqualityComparesTheFieldsItWasBuiltWith() {
-        MediaPart one = new MediaPart("image/png", "https://example.test/a.png", null, null);
-        MediaPart same = new MediaPart("image/png", "https://example.test/a.png", null, null);
-        MediaPart other = new MediaPart("image/png", "https://example.test/b.png", null, null);
-
-        assertEquals(one, same);
-        assertEquals(one.hashCode(), same.hashCode());
-        assertNotEquals(one, other);
     }
 
     @Test

@@ -1,9 +1,11 @@
 package io.github.synapse4j.data;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
+import lombok.Setter;
+import lombok.ToString;
 
 /**
  * One event of a streaming answer: a protocol event, mapped one to one and kept in arrival order.
@@ -21,7 +23,9 @@ import lombok.NonNull;
  * The {@code eventType} is an open string, like every value in this library that can grow; the
  * well-known ones are declared as constants by the provider module that produces them.
  */
-@Data
+@Getter
+@Setter
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChatStreamEvent {

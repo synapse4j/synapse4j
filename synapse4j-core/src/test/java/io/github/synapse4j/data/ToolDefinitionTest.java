@@ -1,7 +1,6 @@
 package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -47,26 +46,6 @@ class ToolDefinitionTest {
         tool.getExtras().put("cache_control", Map.of("type", "ephemeral"));
 
         assertEquals(Map.of("type", "ephemeral"), tool.getExtras().get("cache_control"));
-    }
-
-    @Test
-    void equalityAndHashCodeCoverEveryField() {
-        ToolDefinition one = new ToolDefinition("get_weather", "Looks up the weather", "{}");
-        ToolDefinition two = new ToolDefinition("get_weather", "Looks up the weather", "{}");
-
-        assertEquals(one, two);
-        assertEquals(one.hashCode(), two.hashCode());
-
-        two.setDescription("Something else");
-        assertNotEquals(one, two);
-        two.setDescription("Looks up the weather");
-
-        two.setInputSchema("{\"type\":\"array\"}");
-        assertNotEquals(one, two);
-        two.setInputSchema("{}");
-
-        two.getExtras().put("strict", true);
-        assertNotEquals(one, two);
     }
 
     @Test

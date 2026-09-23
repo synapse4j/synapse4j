@@ -1,8 +1,10 @@
 package io.github.synapse4j.data;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 /**
  * A tool the model may call: what it is called, what it does, and what arguments it takes.
@@ -22,7 +24,9 @@ import lombok.NoArgsConstructor;
  * and no argument schema, so they are not this type. When they are modelled they belong in a
  * subclass, which is why this class stays open.
  */
-@Data
+@Getter
+@Setter
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 public class ToolDefinition {

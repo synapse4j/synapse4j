@@ -4,9 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
+import lombok.Setter;
 
 /**
  * One call: the conversation so far, what the model may call, the shape the answer should take, and
@@ -23,7 +24,8 @@ import lombok.NonNull;
  * in {@link ChatOptions}, next to the configured defaults they override; the node-level ones live on
  * the node they belong to — a message, a part, a tool.
  */
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChatRequest {
@@ -43,5 +45,17 @@ public class ChatRequest {
     /** How to run this call. Never {@code null}; with nothing set, the defaults stand. */
     @NonNull
     private ChatOptions options = new ChatOptions();
+
+    /**
+     * The messages and tools are counted rather than printed: they grow with the conversation, and a
+     * printout that carried them would grow just as long.
+     *
+     * @return this call, in brief
+     */
+    @Override
+    public String toString() {
+        return "ChatRequest(messages=" + messages.size() + ", tools=" + tools.size() + ", responseFormat="
+                + responseFormat + ", options=" + options + ')';
+    }
 
 }

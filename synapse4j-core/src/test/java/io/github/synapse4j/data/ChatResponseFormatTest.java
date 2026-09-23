@@ -1,7 +1,6 @@
 package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -60,34 +59,6 @@ class ChatResponseFormatTest {
         one.getExtras().put("strict", true);
 
         assertTrue(two.getExtras().isEmpty());
-    }
-
-    @Test
-    void equalityAndHashCodeCoverEveryField() {
-        ChatResponseFormat one = new ChatResponseFormat();
-        ChatResponseFormat two = new ChatResponseFormat();
-
-        assertEquals(one, two);
-        assertEquals(one.hashCode(), two.hashCode());
-
-        two.setType(ChatResponseFormat.TYPE_JSON);
-        assertNotEquals(one, two);
-        two.setType(null);
-
-        two.setName("weather");
-        assertNotEquals(one, two);
-        two.setName(null);
-
-        two.setDescription("The weather for a place");
-        assertNotEquals(one, two);
-        two.setDescription(null);
-
-        two.setSchema("{}");
-        assertNotEquals(one, two);
-        two.setSchema(null);
-
-        two.getExtras().put("strict", true);
-        assertNotEquals(one, two);
     }
 
     @Test
