@@ -15,11 +15,11 @@ import lombok.EqualsAndHashCode;
  * request is sent.
  *
  * <p>
- * A provider module assembles its own payload with the same structure: one bag per node, the fields
- * it models put by path, and the node's bag merged over it. Merging is where the two meet — an entry
- * that overlaps one of the module's own replaces it, so the caller's value is the one that goes out,
- * as one member of that name rather than two; a member the bag never sets is left as the module
- * wrote it.
+ * A provider module assembles its own payload one object at a time: a map for the object a node
+ * becomes, the members this module models written straight into it, and the node's bag merged over
+ * them with {@link #mergeInto(Map)}. Merging is where the two meet — an entry that overlaps one of
+ * the module's own replaces it, so the caller's value is the one that goes out, as one member of
+ * that name rather than two; a member the bag never sets is left as the module wrote it.
  *
  * <p>
  * A value is addressed either by a path of one or more segments or by a key the caller has assembled
@@ -250,6 +250,10 @@ public class ProviderExtras {
      * already in the map. Paths {@code a} and {@code a.b} are distinct positions, so setting
      * {@code a} replaces that whole value, while setting {@code a.b} reaches into it and leaves its
      * other members alone.
+     *
+     * <p>
+     * Two bags may be merged into one map, in the order the module chooses. Each is applied over
+     * what is already there, so the one merged later is the one that goes out.
      *
      * @param members the tree to write into; the containers it already holds must be mutable
      * @return this bag

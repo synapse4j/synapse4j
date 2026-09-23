@@ -1,6 +1,7 @@
 package io.github.synapse4j.openai;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,13 +30,13 @@ import lombok.RequiredArgsConstructor;
  * only the application's codec, for embedding schema strings as parsed maps.
  *
  * <p>
- * A request is assembled as the object it goes out as — one bag per node, the module's own members by
- * path with the node's extras merged over them — and written in one pass. The bags hold references
- * and a media payload stays a reader, so neither the document nor a payload is materialized, and
- * every name is a literal spelled out here — no codec's naming strategy can rename one, and a member
- * whose value is not set is never emitted. So the bytes that leave here are exactly the protocol's
- * spelling whichever JSON library the application chose, and the payload is held once instead of
- * being built and then serialized.
+ * A request is assembled as the object it goes out as — one map per node, the members this module
+ * models written into it with the node's extras merged over them — and written in one pass. The maps
+ * hold references and a media payload stays a reader, so neither the document nor a payload is
+ * materialized, and every name is a literal spelled out here — no codec's naming strategy can rename
+ * one, and a member whose value is not set is never emitted. So the bytes that leave here are exactly
+ * the protocol's spelling whichever JSON library the application chose, and the payload is held once
+ * instead of being built and then serialized.
  *
  * <p>
  * Responses are read token by token through {@link JsonReader} rather than decoded into a tree: the
@@ -84,8 +85,8 @@ class ChatCompletionsAdapter {
     }
 
     /** The whole request as the object it goes out as. */
-    private ProviderExtras document(ChatRequest request, boolean stream) {
-        ProviderExtras document = new ProviderExtras();
+    private Map<String, Object> document(ChatRequest request, boolean stream) {
+        Map<String, Object> document = new LinkedHashMap<>();
         document.put("model", request.getOptions().getModel());
         document.put("messages", messages(request.getMessages()));
         if (!request.getTools().isEmpty()) {
@@ -102,12 +103,14 @@ class ChatCompletionsAdapter {
             document.put("stream", true);
             // A streamed answer reports what it consumed in a frame of its own, and only when the
             // request asks for it; without this the assembled answer would carry no counts at all.
-            document.put(List.of("stream_options", "include_usage"), true);
+            Map<String, Object> streamOptions = new LinkedHashMap<>();
+            streamOptions.put("include_usage", true);
+            document.put("stream_options", streamOptions);
         }
-        // The extras of the request itself are its top-level members: a nested bag would nest the
-        // protocol's own fields one level too deep. Merged last, so a path set on both sides is the
-        // caller's value that goes out.
-        document.putAll(request.getOptions().getExtras());
+        // The extras of the request itself merge into the document's own members, so a path lands as
+        // a member of this object rather than a level below it. Merged last, so a path set on both
+        // sides is the caller's value that goes out.
+        request.getOptions().getExtras().mergeInto(document);
         return document;
     }
 
@@ -115,15 +118,15 @@ class ChatCompletionsAdapter {
      * One message into the array of messages. A message of tool results becomes one entry per result,
      * since the protocol has no message carrying several.
      */
-    private List<ProviderExtras> messages(List<ChatMessage> messages) {
-        List<ProviderExtras> written = new ArrayList<>();
+    private List<Map<String, Object>> messages(List<ChatMessage> messages) {
+        List<Map<String, Object>> written = new ArrayList<>();
         for (ChatMessage message : messages) {
             written.addAll(entries(message));
         }
         return written;
     }
 
-    private List<ProviderExtras> entries(ChatMessage message) {
+    private List<Map<String, Object>> entries(ChatMessage message) {
         boolean hasToolResult = message.getParts().stream().anyMatch(ToolResultPart.class::isInstance);
         if (!hasToolResult) {
             return List.of(message(message));
@@ -133,22 +136,22 @@ class ChatCompletionsAdapter {
         }
         // One message becomes one entry per result, so a field set on the message goes onto every
         // entry it turns into.
-        List<ProviderExtras> entries = new ArrayList<>();
+        List<Map<String, Object>> entries = new ArrayList<>();
         for (ContentPart part : message.getParts()) {
             entries.add(toolResult((ToolResultPart) part, message.getExtras()));
         }
         return entries;
     }
 
-    private ProviderExtras message(ChatMessage message) {
-        ProviderExtras entry = new ProviderExtras();
+    private Map<String, Object> message(ChatMessage message) {
+        Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("role", message.getRole());
-        List<ProviderExtras> toolCalls = new ArrayList<>();
+        List<Map<String, Object>> toolCalls = new ArrayList<>();
         if (arrayContent(message)) {
-            List<ProviderExtras> content = new ArrayList<>();
+            List<Map<String, Object>> content = new ArrayList<>();
             for (ContentPart part : message.getParts()) {
                 if (part instanceof TextPart textPart) {
-                    ProviderExtras text = textPart(textPart);
+                    Map<String, Object> text = textPart(textPart);
                     if (text != null) {
                         content.add(text);
                     }
@@ -180,7 +183,7 @@ class ChatCompletionsAdapter {
         }
         ProviderExtras messageExtras = message.getExtras();
         if (messageExtras != null) {
-            entry.putAll(messageExtras);
+            messageExtras.mergeInto(entry);
         }
         return entry;
     }
@@ -200,19 +203,19 @@ class ChatCompletionsAdapter {
      * A text part as the entry it becomes, or {@code null} when it carries neither text nor extras —
      * a part with nothing to say, which the protocol has no place for.
      */
-    private static ProviderExtras textPart(TextPart part) {
+    private static Map<String, Object> textPart(TextPart part) {
         boolean hasText = part.getText() != null && !part.getText().isEmpty();
         if (!hasText && (part.getExtras() == null || part.getExtras().isEmpty())) {
             return null;
         }
-        ProviderExtras entry = new ProviderExtras();
+        Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("type", "text");
         if (hasText) {
             entry.put("text", part.getText());
         }
         ProviderExtras partExtras = part.getExtras();
         if (partExtras != null) {
-            entry.putAll(partExtras);
+            partExtras.mergeInto(entry);
         }
         return entry;
     }
@@ -223,7 +226,7 @@ class ChatCompletionsAdapter {
      * a data URL instead, which is where the type has to be spelled out — a data URL is the only
      * thing that declares it.
      */
-    private static ProviderExtras mediaPart(MediaPart part) {
+    private static Map<String, Object> mediaPart(MediaPart part) {
         String mediaType = part.getMediaType();
         boolean typeStated = mediaType != null && !mediaType.isEmpty();
         if (typeStated && !mediaType.startsWith(IMAGE_TYPE_PREFIX)) {
@@ -237,68 +240,71 @@ class ChatCompletionsAdapter {
             throw new SynapseException(
                     "unsupported media part for OpenAI: mediaType is required to inline the payload");
         }
-        ProviderExtras entry = new ProviderExtras();
+        Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("type", "image_url");
-        entry.put(List.of("image_url", "url"),
-                part.getUri() != null ? part.getUri()
-                        : new Base64Reader("data:" + mediaType + ";base64,", part.getSource()));
+        Map<String, Object> imageUrl = new LinkedHashMap<>();
+        imageUrl.put("url", part.getUri() != null ? part.getUri()
+                : new Base64Reader("data:" + mediaType + ";base64,", part.getSource()));
+        entry.put("image_url", imageUrl);
         ProviderExtras partExtras = part.getExtras();
         if (partExtras != null) {
-            entry.putAll(partExtras);
+            partExtras.mergeInto(entry);
         }
         return entry;
     }
 
-    private ProviderExtras toolResult(ToolResultPart result, ProviderExtras messageExtras) {
-        ProviderExtras entry = new ProviderExtras();
+    private Map<String, Object> toolResult(ToolResultPart result, ProviderExtras messageExtras) {
+        Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("role", "tool");
         entry.put("content", textOf(result.getParts()));
         entry.put("tool_call_id", result.getCallId());
         // The message's extras first, the result's own after: the more specific node is merged last,
         // so it wins where both set the same path.
         if (messageExtras != null) {
-            entry.putAll(messageExtras);
+            messageExtras.mergeInto(entry);
         }
         ProviderExtras resultExtras = result.getExtras();
         if (resultExtras != null) {
-            entry.putAll(resultExtras);
+            resultExtras.mergeInto(entry);
         }
         return entry;
     }
 
-    private ProviderExtras toolCall(ToolCallPart part) {
-        ProviderExtras entry = new ProviderExtras();
+    private Map<String, Object> toolCall(ToolCallPart part) {
+        Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("id", part.getCallId());
         entry.put("type", "function");
-        entry.put(List.of("function", "name"), part.getName());
-        entry.put(List.of("function", "arguments"), part.getArgumentsJson());
+        Map<String, Object> function = new LinkedHashMap<>();
+        function.put("name", part.getName());
+        function.put("arguments", part.getArgumentsJson());
+        entry.put("function", function);
         // A field the response carried inside the function object comes back to the same path.
         ProviderExtras partExtras = part.getExtras();
         if (partExtras != null) {
-            entry.putAll(partExtras);
+            partExtras.mergeInto(entry);
         }
         return entry;
     }
 
-    private List<ProviderExtras> tools(List<ToolDefinition> definitions) {
-        List<ProviderExtras> tools = new ArrayList<>();
+    private List<Map<String, Object>> tools(List<ToolDefinition> definitions) {
+        List<Map<String, Object>> tools = new ArrayList<>();
         for (ToolDefinition definition : definitions) {
             tools.add(tool(definition));
         }
         return tools;
     }
 
-    private ProviderExtras tool(ToolDefinition definition) {
-        ProviderExtras tool = new ProviderExtras();
+    private Map<String, Object> tool(ToolDefinition definition) {
+        Map<String, Object> function = new LinkedHashMap<>();
+        function.put("name", definition.getName());
+        function.put("description", definition.getDescription());
+        putIfSet(function, "parameters", parseSchema(definition.getInputSchema()));
+
+        Map<String, Object> tool = new LinkedHashMap<>();
         tool.put("type", "function");
-        tool.put(List.of("function", "name"), definition.getName());
-        tool.put(List.of("function", "description"), definition.getDescription());
-        Map<String, Object> parameters = parseSchema(definition.getInputSchema());
-        if (parameters != null) {
-            tool.put(List.of("function", "parameters"), parameters);
-        }
+        tool.put("function", function);
         // "strict" lives inside the function object, so it is set by that path.
-        tool.putAll(definition.getExtras());
+        definition.getExtras().mergeInto(tool);
         return tool;
     }
 
@@ -306,28 +312,30 @@ class ChatCompletionsAdapter {
      * The response format as the object it goes out as; the caller only asks for one when it states
      * something.
      */
-    private ProviderExtras responseFormat(ChatResponseFormat format) {
-        ProviderExtras entry = new ProviderExtras();
+    private Map<String, Object> responseFormat(ChatResponseFormat format) {
+        Map<String, Object> entry = new LinkedHashMap<>();
         if (ChatResponseFormat.TYPE_JSON_SCHEMA.equals(format.getType())) {
             entry.put("type", "json_schema");
-            entry.put(List.of("json_schema", "name"), format.getName() != null ? format.getName() : "response");
+            Map<String, Object> jsonSchema = new LinkedHashMap<>();
+            jsonSchema.put("name", format.getName() != null ? format.getName() : "response");
             // "strict" is deliberately not sent in this cut: it changes how strictly the provider
             // enforces the schema, and choosing that for the caller would be a silent behaviour
             // decision. It stays reachable through the format's extras, under the json_schema path.
             Map<String, Object> schema = parseSchema(format.getSchema());
             if (schema != null) {
-                entry.put(List.of("json_schema", "schema"), schema);
+                jsonSchema.put("schema", schema);
             }
+            entry.put("json_schema", jsonSchema);
         } else if (format.getType() != null) {
             entry.put("type",
                     ChatResponseFormat.TYPE_JSON.equals(format.getType()) ? "json_object" : format.getType());
         }
-        entry.putAll(format.getExtras());
+        format.getExtras().mergeInto(entry);
         return entry;
     }
 
     /** Puts a member, or nothing at all when the value is not set. */
-    private static void putIfSet(ProviderExtras members, String name, Object value) {
+    private static void putIfSet(Map<String, Object> members, String name, Object value) {
         if (value != null) {
             members.put(name, value);
         }

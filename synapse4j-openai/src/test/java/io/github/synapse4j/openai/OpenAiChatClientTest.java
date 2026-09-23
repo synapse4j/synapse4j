@@ -818,6 +818,32 @@ class OpenAiChatClientTest {
     }
 
     @Test
+    void aPathUnderAModelledObjectReachesIntoIt() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatResponseFormat format = request.getResponseFormat();
+        format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
+        format.setName("answer");
+        request.getOptions().getExtras().put(List.of("response_format", "json_schema", "strict"), true);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> responseFormat = (Map<String, Object>) wire.get("response_format");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> jsonSchema = (Map<String, Object>) responseFormat.get("json_schema");
+        // A path set from the request reaches into what the modelled format already carries; the
+        // members it walks past stay.
+        assertEquals("json_schema", responseFormat.get("type"));
+        assertEquals("answer", jsonSchema.get("name"));
+        assertEquals(Boolean.TRUE, jsonSchema.get("strict"));
+    }
+
+    @Test
     void aToolResultCarriesItsOwnExtras() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(okBody());
