@@ -18,6 +18,7 @@ class ChatRequestTest {
         assertNull(request.getResponseFormat().getType());
         assertNull(request.getOptions().getModel());
         assertNull(request.getOptions().getTemperature());
+        assertNull(request.getContext());
     }
 
     @Test

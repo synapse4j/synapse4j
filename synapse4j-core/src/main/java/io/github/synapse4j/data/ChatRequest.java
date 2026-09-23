@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.NonNull;
 import lombok.Setter;
 
@@ -13,8 +12,8 @@ import lombok.Setter;
  * how to run it.
  *
  * <p>
- * Nothing here is nullable and the collections start empty, so a caller fills in what it needs and
- * nobody walking the request has to check for null. An empty list means "none of these"; a
+ * The collections start empty, the configured members are never null, and the context is absent
+ * until one is attached, so a caller fills in what it needs. An empty list means "none of these"; a
  * {@link ChatOptions} with nothing set means "no opinion", and the defaults the client was built
  * with stand.
  *
@@ -25,7 +24,6 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-@NoArgsConstructor
 public class ChatRequest {
 
     /** The conversation so far, oldest first. Never {@code null}; empty means no messages yet. */
@@ -41,6 +39,12 @@ public class ChatRequest {
     /** How to run this call. Never {@code null}; with nothing set, the defaults stand. */
     @NonNull
     private ChatOptions options = new ChatOptions();
+
+    /**
+     * The context tying this call to a conversation; {@code null} until one is attached. It travels
+     * inside the library only and is never serialized.
+     */
+    private ChatContext context;
 
     /**
      * Adds a message to the conversation.

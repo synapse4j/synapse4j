@@ -45,11 +45,15 @@ public abstract class AbstractChatClient implements ChatClient {
      *
      * <p>
      * The request goes through {@link #prepare(ChatRequest)} first; the subclass sees the result in
-     * {@link #doChat(ChatRequest)}.
+     * {@link #doChat(ChatRequest)}. The context the prepared request carries is handed back on the
+     * answer — the same instance, so the application's attributes come with it.
      */
     @Override
     public ChatResponse chat(ChatRequest request) {
-        return doChat(prepare(request));
+        ChatRequest prepared = prepare(request);
+        ChatResponse response = doChat(prepared);
+        carryContext(prepared, response);
+        return response;
     }
 
     /**
@@ -57,11 +61,27 @@ public abstract class AbstractChatClient implements ChatClient {
      *
      * <p>
      * The request goes through {@link #prepare(ChatRequest)} first; the subclass sees the result in
-     * {@link #doStream(ChatRequest)}.
+     * {@link #doStream(ChatRequest)}. The context the prepared request carries is handed back on
+     * the aggregated answer the same way a blocking call hands it back.
      */
     @Override
     public ChatStream stream(ChatRequest request) {
-        return doStream(prepare(request));
+        ChatRequest prepared = prepare(request);
+        ChatStream stream = doStream(prepared);
+        carryContext(prepared, stream.aggregatedResponse());
+        return stream;
+    }
+
+    /**
+     * Hands the context of the request that was actually sent back on the answer — that instance,
+     * not the caller's original, since a customizer may have answered another request. When none
+     * was sent, whatever the exchange put on the answer stands: a provider that reports its own
+     * session id fills a context of its own.
+     */
+    private static void carryContext(ChatRequest sent, ChatResponse response) {
+        if (sent.getContext() != null) {
+            response.setContext(sent.getContext());
+        }
     }
 
     /**

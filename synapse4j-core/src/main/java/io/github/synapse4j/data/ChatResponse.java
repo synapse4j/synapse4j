@@ -46,6 +46,12 @@ public class ChatResponse {
     private String id;
 
     /**
+     * The context this answer rides back on — the instance the prepared request carried, or
+     * {@code null} when none did. Filled by the client; never serialized.
+     */
+    private ChatContext context;
+
+    /**
      * Headers the transport reported for this response — a request id, rate-limit counts — and empty
      * when it exposed none. Filled by the adapter; an application has no business writing here.
      */

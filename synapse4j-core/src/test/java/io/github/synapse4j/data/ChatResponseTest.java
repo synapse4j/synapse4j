@@ -19,6 +19,7 @@ class ChatResponseTest {
         assertNull(response.getUsage());
         assertNull(response.getModel());
         assertNull(response.getId());
+        assertNull(response.getContext());
         assertTrue(response.getHeaders().isEmpty());
         assertTrue(response.getExtras().isEmpty());
     }

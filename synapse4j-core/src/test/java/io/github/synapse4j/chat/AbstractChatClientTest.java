@@ -12,6 +12,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 
@@ -123,6 +124,50 @@ class AbstractChatClientTest {
 
         assertThrows(NullPointerException.class, () -> client.addChatRequestCustomizer(null));
         assertThrows(NullPointerException.class, () -> client.removeChatRequestCustomizer(null));
+    }
+
+    @Test
+    void theContextRidesBackOnTheAnswer() {
+        StubChatClient client = new StubChatClient();
+        ChatContext context = new ChatContext();
+        context.setSessionId("s-1");
+        ChatRequest request = new ChatRequest();
+        request.setContext(context);
+
+        ChatResponse response = client.chat(request);
+
+        assertSame(context, response.getContext());
+    }
+
+    @Test
+    void theStreamedAnswerCarriesTheContextToo() {
+        StubChatClient client = new StubChatClient();
+        ChatContext context = new ChatContext();
+        ChatRequest request = new ChatRequest();
+        request.setContext(context);
+
+        ChatStream stream = client.stream(request);
+
+        assertSame(context, stream.aggregatedResponse().getContext());
+    }
+
+    @Test
+    void anAnswerWithoutASentContextKeepsWhatTheExchangeProduced() {
+        ChatContext reported = new ChatContext();
+        reported.setSessionId("provider-1");
+        StubChatClient client = new StubChatClient() {
+            @Override
+            protected ChatResponse doChat(ChatRequest request) {
+                ChatResponse response = super.doChat(request);
+                // What a provider module does when the protocol reports a session id of its own.
+                response.setContext(reported);
+                return response;
+            }
+        };
+
+        ChatResponse response = client.chat(new ChatRequest());
+
+        assertSame(reported, response.getContext());
     }
 
     /** A client that records what it was handed instead of doing an exchange. */
