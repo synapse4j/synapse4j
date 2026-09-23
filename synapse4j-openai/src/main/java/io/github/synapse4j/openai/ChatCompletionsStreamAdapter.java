@@ -4,7 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.function.BiConsumer;
 
@@ -15,7 +14,6 @@ import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
-import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.SseEvent;
 import io.github.synapse4j.http.SseEventStream;
 import io.github.synapse4j.json.JsonCodec;
@@ -35,9 +33,9 @@ import lombok.RequiredArgsConstructor;
  * of chunk this module has never heard of reaches the caller under the name the provider gave it.
  *
  * <p>
- * Each payload is walked token by token through {@link JsonReader}, the way the blocking adapter
- * walks a whole response, and what this module does not model is kept in the extras of the node it
- * came from.
+ * Each payload's document is parsed by {@link ChatCompletionsReader}. This class owns the frame's
+ * orchestration instead: the sentinel frame that ends the answer, and the reader opened over each
+ * payload's bytes before the document inside it is walked into an event.
  *
  * <p>
  * The aggregation is what makes a streamed answer the same answer a blocking call returns: it sums
@@ -122,210 +120,10 @@ class ChatCompletionsStreamAdapter {
             done.setEventType(OpenAiEventTypes.DONE);
             return done;
         }
-        ChatStreamEvent event = new ChatStreamEvent();
-        event.setEventType(OpenAiEventTypes.CHUNK);
         byte[] payload = frame.getData().getBytes(StandardCharsets.UTF_8);
         try (JsonReader reader = codec.reader(new ByteArrayInputStream(payload))) {
-            if (reader.nextToken() != JsonReader.Token.START_OBJECT) {
-                throw new SynapseException("OpenAI stream event was not a JSON object");
-            }
-            while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-                String field = reader.name();
-                reader.nextToken();
-                switch (field) {
-                    case "id" -> event.setId(reader.string());
-                    case "model" -> event.setModel(reader.string());
-                    case "object" -> readEventType(reader, event);
-                    case "choices" -> readChoices(reader, event);
-                    case "usage" -> event.setUsage(ChatCompletionsAdapter.readUsage(reader));
-                    // A failure can arrive as a frame of its own after the answer was accepted, so
-                    // it is raised here rather than left for the aggregation to notice.
-                    case "error" -> throw streamError(reader.captureValue());
-                    default -> event.getExtras().put(field, reader.captureValue());
-                }
-            }
+            return ChatCompletionsReader.readEvent(reader);
         }
-        return event;
-    }
-
-    /**
-     * Takes the payload's own name for the event, or leaves the default when it names none. The
-     * name is what the application dispatches on, so it is read as written rather than mapped onto
-     * a closed set.
-     */
-    private static void readEventType(JsonReader reader, ChatStreamEvent event) {
-        String type = reader.string();
-        if (type != null) {
-            event.setEventType(type);
-        }
-    }
-
-    private void readChoices(JsonReader reader, ChatStreamEvent event) {
-        if (reader.token() != JsonReader.Token.START_ARRAY) {
-            reader.skipValue();
-            return;
-        }
-        // The reader is on the value the "choices" name introduced, so the array's own start token
-        // is the current one and the first element arrives with the next call.
-        boolean first = true;
-        while (reader.nextToken() != JsonReader.Token.END_ARRAY) {
-            if (reader.token() != JsonReader.Token.START_OBJECT) {
-                reader.skipValue();
-                continue;
-            }
-            if (first) {
-                readChoice(reader, event, 0);
-                first = false;
-            } else {
-                // The shared model carries a single message, so a further choice has nowhere to go.
-                reader.skipValue();
-            }
-        }
-    }
-
-    private void readChoice(JsonReader reader, ChatStreamEvent event, int position) {
-        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
-            reader.nextToken();
-            switch (field) {
-                case "finish_reason" -> readFinishReason(reader, event);
-                case "delta" -> readDelta(reader, event);
-                // A choice field this module does not model keeps the path it came from, so a
-                // provider's addition stays readable even though it belongs to a choice.
-                default -> event.getExtras().put(List.of("choices", String.valueOf(position), field),
-                        reader.captureValue());
-            }
-        }
-    }
-
-    /** A chunk that is still generating carries no reason, and a null one is not a reason. */
-    private static void readFinishReason(JsonReader reader, ChatStreamEvent event) {
-        String reason = reader.string();
-        if (reason != null) {
-            event.setFinishReason(reason);
-        }
-    }
-
-    private void readDelta(JsonReader reader, ChatStreamEvent event) {
-        if (reader.token() != JsonReader.Token.START_OBJECT) {
-            reader.skipValue();
-            return;
-        }
-        ChatMessage delta = new ChatMessage();
-        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
-            reader.nextToken();
-            switch (field) {
-                case "role" -> delta.setRole(reader.string());
-                case "content" -> readDeltaContent(reader, delta);
-                case "tool_calls" -> readDeltaToolCalls(reader, delta);
-                // Refusal and anything else the provider puts beside the content belongs to the
-                // message being built, so it stays on the delta rather than on the chunk.
-                default -> extras(delta).put(field, reader.captureValue());
-            }
-        }
-        event.setDelta(delta);
-    }
-
-    private static void readDeltaContent(JsonReader reader, ChatMessage delta) {
-        if (reader.token() != JsonReader.Token.STRING) {
-            reader.skipValue();
-            return;
-        }
-        String fragment = reader.string();
-        if (!fragment.isEmpty()) {
-            // An empty fragment is the provider announcing a turn it has not started saying yet;
-            // it adds nothing, and a part for it would outlive the chunks it came in.
-            delta.getParts().add(new TextPart(fragment));
-        }
-    }
-
-    private void readDeltaToolCalls(JsonReader reader, ChatMessage delta) {
-        if (reader.token() != JsonReader.Token.START_ARRAY) {
-            reader.skipValue();
-            return;
-        }
-        while (reader.nextToken() != JsonReader.Token.END_ARRAY) {
-            if (reader.token() != JsonReader.Token.START_OBJECT) {
-                reader.skipValue();
-                continue;
-            }
-            readDeltaToolCall(reader, delta);
-        }
-    }
-
-    private void readDeltaToolCall(JsonReader reader, ChatMessage delta) {
-        ToolCallPart call = new ToolCallPart();
-        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
-            reader.nextToken();
-            switch (field) {
-                case "id" -> call.setCallId(reader.string());
-                case "function" -> readDeltaToolCallFunction(reader, call);
-                default -> extras(call).put(field, reader.captureValue());
-            }
-        }
-        delta.getParts().add(call);
-    }
-
-    private void readDeltaToolCallFunction(JsonReader reader, ToolCallPart call) {
-        if (reader.token() != JsonReader.Token.START_OBJECT) {
-            reader.skipValue();
-            return;
-        }
-        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
-            reader.nextToken();
-            switch (field) {
-                case "name" -> call.setName(reader.string());
-                case "arguments" -> call.setArgumentsJson(reader.string());
-                // Kept under the path it came from, the way every other extras entry is spelled.
-                default -> extras(call).put(List.of("function", field), reader.captureValue());
-            }
-        }
-    }
-
-    /**
-     * The exception for a failure the provider reports inside the stream, where no HTTP status is
-     * involved: the response was accepted, and the refusal arrives as a frame of its own. The
-     * message keeps the provider's own detail, type and code, the way a refused call's does.
-     */
-    private static SynapseException streamError(Object error) {
-        StringBuilder message = new StringBuilder("OpenAI stream failed");
-        if (error instanceof Map<?, ?> detail) {
-            appendDetail(message, detail.get("message"), ": ", "");
-            appendDetail(message, detail.get("type"), " [", "]");
-            appendDetail(message, detail.get("code"), " (", ")");
-        } else if (error != null) {
-            message.append(": ").append(error);
-        }
-        return new SynapseException(message.toString());
-    }
-
-    private static void appendDetail(StringBuilder message, Object detail, String prefix, String suffix) {
-        if (detail != null) {
-            message.append(prefix).append(detail).append(suffix);
-        }
-    }
-
-    /** The bag to record into, created when the node carries none yet. */
-    private static ProviderExtras extras(ChatMessage message) {
-        ProviderExtras extras = message.getExtras();
-        if (extras == null) {
-            extras = new ProviderExtras();
-            message.setExtras(extras);
-        }
-        return extras;
-    }
-
-    /** The bag to record into, created when the node carries none yet. */
-    private static ProviderExtras extras(ContentPart part) {
-        ProviderExtras extras = part.getExtras();
-        if (extras == null) {
-            extras = new ProviderExtras();
-            part.setExtras(extras);
-        }
-        return extras;
     }
 
     /** Folds one event into the answer being assembled. */
@@ -356,7 +154,7 @@ class ChatCompletionsStreamAdapter {
         // with it rather than staying behind on the chunk that happened to carry it.
         ProviderExtras deltaExtras = delta.getExtras();
         if (deltaExtras != null) {
-            extras(message).putAll(deltaExtras);
+            ChatCompletionsReader.extras(message).putAll(deltaExtras);
         }
         for (ContentPart part : delta.getParts()) {
             if (part instanceof TextPart text) {
@@ -394,7 +192,7 @@ class ChatCompletionsStreamAdapter {
         call.setArgumentsJson(join(call.getArgumentsJson(), fragment.getArgumentsJson()));
         ProviderExtras fragmentExtras = fragment.getExtras();
         if (fragmentExtras != null) {
-            extras(call).putAll(fragmentExtras);
+            ChatCompletionsReader.extras(call).putAll(fragmentExtras);
         }
     }
 

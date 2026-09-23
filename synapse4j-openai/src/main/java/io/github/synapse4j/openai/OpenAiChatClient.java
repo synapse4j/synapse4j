@@ -3,6 +3,7 @@ package io.github.synapse4j.openai;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 
 import io.github.synapse4j.chat.AbstractChatClient;
 import io.github.synapse4j.chat.ChatStream;
@@ -30,7 +31,7 @@ import io.github.synapse4j.json.JsonWriter;
  * writing the protocol's own names takes that knob away. A field this module does not model is kept
  * in the extras of the node it came from rather than dropped. The status is read before the body is
  * touched, because the body is a stream and reaches the caller once: a non-2xx answer is buffered
- * for the error reader, a 2xx one is streamed into the adapter.
+ * for the error reader, a 2xx one is streamed into the reader.
  *
  * <p>
  * A streamed answer is the same exchange with a different response body: the request asks for it
@@ -99,7 +100,9 @@ public class OpenAiChatClient extends AbstractChatClient {
             int status = httpResponse.getStatusCode();
             if (status >= 200 && status < 300) {
                 try (JsonReader reader = codec.reader(httpResponse.getBody())) {
-                    return adapter.fromWire(reader, httpResponse.getHeaders());
+                    ChatResponse response = ChatCompletionsReader.read(reader);
+                    copyHeaders(response, httpResponse.getHeaders());
+                    return response;
                 }
             }
             throw errorReader.read(status, readBody(httpResponse));
@@ -139,10 +142,22 @@ public class OpenAiChatClient extends AbstractChatClient {
             // The headers arrive with the response, before any frame does, so they go onto the
             // answer now: aggregatedResponse() carries them the moment the stream exists, the
             // same way the answer of a blocking call does.
-            ChatCompletionsAdapter.copyHeaders(stream.aggregatedResponse(), httpResponse.getHeaders());
+            copyHeaders(stream.aggregatedResponse(), httpResponse.getHeaders());
             return stream;
         }
         throw refusal(httpResponse, status);
+    }
+
+    /**
+     * Copies the HTTP response headers onto the shared response. The shared model holds one value
+     * per name, so several values of a header are joined the way a blocking call joins them — the
+     * transport metadata of an answer must not depend on which way it was asked for.
+     *
+     * @param response    the response to carry the headers
+     * @param httpHeaders the response headers, as the transport reports them
+     */
+    private static void copyHeaders(ChatResponse response, Map<String, List<String>> httpHeaders) {
+        httpHeaders.forEach((name, values) -> response.getHeaders().put(name, String.join(", ", values)));
     }
 
     /**
