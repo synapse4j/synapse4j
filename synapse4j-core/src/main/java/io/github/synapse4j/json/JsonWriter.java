@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.math.BigDecimal;
 
+import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.exception.SynapseIOException;
 
 /**
@@ -122,18 +123,20 @@ public interface JsonWriter extends Flushable, AutoCloseable {
     JsonWriter writeNull();
 
     /**
-     * Writes a value as the JSON library this writer came from serializes it.
+     * Writes a Java value into the document: the shapes a JSON document is made of, and the types
+     * this library owns in the form they describe.
      *
      * <p>
-     * This is the way out for a value none of the methods above covers: an object handed over as it
-     * is — the kind of value an extras bag holds — written straight into the document rather than
-     * turned into a map first.
+     * A map becomes an object and a list an array, and a {@link Reader} as the string it yields, so a
+     * payload larger than memory still goes out, and their members and elements are written the same
+     * way, so a type this library owns is recognized wherever it sits. A {@link ProviderExtras} is
+     * written as the object its paths describe, a {@link JsonSchema} as the document it describes. A
+     * value none of those covers is handed to the JSON library this writer came from, which decides
+     * what it becomes — a value whose fields the protocol spells differently belongs in a map instead.
      *
      * <p>
-     * What that object becomes is that library's business, not this interface's: its naming strategy
-     * and its modules decide the field names inside it. A value whose fields the protocol spells
-     * differently belongs in a map instead. Nothing this library owns is special-cased here — how
-     * its own types appear on the wire is the caller's to decide.
+     * {@link AbstractJsonWriter} implements this over the tokens; an implementation that does not
+     * extend it carries the same obligation.
      *
      * @param value the value to write; {@code null} writes JSON {@code null}
      */

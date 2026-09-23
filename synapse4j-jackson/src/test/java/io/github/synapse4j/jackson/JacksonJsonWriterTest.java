@@ -2,6 +2,7 @@ package io.github.synapse4j.jackson;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -9,10 +10,14 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonView;
 import io.github.synapse4j.json.JsonWriter;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -132,6 +137,48 @@ class JacksonJsonWriterTest {
         writer.close();
 
         assertEquals("{\"nothing\":null}", sink.text());
+    }
+
+    @Test
+    void writesThisLibrariesOwnTypesAsTheDocumentsTheyDescribe() {
+        RecordingOutputStream sink = new RecordingOutputStream();
+        ProviderExtras extras = new ProviderExtras().put(List.of("annotations", "title"), "x");
+        JsonSchema schema = new JsonSchema();
+        schema.setType("object");
+
+        JsonWriter writer = codec.writer(sink);
+        writer.writeStartObject()
+                .writeName("extras")
+                .writeValue(extras)
+                .writeName("schema")
+                .writeValue(schema)
+                .writeEndObject();
+        writer.close();
+
+        assertEquals("{\"extras\":{\"annotations\":{\"title\":\"x\"}},\"schema\":{\"type\":\"object\"}}",
+                sink.text());
+    }
+
+    @Test
+    void writesAnOwnTypeNestedInAMapTheSameWay() {
+        RecordingOutputStream sink = new RecordingOutputStream();
+        JsonSchema schema = new JsonSchema();
+        schema.setType("string");
+
+        JsonWriter writer = codec.writer(sink);
+        writer.writeStartObject().writeName("nested").writeValue(Map.of("inner", schema)).writeEndObject();
+        writer.close();
+
+        assertEquals("{\"nested\":{\"inner\":{\"type\":\"string\"}}}", sink.text());
+    }
+
+    @Test
+    void refusesToWriteAView() {
+        RecordingOutputStream sink = new RecordingOutputStream();
+
+        JsonWriter writer = codec.writer(sink);
+
+        assertThrows(IllegalArgumentException.class, () -> writer.writeValue(JsonView.of(Map.of("a", 1))));
     }
 
     /** A value only the JSON library behind this writer can turn into JSON. */
