@@ -11,6 +11,7 @@ import io.github.synapse4j.chat.ChatStream;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.exception.SynapseHttpException;
 import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.SseEventStream;
 import io.github.synapse4j.json.JsonCodec;
@@ -219,16 +220,17 @@ public class OpenAiChatClient extends AbstractChatClient {
      * @param body   the whole response body, buffered by the caller
      * @return the exception to throw
      */
-    private SynapseException failure(int status, byte[] body) {
+    private SynapseHttpException failure(int status, byte[] body) {
         try (JsonReader reader = codec.reader(new ByteArrayInputStream(body))) {
             String detail = ChatCompletionsReader.readError(reader);
             if (detail != null) {
-                return new SynapseException("OpenAI request failed with HTTP " + status + detail);
+                return new SynapseHttpException("OpenAI request failed with HTTP " + status + detail, status);
             }
         } catch (RuntimeException ignored) {
             // Not a JSON document at all — a proxy's HTML, say. The snippet below says what came.
         }
-        return new SynapseException("OpenAI request failed with HTTP " + status + ": " + snippet(body));
+        return new SynapseHttpException(
+                "OpenAI request failed with HTTP " + status + ": " + snippet(body), status);
     }
 
     private static String snippet(byte[] body) {

@@ -37,6 +37,7 @@ import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolDefinition;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.exception.SynapseHttpException;
 import io.github.synapse4j.http.DefaultHttpResponse;
 import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpResponse;
@@ -613,6 +614,7 @@ class OpenAiChatClientTest {
         assertTrue(message.contains("Rate limit reached"), message);
         assertTrue(message.contains("rate_limit_exceeded"), message);
         assertTrue(message.contains("rpm"), message);
+        assertEquals(429, assertInstanceOf(SynapseHttpException.class, thrown).getStatusCode());
     }
 
     @Test
@@ -627,6 +629,7 @@ class OpenAiChatClientTest {
         String message = thrown.getMessage();
         assertTrue(message.contains("502"), message);
         assertTrue(message.contains("Bad Gateway"), message);
+        assertEquals(502, assertInstanceOf(SynapseHttpException.class, thrown).getStatusCode());
     }
 
     @Test
@@ -1369,6 +1372,7 @@ class OpenAiChatClientTest {
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.stream(request));
         assertTrue(thrown.getMessage().contains("429"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("Rate limit reached"), thrown.getMessage());
+        assertEquals(429, assertInstanceOf(SynapseHttpException.class, thrown).getStatusCode());
     }
 
     @Test
