@@ -1,7 +1,5 @@
 package io.github.synapse4j.openai;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,19 +29,22 @@ import lombok.RequiredArgsConstructor;
  * only the application's codec, for embedding schema strings as parsed maps.
  *
  * <p>
- * A request is written straight into the caller's {@link JsonWriter}, token by token: the document
- * never exists as a structure, and every name is a literal spelled out here — no codec's naming
- * strategy can rename one, and a member whose value is not set is never emitted. So the bytes that
- * leave here are exactly the protocol's spelling whichever JSON library the application chose, and
- * the payload is held once instead of being built and then serialized.
+ * A request is assembled as the object it goes out as — one bag per node, the module's own members by
+ * path with the node's extras merged over them — and written in one pass. The bags hold references
+ * and a media payload stays a reader, so neither the document nor a payload is materialized, and
+ * every name is a literal spelled out here — no codec's naming strategy can rename one, and a member
+ * whose value is not set is never emitted. So the bytes that leave here are exactly the protocol's
+ * spelling whichever JSON library the application chose, and the payload is held once instead of
+ * being built and then serialized.
  *
  * <p>
  * Responses are read token by token through {@link JsonReader} rather than decoded into a tree: the
  * fields this module models are mapped as they go by, and the ones it does not are captured into the
  * extras bag of the node they belong to, under the path they came from. So a field the provider adds
  * is neither dropped nor able to break the parse, and the body is decoded once instead of twice. In
- * the other direction, every node's extras are merged into the object that node sits in, so a field
- * a caller adds goes out where it was added.
+ * the other direction, every node's extras are merged over the members this module models, so a field
+ * a caller adds goes out where it was added, and a name both of them set is the caller's value that
+ * goes out.
  *
  * <p>
  * A media part is rendered as the protocol's image content: a URL the provider fetches, or the
@@ -62,13 +63,13 @@ class ChatCompletionsAdapter {
     private final JsonCodec codec;
 
     /**
-     * Writes the request as the wire document, in the order the protocol spells it.
+     * Writes the request as the wire document.
      *
      * @param request the request to translate
      * @param writer  the writer to write into; owned by the caller, and left open
      */
     void writeTo(ChatRequest request, JsonWriter writer) {
-        writeDocument(request, false, writer);
+        writer.writeValue(document(request, false));
     }
 
     /**
@@ -79,47 +80,239 @@ class ChatCompletionsAdapter {
      * @param writer  the writer to write into; owned by the caller, and left open
      */
     void writeStreamingTo(ChatRequest request, JsonWriter writer) {
-        writeDocument(request, true, writer);
+        writer.writeValue(document(request, true));
     }
 
-    private void writeDocument(ChatRequest request, boolean stream, JsonWriter writer) {
-        writer.writeStartObject();
-        writer.writeName("model");
-        writeValue(request.getOptions().getModel(), writer);
-        writer.writeName("messages");
-        writer.writeStartArray();
-        for (ChatMessage message : request.getMessages()) {
-            writeMessages(message, writer);
-        }
-        writer.writeEndArray();
+    /** The whole request as the object it goes out as. */
+    private ProviderExtras document(ChatRequest request, boolean stream) {
+        ProviderExtras document = new ProviderExtras();
+        document.put("model", request.getOptions().getModel());
+        document.put("messages", messages(request.getMessages()));
         if (!request.getTools().isEmpty()) {
-            writer.writeName("tools");
-            writer.writeStartArray();
-            for (ToolDefinition tool : request.getTools()) {
-                writeTool(tool, writer);
-            }
-            writer.writeEndArray();
+            document.put("tools", tools(request.getTools()));
         }
-        writeMemberIfNotNull(writer, "temperature", request.getOptions().getTemperature());
-        writeMemberIfNotNull(writer, "max_tokens", request.getOptions().getMaxOutputTokens());
-        writeMemberIfNotNull(writer, "top_p", request.getOptions().getTopP());
-        writeResponseFormat(request.getResponseFormat(), writer);
+        putIfSet(document, "temperature", request.getOptions().getTemperature());
+        putIfSet(document, "max_tokens", request.getOptions().getMaxOutputTokens());
+        putIfSet(document, "top_p", request.getOptions().getTopP());
+        if (request.getResponseFormat().getType() != null
+                || !request.getResponseFormat().getExtras().isEmpty()) {
+            document.put("response_format", responseFormat(request.getResponseFormat()));
+        }
         if (stream) {
-            writer.writeName("stream");
-            writer.writeBoolean(true);
-            writer.writeName("stream_options");
-            writer.writeStartObject();
+            document.put("stream", true);
             // A streamed answer reports what it consumed in a frame of its own, and only when the
             // request asks for it; without this the assembled answer would carry no counts at all.
-            writer.writeName("include_usage");
-            writer.writeBoolean(true);
-            writer.writeEndObject();
+            document.put(List.of("stream_options", "include_usage"), true);
         }
         // The extras of the request itself are its top-level members: a nested bag would nest the
-        // protocol's own fields one level too deep. They come last, so a caller's own member of the
-        // same name is the one that wins.
-        writeExtras(request.getOptions().getExtras().toNestedMap(), writer);
-        writer.writeEndObject();
+        // protocol's own fields one level too deep. Merged last, so a path set on both sides is the
+        // caller's value that goes out.
+        document.putAll(request.getOptions().getExtras());
+        return document;
+    }
+
+    /**
+     * One message into the array of messages. A message of tool results becomes one entry per result,
+     * since the protocol has no message carrying several.
+     */
+    private List<ProviderExtras> messages(List<ChatMessage> messages) {
+        List<ProviderExtras> written = new ArrayList<>();
+        for (ChatMessage message : messages) {
+            written.addAll(entries(message));
+        }
+        return written;
+    }
+
+    private List<ProviderExtras> entries(ChatMessage message) {
+        boolean hasToolResult = message.getParts().stream().anyMatch(ToolResultPart.class::isInstance);
+        if (!hasToolResult) {
+            return List.of(message(message));
+        }
+        if (!message.getParts().stream().allMatch(ToolResultPart.class::isInstance)) {
+            throw new SynapseException("unsupported message for OpenAI: tool results mixed with other parts");
+        }
+        // One message becomes one entry per result, so a field set on the message goes onto every
+        // entry it turns into.
+        List<ProviderExtras> entries = new ArrayList<>();
+        for (ContentPart part : message.getParts()) {
+            entries.add(toolResult((ToolResultPart) part, message.getExtras()));
+        }
+        return entries;
+    }
+
+    private ProviderExtras message(ChatMessage message) {
+        ProviderExtras entry = new ProviderExtras();
+        entry.put("role", message.getRole());
+        List<ProviderExtras> toolCalls = new ArrayList<>();
+        if (arrayContent(message)) {
+            List<ProviderExtras> content = new ArrayList<>();
+            for (ContentPart part : message.getParts()) {
+                if (part instanceof TextPart textPart) {
+                    ProviderExtras text = textPart(textPart);
+                    if (text != null) {
+                        content.add(text);
+                    }
+                } else if (part instanceof MediaPart mediaPart) {
+                    content.add(mediaPart(mediaPart));
+                } else if (part instanceof ToolCallPart toolCall) {
+                    // A tool call is a member of the message rather than an entry of its content,
+                    // so it is held back and written beside the array.
+                    toolCalls.add(toolCall(toolCall));
+                } else {
+                    throw unsupportedPart(part);
+                }
+            }
+            entry.put("content", content);
+        } else {
+            StringBuilder text = new StringBuilder();
+            for (ContentPart part : message.getParts()) {
+                if (!(part instanceof TextPart textPart)) {
+                    throw unsupportedPart(part);
+                }
+                text.append(textPart.getText());
+            }
+            if (text.length() > 0) {
+                entry.put("content", text.toString());
+            }
+        }
+        if (!toolCalls.isEmpty()) {
+            entry.put("tool_calls", toolCalls);
+        }
+        entry.putAll(message.getExtras());
+        return entry;
+    }
+
+    /**
+     * Whether the message takes the array form of content: it does as soon as it is not text alone,
+     * because neither an image nor a replayed tool call can be spelled inside a string — nor can a
+     * field this module does not model.
+     */
+    private static boolean arrayContent(ChatMessage message) {
+        return message.getParts().stream().anyMatch(
+                part -> part instanceof MediaPart || part instanceof ToolCallPart || !part.getExtras().isEmpty());
+    }
+
+    /**
+     * A text part as the entry it becomes, or {@code null} when it carries neither text nor extras —
+     * a part with nothing to say, which the protocol has no place for.
+     */
+    private static ProviderExtras textPart(TextPart part) {
+        boolean hasText = part.getText() != null && !part.getText().isEmpty();
+        if (!hasText && part.getExtras().isEmpty()) {
+            return null;
+        }
+        ProviderExtras entry = new ProviderExtras();
+        entry.put("type", "text");
+        if (hasText) {
+            entry.put("text", part.getText());
+        }
+        entry.putAll(part.getExtras());
+        return entry;
+    }
+
+    /**
+     * A media part in the protocol's image shape. A URL is passed through as it stands: the provider
+     * fetches it, and the payload's type is then the provider's to discover. A payload is inlined as
+     * a data URL instead, which is where the type has to be spelled out — a data URL is the only
+     * thing that declares it.
+     */
+    private static ProviderExtras mediaPart(MediaPart part) {
+        String mediaType = part.getMediaType();
+        boolean typeStated = mediaType != null && !mediaType.isEmpty();
+        if (typeStated && !mediaType.startsWith(IMAGE_TYPE_PREFIX)) {
+            throw new SynapseException("unsupported media type for OpenAI: " + mediaType);
+        }
+        if (part.getUri() == null && part.getSource() == null) {
+            throw new SynapseException(
+                    "unsupported media part for OpenAI: neither uri nor source is set");
+        }
+        if (part.getUri() == null && !typeStated) {
+            throw new SynapseException(
+                    "unsupported media part for OpenAI: mediaType is required to inline the payload");
+        }
+        ProviderExtras entry = new ProviderExtras();
+        entry.put("type", "image_url");
+        entry.put(List.of("image_url", "url"),
+                part.getUri() != null ? part.getUri()
+                        : new Base64Reader("data:" + mediaType + ";base64,", part.getSource()));
+        entry.putAll(part.getExtras());
+        return entry;
+    }
+
+    private ProviderExtras toolResult(ToolResultPart result, ProviderExtras messageExtras) {
+        ProviderExtras entry = new ProviderExtras();
+        entry.put("role", "tool");
+        entry.put("content", textOf(result.getParts()));
+        entry.put("tool_call_id", result.getCallId());
+        // The message's extras first, the result's own after: the more specific node is merged last,
+        // so it wins where both set the same path.
+        entry.putAll(messageExtras);
+        entry.putAll(result.getExtras());
+        return entry;
+    }
+
+    private ProviderExtras toolCall(ToolCallPart part) {
+        ProviderExtras entry = new ProviderExtras();
+        entry.put("id", part.getCallId());
+        entry.put("type", "function");
+        entry.put(List.of("function", "name"), part.getName());
+        entry.put(List.of("function", "arguments"), part.getArgumentsJson());
+        // A field the response carried inside the function object comes back to the same path.
+        entry.putAll(part.getExtras());
+        return entry;
+    }
+
+    private List<ProviderExtras> tools(List<ToolDefinition> definitions) {
+        List<ProviderExtras> tools = new ArrayList<>();
+        for (ToolDefinition definition : definitions) {
+            tools.add(tool(definition));
+        }
+        return tools;
+    }
+
+    private ProviderExtras tool(ToolDefinition definition) {
+        ProviderExtras tool = new ProviderExtras();
+        tool.put("type", "function");
+        tool.put(List.of("function", "name"), definition.getName());
+        tool.put(List.of("function", "description"), definition.getDescription());
+        Map<String, Object> parameters = parseSchema(definition.getInputSchema());
+        if (parameters != null) {
+            tool.put(List.of("function", "parameters"), parameters);
+        }
+        // "strict" lives inside the function object, so it is set by that path.
+        tool.putAll(definition.getExtras());
+        return tool;
+    }
+
+    /**
+     * The response format as the object it goes out as; the caller only asks for one when it states
+     * something.
+     */
+    private ProviderExtras responseFormat(ChatResponseFormat format) {
+        ProviderExtras entry = new ProviderExtras();
+        if (ChatResponseFormat.TYPE_JSON_SCHEMA.equals(format.getType())) {
+            entry.put("type", "json_schema");
+            entry.put(List.of("json_schema", "name"), format.getName() != null ? format.getName() : "response");
+            // "strict" is deliberately not sent in this cut: it changes how strictly the provider
+            // enforces the schema, and choosing that for the caller would be a silent behaviour
+            // decision. It stays reachable through the format's extras, under the json_schema path.
+            Map<String, Object> schema = parseSchema(format.getSchema());
+            if (schema != null) {
+                entry.put(List.of("json_schema", "schema"), schema);
+            }
+        } else if (format.getType() != null) {
+            entry.put("type",
+                    ChatResponseFormat.TYPE_JSON.equals(format.getType()) ? "json_object" : format.getType());
+        }
+        entry.putAll(format.getExtras());
+        return entry;
+    }
+
+    /** Puts a member, or nothing at all when the value is not set. */
+    private static void putIfSet(ProviderExtras members, String name, Object value) {
+        if (value != null) {
+            members.put(name, value);
+        }
     }
 
     /**
@@ -365,200 +558,6 @@ class ChatCompletionsAdapter {
         }
     }
 
-    /**
-     * Writes one message into the open array of messages. A message of tool results becomes one
-     * entry per result, since the protocol has no message carrying several.
-     */
-    private void writeMessages(ChatMessage message, JsonWriter writer) {
-        boolean hasToolResult = message.getParts().stream().anyMatch(ToolResultPart.class::isInstance);
-        if (hasToolResult) {
-            if (!message.getParts().stream().allMatch(ToolResultPart.class::isInstance)) {
-                throw new SynapseException(
-                        "unsupported message for OpenAI: tool results mixed with other parts");
-            }
-            // One message becomes one entry per result, so a field set on the message goes onto
-            // every entry it turns into.
-            Map<String, Object> messageExtras = message.getExtras().toNestedMap();
-            for (ContentPart part : message.getParts()) {
-                writeToolResult((ToolResultPart) part, messageExtras, writer);
-            }
-            return;
-        }
-        writeMessage(message, writer);
-    }
-
-    private void writeMessage(ChatMessage message, JsonWriter writer) {
-        writer.writeStartObject();
-        writer.writeName("role");
-        writeValue(message.getRole(), writer);
-        List<ToolCallPart> toolCalls = new ArrayList<>();
-        if (arrayContent(message)) {
-            writer.writeName("content");
-            writer.writeStartArray();
-            for (ContentPart part : message.getParts()) {
-                if (part instanceof TextPart textPart) {
-                    writeTextPart(textPart, writer);
-                } else if (part instanceof MediaPart mediaPart) {
-                    writeMediaPart(mediaPart, writer);
-                } else if (part instanceof ToolCallPart toolCall) {
-                    // A tool call is a member of the message rather than an entry of its content,
-                    // so it is held back and written beside the array.
-                    toolCalls.add(toolCall);
-                } else {
-                    throw unsupportedPart(part);
-                }
-            }
-            writer.writeEndArray();
-        } else {
-            StringBuilder text = new StringBuilder();
-            for (ContentPart part : message.getParts()) {
-                if (!(part instanceof TextPart textPart)) {
-                    throw unsupportedPart(part);
-                }
-                text.append(textPart.getText());
-            }
-            if (text.length() > 0) {
-                writer.writeName("content");
-                writer.writeString(text.toString());
-            }
-        }
-        if (!toolCalls.isEmpty()) {
-            writer.writeName("tool_calls");
-            writer.writeStartArray();
-            for (ToolCallPart call : toolCalls) {
-                writeToolCall(call, writer);
-            }
-            writer.writeEndArray();
-        }
-        writeExtras(message.getExtras().toNestedMap(), writer);
-        writer.writeEndObject();
-    }
-
-    /**
-     * Whether the message takes the array form of content: it does as soon as it is not text alone,
-     * because neither an image nor a replayed tool call can be spelled inside a string — nor can a
-     * field this module does not model.
-     */
-    private static boolean arrayContent(ChatMessage message) {
-        return message.getParts().stream().anyMatch(
-                part -> part instanceof MediaPart || part instanceof ToolCallPart || !part.getExtras().isEmpty());
-    }
-
-    private static void writeTextPart(TextPart part, JsonWriter writer) {
-        if ((part.getText() == null || part.getText().isEmpty()) && part.getExtras().isEmpty()) {
-            // A part with neither text nor extras carries nothing, and the protocol has no place
-            // for it.
-            return;
-        }
-        writer.writeStartObject();
-        writer.writeName("type");
-        writer.writeString("text");
-        if (part.getText() != null && !part.getText().isEmpty()) {
-            writer.writeName("text");
-            writer.writeString(part.getText());
-        }
-        writeExtras(part.getExtras().toNestedMap(), writer);
-        writer.writeEndObject();
-    }
-
-    /**
-     * Writes a media part in the protocol's image shape. A URL is passed through as it stands: the
-     * provider fetches it, and the payload's type is then the provider's to discover. A payload is
-     * inlined as a data URL instead, which is where the type has to be spelled out — a data URL is
-     * the only thing that declares it.
-     */
-    private static void writeMediaPart(MediaPart part, JsonWriter writer) {
-        String mediaType = part.getMediaType();
-        boolean typeStated = mediaType != null && !mediaType.isEmpty();
-        if (typeStated && !mediaType.startsWith(IMAGE_TYPE_PREFIX)) {
-            throw new SynapseException("unsupported media type for OpenAI: " + mediaType);
-        }
-        if (part.getUri() == null && part.getSource() == null) {
-            throw new SynapseException(
-                    "unsupported media part for OpenAI: neither uri nor source is set");
-        }
-        if (part.getUri() == null && !typeStated) {
-            throw new SynapseException(
-                    "unsupported media part for OpenAI: mediaType is required to inline the payload");
-        }
-        Map<String, Object> extras = part.getExtras().toNestedMap();
-        writer.writeStartObject();
-        writer.writeName("type");
-        writer.writeString("image_url");
-        writer.writeName("image_url");
-        writer.writeStartObject();
-        writer.writeName("url");
-        if (part.getUri() != null) {
-            writer.writeString(part.getUri());
-        } else {
-            writer.writeString(new Base64Reader("data:" + mediaType + ";base64,", part.getSource()));
-        }
-        // "detail", or anything else this module does not model, belongs inside the image_url
-        // object rather than beside it.
-        writeExtras(takeNested(extras, "image_url"), writer);
-        writer.writeEndObject();
-        writeExtras(extras, writer);
-        writer.writeEndObject();
-    }
-
-    private void writeToolResult(ToolResultPart result, Map<String, Object> messageExtras, JsonWriter writer) {
-        writer.writeStartObject();
-        writer.writeName("role");
-        writer.writeString("tool");
-        writer.writeName("content");
-        writer.writeString(textOf(result.getParts()));
-        writer.writeName("tool_call_id");
-        writeValue(result.getCallId(), writer);
-        // The message's extras first, the result's own after: where both set the same member, the
-        // more specific node is the one that wins.
-        writeExtras(messageExtras, writer);
-        writeExtras(result.getExtras().toNestedMap(), writer);
-        writer.writeEndObject();
-    }
-
-    private void writeToolCall(ToolCallPart part, JsonWriter writer) {
-        Map<String, Object> extras = part.getExtras().toNestedMap();
-        writer.writeStartObject();
-        writer.writeName("id");
-        writeValue(part.getCallId(), writer);
-        writer.writeName("type");
-        writer.writeString("function");
-        writer.writeName("function");
-        writer.writeStartObject();
-        writer.writeName("name");
-        writeValue(part.getName(), writer);
-        writer.writeName("arguments");
-        writeValue(part.getArgumentsJson(), writer);
-        // A field the response carried inside the function object comes back to the same place.
-        writeExtras(takeNested(extras, "function"), writer);
-        writer.writeEndObject();
-        writeExtras(extras, writer);
-        writer.writeEndObject();
-    }
-
-    private void writeTool(ToolDefinition definition, JsonWriter writer) {
-        Map<String, Object> extras = definition.getExtras().toNestedMap();
-        writer.writeStartObject();
-        writer.writeName("type");
-        writer.writeString("function");
-        writer.writeName("function");
-        writer.writeStartObject();
-        writer.writeName("name");
-        writeValue(definition.getName(), writer);
-        writer.writeName("description");
-        writeValue(definition.getDescription(), writer);
-        Map<String, Object> parameters = parseSchema(definition.getInputSchema());
-        if (parameters != null) {
-            writer.writeName("parameters");
-            writeValue(parameters, writer);
-        }
-        // "strict" lives inside the function object, so it is reached by that path.
-        writeExtras(takeNested(extras, "function"), writer);
-        writer.writeEndObject();
-        writeExtras(extras, writer);
-        writer.writeEndObject();
-    }
-
     private Map<String, Object> parseSchema(String schema) {
         if (schema == null) {
             return null;
@@ -568,41 +567,6 @@ class ChatCompletionsAdapter {
         } catch (RuntimeException e) {
             throw new SynapseException("tool input schema is not valid JSON", e);
         }
-    }
-
-    /** Writes the response format, or nothing at all when the format states nothing. */
-    private void writeResponseFormat(ChatResponseFormat format, JsonWriter writer) {
-        if (format.getType() == null && format.getExtras().isEmpty()) {
-            return;
-        }
-        Map<String, Object> extras = format.getExtras().toNestedMap();
-        writer.writeName("response_format");
-        writer.writeStartObject();
-        if (ChatResponseFormat.TYPE_JSON_SCHEMA.equals(format.getType())) {
-            writer.writeName("type");
-            writer.writeString("json_schema");
-            String name = format.getName() != null ? format.getName() : "response";
-            // "strict" is deliberately not sent in this cut: it changes how strictly the provider
-            // enforces the schema, and choosing that for the caller would be a silent behaviour
-            // decision. It stays reachable through the format's extras, under the json_schema path.
-            writer.writeName("json_schema");
-            writer.writeStartObject();
-            writer.writeName("name");
-            writer.writeString(name);
-            Map<String, Object> schema = parseSchema(format.getSchema());
-            if (schema != null) {
-                writer.writeName("schema");
-                writeValue(schema, writer);
-            }
-            writeExtras(takeNested(extras, "json_schema"), writer);
-            writer.writeEndObject();
-        } else if (format.getType() != null) {
-            writer.writeName("type");
-            writer.writeString(
-                    ChatResponseFormat.TYPE_JSON.equals(format.getType()) ? "json_object" : format.getType());
-        }
-        writeExtras(extras, writer);
-        writer.writeEndObject();
     }
 
     private String textOf(List<ContentPart> parts) {
@@ -618,89 +582,6 @@ class ChatCompletionsAdapter {
             text.append(textPart.getText());
         }
         return text.toString();
-    }
-
-    /** Writes a member, or nothing at all when the value is not set. */
-    private static void writeMemberIfNotNull(JsonWriter writer, String name, Object value) {
-        if (value != null) {
-            writer.writeName(name);
-            writeValue(value, writer);
-        }
-    }
-
-    /**
-     * Writes the extras of a node as members of the object that is currently open. They go last, so
-     * a caller's own member of the same name is the one that wins, and a field this module does not
-     * model still goes out.
-     */
-    private static void writeExtras(Map<?, ?> extras, JsonWriter writer) {
-        for (Map.Entry<?, ?> member : extras.entrySet()) {
-            writer.writeName(String.valueOf(member.getKey()));
-            writeValue(member.getValue(), writer);
-        }
-    }
-
-    /**
-     * Takes the extras that belong inside a member this module models itself — the function object
-     * of a tool, the image_url of a media part — out of the node's own extras, so both are written
-     * as members of one object instead of two members of the same name.
-     */
-    private static Map<?, ?> takeNested(Map<String, Object> extras, String name) {
-        if (extras.get(name) instanceof Map<?, ?> nested) {
-            extras.remove(name);
-            return nested;
-        }
-        return Map.of();
-    }
-
-    /**
-     * Writes a value that came from outside this module — an extra, or a schema parsed out of its
-     * text. Only the JSON shapes are accepted; anything else is a value this module cannot spell and
-     * fails loudly rather than being dropped from the request.
-     */
-    private static void writeValue(Object value, JsonWriter writer) {
-        if (value == null) {
-            writer.writeNull();
-        } else if (value instanceof String text) {
-            writer.writeString(text);
-        } else if (value instanceof Boolean flag) {
-            writer.writeBoolean(flag);
-        } else if (value instanceof Map<?, ?> object) {
-            writer.writeStartObject();
-            for (Map.Entry<?, ?> member : object.entrySet()) {
-                writer.writeName(String.valueOf(member.getKey()));
-                writeValue(member.getValue(), writer);
-            }
-            writer.writeEndObject();
-        } else if (value instanceof List<?> array) {
-            writer.writeStartArray();
-            for (Object element : array) {
-                writeValue(element, writer);
-            }
-            writer.writeEndArray();
-        } else if (value instanceof Number number) {
-            writeNumber(number, writer);
-        } else {
-            throw new SynapseException(
-                    "unsupported value type for OpenAI: " + value.getClass().getName());
-        }
-    }
-
-    private static void writeNumber(Number number, JsonWriter writer) {
-        if (number instanceof Double || number instanceof Float || number instanceof BigDecimal) {
-            writer.writeNumber(number.doubleValue());
-            return;
-        }
-        if (number instanceof BigInteger integer) {
-            try {
-                writer.writeNumber(integer.longValueExact());
-            } catch (ArithmeticException e) {
-                // longValue() would truncate silently and put a different number on the wire.
-                throw new SynapseException("integer value does not fit in a JSON number: " + integer, e);
-            }
-            return;
-        }
-        writer.writeNumber(number.longValue());
     }
 
     private static Integer asInteger(JsonReader reader) {

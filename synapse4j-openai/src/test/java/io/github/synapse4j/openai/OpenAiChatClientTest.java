@@ -32,6 +32,7 @@ import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.MediaPart;
+import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolDefinition;
@@ -41,6 +42,8 @@ import io.github.synapse4j.http.DefaultHttpResponse;
 import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpResponse;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
+import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonView;
 import io.github.synapse4j.util.InputStreamSupplier;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -677,6 +680,43 @@ class OpenAiChatClientTest {
     }
 
     @Test
+    void anExtraReplacesAModelledMemberOfTheSameName() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        request.getOptions().setTemperature(0.5);
+        request.getOptions().getExtras().put("temperature", 0.9);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        assertEquals(0.9, wire.get("temperature"));
+    }
+
+    @Test
+    void anExtraSetOverAWholeModelledObjectReplacesIt() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
+        tool.getExtras().put("function", Map.of("name", "other"));
+        request.getTools().add(tool);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> tools = (List<Map<String, Object>>) wire.get("tools");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> function = (Map<String, Object>) tools.get(0).get("function");
+        assertEquals(Map.of("name", "other"), function);
+    }
+
+    @Test
     void aToolDefinitionCarriesItsFunctionExtras() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(okBody());
@@ -827,6 +867,68 @@ class OpenAiChatClientTest {
         assertEquals("call_2", messages.get(1).get("tool_call_id"));
         assertEquals(Map.of("type", "ephemeral"), messages.get(0).get("cache_control"));
         assertEquals(Map.of("type", "ephemeral"), messages.get(1).get("cache_control"));
+    }
+
+    @Test
+    void anExtraNoneOfTheShapesCoversGoesOutAsTheCodecWritesIt() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        request.getOptions().getExtras().put("metadata", new Marker());
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        assertEquals(Map.of("source", "test"), wire.get("metadata"));
+    }
+
+    @Test
+    void aSchemaInAnExtraGoesOutAsTheDocumentItDescribes() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        JsonSchema schema = new JsonSchema();
+        schema.setType("object");
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        request.getOptions().getExtras().put("schema", schema);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        assertEquals(Map.of("type", "object"), wire.get("schema"));
+    }
+
+    @Test
+    void aViewInAnExtraFailsLoudly() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        request.getOptions().getExtras().put("view", JsonView.of(Map.of("a", 1)));
+
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> client.chat(request));
+
+        assertTrue(thrown.getMessage().contains("JsonView"), thrown.getMessage());
+    }
+
+    @Test
+    void anExtrasBagInsideAnExtraGoesOutAsTheObjectItDescribes() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ProviderExtras nested = new ProviderExtras().put(List.of("annotations", "title"), "x");
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        request.getOptions().getExtras().put("metadata", nested);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        assertEquals(Map.of("annotations", Map.of("title", "x")), wire.get("metadata"));
     }
 
     @Test
@@ -1292,6 +1394,13 @@ class OpenAiChatClientTest {
         message.setRole(role);
         message.getParts().add(new TextPart(text));
         return message;
+    }
+
+    /** A value only the JSON library behind the codec can turn into JSON. */
+    static class Marker {
+
+        public String source = "test";
+
     }
 
     /** A canned 200 body the request-writing tests answer with, since none of them read it. */
