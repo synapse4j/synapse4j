@@ -15,12 +15,14 @@ import io.github.synapse4j.data.ChatResponse;
  * customizer adjusts the model's contents, it does not re-read the wire.
  *
  * <p>
- * Customizers belong to a {@link ChatClient} and run in the order they were added, after the
- * client's own steps — the context the request carried is already back on the answer — and the
- * last one's answer is what the caller receives. For a streamed answer they run once, when the
- * stream runs to its end; a stream that fails, is closed or is left half-consumed never runs
- * them, the same way a blocking call that failed runs none. The pass happens exactly once per
- * call, so a customizer that changes the response in place should make each change once.
+ * Customizers belong to a {@link ChatClient} and run on the calling thread after the client's own
+ * steps, and the last one's answer is what the caller receives. The sequence among them is the
+ * client's business — the order each was registered with, see {@link ChatClient#DEFAULT_ORDER} —
+ * not a property of this interface: a customizer says what to do, the client decides when. For a
+ * streamed answer they run once, when the stream runs to its end; a stream that fails, is closed
+ * or is left half-consumed never runs them, the same way a blocking call that failed runs none.
+ * The pass happens exactly once per call, so a customizer that changes the response in place
+ * should make each change once.
  *
  * <p>
  * The response handed in is the client's own, so a customizer may change it in place and answer

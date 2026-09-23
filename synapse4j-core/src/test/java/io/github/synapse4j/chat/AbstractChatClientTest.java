@@ -266,6 +266,99 @@ class AbstractChatClientTest {
         assertTrue(ran.isEmpty());
     }
 
+    @Test
+    void requestCustomizersRunByTheirRegisteredOrderWithInsertionOrderAsTheTieBreak() {
+        List<String> ran = new ArrayList<>();
+        StubChatClient client = new StubChatClient();
+        client.addChatRequestCustomizer(namedRequest("late", ran), 10);
+        client.addChatRequestCustomizer(namedRequest("early", ran), -5);
+        client.addChatRequestCustomizer(namedRequest("first-default", ran), ChatClient.DEFAULT_ORDER);
+        client.addChatRequestCustomizer(request -> {
+            ran.add("lambda");
+            return request;
+        });
+        client.addChatRequestCustomizer(namedRequest("second-default", ran), ChatClient.DEFAULT_ORDER);
+
+        client.chat(new ChatRequest());
+
+        assertEquals(List.of("early", "first-default", "lambda", "second-default", "late"), ran);
+    }
+
+    @Test
+    void responseCustomizersRunByTheirRegisteredOrderWithInsertionOrderAsTheTieBreak() {
+        List<String> ran = new ArrayList<>();
+        StubChatClient client = new StubChatClient();
+        client.addChatResponseCustomizer(namedResponse("late", ran), 10);
+        client.addChatResponseCustomizer(namedResponse("early", ran), -5);
+        client.addChatResponseCustomizer(response -> {
+            ran.add("lambda");
+            return response;
+        });
+        client.addChatResponseCustomizer(namedResponse("after-lambda", ran), ChatClient.DEFAULT_ORDER);
+
+        client.chat(new ChatRequest());
+
+        assertEquals(List.of("early", "lambda", "after-lambda", "late"), ran);
+    }
+
+    @Test
+    void theClientDefaultsApplyBetweenTheCustomizersThatStraddleThem() {
+        List<String> ran = new ArrayList<>();
+        DefaultsChatClient client = new DefaultsChatClient();
+        client.addChatRequestCustomizer(request -> {
+            ran.add("before:" + request.getOptions().getModel());
+            return request;
+        }, ChatClient.DEFAULT_ORDER - 1);
+        client.addChatRequestCustomizer(request -> {
+            ran.add("after:" + request.getOptions().getModel());
+            return request;
+        });
+
+        client.chat(new ChatRequest());
+
+        assertEquals(List.of("before:null", "after:inherited"), ran);
+        assertEquals(1, client.defaultsApplied);
+    }
+
+    @Test
+    void theClientDefaultsApplyEvenWhenNoCustomizerIsRegistered() {
+        DefaultsChatClient client = new DefaultsChatClient();
+
+        client.chat(new ChatRequest());
+
+        assertEquals(1, client.defaultsApplied);
+        assertEquals("inherited", client.seen.getOptions().getModel());
+    }
+
+    /** A request customizer that records a name instead of touching the request. */
+    private static ChatRequestCustomizer namedRequest(String name, List<String> ran) {
+        return request -> {
+            ran.add(name);
+            return request;
+        };
+    }
+
+    /** A response customizer that records a name instead of touching the response. */
+    private static ChatResponseCustomizer namedResponse(String name, List<String> ran) {
+        return response -> {
+            ran.add(name);
+            return response;
+        };
+    }
+
+    /** A client whose defaults fill in a model, to show where in the sequence they land. */
+    static class DefaultsChatClient extends StubChatClient {
+
+        int defaultsApplied;
+
+        @Override
+        protected ChatRequest applyDefaults(ChatRequest request) {
+            defaultsApplied++;
+            request.getOptions().setModel("inherited");
+            return request;
+        }
+    }
+
     /** A client that records what it was handed instead of doing an exchange. */
     static class StubChatClient extends AbstractChatClient {
 

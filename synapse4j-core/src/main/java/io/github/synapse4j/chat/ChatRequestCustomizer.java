@@ -14,8 +14,10 @@ import io.github.synapse4j.data.ChatRequest;
  * is cleared, or the shared field is cleared on its own when it must not go out at all.
  *
  * <p>
- * Customizers belong to a {@link ChatClient} and run in the order they were added, on the calling
- * thread, before the request is validated and sent.
+ * Customizers belong to a {@link ChatClient} and run on the calling thread, before the request is
+ * validated and sent. The sequence among them is the client's business — the order each was
+ * registered with, see {@link ChatClient#DEFAULT_ORDER} — not a property of this interface: a
+ * customizer says what to do, the client decides when.
  *
  * <p>
  * The request handed in is the caller's own, so a customizer may change it in place and answer it,
