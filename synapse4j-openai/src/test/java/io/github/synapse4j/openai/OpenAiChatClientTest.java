@@ -25,7 +25,6 @@ import org.junit.jupiter.api.Test;
 import io.github.synapse4j.chat.ChatStream;
 import io.github.synapse4j.data.ChatFinishReason;
 import io.github.synapse4j.data.ChatMessage;
-import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatResponseFormat;
@@ -131,7 +130,7 @@ class OpenAiChatClientTest {
         Map<String, Object> wire = parseCaptured();
         assertEquals("gpt-test", wire.get("model"));
         assertEquals(0.5, wire.get("temperature"));
-        assertEquals(64, wire.get("max_tokens"));
+        assertEquals(64, wire.get("max_completion_tokens"));
         assertEquals(0.9, wire.get("top_p"));
         assertNoNullValues(wire);
 
@@ -162,15 +161,10 @@ class OpenAiChatClientTest {
         stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-3\",\"model\":\"gpt-test\","
                 + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
                 + "\"message\":{\"role\":\"assistant\",\"content\":\"Hi\"}}]}").getBytes(UTF_8)));
-        // The shape a preset takes: a shared field this endpoint spells differently moves into the
-        // extras under the name it wants, and the shared field is cleared so it does not go out as
-        // well.
-        client.addChatRequestCustomizer(request -> {
-            ChatOptions options = request.getOptions();
-            options.getExtras().put("max_completion_tokens", options.getMaxOutputTokens());
-            options.setMaxOutputTokens(null);
-            return request;
-        });
+        // The preset is a customizer like any other: it runs before the request is written, so the
+        // limit goes out under the legacy name and the shared field — which the adapter would spell
+        // the modern way — has been cleared by the time the document is assembled.
+        client.addChatRequestCustomizer(OpenAiCustomizers.legacyMaxTokens());
 
         ChatRequest request = new ChatRequest();
         request.getOptions().setModel("gpt-test");
@@ -179,8 +173,28 @@ class OpenAiChatClientTest {
         client.chat(request);
 
         Map<String, Object> wire = parseCaptured();
-        assertEquals(64, wire.get("max_completion_tokens"));
-        assertFalse(wire.containsKey("max_tokens"));
+        assertEquals(64, wire.get("max_tokens"));
+        assertFalse(wire.containsKey("max_completion_tokens"));
+    }
+
+    @Test
+    void theLegacyMaxTokensPresetIsIdempotentAndQuietWithoutALimit() {
+        ChatRequest request = new ChatRequest();
+
+        // No limit set: the preset moves nothing and adds nothing.
+        OpenAiCustomizers.legacyMaxTokens().customize(request);
+        assertTrue(request.getOptions().getExtras().isEmpty());
+
+        request.getOptions().setMaxOutputTokens(64);
+        OpenAiCustomizers.legacyMaxTokens().customize(request);
+        assertEquals(64, request.getOptions().getExtras().get("max_tokens"));
+        assertNull(request.getOptions().getMaxOutputTokens());
+
+        // A retry passes through the same request: the change was made once, so the bag still
+        // carries exactly one entry under one name.
+        OpenAiCustomizers.legacyMaxTokens().customize(request);
+        assertEquals(1, request.getOptions().getExtras().rawMap().size());
+        assertEquals(64, request.getOptions().getExtras().get("max_tokens"));
     }
 
     @Test

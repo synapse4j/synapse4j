@@ -86,7 +86,9 @@ class ChatCompletionsWriter {
             document.put("tools", tools(request.getTools()));
         }
         putIfSet(document, "temperature", request.getOptions().getTemperature());
-        putIfSet(document, "max_tokens", request.getOptions().getMaxOutputTokens());
+        // The modern name for the limit; an endpoint that only answers to the legacy one gets it
+        // through OpenAiCustomizers.legacyMaxTokens().
+        putIfSet(document, "max_completion_tokens", request.getOptions().getMaxOutputTokens());
         putIfSet(document, "top_p", request.getOptions().getTopP());
         if (request.getResponseFormat().getType() != null
                 || !request.getResponseFormat().getExtras().isEmpty()) {
