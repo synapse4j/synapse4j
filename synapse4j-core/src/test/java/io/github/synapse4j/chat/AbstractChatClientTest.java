@@ -170,6 +170,102 @@ class AbstractChatClientTest {
         assertSame(reported, response.getContext());
     }
 
+    @Test
+    void responseCustomizersRunAfterTheContextHasRiddenBack() {
+        StubChatClient client = new StubChatClient();
+        ChatContext context = new ChatContext();
+        ChatRequest request = new ChatRequest();
+        request.setContext(context);
+        List<ChatContext> carried = new ArrayList<>();
+        client.addChatResponseCustomizer(response -> {
+            carried.add(response.getContext());
+            return response;
+        });
+
+        client.chat(request);
+
+        assertEquals(1, carried.size());
+        assertSame(context, carried.get(0));
+    }
+
+    @Test
+    void aResponseCustomizerMayAnswerAnotherResponse() {
+        StubChatClient client = new StubChatClient();
+        ChatResponse replacement = new ChatResponse();
+        replacement.setId("replacement");
+        client.addChatResponseCustomizer(response -> replacement);
+
+        ChatResponse response = client.chat(new ChatRequest());
+
+        assertEquals("replacement", response.getId());
+    }
+
+    @Test
+    void aResponseCustomizerAnsweringNullFailsLoudly() {
+        StubChatClient client = new StubChatClient();
+        client.addChatResponseCustomizer(response -> null);
+
+        NullPointerException thrown = assertThrows(NullPointerException.class,
+                () -> client.chat(new ChatRequest()));
+
+        assertTrue(thrown.getMessage().contains("customizer"));
+    }
+
+    @Test
+    void aRemovedResponseCustomizerNoLongerRuns() {
+        List<String> ran = new ArrayList<>();
+        ChatResponseCustomizer customizer = response -> {
+            ran.add("run");
+            return response;
+        };
+        StubChatClient client = new StubChatClient();
+        client.addChatResponseCustomizer(customizer);
+
+        assertTrue(client.removeChatResponseCustomizer(customizer));
+        assertFalse(client.removeChatResponseCustomizer(customizer));
+        client.chat(new ChatRequest());
+
+        assertTrue(ran.isEmpty());
+    }
+
+    @Test
+    void theStreamRunsItsResponseCustomizersOnceItIsDrained() {
+        StubChatClient client = new StubChatClient();
+        ChatContext context = new ChatContext();
+        ChatRequest request = new ChatRequest();
+        request.setContext(context);
+        List<ChatResponse> seen = new ArrayList<>();
+        client.addChatResponseCustomizer(response -> {
+            seen.add(response);
+            return response;
+        });
+
+        ChatStream stream = client.stream(request);
+        var events = stream.iterator();
+        while (events.hasNext()) {
+            events.next();
+        }
+
+        assertEquals(1, seen.size());
+        assertSame(context, seen.get(0).getContext());
+        assertSame(seen.get(0), stream.aggregatedResponse());
+    }
+
+    @Test
+    void anAbandonedStreamNeverRunsItsResponseCustomizers() {
+        StubChatClient client = new StubChatClient();
+        List<String> ran = new ArrayList<>();
+        client.addChatResponseCustomizer(response -> {
+            ran.add("run");
+            return response;
+        });
+
+        ChatStream stream = client.stream(new ChatRequest());
+        stream.close();
+
+        assertTrue(ran.isEmpty());
+    }
+
     /** A client that records what it was handed instead of doing an exchange. */
     static class StubChatClient extends AbstractChatClient {
 

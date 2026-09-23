@@ -21,9 +21,10 @@ import io.github.synapse4j.exception.SynapseException;
  *
  * <p>
  * A client may also carry {@link ChatRequestCustomizer}s, which prepare every request before it is
- * validated and sent. That is where an application corrects a shared field whose mapping does not
- * fit the endpoint it is talking to. {@link AbstractChatClient} implements this part for an
- * implementation; a client that implements this interface directly carries the same obligation.
+ * validated and sent — where an application corrects a shared field whose mapping does not fit the
+ * endpoint — and {@link ChatResponseCustomizer}s, which adjust an answer on its way back.
+ * {@link AbstractChatClient} implements both parts for an implementation; a client that implements
+ * this interface directly carries the same obligation.
  *
  * <p>
  * The calls carry nothing between calls: every input arrives on the request, and there is no
@@ -79,5 +80,28 @@ public interface ChatClient {
      * @return whether one was removed
      */
     boolean removeChatRequestCustomizer(ChatRequestCustomizer customizer);
+
+    /**
+     * Adds a customizer that adjusts every answer after this client has finished with it.
+     *
+     * <p>
+     * Customizers run in the order they were added, on the calling thread, after the client's own
+     * steps, and the last one's answer is what the caller receives. For a streamed answer they run
+     * once, when the stream runs to its end; an answer that failed runs none. The same customizer
+     * may be added more than once, and then runs once per addition. A client shared across threads
+     * hands each call a consistent list, so a customizer must itself be safe to run concurrently.
+     *
+     * @param customizer the customizer to add; never {@code null}
+     */
+    void addChatResponseCustomizer(ChatResponseCustomizer customizer);
+
+    /**
+     * Removes the first customizer equal to the given one. Since a lambda equals only itself, the
+     * caller has to keep the reference it added.
+     *
+     * @param customizer the customizer to remove; never {@code null}
+     * @return whether one was removed
+     */
+    boolean removeChatResponseCustomizer(ChatResponseCustomizer customizer);
 
 }

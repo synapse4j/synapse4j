@@ -1,14 +1,18 @@
 package io.github.synapse4j.chat;
 
+import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
+import io.github.synapse4j.data.ChatStreamEvent;
 
 /**
- * A {@link ChatClient} that runs its customizers before the subclass sees the request.
+ * A {@link ChatClient} that runs its customizers around the exchange: a request customizer before
+ * the subclass sees the request, a response customizer before the caller sees the answer.
  *
  * <p>
  * A subclass implements {@link #doChat(ChatRequest)} and {@link #doStream(ChatRequest)} with the
@@ -26,18 +30,31 @@ public abstract class AbstractChatClient implements ChatClient {
 
     /**
      * Copy-on-write, so a call in flight walks a list no other thread can change under it, and
-     * adding a customizer costs a copy only when one is added.
+     * adding a customizer costs a copy only when one is added. Both customizer kinds get their
+     * own list for the same reason.
      */
-    private final List<ChatRequestCustomizer> customizers = new CopyOnWriteArrayList<>();
+    private final List<ChatRequestCustomizer> requestCustomizers = new CopyOnWriteArrayList<>();
+
+    private final List<ChatResponseCustomizer> responseCustomizers = new CopyOnWriteArrayList<>();
 
     @Override
     public void addChatRequestCustomizer(ChatRequestCustomizer customizer) {
-        customizers.add(Objects.requireNonNull(customizer, "customizer must not be null"));
+        requestCustomizers.add(Objects.requireNonNull(customizer, "customizer must not be null"));
     }
 
     @Override
     public boolean removeChatRequestCustomizer(ChatRequestCustomizer customizer) {
-        return customizers.remove(Objects.requireNonNull(customizer, "customizer must not be null"));
+        return requestCustomizers.remove(Objects.requireNonNull(customizer, "customizer must not be null"));
+    }
+
+    @Override
+    public void addChatResponseCustomizer(ChatResponseCustomizer customizer) {
+        responseCustomizers.add(Objects.requireNonNull(customizer, "customizer must not be null"));
+    }
+
+    @Override
+    public boolean removeChatResponseCustomizer(ChatResponseCustomizer customizer) {
+        return responseCustomizers.remove(Objects.requireNonNull(customizer, "customizer must not be null"));
     }
 
     /**
@@ -46,14 +63,15 @@ public abstract class AbstractChatClient implements ChatClient {
      * <p>
      * The request goes through {@link #prepare(ChatRequest)} first; the subclass sees the result in
      * {@link #doChat(ChatRequest)}. The context the prepared request carries is handed back on the
-     * answer — the same instance, so the application's attributes come with it.
+     * answer — the same instance, so the application's attributes come with it — and the response
+     * customizers run last, before the caller.
      */
     @Override
     public ChatResponse chat(ChatRequest request) {
         ChatRequest prepared = prepare(request);
         ChatResponse response = doChat(prepared);
         carryContext(prepared, response);
-        return response;
+        return customize(response);
     }
 
     /**
@@ -62,14 +80,15 @@ public abstract class AbstractChatClient implements ChatClient {
      * <p>
      * The request goes through {@link #prepare(ChatRequest)} first; the subclass sees the result in
      * {@link #doStream(ChatRequest)}. The context the prepared request carries is handed back on
-     * the aggregated answer the same way a blocking call hands it back.
+     * the aggregated answer the same way a blocking call hands it back; the response customizers
+     * run once, when the stream runs to its end.
      */
     @Override
     public ChatStream stream(ChatRequest request) {
         ChatRequest prepared = prepare(request);
         ChatStream stream = doStream(prepared);
         carryContext(prepared, stream.aggregatedResponse());
-        return stream;
+        return customizeWhenDrained(stream);
     }
 
     /**
@@ -84,8 +103,29 @@ public abstract class AbstractChatClient implements ChatClient {
         }
     }
 
+    /** Runs every response customizer in the order they were added; the last one's answer is the caller's. */
+    private ChatResponse customize(ChatResponse response) {
+        for (ChatResponseCustomizer customizer : responseCustomizers) {
+            response = Objects.requireNonNull(customizer.customize(response), "customizer answered null");
+        }
+        return response;
+    }
+
     /**
-     * Applies every customizer, in the order they were added.
+     * The same pass for a streamed answer, taken when the stream runs to its end — the first
+     * moment the aggregated answer is whole. With nothing registered the stream is handed on
+     * untouched, and the list is snapshotted now so a customizer added mid-flight does not join
+     * an exchange already under way.
+     */
+    private ChatStream customizeWhenDrained(ChatStream stream) {
+        if (responseCustomizers.isEmpty()) {
+            return stream;
+        }
+        return new CustomizedStream(stream, List.copyOf(responseCustomizers));
+    }
+
+    /**
+     * Applies every request customizer, in the order they were added.
      *
      * @param request the request as the caller built it
      * @return the request to send, which is the one that was given when no customizer answered
@@ -93,7 +133,7 @@ public abstract class AbstractChatClient implements ChatClient {
      * @throws NullPointerException a customizer answered {@code null}
      */
     protected ChatRequest prepare(ChatRequest request) {
-        for (ChatRequestCustomizer customizer : customizers) {
+        for (ChatRequestCustomizer customizer : requestCustomizers) {
             request = Objects.requireNonNull(customizer.customize(request), "customizer answered null");
         }
         return request;
@@ -114,5 +154,75 @@ public abstract class AbstractChatClient implements ChatClient {
      * @return the streaming answer; never {@code null}
      */
     protected abstract ChatStream doStream(ChatRequest request);
+
+    /**
+     * A stream that hands the aggregated answer to the response customizers once it runs to its
+     * end. A loop that breaks out early leaves them unrun: what it holds is a partial answer, and
+     * so is a stream that fails or is closed before its last event.
+     */
+    private static final class CustomizedStream implements ChatStream {
+
+        private final ChatStream delegate;
+
+        private final List<ChatResponseCustomizer> customizers;
+
+        private boolean applied;
+
+        private ChatResponse result;
+
+        private CustomizedStream(ChatStream delegate, List<ChatResponseCustomizer> customizers) {
+            this.delegate = delegate;
+            this.customizers = customizers;
+        }
+
+        @Override
+        public Iterator<ChatStreamEvent> iterator() {
+            Iterator<ChatStreamEvent> events = delegate.iterator();
+            return new Iterator<>() {
+                @Override
+                public boolean hasNext() {
+                    boolean more = events.hasNext();
+                    if (!more) {
+                        apply();
+                    }
+                    return more;
+                }
+
+                @Override
+                public ChatStreamEvent next() {
+                    try {
+                        return events.next();
+                    } catch (NoSuchElementException drained) {
+                        // Drained by pulling past the end: the customizers still owe their pass.
+                        apply();
+                        throw drained;
+                    }
+                }
+            };
+        }
+
+        @Override
+        public ChatResponse aggregatedResponse() {
+            return result != null ? result : delegate.aggregatedResponse();
+        }
+
+        @Override
+        public void close() {
+            delegate.close();
+        }
+
+        private void apply() {
+            if (applied) {
+                return;
+            }
+            applied = true;
+            ChatResponse response = delegate.aggregatedResponse();
+            for (ChatResponseCustomizer customizer : customizers) {
+                response = Objects.requireNonNull(customizer.customize(response), "customizer answered null");
+            }
+            result = response;
+        }
+
+    }
 
 }
