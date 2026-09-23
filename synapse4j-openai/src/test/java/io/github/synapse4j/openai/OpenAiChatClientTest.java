@@ -741,6 +741,81 @@ class OpenAiChatClientTest {
     }
 
     @Test
+    void aStrictResponseFormatGoesOutInsideTheJsonSchema() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatResponseFormat format = request.getResponseFormat();
+        format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
+        format.setSchema("{\"type\":\"object\"}");
+        format.setStrict(true);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> responseFormat = (Map<String, Object>) wire.get("response_format");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> jsonSchema = (Map<String, Object>) responseFormat.get("json_schema");
+        // The flag is a sibling of the schema document, inside the json_schema object.
+        assertEquals(Boolean.TRUE, jsonSchema.get("strict"));
+        assertEquals(Map.of("type", "object"), jsonSchema.get("schema"));
+    }
+
+    @Test
+    void aStrictToolGoesOutInsideItsFunction() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
+        tool.setStrict(true);
+        request.getTools().add(tool);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> tools = (List<Map<String, Object>>) wire.get("tools");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> function = (Map<String, Object>) tools.get(0).get("function");
+        assertEquals(Boolean.TRUE, function.get("strict"));
+        assertEquals("get_weather", function.get("name"));
+    }
+
+    @Test
+    void anUnsetStrictIsNotSent() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatResponseFormat format = request.getResponseFormat();
+        format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
+        format.setSchema("{\"type\":\"object\"}");
+        ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
+        request.getTools().add(tool);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> responseFormat = (Map<String, Object>) wire.get("response_format");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> jsonSchema = (Map<String, Object>) responseFormat.get("json_schema");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> tools = (List<Map<String, Object>>) wire.get("tools");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> function = (Map<String, Object>) tools.get(0).get("function");
+        // A flag nobody set stays off the wire rather than going out as a false.
+        assertNull(jsonSchema.get("strict"));
+        assertNull(function.get("strict"));
+    }
+
+    @Test
     void aReplayedToolCallCarriesItsFunctionExtras() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(okBody());

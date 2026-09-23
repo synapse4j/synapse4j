@@ -20,9 +20,10 @@ import lombok.ToString;
  * asked for is the most expensive way to be wrong, because it looks like success.
  *
  * <p>
- * Properties of the requirement that only some protocols have — the flag that turns enforcement on,
- * where enforcement is optional — go in {@link #getExtras()}, like every other provider-specific
- * field.
+ * Properties of the requirement that only some protocols have go in {@link #getExtras()}, like
+ * every other provider-specific field. The flag that turns enforcement on is modelled rather than
+ * left to the bag: every major protocol carries it in some form, so {@link #getStrict()} speaks for
+ * all of them and each adapter translates it.
  */
 @Getter
 @Setter
@@ -49,6 +50,13 @@ public class ChatResponseFormat {
 
     /** The schema, as JSON Schema text. */
     private String schema;
+
+    /**
+     * Whether the provider has to enforce the schema rather than merely aim at it; {@code null}
+     * leaves the decision to the protocol's default. Only the protocols that carry the flag inside
+     * a schema-shaped answer send it, and only for {@link #TYPE_JSON_SCHEMA}.
+     */
+    private Boolean strict;
 
     /** Provider-specific fields of this requirement. */
     private final ProviderExtras extras = new ProviderExtras();

@@ -16,6 +16,7 @@ class ChatResponseFormatTest {
         assertNull(format.getName());
         assertNull(format.getDescription());
         assertNull(format.getSchema());
+        assertNull(format.getStrict());
         assertTrue(format.getExtras().isEmpty());
     }
 
@@ -27,11 +28,13 @@ class ChatResponseFormatTest {
         format.setName("weather");
         format.setDescription("The weather for a place");
         format.setSchema("{\"type\":\"object\"}");
+        format.setStrict(true);
 
         assertEquals(ChatResponseFormat.TYPE_JSON_SCHEMA, format.getType());
         assertEquals("weather", format.getName());
         assertEquals("The weather for a place", format.getDescription());
         assertEquals("{\"type\":\"object\"}", format.getSchema());
+        assertEquals(Boolean.TRUE, format.getStrict());
     }
 
     @Test

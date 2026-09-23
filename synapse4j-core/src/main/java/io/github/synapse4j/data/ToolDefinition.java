@@ -1,6 +1,5 @@
 package io.github.synapse4j.data;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -28,7 +27,6 @@ import lombok.ToString;
 @Setter
 @ToString
 @NoArgsConstructor
-@AllArgsConstructor
 public class ToolDefinition {
 
     /** Name the model calls the tool by; the application resolves it against its own registry. */
@@ -40,7 +38,27 @@ public class ToolDefinition {
     /** The arguments schema, as JSON Schema text. */
     private String inputSchema;
 
+    /**
+     * Whether the provider has to fill in an invocation that enforces this schema rather than
+     * merely aiming at it; {@code null} leaves the decision to the protocol's default.
+     */
+    private Boolean strict;
+
     /** Provider-specific fields to merge into this tool when the request is sent. */
     private final ProviderExtras extras = new ProviderExtras();
+
+    /**
+     * A tool with the given name, purpose and argument schema; nothing is said about enforcement,
+     * see {@link #getStrict()}.
+     *
+     * @param name        the name the model calls the tool by
+     * @param description what the tool does
+     * @param inputSchema the arguments schema, as JSON Schema text
+     */
+    public ToolDefinition(String name, String description, String inputSchema) {
+        this.name = name;
+        this.description = description;
+        this.inputSchema = inputSchema;
+    }
 
 }

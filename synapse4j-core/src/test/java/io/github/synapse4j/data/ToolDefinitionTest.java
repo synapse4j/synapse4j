@@ -17,16 +17,21 @@ class ToolDefinitionTest {
         assertNull(tool.getName());
         assertNull(tool.getDescription());
         assertNull(tool.getInputSchema());
+        assertNull(tool.getStrict());
         assertTrue(tool.getExtras().isEmpty());
     }
 
     @Test
-    void allArgumentsConstructorFillsEveryField() {
+    void constructorFillsNameDescriptionAndSchema() {
         ToolDefinition tool = new ToolDefinition("get_weather", "Looks up the weather", "{\"type\":\"object\"}");
 
         assertEquals("get_weather", tool.getName());
         assertEquals("Looks up the weather", tool.getDescription());
         assertEquals("{\"type\":\"object\"}", tool.getInputSchema());
+
+        tool.setStrict(true);
+
+        assertEquals(Boolean.TRUE, tool.getStrict());
     }
 
     @Test

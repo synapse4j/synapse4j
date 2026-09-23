@@ -299,11 +299,12 @@ class ChatCompletionsAdapter {
         function.put("name", definition.getName());
         function.put("description", definition.getDescription());
         putIfSet(function, "parameters", parseSchema(definition.getInputSchema()));
+        // This protocol carries the enforcement flag inside the function object, beside the schema.
+        putIfSet(function, "strict", definition.getStrict());
 
         Map<String, Object> tool = new LinkedHashMap<>();
         tool.put("type", "function");
         tool.put("function", function);
-        // "strict" lives inside the function object, so it is set by that path.
         definition.getExtras().mergeInto(tool);
         return tool;
     }
@@ -318,9 +319,7 @@ class ChatCompletionsAdapter {
             entry.put("type", "json_schema");
             Map<String, Object> jsonSchema = new LinkedHashMap<>();
             jsonSchema.put("name", format.getName() != null ? format.getName() : "response");
-            // "strict" is deliberately not sent in this cut: it changes how strictly the provider
-            // enforces the schema, and choosing that for the caller would be a silent behaviour
-            // decision. It stays reachable through the format's extras, under the json_schema path.
+            putIfSet(jsonSchema, "strict", format.getStrict());
             Map<String, Object> schema = parseSchema(format.getSchema());
             if (schema != null) {
                 jsonSchema.put("schema", schema);
