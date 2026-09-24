@@ -187,11 +187,14 @@ public abstract class AbstractChatClient implements ChatClient {
 
     /**
      * The context this exchange runs on: the prepared request's own when it carries one — the
-     * application's, carrying its attributes — and otherwise a fresh call-scoped one, which is
-     * never attached back to the request, so a request the application reuses does not
-     * silently inherit it. Either way the request is recorded on it as it went out.
+     * application's, carrying its attributes — and otherwise a fresh call-scoped one. Either
+     * way the request is recorded on it as it went out.
+     *
+     * <p>
+     * A subclass that must reach the context through the request itself — a loop driving
+     * several exchanges under one — attaches what this method would leave call-scoped.
      */
-    private static ChatContext resolveContext(ChatRequest sent) {
+    protected ChatContext resolveContext(ChatRequest sent) {
         ChatContext context = sent.getContext() != null ? sent.getContext() : new ChatContext();
         context.setRequest(sent);
         return context;
