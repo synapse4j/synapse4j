@@ -2,7 +2,6 @@ package io.github.synapse4j.jackson;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -17,7 +16,6 @@ import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.json.JsonSchema;
-import io.github.synapse4j.json.JsonView;
 import io.github.synapse4j.json.JsonWriter;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -170,15 +168,6 @@ class JacksonJsonWriterTest {
         writer.close();
 
         assertEquals("{\"nested\":{\"inner\":{\"type\":\"string\"}}}", sink.text());
-    }
-
-    @Test
-    void refusesToWriteAView() {
-        RecordingOutputStream sink = new RecordingOutputStream();
-
-        JsonWriter writer = codec.writer(sink);
-
-        assertThrows(IllegalArgumentException.class, () -> writer.writeValue(JsonView.of(Map.of("a", 1))));
     }
 
     /** A value only the JSON library behind this writer can turn into JSON. */

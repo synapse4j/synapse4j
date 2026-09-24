@@ -1,7 +1,6 @@
 package io.github.synapse4j.json;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
@@ -38,24 +37,6 @@ class AbstractJsonCodecTest {
         assertEquals(Map.class, codec.decodedType);
         assertEquals(List.of("object"), schema.getType());
         assertEquals(List.of("string"), schema.getProperties().get("name").getType());
-    }
-
-    @Test
-    void readsAViewOverTheDocument() {
-        StubCodec codec = new StubCodec();
-        codec.decoded = Map.of("choices", List.of(Map.of("message", Map.of("content", "hi"))));
-
-        JsonView view = codec.decode("{}", JsonView.class);
-
-        assertEquals(Object.class, codec.decodedType);
-        assertEquals("hi", view.get("choices").get(0).get("message").get("content").asText());
-    }
-
-    @Test
-    void refusesToEncodeAView() {
-        StubCodec codec = new StubCodec();
-
-        assertThrows(IllegalArgumentException.class, () -> codec.encode(JsonView.of(Map.of("a", 1))));
     }
 
     @Test

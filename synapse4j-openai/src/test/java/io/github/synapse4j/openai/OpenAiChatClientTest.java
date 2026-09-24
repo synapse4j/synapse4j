@@ -43,7 +43,6 @@ import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpResponse;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.json.JsonSchema;
-import io.github.synapse4j.json.JsonView;
 import io.github.synapse4j.tool.FunctionTool;
 import io.github.synapse4j.util.InputStreamSupplier;
 import tools.jackson.databind.json.JsonMapper;
@@ -1018,20 +1017,6 @@ class OpenAiChatClientTest {
 
         Map<String, Object> wire = parseCaptured();
         assertEquals(Map.of("type", "object"), wire.get("schema"));
-    }
-
-    @Test
-    void aViewInAnExtraFailsLoudly() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
-
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        request.getOptions().getExtras().put("view", JsonView.of(Map.of("a", 1)));
-
-        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> client.chat(request));
-
-        assertTrue(thrown.getMessage().contains("JsonView"), thrown.getMessage());
     }
 
     @Test

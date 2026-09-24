@@ -19,7 +19,6 @@ import com.github.victools.jsonschema.generator.SchemaGenerator;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 
 import io.github.synapse4j.json.JsonSchema;
-import io.github.synapse4j.json.JsonView;
 import io.github.synapse4j.json.JsonWriter;
 import lombok.Data;
 import org.junit.jupiter.api.Test;
@@ -52,18 +51,6 @@ class JacksonJsonCodecTest {
         assertEquals(List.of("a"), properties(codec.generateDecodeSchema(Helper.class)));
         assertEquals(List.of("kept", "x"), sorted(codec.generateDecodeSchema(Hidden.class)));
         assertEquals(List.of("x", "y"), sorted(codec.generateDecodeSchema(Point.class)));
-    }
-
-    @Test
-    void decodesIntoAJsonViewThatNavigatesTheDocument() {
-        JsonView view = codec.decode("{\"choices\":[{\"message\":{\"content\":\"Hi\"},"
-                + "\"finish_reason\":\"stop\"}],"
-                + "\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7}}", JsonView.class);
-
-        assertEquals("Hi", view.get("choices").get(0).get("message").get("content").asText());
-        assertEquals("stop", view.get("choices").get(0).get("finish_reason").asText());
-        assertEquals(11L, view.get("usage").get("prompt_tokens").asLong());
-        assertTrue(view.get("usage").get("absent").isMissing());
     }
 
     @Test

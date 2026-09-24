@@ -68,9 +68,6 @@ public abstract class AbstractJsonWriter implements JsonWriter {
             }
             return writeEndArray();
         }
-        if (value instanceof JsonView) {
-            throw new IllegalArgumentException("JsonView is a read-side type and cannot be written");
-        }
         if (value instanceof JsonSchema schema) {
             return writeValue(schema.toMap());
         }

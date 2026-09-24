@@ -26,15 +26,10 @@ public abstract class AbstractJsonCodec implements JsonCodec {
      *
      * <p>
      * A {@link JsonSchema} is written as the document it describes; everything else is handed to
-     * {@link #encodeValue(Object)} untouched. A {@link JsonView} is refused: it is a read-side type,
-     * and writing it would silently produce an empty shell, so the mistake is reported where it is
-     * made.
+     * {@link #encodeValue(Object)} untouched.
      */
     @Override
     public String encode(Object value) {
-        if (value instanceof JsonView) {
-            throw new IllegalArgumentException("JsonView is a read-side type and cannot be encoded");
-        }
         return encodeValue(value instanceof JsonSchema schema ? schema.toMap() : value);
     }
 
@@ -43,19 +38,15 @@ public abstract class AbstractJsonCodec implements JsonCodec {
      *
      * <p>
      * Reading into {@link JsonSchema} — or a subclass of it, answered with a {@code JsonSchema} —
-     * reads the document it describes; reading into {@link JsonView} reads the document generically
-     * (any root — object, array, or scalar) and hands the caller a null-safe view over it. Anything
-     * else is handed to {@link #decodeValue(String, Type)} untouched. The checks are on the type
-     * asked for rather than on the value, so a {@code JsonSchema} nested in a collection is read as
-     * the collection's element type would have it, not as a schema this method recognises.
+     * reads the document it describes. Anything else is handed to
+     * {@link #decodeValue(String, Type)} untouched. The checks are on the type asked for rather
+     * than on the value, so a {@code JsonSchema} nested in a collection is read as the
+     * collection's element type would have it, not as a schema this method recognises.
      */
     @Override
     public <T> T decode(String json, Type type) {
         if (type instanceof Class<?> asked && JsonSchema.class.isAssignableFrom(asked)) {
             return cast(JsonSchema.fromMap(decodeValue(json, Map.class)));
-        }
-        if (type instanceof Class<?> asked && JsonView.class.isAssignableFrom(asked)) {
-            return cast(JsonView.of(decodeValue(json, Object.class)));
         }
         return decodeValue(json, type);
     }
