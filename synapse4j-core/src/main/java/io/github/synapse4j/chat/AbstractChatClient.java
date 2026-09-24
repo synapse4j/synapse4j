@@ -7,6 +7,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
@@ -152,15 +153,17 @@ public abstract class AbstractChatClient implements ChatClient {
      *
      * <p>
      * The request goes through {@link #prepare(ChatRequest)} first; the subclass sees the result in
-     * {@link #doChat(ChatRequest)}. The context the prepared request carries is handed back on the
-     * answer — the same instance, so the application's attributes come with it — and the response
-     * customizers run last, before the caller.
+     * {@link #doChat(ChatRequest)}. A context is resolved for the exchange — the prepared request's
+     * own when it carries one, a fresh call-scoped one otherwise, never attached back to the
+     * request — and it records the request as sent and the response as received before the answer
+     * is handed back on it. The response customizers run last, before the caller.
      */
     @Override
     public ChatResponse chat(ChatRequest request) {
         ChatRequest prepared = prepare(request);
+        ChatContext context = resolveContext(prepared);
         ChatResponse response = doChat(prepared);
-        carryContext(prepared, response);
+        carryContext(context, response);
         return customize(response);
     }
 
@@ -169,28 +172,44 @@ public abstract class AbstractChatClient implements ChatClient {
      *
      * <p>
      * The request goes through {@link #prepare(ChatRequest)} first; the subclass sees the result in
-     * {@link #doStream(ChatRequest)}. The context the prepared request carries is handed back on
-     * the aggregated answer the same way a blocking call hands it back; the response customizers
-     * run once, when the stream runs to its end.
+     * {@link #doStream(ChatRequest)}. The context is resolved, the request recorded, and the
+     * answer handed back the same way a blocking call does; the response customizers run once,
+     * when the stream runs to its end.
      */
     @Override
     public ChatStream stream(ChatRequest request) {
         ChatRequest prepared = prepare(request);
+        ChatContext context = resolveContext(prepared);
         ChatStream stream = doStream(prepared);
-        carryContext(prepared, stream.aggregatedResponse());
+        carryContext(context, stream.aggregatedResponse());
         return customizeWhenDrained(stream);
     }
 
     /**
-     * Hands the context of the request that was actually sent back on the answer — that instance,
-     * not the caller's original, since a customizer may have answered another request. When none
-     * was sent, whatever the exchange put on the answer stands: a provider that reports its own
-     * session id fills a context of its own.
+     * The context this exchange runs on: the prepared request's own when it carries one — the
+     * application's, carrying its attributes — and otherwise a fresh call-scoped one, which is
+     * never attached back to the request, so a request the application reuses does not
+     * silently inherit it. Either way the request is recorded on it as it went out.
      */
-    private static void carryContext(ChatRequest sent, ChatResponse response) {
-        if (sent.getContext() != null) {
-            response.setContext(sent.getContext());
+    private static ChatContext resolveContext(ChatRequest sent) {
+        ChatContext context = sent.getContext() != null ? sent.getContext() : new ChatContext();
+        context.setRequest(sent);
+        return context;
+    }
+
+    /**
+     * Records the response, adopts any session id the exchange reported into a context of its
+     * own — only into one still empty, so the application's value always wins — and hands this
+     * context back on the answer: it holds the request, the response and whatever the turn
+     * says, and is the instance the caller can carry into the next call.
+     */
+    private static void carryContext(ChatContext context, ChatResponse response) {
+        ChatContext reported = response.getContext();
+        if (reported != null && reported != context && context.getSessionId() == null) {
+            context.setSessionId(reported.getSessionId());
         }
+        context.setResponse(response);
+        response.setContext(context);
     }
 
     /** Runs every response customizer in registration order; the last one's answer is the caller's. */

@@ -18,9 +18,10 @@ import io.github.synapse4j.data.ToolResultPart;
  * execution that throws and does not dispose; the client stays out of execution altogether.
  *
  * <p>
- * One result comes back per call, in the order the calls were given, each carrying its call's
- * id — a protocol requires every call to be answered, so a failed call answers as a result too,
- * unless the whole batch aborts by throwing.
+ * An implementation answers with one result per call, in the order the calls were given, each
+ * carrying its call's id — a protocol requires every call to be answered, so a failed call
+ * answers as a result too, unless the whole batch aborts by throwing. It may also decline the
+ * batch outright: then no call runs at all and the round ends where it stands.
  */
 public interface ToolExecutor {
 
@@ -32,8 +33,10 @@ public interface ToolExecutor {
      *                      with; never {@code null}
      * @param context   the conversation this round belongs to; {@code null} when none was
      *                      attached
-     * @return one result per call, in the same order, each carrying its call's id; never
-     *         {@code null}, never shorter than {@code calls}
+     * @return one result per call, in the same order, each carrying its call's id, never
+     *         shorter than {@code calls} — or {@code null} to decline the batch: not one call
+     *         runs, the round ends where it stands, and the response that carried the calls
+     *         is the round's output with them unanswered
      * @throws Exception if the batch aborts — the error policy rethrew, or resolution itself
      *                       failed; carried openly, decided by the caller
      */

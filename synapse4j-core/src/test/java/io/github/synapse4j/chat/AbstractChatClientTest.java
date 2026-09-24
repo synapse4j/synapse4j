@@ -2,6 +2,9 @@ package io.github.synapse4j.chat;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -152,10 +155,11 @@ class AbstractChatClientTest {
         ChatStream stream = client.stream(request);
 
         assertSame(context, stream.aggregatedResponse().getContext());
+        assertSame(stream.aggregatedResponse(), context.getResponse());
     }
 
     @Test
-    void anAnswerWithoutASentContextKeepsWhatTheExchangeProduced() {
+    void anAnswerWhoseExchangeReportedASessionIdHasItAdopted() {
         ChatContext reported = new ChatContext();
         reported.setSessionId("provider-1");
         StubChatClient client = new StubChatClient() {
@@ -170,7 +174,67 @@ class AbstractChatClientTest {
 
         ChatResponse response = client.chat(new ChatRequest());
 
-        assertSame(reported, response.getContext());
+        ChatContext context = response.getContext();
+        assertNotSame(reported, context);
+        assertEquals("provider-1", context.getSessionId());
+        assertSame(client.seen, context.getRequest());
+        assertSame(response, context.getResponse());
+    }
+
+    @Test
+    void aRequestWithoutAContextGetsOneItNeverSees() {
+        StubChatClient client = new StubChatClient();
+        ChatRequest request = new ChatRequest();
+
+        ChatResponse response = client.chat(request);
+
+        // The fresh context is call-scoped: it goes back on the answer, never onto the request.
+        assertNull(request.getContext());
+        ChatContext context = response.getContext();
+        assertNotNull(context);
+        assertEquals(0, context.getTurn());
+        assertSame(client.seen, context.getRequest());
+        assertSame(response, context.getResponse());
+    }
+
+    @Test
+    void theContextCarriesTheRequestAsItWentOut() {
+        StubChatClient client = new StubChatClient();
+        ChatRequest replacement = new ChatRequest();
+        client.addChatRequestCustomizer(request -> replacement);
+
+        ChatResponse response = client.chat(new ChatRequest());
+
+        assertSame(replacement, response.getContext().getRequest());
+    }
+
+    @Test
+    void everyCallOverwritesWhatTheContextCarried() {
+        StubChatClient client = new StubChatClient();
+        ChatContext context = new ChatContext();
+        ChatRequest first = new ChatRequest();
+        first.setContext(context);
+        client.chat(first);
+        ChatRequest second = new ChatRequest();
+        second.setContext(context);
+
+        ChatResponse response = client.chat(second);
+
+        assertSame(second, context.getRequest());
+        assertSame(response, context.getResponse());
+    }
+
+    @Test
+    void theClientNeverTouchesTheTurn() {
+        StubChatClient client = new StubChatClient();
+        ChatContext context = new ChatContext();
+        context.setTurn(7);
+        ChatRequest request = new ChatRequest();
+        request.setContext(context);
+
+        client.chat(request);
+
+        assertEquals(7, context.getTurn());
     }
 
     @Test

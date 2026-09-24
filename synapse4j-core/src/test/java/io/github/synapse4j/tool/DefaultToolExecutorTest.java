@@ -3,6 +3,7 @@ package io.github.synapse4j.tool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -243,6 +244,51 @@ class DefaultToolExecutorTest {
             release.countDown();
             workers.shutdownNow();
         }
+    }
+
+    @Test
+    void aBatchAtTheTurnCapIsDeclined() throws Exception {
+        DefaultToolExecutor capped = new DefaultToolExecutor(null, null, 3);
+        AtomicBoolean ran = new AtomicBoolean();
+        ChatContext context = new ChatContext();
+        context.setTurn(3);
+
+        List<ToolResultPart> results = capped.execute(
+                List.of(call("c1", "alpha")),
+                List.of(tool("alpha", arguments -> {
+                    ran.set(true);
+                    return "A";
+                })),
+                context);
+
+        assertNull(results);
+        assertFalse(ran.get());
+    }
+
+    @Test
+    void aBatchUnderTheTurnCapRuns() throws Exception {
+        DefaultToolExecutor capped = new DefaultToolExecutor(null, null, 3);
+        ChatContext context = new ChatContext();
+        context.setTurn(2);
+
+        List<ToolResultPart> results = capped.execute(
+                List.of(call("c1", "alpha")),
+                List.of(tool("alpha", arguments -> "A")),
+                context);
+
+        assertEquals("A", text(results.get(0)));
+    }
+
+    @Test
+    void theCapNeverBitesWhereNoLoopCounts() throws Exception {
+        DefaultToolExecutor capped = new DefaultToolExecutor(null, null, 1);
+
+        List<ToolResultPart> results = capped.execute(
+                List.of(call("c1", "alpha")),
+                List.of(tool("alpha", arguments -> "A")),
+                null);
+
+        assertEquals("A", text(results.get(0)));
     }
 
     private static DefaultToolExecutor executor(ExecutorService workers) {

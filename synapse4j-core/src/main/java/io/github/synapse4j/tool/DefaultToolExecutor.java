@@ -18,7 +18,8 @@ import io.github.synapse4j.exception.ToolNotFoundException;
 /**
  * The default {@link ToolExecutor}: a name resolves against the tools at hand, a failure goes
  * through one {@link ToolExecutor.ErrorHandler}, and the answers come back paired with their
- * calls.
+ * calls. A batch is answered or aborts — unless a turn cap is configured and the round has
+ * reached it, in which case it is declined and the round ends where it stands.
  *
  * <p>
  * How the batch runs depends on what it was built with. With no workers, each call runs inline
@@ -46,9 +47,11 @@ public class DefaultToolExecutor implements ToolExecutor {
 
     private final ToolExecutor.ErrorHandler failures;
 
-    /** Runs the batch inline, in order, answering failures with the prefixed message. */
+    private final int maxTurns;
+
+    /** Runs the batch inline, in order, with no cap on the round, answering failures with the prefixed message. */
     public DefaultToolExecutor() {
-        this(null, null);
+        this(null, null, 0);
     }
 
     /**
@@ -58,8 +61,23 @@ public class DefaultToolExecutor implements ToolExecutor {
      *                     {@code "Error: "}
      */
     public DefaultToolExecutor(ExecutorService workers, ToolExecutor.ErrorHandler failures) {
+        this(workers, failures, 0);
+    }
+
+    /**
+     * @param workers  how the batch runs: {@code null} for inline on the calling thread, in
+     *                     order; a service for the whole batch concurrently — never shut down here
+     * @param failures where a failed call goes; {@code null} for the failure's message under
+     *                     {@code "Error: "}
+     * @param maxTurns the most turns a round may have spent by the time a batch arrives: at or
+     *                     past that count the batch is declined; {@code 0} for no cap. Consulted
+     *                     against the context's turn, which only a loop maintains — a bare call
+     *                     still reads {@code 0} and runs
+     */
+    public DefaultToolExecutor(ExecutorService workers, ToolExecutor.ErrorHandler failures, int maxTurns) {
         this.workers = workers;
         this.failures = failures != null ? failures : ErrorHandlers.message(DEFAULT_PREFIX);
+        this.maxTurns = maxTurns;
     }
 
     @Override
@@ -69,6 +87,10 @@ public class DefaultToolExecutor implements ToolExecutor {
         Objects.requireNonNull(available, "available must not be null");
         if (calls.isEmpty()) {
             return new ArrayList<>();
+        }
+        int turn = context != null ? context.getTurn() : 0;
+        if (maxTurns > 0 && turn >= maxTurns) {
+            return null;
         }
         if (workers == null) {
             List<ToolResultPart> results = new ArrayList<>(calls.size());
