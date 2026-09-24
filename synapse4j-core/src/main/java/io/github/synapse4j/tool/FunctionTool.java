@@ -1,79 +1,152 @@
 package io.github.synapse4j.tool;
 
 import io.github.synapse4j.data.ChatContext;
-import io.github.synapse4j.data.Tool;
 import io.github.synapse4j.data.ToolDefinition;
+import io.github.synapse4j.json.JsonCodec;
+import io.github.synapse4j.json.JsonSchema;
 import java.util.Objects;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 
 /**
- * A {@link Tool} built from a declaration and the code behind it.
+ * A {@link StagedTool} for one typed lambda: the model's arguments are decoded into a single
+ * value of the declared type, the lambda runs on it, and its return is rendered for the model.
+ * JSON in both directions belongs to the {@link JsonCodec} — the same codec the application
+ * chose for everything else — and the lambda is only the middle stage.
  *
  * <p>
- * The declaration is everything the model sees; the {@link Executor} is everything the library
- * sees when the model calls. Both arrive through {@link #of(ToolDefinition, Executor)} — a lambda
- * is the expected shape, and parsing the arguments or shaping the result is that lambda's own
- * business, done with whichever JSON library the application already has.
+ * The type comes from a token handed in at construction: a lambda carries no signature to
+ * introspect, so {@code inputType} is where the knowledge lives. It has to describe an object,
+ * because the protocol's arguments are an object — a scalar input type is refused at the
+ * factory, with a pointer to wrap the parameters in a record.
  *
  * <p>
- * {@link #of(ToolDefinition)} builds the other half of the story: a declaration with nothing
- * behind it. {@link #execute(String, ChatContext)} on such a tool fails with {@link
- * UnsupportedOperationException} — a caller that wanted to run it has the wrong tool, and the
- * message says which.
+ * The other construction is a declaration with nothing behind it: {@link #of(ToolDefinition)}
+ * answers a tool the model may see and the library may not run. Such an instance carries no
+ * executor, no input type and no codec; {@link #execute} reaches the missing executor and
+ * fails, saying so.
  */
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class FunctionTool implements Tool {
+public class FunctionTool<I, O> implements StagedTool {
 
     /**
-     * The code behind a tool: the model's arguments in, the model's answer out. Named and shaped
-     * like {@link Tool#execute(String, ChatContext)} because that is what it is — the body of it,
-     * for tools assembled from a declaration plus a lambda rather than written as a class.
+     * The typed middle stage: the decoded value in, the value to render out. Parsing and
+     * rendering are not this lambda's business — that is the codec's; what happens between the
+     * two is the application's.
+     *
+     * @param <I> the type the arguments decode into
+     * @param <O> the type the lambda returns
      */
     @FunctionalInterface
-    public interface Executor {
+    public interface Executor<I, O> {
 
         /**
-         * Runs the tool against the given arguments.
+         * Runs the tool on the decoded value.
          *
-         * @param arguments the arguments the model produced, as JSON text
-         * @param context   the conversation this call belongs to; {@code null} when none was
-         *                      attached
-         * @return the result to hand back to the model; never {@code null}
-         * @throws Exception if execution fails — carried openly, decided by the caller
+         * @param input   the value decoded from the model's arguments; never {@code null} for a
+         *                    decodable document
+         * @param context the conversation this call belongs to; {@code null} when none was
+         *                    attached
+         * @return what the tool produced — a String reaches the model as itself, anything else
+         *         is rendered by the codec
+         * @throws Exception if the tool fails — carried openly, decided by the caller
          */
-        String execute(String arguments, ChatContext context) throws Exception;
+        O execute(I input, ChatContext context) throws Exception;
     }
 
-    /** The declaration this tool carries. */
+    /** The declaration, whether generated from the token or handed in. */
     private final ToolDefinition definition;
 
-    /** The code behind this tool; {@code null} when the tool is a declaration only. */
-    private final Executor executor;
+    /** What the model's arguments decode into; {@code null} when this tool is a declaration only. */
+    private final Class<I> inputType;
+
+    /** The middle stage; {@code null} when this tool is a declaration only. */
+    private final Executor<I, O> executor;
+
+    /** The codec for both directions; {@code null} when this tool is a declaration only. */
+    private final JsonCodec codec;
+
+    /**
+     * Assembles the tool. An executor brings its own requirements: a type to decode into and a
+     * codec to decode with.
+     *
+     * @param definition the declaration to carry; never {@code null}
+     * @param inputType  what the arguments decode into; required with an executor, {@code
+     *                   null} for a declaration only
+     * @param executor   the middle stage; {@code null} for a declaration only
+     * @param codec      the codec for both directions; required with an executor, {@code null}
+     *                       for a declaration only
+     */
+    protected FunctionTool(ToolDefinition definition, Class<I> inputType, Executor<I, O> executor, JsonCodec codec) {
+        this.definition = Objects.requireNonNull(definition, "definition must not be null");
+        this.inputType = inputType;
+        this.executor = executor;
+        this.codec = codec;
+        if (executor != null) {
+            Objects.requireNonNull(inputType, "inputType must not be null when there is an executor");
+            Objects.requireNonNull(codec, "codec must not be null when there is an executor");
+        }
+    }
+
+    /**
+     * A tool whose declaration comes from the input type: one object schema, the type's.
+     *
+     * @param name        the name the model calls the tool by; never {@code null}
+     * @param description what the tool does; never {@code null}
+     * @param inputType   what the arguments decode into; never {@code null}, and it has to
+     *                        describe an object
+     * @param executor    the middle stage; never {@code null}
+     * @param codec       the codec for both directions; never {@code null}
+     * @param <I>         the type the arguments decode into
+     * @param <O>         the type the executor returns
+     * @return the assembled tool
+     * @throws IllegalArgumentException if the input type does not describe an object — wrap
+     *                                      the parameters in a record or a class
+     */
+    public static <I, O> FunctionTool<I, O> of(String name, String description, Class<I> inputType,
+            Executor<I, O> executor, JsonCodec codec) {
+        Objects.requireNonNull(name, "name must not be null");
+        Objects.requireNonNull(description, "description must not be null");
+        Objects.requireNonNull(inputType, "inputType must not be null");
+        Objects.requireNonNull(executor, "executor must not be null");
+        Objects.requireNonNull(codec, "codec must not be null");
+        JsonSchema schema = codec.generateDecodeSchema(inputType);
+        if (!schema.getType().contains("object")) {
+            throw new IllegalArgumentException("inputType " + inputType.getTypeName()
+                    + " does not describe an object; the protocol's arguments are an object, so wrap the parameters in a record");
+        }
+        ToolDefinition definition = new ToolDefinition(name, description, codec.encode(schema));
+        return new FunctionTool<>(definition, inputType, executor, codec);
+    }
+
+    /**
+     * A tool under a declaration the application assembled itself — the input type is not
+     * asked; keep the declaration consistent with what {@code inputType} decodes, the same
+     * promise {@link MethodTool} makes when handed a declaration.
+     *
+     * @param definition the declaration to carry; never {@code null}
+     * @param inputType  what the arguments decode into; never {@code null}
+     * @param executor   the middle stage; never {@code null}
+     * @param codec      the codec for both directions; never {@code null}
+     * @param <I>        the type the arguments decode into
+     * @param <O>        the type the executor returns
+     * @return the assembled tool
+     */
+    public static <I, O> FunctionTool<I, O> of(ToolDefinition definition, Class<I> inputType,
+            Executor<I, O> executor, JsonCodec codec) {
+        Objects.requireNonNull(inputType, "inputType must not be null");
+        Objects.requireNonNull(executor, "executor must not be null");
+        Objects.requireNonNull(codec, "codec must not be null");
+        return new FunctionTool<>(definition, inputType, executor, codec);
+    }
 
     /**
      * A tool the model may see and the library may not run: the declaration alone, for callers
-     * that execute tools themselves or hand them elsewhere.
+     * that execute tools themselves or hand them elsewhere. The type parameters say nothing —
+     * nothing ever runs — so they answer {@code Object}.
      *
      * @param definition the declaration to carry; never {@code null}
      * @return the declaration-backed tool
      */
-    public static FunctionTool of(ToolDefinition definition) {
-        Objects.requireNonNull(definition, "definition must not be null");
-        return new FunctionTool(definition, null);
-    }
-
-    /**
-     * A tool with code behind it.
-     *
-     * @param definition the declaration to carry; never {@code null}
-     * @param executor   the code to run on a call; never {@code null}
-     * @return the assembled tool
-     */
-    public static FunctionTool of(ToolDefinition definition, Executor executor) {
-        Objects.requireNonNull(definition, "definition must not be null");
-        Objects.requireNonNull(executor, "executor must not be null");
-        return new FunctionTool(definition, executor);
+    public static FunctionTool<Object, Object> of(ToolDefinition definition) {
+        return new FunctionTool<>(definition, null, null, null);
     }
 
     /**
@@ -87,31 +160,67 @@ public class FunctionTool implements Tool {
     }
 
     /**
-     * Runs this tool against the given arguments.
+     * The middle stage to run, once the model calls — the automatic loops ask; a declaration
+     * only has none.
+     *
+     * @return the executor; {@code null} when this tool is a declaration only
+     */
+    public Executor<I, O> executor() {
+        return executor;
+    }
+
+    /**
+     * The model's arguments decoded into one value of the input type. A declaration only has
+     * nothing to decode and answers an empty array on its way to the missing executor.
      *
      * @param arguments the arguments the model produced, as JSON text
-     * @param context   the conversation this call belongs to; {@code null} when none was attached
-     * @return the result to hand back to the model; never {@code null}
-     * @throws UnsupportedOperationException if this tool is a declaration with no executor
-     * @throws Exception                     if execution fails — carried openly, decided by the
-     *                                           caller
+     * @param context   the conversation this call belongs to; unused in this stage
+     * @return the decoded value as the single element of an array; an empty array for a
+     *         declaration only
+     * @throws Exception if the text cannot be decoded into the input type
      */
     @Override
-    public String execute(String arguments, ChatContext context) throws Exception {
+    public Object[] resolveArguments(String arguments, ChatContext context) throws Exception {
+        if (inputType == null) {
+            return new Object[0];
+        }
+        return new Object[] { codec.decode(arguments, inputType) };
+    }
+
+    /**
+     * The lambda itself. A declaration only fails here, saying so — the reflection-less
+     * counterpart of {@link MethodTool}'s invoke.
+     *
+     * @param values  the decoded value from {@link #resolveArguments}; never {@code null} when
+     *                    this tool has an executor
+     * @param context the conversation this call belongs to; passed straight through
+     * @return what the lambda returned
+     * @throws UnsupportedOperationException if this tool is a declaration with no executor
+     * @throws Exception                     if the lambda fails — carried openly
+     */
+    @Override
+    public Object call(Object[] values, ChatContext context) throws Exception {
         if (executor == null) {
             throw new UnsupportedOperationException(
                     "tool '" + definition.getName() + "' was declared without an executor");
         }
-        return executor.execute(arguments, context);
+        return executor.execute(inputType.cast(values[0]), context);
     }
 
     /**
-     * The code behind this tool.
+     * The text for the answer: the text itself for a String, the codec's rendering for
+     * anything else — {@code null} included, which renders as JSON null.
      *
-     * @return the executor; {@code null} when this tool is a declaration only
+     * @param returnValue what the lambda returned; may be {@code null}
+     * @param context     the conversation this call belongs to; unused in this stage
+     * @return the result as the model sees it; never {@code null}
      */
-    public Executor executor() {
-        return executor;
+    @Override
+    public String resolveResult(Object returnValue, ChatContext context) {
+        if (returnValue instanceof String text) {
+            return text;
+        }
+        return codec.encode(returnValue);
     }
 
 }

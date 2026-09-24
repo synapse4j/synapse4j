@@ -1,86 +1,231 @@
 package io.github.synapse4j.tool;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ToolDefinition;
+import io.github.synapse4j.json.AbstractJsonCodec;
+import io.github.synapse4j.json.JsonReader;
+import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonWriter;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class FunctionToolTest {
 
-    private final ToolDefinition definition = new ToolDefinition("weather", "Looks up the weather",
-            "{\"type\":\"object\"}");
+    private final FakeCodec codec = new FakeCodec();
+
+    /** The one value the codec decodes arguments into, whatever type is asked. */
+    private record Input(String value) {
+    }
+
+    // ===== factories =====
 
     @Test
-    void carriesTheDeclarationGiven() {
-        FunctionTool tool = FunctionTool.of(definition);
+    void signatureFactoryBuildsTheDeclarationFromTheType() {
+        FunctionTool<Input, String> tool = FunctionTool.of("echo", "Echoes back", Input.class,
+                (input, context) -> input.value(), codec);
 
-        assertSame(definition, tool.definition());
+        assertEquals("echo", tool.definition().getName());
+        assertEquals("Echoes back", tool.definition().getDescription());
+        assertEquals("encoded", tool.definition().getInputSchema());
+        assertTrue(codec.generatedFor.contains(Input.class));
+        assertSame(Input.class, lastOf(codec.generatedFor));
     }
 
     @Test
-    void runsTheExecutorWithWhatItWasGiven() throws Exception {
-        ChatContext context = new ChatContext();
+    void scalarInputTypeIsRefusedAtTheFactory() {
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                () -> FunctionTool.of("len", "Counts", String.class, (input, context) -> "x", codec));
+
+        assertTrue(failure.getMessage().contains("record"));
+    }
+
+    @Test
+    void signatureFactoryRefusesMissingParts() {
+        assertThrows(NullPointerException.class,
+                () -> FunctionTool.of(null, "d", Input.class, (in, ctx) -> "x", codec));
+        assertThrows(NullPointerException.class,
+                () -> FunctionTool.of("n", null, Input.class, (in, ctx) -> "x", codec));
+        assertThrows(NullPointerException.class, () -> FunctionTool.of("n", "d", null, (in, ctx) -> "x", codec));
+        assertThrows(NullPointerException.class, () -> FunctionTool.of("n", "d", Input.class, null, codec));
+        assertThrows(NullPointerException.class, () -> FunctionTool.of("n", "d", Input.class, (in, ctx) -> "x", null));
+    }
+
+    @Test
+    void handedDeclarationKeptAsIsAndStillDemandsTheRest() {
+        ToolDefinition handed = new ToolDefinition("handed", "Built by hand", "{\"type\":\"object\"}");
+
+        FunctionTool<Input, String> tool = FunctionTool.of(handed, Input.class, (input, context) -> "x", codec);
+        assertSame(handed, tool.definition());
+        assertTrue(codec.encoded.isEmpty());
+
+        assertThrows(NullPointerException.class,
+                () -> FunctionTool.of((ToolDefinition) null, Input.class, (in, ctx) -> "x", codec));
+        assertThrows(NullPointerException.class, () -> FunctionTool.of(handed, null, (in, ctx) -> "x", codec));
+        assertThrows(NullPointerException.class, () -> FunctionTool.of(handed, Input.class, null, codec));
+        assertThrows(NullPointerException.class, () -> FunctionTool.of(handed, Input.class, (in, ctx) -> "x", null));
+    }
+
+    // ===== the three stages =====
+
+    @Test
+    void argumentsDecodeIntoOneValueAndReachTheExecutor() throws Exception {
+        codec.decoded = new Input("hello");
         StringBuilder seen = new StringBuilder();
-        FunctionTool tool = FunctionTool.of(definition, (arguments, ctx) -> {
-            seen.append(arguments).append('|').append(ctx == context);
-            return "sunny";
-        });
+        ChatContext context = new ChatContext();
+        FunctionTool<Input, String> tool = FunctionTool.of("echo", "Echoes back", Input.class, (input, ctx) -> {
+            seen.append(input.value()).append('|').append(ctx == context);
+            return input.value();
+        }, codec);
 
-        String result = tool.execute("{\"city\":\"Oslo\"}", context);
+        Object[] values = tool.resolveArguments("{\"value\":\"hello\"}", context);
 
-        assertEquals("sunny", result);
-        assertEquals("{\"city\":\"Oslo\"}|true", seen.toString());
+        assertEquals(1, values.length);
+        assertSame(codec.decoded, values[0]);
+        assertTrue(codec.decodedFor.contains(Input.class));
+
+        assertEquals("hello", tool.call(values, context));
+        assertEquals("hello|true", seen.toString());
     }
 
     @Test
-    void carriesNullContextThroughToTheExecutor() throws Exception {
-        FunctionTool tool = FunctionTool.of(definition, (arguments, ctx) -> {
-            assertNull(ctx);
-            return "ok";
-        });
+    void aStringValueReachesTheModelAsItself() throws Exception {
+        codec.decoded = new Input("plain");
+        FunctionTool<Input, String> tool = FunctionTool.of("echo", "Echoes back", Input.class,
+                (input, context) -> "already text", codec);
 
-        assertEquals("ok", tool.execute("{}", null));
+        assertEquals("already text", tool.execute("{\"value\":\"plain\"}", null));
     }
 
     @Test
-    void exposesTheExecutorItWasBuiltWith() {
-        FunctionTool.Executor executor = (arguments, ctx) -> "done";
-        FunctionTool tool = FunctionTool.of(definition, executor);
+    void otherReturnsAreRenderedByTheCodec() throws Exception {
+        codec.decoded = new Input("x");
+        FunctionTool<Input, Input> tool = FunctionTool.of("self", "Returns the input", Input.class,
+                (input, context) -> input, codec);
 
-        assertSame(executor, tool.executor());
+        assertEquals("encoded", tool.execute("{\"value\":\"x\"}", null));
+        assertInstanceOf(Input.class, lastOf(codec.encoded));
     }
 
     @Test
-    void declarationOnlyToolHasNoExecutorAndRefusesToRun() {
-        FunctionTool tool = FunctionTool.of(definition);
+    void aNullReturnRendersAsJsonNull() throws Exception {
+        codec.decoded = new Input("x");
+        FunctionTool<Input, String> tool = FunctionTool.of("maybe", "Sometimes silent", Input.class,
+                (input, context) -> null, codec);
 
-        assertNull(tool.executor());
-        UnsupportedOperationException failure = assertThrows(UnsupportedOperationException.class,
-                () -> tool.execute("{}", null));
-        assertEquals("tool 'weather' was declared without an executor", failure.getMessage());
+        assertEquals("encoded", tool.execute("{\"value\":\"x\"}", null));
+        assertNull(lastOf(codec.encoded));
     }
 
     @Test
-    void executorFailureCarriesThroughUnchanged() {
-        Exception original = new Exception("the weather service is down");
-        FunctionTool tool = FunctionTool.of(definition, (arguments, ctx) -> {
+    void executorFailureArrivesAsItself() {
+        IllegalStateException original = new IllegalStateException("boom");
+        FunctionTool<Input, String> tool = FunctionTool.of("fail", "Always fails", Input.class, (input, context) -> {
             throw original;
-        });
+        }, codec);
 
-        Exception thrown = assertThrows(Exception.class, () -> tool.execute("{}", null));
-
+        IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> tool.execute("{}", null));
         assertSame(original, thrown);
     }
 
+    // ===== declaration only =====
+
     @Test
-    void factoriesRefuseMissingParts() {
-        assertThrows(NullPointerException.class, () -> FunctionTool.of(null));
-        assertThrows(NullPointerException.class, () -> FunctionTool.of(null, (arguments, ctx) -> "x"));
-        assertThrows(NullPointerException.class, () -> FunctionTool.of(definition, null));
+    void declarationOnlyCarriesNothingBehindIt() throws Exception {
+        ToolDefinition declaration = new ToolDefinition("bare", "Just the words", "{\"type\":\"object\"}");
+
+        FunctionTool<Object, Object> tool = FunctionTool.of(declaration);
+
+        assertSame(declaration, tool.definition());
+        assertNull(tool.executor());
+        assertEquals(0, tool.resolveArguments(null, null).length);
+
+        UnsupportedOperationException failure = assertThrows(UnsupportedOperationException.class,
+                () -> tool.execute("{}", null));
+        assertEquals("tool 'bare' was declared without an executor", failure.getMessage());
+    }
+
+    @Test
+    void declarationOnlyFactoryRefusesNull() {
+        assertThrows(NullPointerException.class, () -> FunctionTool.of((ToolDefinition) null));
+    }
+
+    // ===== harness =====
+
+    private <T> T lastOf(List<T> list) {
+        return list.get(list.size() - 1);
+    }
+
+    /**
+     * A codec that answers what a test sets up: one decoded value, type-aware schema shapes —
+     * String is a scalar so the factory's object check has something to refuse.
+     */
+    private static class FakeCodec extends AbstractJsonCodec {
+
+        /** What every decode answers, whatever type is asked. */
+        private Object decoded;
+
+        /** The types decode was asked for, in order. */
+        private final List<Type> decodedFor = new ArrayList<>();
+
+        /** Everything encode was asked to render, in order. */
+        private final List<Object> encoded = new ArrayList<>();
+
+        /** The types generateDecodeSchema was asked for, in order. */
+        private final List<Type> generatedFor = new ArrayList<>();
+
+        @Override
+        public JsonSchema generateEncodeSchema(Type type) {
+            return new JsonSchema();
+        }
+
+        @Override
+        public JsonSchema generateDecodeSchema(Type type) {
+            generatedFor.add(type);
+            JsonSchema schema = new JsonSchema();
+            if (type == String.class) {
+                schema.setType("string");
+            } else if (type == int.class || type == Integer.class) {
+                schema.setType("integer");
+            } else {
+                schema.setType("object");
+            }
+            return schema;
+        }
+
+        @Override
+        protected String encodeValue(Object value) {
+            encoded.add(value);
+            return "encoded";
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        protected <T> T decodeValue(String json, Type type) {
+            decodedFor.add(type);
+            return (T) decoded;
+        }
+
+        @Override
+        public JsonWriter writer(OutputStream out) {
+            throw new UnsupportedOperationException("these tests never write a document");
+        }
+
+        @Override
+        public JsonReader reader(InputStream in) {
+            throw new UnsupportedOperationException("these tests never read a document");
+        }
+
     }
 
 }
