@@ -15,6 +15,9 @@ import org.junit.jupiter.api.Test;
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
+import io.github.synapse4j.data.Tool;
+import io.github.synapse4j.data.ToolDefinition;
+import io.github.synapse4j.tool.FunctionTool;
 
 class AbstractChatClientTest {
 
@@ -331,6 +334,104 @@ class AbstractChatClientTest {
     }
 
     /** A request customizer that records a name instead of touching the request. */
+    @Test
+    void defaultToolsGoOutBeforeTheOnesTheRequestItselfCarries() {
+        StubChatClient client = new StubChatClient();
+        client.addDefaultTool(tool("a"));
+        client.addDefaultTool(tool("b"));
+        ChatRequest request = new ChatRequest();
+        request.addTool(tool("c"));
+
+        client.chat(request);
+
+        assertEquals(List.of("a", "b", "c"), names(client.seen.getTools()));
+    }
+
+    @Test
+    void aRequestToolOfADefaultsNameStandsInItsSlot() {
+        StubChatClient client = new StubChatClient();
+        client.addDefaultTool(tool("a"));
+        client.addDefaultTool(tool("b"));
+        client.addDefaultTool(tool("c"));
+        ChatRequest request = new ChatRequest();
+        Tool replacement = tool("b");
+        request.addTool(replacement);
+        request.addTool(tool("d"));
+
+        client.chat(request);
+
+        assertEquals(List.of("a", "b", "c", "d"), names(client.seen.getTools()));
+        assertSame(replacement, client.seen.getTools().get(1));
+    }
+
+    @Test
+    void sendingTheSameRequestTwiceProducesTheSameOrder() {
+        StubChatClient client = new StubChatClient();
+        client.addDefaultTool(tool("a"));
+        client.addDefaultTool(tool("b"));
+        ChatRequest request = new ChatRequest();
+        request.addTool(tool("c"));
+
+        client.chat(request);
+        List<String> first = names(request.getTools());
+        client.chat(request);
+
+        assertEquals(List.of("a", "b", "c"), first);
+        assertEquals(first, names(request.getTools()));
+    }
+
+    @Test
+    void registeringANameAgainReplacesTheToolInPlace() {
+        StubChatClient client = new StubChatClient();
+        client.addDefaultTool(tool("a"));
+        client.addDefaultTool(tool("b"));
+        Tool upgraded = tool("a");
+        client.addDefaultTool(upgraded);
+
+        client.chat(new ChatRequest());
+
+        assertEquals(List.of("a", "b"), names(client.seen.getTools()));
+        assertSame(upgraded, client.seen.getTools().get(0));
+    }
+
+    @Test
+    void aRemovedDefaultNoLongerGoesOut() {
+        StubChatClient client = new StubChatClient();
+        client.addDefaultTool(tool("a"));
+        client.addDefaultTool(tool("b"));
+
+        assertTrue(client.removeDefaultTool("a"));
+        assertFalse(client.removeDefaultTool("a"));
+
+        client.chat(new ChatRequest());
+
+        assertEquals(List.of("b"), names(client.seen.getTools()));
+    }
+
+    @Test
+    void aNullToolOrNameIsRefused() {
+        StubChatClient client = new StubChatClient();
+
+        assertThrows(NullPointerException.class, () -> client.addDefaultTool(null));
+        assertThrows(NullPointerException.class, () -> client.removeDefaultTool(null));
+        assertThrows(NullPointerException.class,
+                () -> client.addDefaultTool(FunctionTool.of(new ToolDefinition(null, "does things", "{}"))));
+    }
+
+    /** A declare-only tool carrying the given name — all the merge looks at. */
+    private static Tool tool(String name) {
+        return FunctionTool.of(new ToolDefinition(name, "does things", "{}"));
+    }
+
+    /** The tools' names, in the order they would go out. */
+    private static List<String> names(List<Tool> tools) {
+        List<String> names = new ArrayList<>();
+        for (Tool tool : tools) {
+            names.add(tool.name());
+        }
+        return names;
+    }
+
     private static ChatRequestCustomizer namedRequest(String name, List<String> ran) {
         return request -> {
             ran.add(name);
@@ -355,7 +456,7 @@ class AbstractChatClientTest {
         protected ChatRequest applyDefaults(ChatRequest request) {
             defaultsApplied++;
             request.getOptions().setModel("inherited");
-            return request;
+            return super.applyDefaults(request);
         }
     }
 

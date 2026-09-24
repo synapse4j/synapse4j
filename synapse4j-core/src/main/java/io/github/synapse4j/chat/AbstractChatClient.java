@@ -1,5 +1,6 @@
 package io.github.synapse4j.chat;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -9,6 +10,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
+import io.github.synapse4j.data.Tool;
 
 /**
  * A {@link ChatClient} that runs its customizers around the exchange: a request customizer before
@@ -46,6 +48,14 @@ public abstract class AbstractChatClient implements ChatClient {
 
     private final List<Registration<ChatResponseCustomizer>> responseCustomizers = new CopyOnWriteArrayList<>();
 
+    /**
+     * The standing tool set, in registration order. Copy-on-write for the same reason as the
+     * customizer lists: registration is a configuration-time write, every call reads, and a call
+     * in flight walks a snapshot no registration can change under it. Names are unique among
+     * these — see {@link #addDefaultTool(Tool)}.
+     */
+    private final List<Tool> defaultTools = new CopyOnWriteArrayList<>();
+
     @Override
     public void addChatRequestCustomizer(ChatRequestCustomizer customizer) {
         addChatRequestCustomizer(customizer, DEFAULT_ORDER);
@@ -74,6 +84,43 @@ public abstract class AbstractChatClient implements ChatClient {
     @Override
     public synchronized boolean removeChatResponseCustomizer(ChatResponseCustomizer customizer) {
         return remove(responseCustomizers, Objects.requireNonNull(customizer, "customizer must not be null"));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>
+     * A name already registered has its tool replaced at the same slot, under the class monitor:
+     * finding the slot and taking it has to be one step, or two concurrent registrations of one
+     * name could both land — or a removal could shift the slot between the find and the write.
+     */
+    @Override
+    public synchronized void addDefaultTool(Tool tool) {
+        // The one entry where a tool arrives from outside: validate here, never again.
+        Objects.requireNonNull(tool, "tool must not be null");
+        String name = Objects.requireNonNull(tool.name(), "tool name must not be null");
+        int size = defaultTools.size();
+        for (int index = 0; index < size; index++) {
+            if (name.equals(defaultTools.get(index).name())) {
+                defaultTools.set(index, tool);
+                return;
+            }
+        }
+        defaultTools.add(tool);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>
+     * The monitor matches {@link #addDefaultTool(Tool)}'s so the two compose: {@code removeIf}
+     * is atomic on its own, but only against another single list operation — held apart from the
+     * add's find-and-write, it could drop an entry and shift the slot the add is about to write.
+     */
+    @Override
+    public synchronized boolean removeDefaultTool(String name) {
+        Objects.requireNonNull(name, "name must not be null");
+        return defaultTools.removeIf(tool -> name.equals(tool.name()));
     }
 
     /**
@@ -172,15 +219,45 @@ public abstract class AbstractChatClient implements ChatClient {
     /**
      * Applies this client's own defaults to the request, at {@link ChatClient#DEFAULT_ORDER}:
      * after the customizers registered below it, before those at or above it. Runs exactly once
-     * per call, even when no customizer is registered. The base does nothing — a subclass with
-     * defaults of its own, a default tool set among them, overrides this.
+     * per call, even when no customizer is registered. The base merges the default tools
+     * registered through {@link #addDefaultTool(Tool)}. A subclass with defaults of its own
+     * overrides this and must call {@code super.applyDefaults(request)} to keep that merge.
      *
      * @param request the request so far, with the customizers below the defaults already run
      * @return the request to continue with, which may be the one that was given; never
      *         {@code null}
      */
     protected ChatRequest applyDefaults(ChatRequest request) {
+        // One snapshot for both passes: registration mid-merge must not produce a set where the
+        // defaults were read once and tested against a different list.
+        List<Tool> defaults = List.copyOf(defaultTools);
+        if (defaults.isEmpty()) {
+            return request;
+        }
+        List<Tool> tools = request.getTools();
+        List<Tool> merged = new ArrayList<>(defaults.size() + tools.size());
+        for (Tool fallback : defaults) {
+            Tool replacement = named(tools, fallback.name());
+            merged.add(replacement != null ? replacement : fallback);
+        }
+        for (Tool tool : tools) {
+            if (named(defaults, tool.name()) == null) {
+                merged.add(tool);
+            }
+        }
+        tools.clear();
+        tools.addAll(merged);
         return request;
+    }
+
+    /** The tool in the given list carrying that name, or {@code null} when none does. */
+    private static Tool named(List<Tool> tools, String name) {
+        for (Tool tool : tools) {
+            if (name.equals(tool.name())) {
+                return tool;
+            }
+        }
+        return null;
     }
 
     /**

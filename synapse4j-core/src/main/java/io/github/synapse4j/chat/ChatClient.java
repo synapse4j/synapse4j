@@ -2,6 +2,7 @@ package io.github.synapse4j.chat;
 
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
+import io.github.synapse4j.data.Tool;
 import io.github.synapse4j.exception.SynapseException;
 
 /**
@@ -22,9 +23,10 @@ import io.github.synapse4j.exception.SynapseException;
  * <p>
  * A client may also carry {@link ChatRequestCustomizer}s, which prepare every request before it is
  * validated and sent — where an application corrects a shared field whose mapping does not fit the
- * endpoint — and {@link ChatResponseCustomizer}s, which adjust an answer on its way back.
- * {@link AbstractChatClient} implements both parts for an implementation; a client that implements
- * this interface directly carries the same obligation.
+ * endpoint — {@link ChatResponseCustomizer}s, which adjust an answer on its way back, and a set of
+ * default tools merged into every request's own. {@link AbstractChatClient} implements these parts
+ * for an implementation; a client that implements this interface directly carries the same
+ * obligation.
  *
  * <p>
  * The calls carry nothing between calls: every input arrives on the request, and there is no
@@ -148,5 +150,35 @@ public interface ChatClient {
      * @return whether one was removed
      */
     boolean removeChatResponseCustomizer(ChatResponseCustomizer customizer);
+
+    /**
+     * Registers a tool this client merges into every request it sends, beside the ones the request
+     * itself carries, so a standing tool set need not be restated per call. Registration is
+     * configuration, meant for the time before the client is shared; a call already in flight sees
+     * either set, never a half-written one.
+     *
+     * <p>
+     * A name is unique among the defaults: registering a name that is already registered replaces
+     * that tool where it sits, so upgrading an implementation does not shuffle the rest.
+     *
+     * <p>
+     * The defaults meet the request's own tools at the client's defaults step of every call, in
+     * one fixed shape: the defaults in registration order, a request tool of the same name
+     * standing in its slot for that call, then the request's remaining tools in the order the
+     * request lists them. The same defaults and the same request therefore always go out in the
+     * same order. Names duplicated within the request itself are the caller's to avoid.
+     *
+     * @param tool the tool to register; never {@code null}, and its definition's name must not be
+     *                 {@code null}
+     */
+    void addDefaultTool(Tool tool);
+
+    /**
+     * Removes the default tool registered under the given name, so requests no longer carry it.
+     *
+     * @param name the name it was registered under; never {@code null}
+     * @return whether a default tool of that name was registered
+     */
+    boolean removeDefaultTool(String name);
 
 }

@@ -31,6 +31,17 @@ public interface Tool {
     ToolDefinition definition();
 
     /**
+     * The name the model calls this tool by — its identity on the wire, used wherever a tool is
+     * keyed by name. The default reads it off the declaration; an implementation that already
+     * holds it may return it directly.
+     *
+     * @return this tool's name
+     */
+    default String name() {
+        return definition().getName();
+    }
+
+    /**
      * Runs this tool against the given arguments.
      *
      * @param arguments the arguments the model produced, as JSON text
