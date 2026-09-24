@@ -44,6 +44,7 @@ import io.github.synapse4j.http.HttpResponse;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonView;
+import io.github.synapse4j.tool.FunctionTool;
 import io.github.synapse4j.util.InputStreamSupplier;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -355,7 +356,7 @@ class OpenAiChatClientTest {
         request.getOptions().setModel("gpt-test");
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather",
                 "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}}}");
-        request.getTools().add(tool);
+        request.getTools().add(FunctionTool.of(tool));
 
         ChatResponse response = client.chat(request);
 
@@ -721,7 +722,7 @@ class OpenAiChatClientTest {
         request.getOptions().setModel("gpt-test");
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
         tool.getExtras().put("function", Map.of("name", "other"));
-        request.getTools().add(tool);
+        request.getTools().add(FunctionTool.of(tool));
 
         client.chat(request);
 
@@ -742,7 +743,7 @@ class OpenAiChatClientTest {
         request.getOptions().setModel("gpt-test");
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
         tool.getExtras().put(List.of("function", "strict"), true);
-        request.getTools().add(tool);
+        request.getTools().add(FunctionTool.of(tool));
 
         client.chat(request);
 
@@ -790,7 +791,7 @@ class OpenAiChatClientTest {
         request.getOptions().setModel("gpt-test");
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
         tool.setStrict(true);
-        request.getTools().add(tool);
+        request.getTools().add(FunctionTool.of(tool));
 
         client.chat(request);
 
@@ -814,7 +815,7 @@ class OpenAiChatClientTest {
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setSchema("{\"type\":\"object\"}");
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
-        request.getTools().add(tool);
+        request.getTools().add(FunctionTool.of(tool));
 
         client.chat(request);
 

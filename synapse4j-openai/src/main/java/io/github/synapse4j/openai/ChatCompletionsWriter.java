@@ -12,6 +12,7 @@ import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.TextPart;
+import io.github.synapse4j.data.Tool;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolDefinition;
 import io.github.synapse4j.data.ToolResultPart;
@@ -281,10 +282,10 @@ class ChatCompletionsWriter {
         return entry;
     }
 
-    private List<Map<String, Object>> tools(List<ToolDefinition> definitions) {
+    private List<Map<String, Object>> tools(List<Tool> requestTools) {
         List<Map<String, Object>> tools = new ArrayList<>();
-        for (ToolDefinition definition : definitions) {
-            tools.add(tool(definition));
+        for (Tool requestTool : requestTools) {
+            tools.add(tool(requestTool.definition()));
         }
         return tools;
     }

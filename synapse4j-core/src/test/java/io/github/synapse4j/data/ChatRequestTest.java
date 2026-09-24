@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.synapse4j.tool.FunctionTool;
+
 class ChatRequestTest {
 
     @Test
@@ -26,7 +28,8 @@ class ChatRequestTest {
         ChatRequest request = new ChatRequest();
 
         request.addMessage(new ChatMessage(ChatRole.USER));
-        request.addTool(new ToolDefinition("get_weather", "Looks up the weather", "{}"));
+        request.addTool(FunctionTool.of(
+                new ToolDefinition("get_weather", "Looks up the weather", "{}")));
 
         assertEquals(1, request.getMessages().size());
         assertEquals(1, request.getTools().size());

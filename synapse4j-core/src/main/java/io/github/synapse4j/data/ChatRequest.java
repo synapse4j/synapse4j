@@ -29,8 +29,11 @@ public class ChatRequest {
     /** The conversation so far, oldest first. Never {@code null}; empty means no messages yet. */
     private final List<ChatMessage> messages = new ArrayList<>();
 
-    /** Tools the model may call. Never {@code null}; empty means none. */
-    private final List<ToolDefinition> tools = new ArrayList<>();
+    /**
+     * Tools the model may call. Never {@code null}; empty means none. Carries the whole
+     * {@link Tool}, not just its declaration, so what is sent and what can run are the same set.
+     */
+    private final List<Tool> tools = new ArrayList<>();
 
     /** The shape the answer should take. Never {@code null}; with nothing set, nothing is asked. */
     @NonNull
@@ -63,7 +66,7 @@ public class ChatRequest {
      * @param tool the tool to add
      * @return this call
      */
-    public ChatRequest addTool(ToolDefinition tool) {
+    public ChatRequest addTool(Tool tool) {
         tools.add(tool);
         return this;
     }
