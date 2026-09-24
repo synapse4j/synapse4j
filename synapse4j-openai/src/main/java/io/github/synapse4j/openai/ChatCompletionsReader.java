@@ -5,7 +5,6 @@ import java.util.List;
 import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
-import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -107,7 +106,7 @@ class ChatCompletionsReader {
                 case "role" -> message.setRole(reader.string());
                 case "content" -> readContent(reader, message);
                 case "tool_calls" -> readToolCalls(reader, message);
-                default -> extras(message).put(field, reader.captureValue());
+                default -> message.getOrCreateExtras().put(field, reader.captureValue());
             }
         }
     }
@@ -166,7 +165,7 @@ class ChatCompletionsReader {
         TextPart part = new TextPart(text);
         // The type that decides what the part is may come after the fields it does not model, so
         // the part is built here and the fields collected on the way move into its own bag.
-        extras(part).putAll(collected);
+        part.getOrCreateExtras().putAll(collected);
         message.getParts().add(part);
     }
 
@@ -192,7 +191,7 @@ class ChatCompletionsReader {
             switch (field) {
                 case "id" -> call.setCallId(reader.string());
                 case "function" -> readToolCallFunction(reader, call);
-                default -> extras(call).put(field, reader.captureValue());
+                default -> call.getOrCreateExtras().put(field, reader.captureValue());
             }
         }
         message.getParts().add(call);
@@ -210,7 +209,7 @@ class ChatCompletionsReader {
                 case "name" -> call.setName(reader.string());
                 case "arguments" -> call.setArgumentsJson(reader.string());
                 // Kept under the path it came from, the way every other extras entry is spelled.
-                default -> extras(call).put(List.of("function", field), reader.captureValue());
+                default -> call.getOrCreateExtras().put(List.of("function", field), reader.captureValue());
             }
         }
     }
@@ -320,7 +319,7 @@ class ChatCompletionsReader {
                 case "tool_calls" -> readDeltaToolCalls(reader, delta);
                 // Refusal and anything else the provider puts beside the content belongs to the
                 // message being built, so it stays on the delta rather than on the chunk.
-                default -> extras(delta).put(field, reader.captureValue());
+                default -> delta.getOrCreateExtras().put(field, reader.captureValue());
             }
         }
         event.setDelta(delta);
@@ -361,7 +360,7 @@ class ChatCompletionsReader {
             switch (field) {
                 case "id" -> call.setCallId(reader.string());
                 case "function" -> readDeltaToolCallFunction(reader, call);
-                default -> extras(call).put(field, reader.captureValue());
+                default -> call.getOrCreateExtras().put(field, reader.captureValue());
             }
         }
         delta.getParts().add(call);
@@ -379,7 +378,7 @@ class ChatCompletionsReader {
                 case "name" -> call.setName(reader.string());
                 case "arguments" -> call.setArgumentsJson(reader.string());
                 // Kept under the path it came from, the way every other extras entry is spelled.
-                default -> extras(call).put(List.of("function", field), reader.captureValue());
+                default -> call.getOrCreateExtras().put(List.of("function", field), reader.captureValue());
             }
         }
     }
@@ -537,26 +536,6 @@ class ChatCompletionsReader {
             return "Boolean";
         }
         return "unexpected";
-    }
-
-    /** The bag to record into, created when the node carries none yet. */
-    static ProviderExtras extras(ChatMessage message) {
-        ProviderExtras extras = message.getExtras();
-        if (extras == null) {
-            extras = new ProviderExtras();
-            message.setExtras(extras);
-        }
-        return extras;
-    }
-
-    /** The bag to record into, created when the node carries none yet. */
-    static ProviderExtras extras(ContentPart part) {
-        ProviderExtras extras = part.getExtras();
-        if (extras == null) {
-            extras = new ProviderExtras();
-            part.setExtras(extras);
-        }
-        return extras;
     }
 
 }

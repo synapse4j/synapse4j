@@ -158,7 +158,7 @@ class ChatCompletionsStream extends DefaultChatStream {
         // with it rather than staying behind on the chunk that happened to carry it.
         ProviderExtras deltaExtras = delta.getExtras();
         if (deltaExtras != null) {
-            ChatCompletionsReader.extras(message).putAll(deltaExtras);
+            message.getOrCreateExtras().putAll(deltaExtras);
         }
         for (ContentPart part : delta.getParts()) {
             if (part instanceof TextPart text) {
@@ -196,7 +196,7 @@ class ChatCompletionsStream extends DefaultChatStream {
         call.setArgumentsJson(join(call.getArgumentsJson(), fragment.getArgumentsJson()));
         ProviderExtras fragmentExtras = fragment.getExtras();
         if (fragmentExtras != null) {
-            ChatCompletionsReader.extras(call).putAll(fragmentExtras);
+            call.getOrCreateExtras().putAll(fragmentExtras);
         }
     }
 

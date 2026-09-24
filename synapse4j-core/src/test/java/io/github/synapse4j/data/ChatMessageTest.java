@@ -1,7 +1,9 @@
 package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,17 @@ class ChatMessageTest {
         assertNull(message.getRole());
         assertTrue(message.getParts().isEmpty());
         assertNull(message.getExtras());
+    }
+
+    @Test
+    void getOrCreateExtrasBuildsTheBagOnceAndNeverAnswersNull() {
+        ChatMessage message = new ChatMessage();
+
+        ProviderExtras created = message.getOrCreateExtras();
+
+        assertNotNull(created);
+        assertSame(created, message.getOrCreateExtras());
+        assertSame(created, message.getExtras());
     }
 
     @Test

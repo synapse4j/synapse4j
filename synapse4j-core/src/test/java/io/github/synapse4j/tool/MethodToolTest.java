@@ -81,8 +81,7 @@ class MethodToolTest {
 
     @Test
     void chatContextParameterStaysOutOfTheSchema() {
-        MethodTool tool = MethodTool.of("ctx", "Takes the context", method("withContext", ChatContext.class), null,
-                codec);
+        MethodTool.of("ctx", "Takes the context", method("withContext", ChatContext.class), null, codec);
 
         // toMap omits empty collections, so an envelope with nothing in it carries neither keyword
         assertFalse(lastEncoded().containsKey("properties"));
@@ -373,6 +372,9 @@ class MethodToolTest {
             return "hello " + name;
         }
 
+        // Taken by name through getDeclaredMethod: the tests reach it reflectively, which the
+        // compiler cannot see.
+        @SuppressWarnings("unused")
         private static String secret() {
             return "secret!";
         }

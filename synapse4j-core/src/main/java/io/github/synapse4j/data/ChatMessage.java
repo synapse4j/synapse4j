@@ -39,6 +39,20 @@ public class ChatMessage {
     private ProviderExtras extras;
 
     /**
+     * The extras bag, created on first use — never {@code null}, unlike {@link #getExtras()}.
+     * Only a node about to record something allocates; a message nobody configures still
+     * carries no bag until this is called.
+     *
+     * @return this message's extras, existing or fresh; never {@code null}
+     */
+    public ProviderExtras getOrCreateExtras() {
+        if (extras == null) {
+            extras = new ProviderExtras();
+        }
+        return extras;
+    }
+
+    /**
      * A message from the given speaker, with nothing said yet.
      *
      * @param role the {@link ChatRole} constant, or any other value
