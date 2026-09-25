@@ -289,6 +289,29 @@ class DefaultToolExecutorTest {
         assertEquals("A", text(results.get(0)));
     }
 
+    @Test
+    void anInterruptionFromACallComesStraightOutWithoutTheHandlerSeeingIt() {
+        AtomicBoolean handled = new AtomicBoolean();
+        DefaultToolExecutor withHandler = new DefaultToolExecutor(null, (call, failure) -> {
+            handled.set(true);
+            return "handled";
+        });
+        Tool interrupted = tool("sleeper", arguments -> {
+            throw new InterruptedException("stopped");
+        });
+
+        try {
+            assertThrows(InterruptedException.class,
+                    () -> withHandler.execute(List.of(call("c1", "sleeper")), List.of(interrupted), null));
+            // The status is restored on its way out, so whoever called still knows it was asked
+            // to stop — and the handler never saw the interruption at all.
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted(); // the status belongs to this test's thread alone
+        }
+        assertFalse(handled.get());
+    }
+
     private static DefaultToolExecutor executor(ExecutorService workers) {
         return new DefaultToolExecutor(workers, null);
     }

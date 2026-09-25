@@ -1,6 +1,7 @@
 package io.github.synapse4j.openai;
 
 import lombok.Data;
+import lombok.ToString;
 
 /**
  * Configuration of the OpenAI family: where the API lives and how the caller authenticates.
@@ -16,7 +17,11 @@ public class OpenAiConfig {
     /** Base URL of the API, without a trailing path. Defaults to OpenAI's hosted endpoint. */
     private String baseUrl = "https://api.openai.com/v1";
 
-    /** The API key, sent as {@code Authorization: Bearer}. */
+    /**
+     * The API key, sent as {@code Authorization: Bearer}. Kept out of {@code toString()}: a
+     * credential belongs in the header it authenticates, not in a log line or an error message.
+     */
+    @ToString.Exclude
     private String apiKey;
 
     /** Optional {@code OpenAI-Organization} header value. */

@@ -26,7 +26,9 @@ import io.github.synapse4j.exception.ToolNotFoundException;
  * {@link ExecutorService}, the whole batch runs concurrently: results are still assembled in
  * call order, an abort waits for every call to finish and then rethrows the first failure in
  * that order, and nothing already running is cancelled — abandoning a call cannot undo what it
- * has already done. The handler runs on whichever thread ran the call, so one shared across
+ * has already done. A submission the service refuses leaves straight away too; what was already
+ * submitted keeps running, unwaited — the service's policy meeting the batch, not this executor's
+ * to override. The handler runs on whichever thread ran the call, so one shared across
  * runs must be safe to run concurrently. The service belongs to whoever passed it: this
  * executor never shuts it down.
  *
@@ -148,6 +150,12 @@ public class DefaultToolExecutor implements ToolExecutor {
                     tool.execute(call.getArgumentsJson(), context),
                     "tool answered null");
             result.getParts().add(new TextPart(answer));
+        } catch (InterruptedException interruption) {
+            // The caller's thread being told to stop is not this call's failure to report: the
+            // status comes back and the interruption leaves, no handler seeing it — the way the
+            // class javadoc has always promised.
+            Thread.currentThread().interrupt();
+            throw interruption;
         } catch (Exception failure) {
             String text = Objects.requireNonNull(
                     failures.handle(call, failure),

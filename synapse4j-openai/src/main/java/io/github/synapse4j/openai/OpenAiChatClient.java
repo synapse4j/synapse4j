@@ -68,7 +68,12 @@ public class OpenAiChatClient extends AbstractChatClient {
     private final JsonCodec codec;
     private final ChatCompletionsWriter requestWriter;
 
-    private OpenAiConfig config = new OpenAiConfig();
+    /**
+     * The family configuration in effect. Volatile, and read once per exchange: a
+     * {@link #setConfig(OpenAiConfig)} landing mid-call must not send one request partly under
+     * the old configuration and partly under the new.
+     */
+    private volatile OpenAiConfig config = new OpenAiConfig();
 
     public OpenAiChatClient(HttpClient http, JsonCodec codec) {
         this.http = http;
@@ -90,9 +95,12 @@ public class OpenAiChatClient extends AbstractChatClient {
 
     @Override
     protected ChatResponse doChat(ChatRequest request) {
-        requireCallable(request);
+        // One snapshot for the whole exchange: a setConfig landing mid-call must not send this
+        // request partly under the old configuration and partly under the new.
+        OpenAiConfig config = this.config;
+        requireCallable(config, request);
 
-        io.github.synapse4j.http.HttpRequest httpRequest = httpRequest(request, out -> {
+        io.github.synapse4j.http.HttpRequest httpRequest = httpRequest(config, request, out -> {
             // The body is written when the transport asks for it, and written again on every retry
             // or redirect: the document goes into whatever sink the implementation hands over, so it
             // never exists as bytes here.
@@ -120,9 +128,11 @@ public class OpenAiChatClient extends AbstractChatClient {
 
     @Override
     protected ChatStream doStream(ChatRequest request) {
-        requireCallable(request);
+        // The same once-per-exchange snapshot the blocking path takes.
+        OpenAiConfig config = this.config;
+        requireCallable(config, request);
 
-        io.github.synapse4j.http.HttpRequest httpRequest = httpRequest(request, out -> {
+        io.github.synapse4j.http.HttpRequest httpRequest = httpRequest(config, request, out -> {
             try (JsonWriter writer = codec.writer(out)) {
                 requestWriter.writeStreaming(request, writer);
             }
@@ -170,7 +180,7 @@ public class OpenAiChatClient extends AbstractChatClient {
      * The HTTP request both ways of asking share: one endpoint, one set of headers, the caller's
      * applied last. Only the body differs between them, so it is the one thing handed in.
      */
-    private io.github.synapse4j.http.HttpRequest httpRequest(ChatRequest request,
+    private io.github.synapse4j.http.HttpRequest httpRequest(OpenAiConfig config, ChatRequest request,
             io.github.synapse4j.http.HttpBody body) {
         io.github.synapse4j.http.HttpRequest httpRequest = new io.github.synapse4j.http.HttpRequest(
                 config.getBaseUrl() + "/chat/completions");
@@ -207,7 +217,7 @@ public class OpenAiChatClient extends AbstractChatClient {
     }
 
     /** A call the provider cannot even be asked: the caller's mistake, found before anything goes out. */
-    private void requireCallable(ChatRequest request) {
+    private void requireCallable(OpenAiConfig config, ChatRequest request) {
         require(config.getApiKey() != null && !config.getApiKey().isBlank(), "apiKey is required");
         require(request.getOptions().getModel() != null && !request.getOptions().getModel().isBlank(),
                 "options.model is required");
