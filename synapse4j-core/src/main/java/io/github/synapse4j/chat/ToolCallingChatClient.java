@@ -42,6 +42,14 @@ import io.github.synapse4j.tool.ToolExecutor;
  * around — which is what an executor's turn cap reads.
  *
  * <p>
+ * Two consequences of that growth are worth stating. The loop grows the request it holds, so
+ * an inner request customizer that answers another request must answer one derived from the
+ * one it was given — a replacement that drops the grown transcript sends the next round
+ * without it. Same-named tools settle the same way outward: the decorator's defaults are on
+ * the request before the inner client merges its own, and the request has the last word there
+ * too, so an outer default stands in the inner one's slot.
+ *
+ * <p>
  * A decline ends the round with the response that asked for the calls, them unanswered; a
  * failure the executor throws comes straight out — of {@link #chat(ChatRequest)}, or of the
  * pull on a stream — a checked one under a {@link SynapseException}, the only form either
@@ -209,10 +217,12 @@ public class ToolCallingChatClient extends AbstractChatClient {
         private boolean exhausted;
 
         /**
-         * The failure that ended the stream, replayed to any later pull: a batch must not run
-         * twice, and a round must not open twice, because a caller pulled again after a failure.
+         * The failure that ended the stream — recorded as it came, {@code RuntimeException} or
+         * {@code Error} alike — replayed to any later pull: a batch must not run twice, a round
+         * must not open twice, and a failure must not leave the round's connection open, so
+         * ending here releases it.
          */
-        private RuntimeException failure;
+        private Throwable failure;
 
         /** Set by {@link #close()} from any thread; read by the consuming thread. */
         private volatile boolean cancelled;
@@ -241,7 +251,14 @@ public class ToolCallingChatClient extends AbstractChatClient {
                     if (!advance()) {
                         throw new NoSuchElementException("the stream is exhausted");
                     }
-                    return events.next();
+                    try {
+                        return events.next();
+                    } catch (RuntimeException | Error caught) {
+                        // A failure this deep never reaches advance()'s own catch; the stream
+                        // still ends the same way — released, recorded, replayed.
+                        die(caught);
+                        throw caught;
+                    }
                 }
             };
             return iterator;
@@ -269,7 +286,11 @@ public class ToolCallingChatClient extends AbstractChatClient {
                 throw new IllegalStateException("this stream is closed");
             }
             if (failure != null) {
-                throw failure;
+                // Recorded as it came — only RuntimeException and Error ever land here.
+                if (failure instanceof RuntimeException runtime) {
+                    throw runtime;
+                }
+                throw (Error) failure;
             }
             if (exhausted) {
                 return false;
@@ -305,13 +326,28 @@ public class ToolCallingChatClient extends AbstractChatClient {
                         throw new IllegalStateException("this stream is closed");
                     }
                 }
-            } catch (RuntimeException thrown) {
+            } catch (RuntimeException | Error caught) {
                 // Whatever ended the pull ends the stream: a later pull replays this failure
-                // rather than re-running the batch or re-opening a round.
-                failure = thrown;
-                throw thrown;
+                // rather than re-running the batch or re-opening a round, and the round in
+                // progress is released so nothing keeps reading behind a dead stream.
+                die(caught);
+                throw caught;
             }
             return true;
+        }
+
+        /**
+         * Ends the stream on a failure: recorded for any later pull, and the round in progress
+         * released — a failure must not leave a connection open behind it. A close that fails
+         * on the way is suppressed onto the original rather than replacing it.
+         */
+        private void die(Throwable caught) {
+            failure = caught;
+            try {
+                current.close();
+            } catch (RuntimeException closeFailure) {
+                caught.addSuppressed(closeFailure);
+            }
         }
 
     }

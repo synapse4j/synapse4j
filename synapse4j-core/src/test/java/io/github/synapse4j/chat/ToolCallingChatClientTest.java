@@ -335,6 +335,48 @@ class ToolCallingChatClientTest {
     }
 
     @Test
+    void anErrorFromTheBatchIsReplayedAndTheBatchRunsOnce() {
+        inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
+        AtomicInteger attempts = new AtomicInteger();
+        ToolCallingChatClient client = new ToolCallingChatClient(inner, (calls, available, context) -> {
+            attempts.incrementAndGet();
+            throw new AssertionError("fatal");
+        });
+        ChatRequest request = new ChatRequest();
+
+        ChatStream stream = client.stream(request);
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        assertTrue(events.hasNext());
+        events.next();
+        AssertionError first = assertThrows(AssertionError.class, events::hasNext);
+        AssertionError second = assertThrows(AssertionError.class, events::hasNext);
+
+        // An Error ends the stream just as a RuntimeException does — the batch never re-runs.
+        assertSame(first, second);
+        assertEquals(1, attempts.get());
+    }
+
+    @Test
+    void aFailureWhilePullingAnEventEndsTheStreamAndReleasesIt() {
+        inner.streamScript.add(new StreamRound(textResponse("done"), "r1"));
+        ToolCallingChatClient client = new ToolCallingChatClient(inner);
+        client.addChatStreamEventCustomizer((it, event) -> {
+            throw new IllegalStateException("boom");
+        });
+        ChatRequest request = new ChatRequest();
+
+        ChatStream stream = client.stream(request);
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        IllegalStateException first = assertThrows(IllegalStateException.class, events::next);
+        IllegalStateException second = assertThrows(IllegalStateException.class, events::next);
+
+        assertSame(first, second);
+        assertEquals(1, inner.streamTrips.get());
+        // The round in progress was released by the failure, not left open behind it.
+        assertEquals(1, inner.streamCloses.get());
+    }
+
+    @Test
     void aDrainedStreamReleasesEveryRoundAndCloseAddsNothing() {
         inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
         inner.streamScript.add(new StreamRound(textResponse("done"), "r2"));
