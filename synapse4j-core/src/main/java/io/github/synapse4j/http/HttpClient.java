@@ -25,7 +25,7 @@ import io.github.synapse4j.exception.SynapseException;
  *
  * <p>
  * Implementations must be stateless and safe to share across threads. A request carries its own
- * {@link HttpRequest#getOptions() options} where it has opinions of its own, and the implementation
+ * {@code options} where it has opinions of its own, and the implementation
  * falls back to its own defaults for the rest — {@link HttpOptions#effective} is where the two come
  * together. An implementation need not support every setting a request can carry, and must say so
  * rather than silently ignore it.

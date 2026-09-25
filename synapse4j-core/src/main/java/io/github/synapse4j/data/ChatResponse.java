@@ -21,7 +21,7 @@ import lombok.ToString;
  * {@code null} rather than being filled with a guess.
  *
  * <p>
- * Transport metadata stays out of {@link #getExtras()}: headers have their own field, so the open part
+ * Transport metadata stays out of {@code getExtras()}: headers have their own field, so the open part
  * holds only what came out of the response body.
  */
 @Getter

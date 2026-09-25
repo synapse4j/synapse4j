@@ -16,8 +16,8 @@ import lombok.ToString;
  * Responses API names events after the lifecycle they mark. Rather than folding those grammars into
  * one another, an event carries the protocol's own {@code eventType} so an application can dispatch
  * on it; the fields below hold the normalized view for the events that have one. Events that carry
- * no normalized content leave {@link #getDelta()} {@code null} and keep their payload in
- * {@link #getExtras()}.
+ * no normalized content leave {@code getDelta()} {@code null} and keep their payload in
+ * {@code getExtras()}.
  *
  * <p>
  * The {@code eventType} is an open string, like every value in this library that can grow; the

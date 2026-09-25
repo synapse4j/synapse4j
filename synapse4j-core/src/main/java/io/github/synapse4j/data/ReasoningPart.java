@@ -17,7 +17,7 @@ import lombok.ToString;
  * <p>
  * Providers attach opaque companions to reasoning — a signature, an encrypted blob — and those do
  * not always belong to this part alone (one protocol attaches them to tool calls as well).
- * They therefore go in {@link #getExtras()}, keyed by provider, rather than into a typed field here.
+ * They therefore go in {@code getExtras()}, keyed by provider, rather than into a typed field here.
  */
 @Getter
 @Setter

@@ -51,7 +51,7 @@ public class ToolDefinition {
 
     /**
      * A tool with the given name, purpose and argument schema; nothing is said about enforcement,
-     * see {@link #getStrict()}.
+     * see {@code getStrict()}.
      *
      * @param name        the name the model calls the tool by
      * @param description what the tool does

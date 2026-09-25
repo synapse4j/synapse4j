@@ -16,7 +16,7 @@ import lombok.ToString;
  *
  * <p>
  * A count this library does not model — a cache write, an audio count, a billing unit that is not a
- * token at all — is one path in {@link #getExtras()}, the same bag every other node keeps.
+ * token at all — is one path in {@code getExtras()}, the same bag every other node keeps.
  *
  * <p>
  * Every count is optional: not every provider reports them, and a streaming one usually reports them

@@ -130,7 +130,7 @@ public class JsonSchema {
     private final ProviderExtras extras = new ProviderExtras();
 
     /**
-     * Sets the JSON types, replacing whatever {@link #getType()} held before.
+     * Sets the JSON types, replacing whatever {@code getType()} held before.
      *
      * <p>
      * Written out rather than left to Lombok: the single-type convenience below carries the same name,
@@ -143,7 +143,7 @@ public class JsonSchema {
     }
 
     /**
-     * Sets a single JSON type, replacing whatever {@link #getType()} held before.
+     * Sets a single JSON type, replacing whatever {@code getType()} held before.
      *
      * <p>
      * A convenience: most schemas name exactly one type, and writing it as a one-element list reads
@@ -180,7 +180,7 @@ public class JsonSchema {
      *
      * <p>
      * The order is not part of the contract, hence a collection rather than a list. A sub-schema
-     * reached through {@link #getExtras()} is not included: this class cannot tell which of those
+     * reached through {@code getExtras()} is not included: this class cannot tell which of those
      * values are schemas.
      *
      * @return the sub-schemas; never {@code null}
@@ -204,7 +204,7 @@ public class JsonSchema {
      *
      * <p>
      * A field that carries nothing is left out — an empty collection and a null both mean the keyword
-     * is absent. A single {@link #getType() type} is written as a string rather than a one-element
+     * is absent. A single {@code type} is written as a string rather than a one-element
      * array. The open part is written at the same level, one entry per keyword, its value as it
      * stands; an open entry whose name is a keyword this class models is ignored, so a field always
      * wins over the open part.

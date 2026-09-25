@@ -35,7 +35,7 @@ public abstract class ContentPart {
     private ProviderExtras extras;
 
     /**
-     * The extras bag, created on first use — never {@code null}, unlike {@link #getExtras()}.
+     * The extras bag, created on first use — never {@code null}, unlike {@code getExtras()}.
      * Only a node about to record something allocates; a part nobody configures still carries
      * no bag until this is called.
      *
