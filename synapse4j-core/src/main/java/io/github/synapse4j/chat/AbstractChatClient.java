@@ -117,8 +117,9 @@ public abstract class AbstractChatClient implements ChatClient {
      */
     @Override
     public synchronized void addDefaultTool(Tool tool) {
-        // The one entry where a tool arrives from outside: validate here, never again.
-        Objects.requireNonNull(tool, "tool must not be null");
+        // The one entry where a tool arrives from outside: validate here, never again. The tool
+        // itself needs no check — tool.name() below fails right here. The name does: an empty
+        // list never runs the equals, so without this a null name would sail straight in.
         String name = Objects.requireNonNull(tool.name(), "tool name must not be null");
         int size = defaultTools.size();
         for (int index = 0; index < size; index++) {
@@ -160,7 +161,12 @@ public abstract class AbstractChatClient implements ChatClient {
         ChatContext context = resolveContext(prepared);
         ChatResponse response = doChat(prepared);
         carryContext(context, response);
-        return customize(context, response);
+        // Each answer is stamped with the context as the pass goes, so the caller's answer and
+        // context.getResponse() end up as the same instance even when a customizer answered a copy.
+        return runCustomizers(responseCustomizers, response, stamped -> {
+            stamped.setContext(context);
+            context.setResponse(stamped);
+        });
     }
 
     /**
@@ -170,7 +176,8 @@ public abstract class AbstractChatClient implements ChatClient {
      * The request goes through {@link #prepare(ChatRequest)} first; the subclass sees the result in
      * {@link #doStream(ChatRequest)}. The context is resolved, the request recorded, and the
      * answer handed back the same way a blocking call does; the response customizers run once,
-     * when the stream runs to its end.
+     * when the stream runs to its end, on a list snapshotted when the stream opens — one
+     * registered mid-flight joins neither this stream nor its pass.
      */
     @Override
     public ChatStream stream(ChatRequest request) {
@@ -178,7 +185,11 @@ public abstract class AbstractChatClient implements ChatClient {
         ChatContext context = resolveContext(prepared);
         ChatStream stream = doStream(prepared);
         carryContext(context, stream.aggregatedResponse());
-        return customizeWhenDrained(stream, context);
+        if (responseCustomizers.isEmpty()) {
+            return stream;
+        }
+        // The list is already in execution order; the copy is the snapshot across the stream's life.
+        return new CustomizedStream(stream, List.copyOf(responseCustomizers), context);
     }
 
     /**
@@ -212,19 +223,6 @@ public abstract class AbstractChatClient implements ChatClient {
     }
 
     /**
-     * Runs every response customizer in registration order; the last one's answer is the caller's.
-     * Each answer is stamped with this exchange's context as the pass goes, so the caller's answer
-     * and {@link ChatContext#getResponse()} end up as the same instance even when a customizer
-     * answered one of its own.
-     */
-    private ChatResponse customize(ChatContext context, ChatResponse response) {
-        return runCustomizers(responseCustomizers, response, stamped -> {
-            stamped.setContext(context);
-            context.setResponse(stamped);
-        });
-    }
-
-    /**
      * Runs the chain in registration order: each customizer's answer is the next one's input, and
      * the answer that comes out is the caller's; an answer of {@code null} fails loudly. The hook,
      * when given, runs after each step — where bookkeeping has to follow the answer along, as the
@@ -250,20 +248,6 @@ public abstract class AbstractChatClient implements ChatClient {
     /** The same, with nothing to do after each step. */
     private <T> T runCustomizers(List<? extends ChatCustomizer<T>> registrations, T initial) {
         return runCustomizers(registrations, initial, null);
-    }
-
-    /**
-     * The same pass for a streamed answer, taken when the stream runs to its end — the first
-     * moment the aggregated answer is whole. With nothing registered the stream is handed on
-     * untouched, and the list is snapshotted now so a customizer added mid-flight does not join
-     * an exchange already under way.
-     */
-    private ChatStream customizeWhenDrained(ChatStream stream, ChatContext context) {
-        if (responseCustomizers.isEmpty()) {
-            return stream;
-        }
-        // The list is already in execution order; the copy is the snapshot across the stream's life.
-        return new CustomizedStream(stream, List.copyOf(responseCustomizers), context);
     }
 
     /**
@@ -317,16 +301,11 @@ public abstract class AbstractChatClient implements ChatClient {
      * @param request the request as the caller built it
      * @return the request to send, which is the one that was given when no customizer answered
      *         another; never {@code null}
-     * @throws NullPointerException a customizer answered {@code null}
+     * @throws NullPointerException a customizer or {@link #applyDefaults} answered {@code null}
      */
     protected ChatRequest prepare(ChatRequest request) {
-        request = applyDefaultsChecked(request);
+        request = Objects.requireNonNull(applyDefaults(request), "applyDefaults answered null");
         return runCustomizers(requestCustomizers, request);
-    }
-
-    /** The defaults step, failing as loudly as a customizer that answered {@code null}. */
-    private ChatRequest applyDefaultsChecked(ChatRequest request) {
-        return Objects.requireNonNull(applyDefaults(request), "applyDefaults answered null");
     }
 
     /**

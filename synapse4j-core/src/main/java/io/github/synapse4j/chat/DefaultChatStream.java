@@ -118,7 +118,9 @@ public class DefaultChatStream implements ChatStream {
 
         @Override
         public boolean hasNext() {
-            checkOpen();
+            if (cancelled) {
+                throw new IllegalStateException("this stream is closed");
+            }
             if (exhausted) {
                 return false;
             }
@@ -153,12 +155,6 @@ public class DefaultChatStream implements ChatStream {
             ChatStreamEvent event = eventPipeline.apply(source.next());
             aggregation.accept(aggregated, event);
             return event;
-        }
-
-        private void checkOpen() {
-            if (cancelled) {
-                throw new IllegalStateException("this stream is closed");
-            }
         }
 
     }
