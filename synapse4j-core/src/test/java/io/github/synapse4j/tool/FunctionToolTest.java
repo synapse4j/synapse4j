@@ -98,6 +98,22 @@ class FunctionToolTest {
     }
 
     @Test
+    void argumentsThatNeverArrivedDecodeAsAnEmptyObject() throws Exception {
+        codec.decoded = new Input(null);
+        FunctionTool<Input, String> tool = FunctionTool.of("echo", "Echoes back", Input.class,
+                (input, ctx) -> "ok", codec);
+
+        Object[] blank = tool.resolveArguments("   ", null);
+        Object[] missing = tool.resolveArguments(null, null);
+
+        // The stage's contract: null or blank means the model produced none, and none spells
+        // "{}" — never a null the codec would meet with its own idea of the question.
+        assertEquals(List.of("{}", "{}"), codec.decodedFrom);
+        assertEquals(1, blank.length);
+        assertEquals(1, missing.length);
+    }
+
+    @Test
     void aStringValueReachesTheModelAsItself() throws Exception {
         codec.decoded = new Input("plain");
         FunctionTool<Input, String> tool = FunctionTool.of("echo", "Echoes back", Input.class,
@@ -177,6 +193,9 @@ class FunctionToolTest {
         /** The types decode was asked for, in order. */
         private final List<Type> decodedFor = new ArrayList<>();
 
+        /** The text decode was handed, in order. */
+        private final List<String> decodedFrom = new ArrayList<>();
+
         /** Everything encode was asked to render, in order. */
         private final List<Object> encoded = new ArrayList<>();
 
@@ -212,6 +231,7 @@ class FunctionToolTest {
         @Override
         protected <T> T decodeValue(String json, Type type) {
             decodedFor.add(type);
+            decodedFrom.add(json);
             return (T) decoded;
         }
 

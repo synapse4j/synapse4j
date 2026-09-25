@@ -170,9 +170,12 @@ public class FunctionTool<I, O> implements StagedTool {
 
     /**
      * The model's arguments decoded into one value of the input type. A declaration only has
-     * nothing to decode and answers an empty array on its way to the missing executor.
+     * nothing to decode and answers an empty array on its way to the missing executor; arguments
+     * that never arrived decode as {@code {}} — the stage's contract spells that "the model
+     * produced none", and an empty object is what every protocol spells none as.
      *
-     * @param arguments the arguments the model produced, as JSON text
+     * @param arguments the arguments the model produced, as JSON text; {@code null} or blank
+     *                      means the model produced none
      * @param context   the conversation this call belongs to; unused in this stage
      * @return the decoded value as the single element of an array; an empty array for a
      *         declaration only
@@ -182,6 +185,9 @@ public class FunctionTool<I, O> implements StagedTool {
     public Object[] resolveArguments(String arguments, ChatContext context) throws Exception {
         if (inputType == null) {
             return new Object[0];
+        }
+        if (arguments == null || arguments.isBlank()) {
+            arguments = "{}";
         }
         return new Object[] { codec.decode(arguments, inputType) };
     }
