@@ -72,10 +72,13 @@ class ChatCompletionsReader {
         }
         // The reader is on the first choice's START_OBJECT here.
         readChoice(reader, response, 0);
+        int position = 1;
         while (reader.nextToken() != JsonReader.Token.END_ARRAY) {
-            // The shared model carries a single message, so a further choice is not modelled and
-            // there is nowhere to put it.
-            reader.skipValue();
+            // The shared model carries a single message, so a further choice is not modelled —
+            // and is kept whole under its own path rather than thrown away: a provider's words
+            // reach extras whenever this library has nowhere of its own to put them.
+            response.getExtras().put(List.of("choices", String.valueOf(position)), reader.captureValue());
+            position++;
         }
     }
 
@@ -266,6 +269,7 @@ class ChatCompletionsReader {
         // The reader is on the value the "choices" name introduced, so the array's own start token
         // is the current one and the first element arrives with the next call.
         boolean first = true;
+        int position = 1;
         while (reader.nextToken() != JsonReader.Token.END_ARRAY) {
             if (reader.token() != JsonReader.Token.START_OBJECT) {
                 reader.skipValue();
@@ -275,8 +279,10 @@ class ChatCompletionsReader {
                 readChoice(reader, event, 0);
                 first = false;
             } else {
-                // The shared model carries a single message, so a further choice has nowhere to go.
-                reader.skipValue();
+                // Kept whole under its own path, the way the blocking walk keeps it: the shared
+                // model has no message for it, but the words still need to arrive.
+                event.getExtras().put(List.of("choices", String.valueOf(position)), reader.captureValue());
+                position++;
             }
         }
     }

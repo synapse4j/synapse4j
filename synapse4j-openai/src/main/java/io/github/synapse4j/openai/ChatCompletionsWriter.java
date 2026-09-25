@@ -274,12 +274,28 @@ class ChatCompletionsWriter {
         function.put("name", part.getName());
         function.put("arguments", part.getArgumentsJson());
         entry.put("function", function);
-        // A field the response carried inside the function object comes back to the same path.
+        // A field the response carried inside the function object comes back to the same path —
+        // except the chunk's association index, which the fold kept only long enough to match
+        // fragments to their call and a request has no member to carry.
         ProviderExtras partExtras = part.getExtras();
         if (partExtras != null) {
-            partExtras.mergeInto(entry);
+            withoutChunkIndex(partExtras).mergeInto(entry);
         }
         return entry;
+    }
+
+    /** The call's extras minus {@link OpenAiFields#TOOL_CALL_INDEX} — the original is left alone. */
+    private static ProviderExtras withoutChunkIndex(ProviderExtras extras) {
+        if (!extras.rawMap().containsKey(OpenAiFields.TOOL_CALL_INDEX)) {
+            return extras;
+        }
+        ProviderExtras rest = new ProviderExtras();
+        for (Map.Entry<String, Object> member : extras.rawMap().entrySet()) {
+            if (!OpenAiFields.TOOL_CALL_INDEX.equals(member.getKey())) {
+                rest.putRaw(member.getKey(), member.getValue());
+            }
+        }
+        return rest;
     }
 
     private List<Map<String, Object>> tools(List<Tool> requestTools) {
@@ -315,6 +331,7 @@ class ChatCompletionsWriter {
             entry.put("type", "json_schema");
             Map<String, Object> jsonSchema = new LinkedHashMap<>();
             jsonSchema.put("name", format.getName() != null ? format.getName() : "response");
+            putIfSet(jsonSchema, "description", format.getDescription());
             putIfSet(jsonSchema, "strict", format.getStrict());
             Map<String, Object> schema = parseSchema(format.getSchema());
             if (schema != null) {

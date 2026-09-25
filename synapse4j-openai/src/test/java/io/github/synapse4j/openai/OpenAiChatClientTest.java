@@ -260,7 +260,7 @@ class OpenAiChatClientTest {
     }
 
     @Test
-    void theFirstChoiceIsReadAndAFurtherChoiceIsSkipped() {
+    void theFirstChoiceIsReadAndAFurtherChoiceIsKept() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-3\",\"model\":\"gpt-test\","
                 + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
@@ -276,8 +276,12 @@ class OpenAiChatClientTest {
         assertEquals(1, response.getMessage().getParts().size());
         assertEquals("first", assertInstanceOf(TextPart.class, response.getMessage().getParts().get(0)).getText());
         assertEquals(ChatFinishReason.STOP, response.getFinishReason());
-        assertFalse(response.getExtras().contains("choices", "1", "index"));
-        // The fields after the skipped choice were still read, so the walk stayed in step.
+        // The modelled message is still the first choice's; the second rides whole in extras.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> second = (Map<String, Object>) response.getExtras().get("choices", "1");
+        assertEquals(1, second.get("index"));
+        assertEquals("second", ((Map<String, Object>) second.get("message")).get("content"));
+        // The fields after the second choice were still read, so the walk stayed in step.
         assertEquals(Integer.valueOf(1), response.getUsage().getInputTokens());
         assertEquals(Integer.valueOf(2), response.getUsage().getOutputTokens());
     }
@@ -585,6 +589,7 @@ class OpenAiChatClientTest {
         ChatResponseFormat format = request.getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setName("answer");
+        format.setDescription("The answer, as JSON");
         format.setSchema("{\"type\":\"object\"}");
         client.chat(request);
 
@@ -595,6 +600,7 @@ class OpenAiChatClientTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> jsonSchema = (Map<String, Object>) responseFormat.get("json_schema");
         assertEquals("answer", jsonSchema.get("name"));
+        assertEquals("The answer, as JSON", jsonSchema.get("description"));
         assertEquals(Map.of("type", "object"), jsonSchema.get("schema"));
     }
 
@@ -1139,6 +1145,7 @@ class OpenAiChatClientTest {
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
                 "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
+                        + "\"created\":1700000000,\"system_fingerprint\":\"fp_1\","
                         + "\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},"
                         + "\"finish_reason\":null}]}",
                 "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
@@ -1189,6 +1196,7 @@ class OpenAiChatClientTest {
         stub.canned = new DefaultHttpResponse();
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-1\",\"model\":\"gpt-test\","
+                + "\"created\":1700000000,\"system_fingerprint\":\"fp_1\","
                 + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
                 + "\"message\":{\"role\":\"assistant\",\"content\":\"Hi there\"}}],"
                 + "\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7}}").getBytes(UTF_8)));
@@ -1202,6 +1210,11 @@ class OpenAiChatClientTest {
         assertEquals(blocking.getModel(), aggregated.getModel());
         assertEquals(blocking.getUsage().getInputTokens(), aggregated.getUsage().getInputTokens());
         assertEquals(blocking.getUsage().getOutputTokens(), aggregated.getUsage().getOutputTokens());
+        // Unmodelled fields arrive the same way too: what the blocking walk kept in extras, the
+        // drained stream has folded into its own — same keys, same values.
+        assertEquals(1700000000, aggregated.getExtras().get("created"));
+        assertEquals("fp_1", aggregated.getExtras().get("system_fingerprint"));
+        assertEquals(blocking.getExtras().rawMap(), aggregated.getExtras().rawMap());
     }
 
     @Test
@@ -1243,6 +1256,40 @@ class OpenAiChatClientTest {
         // A field the module does not model travelled with the fragments it came in on.
         assertEquals("function", call.getExtras().get("type"));
         assertEquals(ChatFinishReason.TOOL_CALLS, aggregated.getFinishReason());
+    }
+
+    @Test
+    void theChunkIndexDoesNotRideBackIntoARequest() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
+                        + "\"message\":{\"role\":\"assistant\",\"content\":\"ok\"}}]}").getBytes(UTF_8)));
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        // What a drained tool-call stream leaves on the part: the association index the fold
+        // matched fragments by, parked in extras where the wire first spelled it.
+        ChatMessage assistant = new ChatMessage(ChatRole.ASSISTANT);
+        ToolCallPart call = new ToolCallPart("call_1", "get_weather", "{\"city\":\"Paris\"}");
+        call.getOrCreateExtras().put("index", 0);
+        assistant.addPart(call);
+        request.getMessages().add(assistant);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) wire.get("messages");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> toolCalls = (List<Map<String, Object>>) messages.get(0).get("tool_calls");
+        Map<String, Object> sent = toolCalls.get(0);
+        // The call comes back whole — the index was stream bookkeeping and stays behind.
+        assertEquals("call_1", sent.get("id"));
+        assertEquals("function", sent.get("type"));
+        assertFalse(sent.containsKey("index"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> function = (Map<String, Object>) sent.get("function");
+        assertEquals("get_weather", function.get("name"));
+        assertEquals("{\"city\":\"Paris\"}", function.get("arguments"));
     }
 
     @Test

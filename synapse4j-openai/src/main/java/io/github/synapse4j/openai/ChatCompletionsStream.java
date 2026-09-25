@@ -50,7 +50,7 @@ class ChatCompletionsStream extends DefaultChatStream {
      * This module does not model it, so it stays in the part's extras — and is read back from there
      * when a fragment has to be matched to its call.
      */
-    private static final String TOOL_CALL_POSITION = "index";
+    private static final String TOOL_CALL_POSITION = OpenAiFields.TOOL_CALL_INDEX;
 
     /**
      * A stream over the given frames.
@@ -147,6 +147,13 @@ class ChatCompletionsStream extends DefaultChatStream {
         }
         if (event.getUsage() != null) {
             response.setUsage(event.getUsage());
+        }
+        // The event's own unmodelled fields belong to the answer the way they belong to a
+        // blocking response — folded in as they arrive, the last frame winning, which for the
+        // fields that stay constant across a stream is the value the single response carries.
+        ProviderExtras eventExtras = event.getExtras();
+        if (eventExtras != null) {
+            response.getExtras().putAll(eventExtras);
         }
         ChatMessage delta = event.getDelta();
         if (delta == null) {
