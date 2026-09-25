@@ -13,6 +13,7 @@ import com.github.victools.jsonschema.generator.MemberScope;
 import com.github.victools.jsonschema.generator.Option;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 
+import io.github.synapse4j.exception.SynapseException;
 import lombok.RequiredArgsConstructor;
 import tools.jackson.databind.BeanDescription;
 import tools.jackson.databind.JavaType;
@@ -45,6 +46,13 @@ import tools.jackson.databind.json.JsonMapper;
  * schema describes, answers which properties exist, what they are called, in what order, and whether
  * they can be written or read at all. That answer is then imposed on victools — members Jackson does
  * not move in this direction are ignored, and the rest take Jackson's name.
+ *
+ * <p>
+ * One answer victools cannot be given: a property that exists only on a constructor parameter. Its
+ * members are fields and methods, so there is nothing to carry the name, and a schema built without
+ * it would disagree with the binder that reads it — silently, in the direction a generated document
+ * travels. Such a type is refused at introspection rather than described wrongly: the binder can
+ * still read it, but this codec will not vouch for a schema it cannot make true.
  *
  * <p>
  * What victools keeps is the part it is good at: what each property's value looks like. Its type
@@ -115,7 +123,17 @@ final class JacksonPropertyDiscovery implements SchemaGeneratorConfigBuilderCust
             if (encoding ? !property.couldSerialize() : !property.couldDeserialize()) {
                 continue;
             }
-            for (Member accessor : accessorsOf(property)) {
+            List<Member> accessors = accessorsOf(property);
+            if (accessors.isEmpty()) {
+                // Only a constructor parameter carries this property, and victools walks fields
+                // and methods — no member could hold the name, so the schema would leave the
+                // property out while the binder still reads it. Refuse instead: a schema that
+                // quietly disagrees with the reader is worse than no schema at all.
+                throw new SynapseException("cannot describe property \"" + property.getName() + "\" of "
+                        + type.getName()
+                        + ": it arrives only on a constructor parameter, which the schema generator cannot walk");
+            }
+            for (Member accessor : accessors) {
                 properties.names.put(accessor, property.getName());
                 properties.positions.put(accessor, position);
             }

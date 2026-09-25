@@ -13,11 +13,13 @@ import java.util.Map;
 import java.util.TreeSet;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.github.victools.jsonschema.generator.SchemaGenerator;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 
+import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonWriter;
 import lombok.Data;
@@ -327,6 +329,34 @@ class JacksonJsonCodecTest {
     }
 
     record Point(int x, int y) {
+    }
+
+    @Test
+    void aCreatorOnlyPropertyRefusesTheDecodeSchemaRatherThanOmittingIt() {
+        // The binder reads "alias"; the schema will not pretend to describe a property the
+        // generator has no member to carry — a refusal beats a document that disagrees with
+        // the reader in silence.
+        SynapseException thrown = assertThrows(SynapseException.class,
+                () -> codec.generateDecodeSchema(Boxed.class));
+        assertTrue(thrown.getMessage().contains("alias"), thrown.getMessage());
+
+        Boxed boxed = codec.decode("{\"alias\":\"value\"}", Boxed.class);
+        assertEquals("value", boxed.value());
+    }
+
+    /** An immutable type whose JSON name arrives only on the creator parameter. */
+    static final class Boxed {
+
+        private final String name;
+
+        @JsonCreator
+        Boxed(@JsonProperty("alias") String name) {
+            this.name = name;
+        }
+
+        String value() {
+            return name;
+        }
     }
 
 }
