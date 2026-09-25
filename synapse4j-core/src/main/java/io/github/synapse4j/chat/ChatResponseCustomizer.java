@@ -26,7 +26,11 @@ import io.github.synapse4j.data.ChatResponse;
  *
  * <p>
  * The response handed in is the client's own, so a customizer may change it in place and answer
- * it, or leave it alone and answer another one.
+ * it, or leave it alone and answer another one. Either way the answer is stamped with the
+ * exchange's {@link ChatContext} before the next customizer sees it: the caller's answer and
+ * {@link ChatContext#getResponse()} are always the same instance, and the context rides on
+ * whatever comes back — a copy included. What a customizer adjusts is the context's contents;
+ * the instance itself belongs to the exchange.
  *
  * <p>
  * The client passed in is the one applying the customizer, carrying the same meaning as in

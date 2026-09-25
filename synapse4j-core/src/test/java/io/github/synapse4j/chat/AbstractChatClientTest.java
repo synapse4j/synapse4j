@@ -294,6 +294,72 @@ class AbstractChatClientTest {
     }
 
     @Test
+    void anAnswerReturnedInPlaceOfAnotherStillCarriesTheContext() {
+        StubChatClient client = new StubChatClient();
+        ChatContext context = new ChatContext();
+        ChatRequest request = new ChatRequest();
+        request.setContext(context);
+        ChatResponse copy = new ChatResponse();
+        client.addChatResponseCustomizer((it, response) -> copy);
+
+        ChatResponse response = client.chat(request);
+
+        assertSame(copy, response);
+        assertSame(context, copy.getContext());
+        assertSame(copy, context.getResponse());
+    }
+
+    @Test
+    void everyAnswerIsStampedBeforeTheNextCustomizerSeesIt() {
+        StubChatClient client = new StubChatClient();
+        ChatContext context = new ChatContext();
+        ChatRequest request = new ChatRequest();
+        request.setContext(context);
+        List<ChatContext> seen = new ArrayList<>();
+        ChatResponse last = new ChatResponse();
+        client.addChatResponseCustomizer((it, response) -> {
+            seen.add(response.getContext());
+            return new ChatResponse();
+        });
+        client.addChatResponseCustomizer((it, response) -> {
+            seen.add(response.getContext());
+            return last;
+        });
+
+        ChatResponse response = client.chat(request);
+
+        // The first sees the stamped original; the second sees the copy the first answered —
+        // stamped by the pass between them.
+        assertEquals(2, seen.size());
+        assertSame(context, seen.get(0));
+        assertSame(context, seen.get(1));
+        assertSame(last, response);
+        assertSame(last, context.getResponse());
+        assertSame(context, last.getContext());
+    }
+
+    @Test
+    void theStreamedAnswerIsStampedTheSameWay() {
+        StubChatClient client = new StubChatClient();
+        ChatContext context = new ChatContext();
+        ChatRequest request = new ChatRequest();
+        request.setContext(context);
+        ChatResponse copy = new ChatResponse();
+        client.addChatResponseCustomizer((it, response) -> copy);
+
+        ChatStream stream = client.stream(request);
+        var events = stream.iterator();
+        while (events.hasNext()) {
+            events.next();
+        }
+
+        ChatResponse response = stream.aggregatedResponse();
+        assertSame(copy, response);
+        assertSame(context, copy.getContext());
+        assertSame(copy, context.getResponse());
+    }
+
+    @Test
     void aResponseCustomizerAnsweringNullFailsLoudly() {
         StubChatClient client = new StubChatClient();
         client.addChatResponseCustomizer((it, response) -> null);

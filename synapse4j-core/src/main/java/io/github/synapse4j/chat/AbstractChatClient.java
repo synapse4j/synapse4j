@@ -164,7 +164,7 @@ public abstract class AbstractChatClient implements ChatClient {
         ChatContext context = resolveContext(prepared);
         ChatResponse response = doChat(prepared);
         carryContext(context, response);
-        return customize(response);
+        return customize(context, response);
     }
 
     /**
@@ -182,7 +182,7 @@ public abstract class AbstractChatClient implements ChatClient {
         ChatContext context = resolveContext(prepared);
         ChatStream stream = doStream(prepared);
         carryContext(context, stream.aggregatedResponse());
-        return customizeWhenDrained(stream);
+        return customizeWhenDrained(stream, context);
     }
 
     /**
@@ -215,11 +215,18 @@ public abstract class AbstractChatClient implements ChatClient {
         response.setContext(context);
     }
 
-    /** Runs every response customizer in registration order; the last one's answer is the caller's. */
-    private ChatResponse customize(ChatResponse response) {
+    /**
+     * Runs every response customizer in registration order; the last one's answer is the caller's.
+     * Each answer is stamped with this exchange's context as the pass goes, so the caller's answer
+     * and {@link ChatContext#getResponse()} end up as the same instance even when a customizer
+     * answered one of its own.
+     */
+    private ChatResponse customize(ChatContext context, ChatResponse response) {
         for (Registration<ChatResponseCustomizer> registration : responseCustomizers) {
             ChatResponseCustomizer customizer = registration.customizer();
             response = Objects.requireNonNull(customizer.customize(this, response), "customizer answered null");
+            response.setContext(context);
+            context.setResponse(response);
         }
         return response;
     }
@@ -230,12 +237,12 @@ public abstract class AbstractChatClient implements ChatClient {
      * untouched, and the list is snapshotted now so a customizer added mid-flight does not join
      * an exchange already under way.
      */
-    private ChatStream customizeWhenDrained(ChatStream stream) {
+    private ChatStream customizeWhenDrained(ChatStream stream, ChatContext context) {
         if (responseCustomizers.isEmpty()) {
             return stream;
         }
         // The list is already in execution order; the copy is the snapshot across the stream's life.
-        return new CustomizedStream(stream, List.copyOf(responseCustomizers));
+        return new CustomizedStream(stream, List.copyOf(responseCustomizers), context);
     }
 
     /**
@@ -336,13 +343,18 @@ public abstract class AbstractChatClient implements ChatClient {
 
         private final List<Registration<ChatResponseCustomizer>> customizers;
 
+        /** The exchange's context; stamped on every answer the pass hands on. */
+        private final ChatContext context;
+
         private boolean applied;
 
         private ChatResponse result;
 
-        private CustomizedStream(ChatStream delegate, List<Registration<ChatResponseCustomizer>> customizers) {
+        private CustomizedStream(ChatStream delegate, List<Registration<ChatResponseCustomizer>> customizers,
+                ChatContext context) {
             this.delegate = delegate;
             this.customizers = customizers;
+            this.context = context;
         }
 
         @Override
@@ -391,6 +403,8 @@ public abstract class AbstractChatClient implements ChatClient {
                 ChatResponseCustomizer customizer = registration.customizer();
                 response = Objects.requireNonNull(customizer.customize(AbstractChatClient.this, response),
                         "customizer answered null");
+                response.setContext(context);
+                context.setResponse(response);
             }
             result = response;
         }
