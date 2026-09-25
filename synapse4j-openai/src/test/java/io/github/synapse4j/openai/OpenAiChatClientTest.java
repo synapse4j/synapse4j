@@ -183,17 +183,17 @@ class OpenAiChatClientTest {
         ChatRequest request = new ChatRequest();
 
         // No limit set: the preset moves nothing and adds nothing.
-        OpenAiCustomizers.legacyMaxTokens().customize(request);
+        OpenAiCustomizers.legacyMaxTokens().customize(client, request);
         assertTrue(request.getOptions().getExtras().isEmpty());
 
         request.getOptions().setMaxOutputTokens(64);
-        OpenAiCustomizers.legacyMaxTokens().customize(request);
+        OpenAiCustomizers.legacyMaxTokens().customize(client, request);
         assertEquals(64, request.getOptions().getExtras().get("max_tokens"));
         assertNull(request.getOptions().getMaxOutputTokens());
 
         // A retry passes through the same request: the change was made once, so the bag still
         // carries exactly one entry under one name.
-        OpenAiCustomizers.legacyMaxTokens().customize(request);
+        OpenAiCustomizers.legacyMaxTokens().customize(client, request);
         assertEquals(1, request.getOptions().getExtras().rawMap().size());
         assertEquals(64, request.getOptions().getExtras().get("max_tokens"));
     }

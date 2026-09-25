@@ -28,12 +28,12 @@ class AbstractChatClientTest {
     void customizersRunInTheOrderTheyWereAddedBeforeTheSubclassSeesTheRequest() {
         List<String> ran = new ArrayList<>();
         StubChatClient client = new StubChatClient();
-        client.addChatRequestCustomizer(request -> {
+        client.addChatRequestCustomizer((it, request) -> {
             ran.add("first");
             request.getOptions().setModel("first");
             return request;
         });
-        client.addChatRequestCustomizer(request -> {
+        client.addChatRequestCustomizer((it, request) -> {
             ran.add("second");
             request.getOptions().setModel(request.getOptions().getModel() + "+second");
             return request;
@@ -48,7 +48,7 @@ class AbstractChatClientTest {
     @Test
     void theStreamedCallIsPreparedTheSameWay() {
         StubChatClient client = new StubChatClient();
-        client.addChatRequestCustomizer(request -> {
+        client.addChatRequestCustomizer((it, request) -> {
             request.getOptions().setModel("customized");
             return request;
         });
@@ -63,7 +63,7 @@ class AbstractChatClientTest {
         ChatRequest replacement = new ChatRequest();
         replacement.getOptions().setModel("replacement");
         StubChatClient client = new StubChatClient();
-        client.addChatRequestCustomizer(request -> replacement);
+        client.addChatRequestCustomizer((it, request) -> replacement);
 
         client.chat(new ChatRequest());
 
@@ -83,7 +83,7 @@ class AbstractChatClientTest {
     @Test
     void theSameCustomizerAddedTwiceRunsTwice() {
         List<String> ran = new ArrayList<>();
-        ChatRequestCustomizer customizer = request -> {
+        ChatRequestCustomizer customizer = (it, request) -> {
             ran.add("run");
             return request;
         };
@@ -99,7 +99,7 @@ class AbstractChatClientTest {
     @Test
     void aRemovedCustomizerNoLongerRuns() {
         List<String> ran = new ArrayList<>();
-        ChatRequestCustomizer customizer = request -> {
+        ChatRequestCustomizer customizer = (it, request) -> {
             ran.add("run");
             return request;
         };
@@ -116,7 +116,7 @@ class AbstractChatClientTest {
     @Test
     void aCustomizerAnsweringNullFailsLoudly() {
         StubChatClient client = new StubChatClient();
-        client.addChatRequestCustomizer(request -> null);
+        client.addChatRequestCustomizer((it, request) -> null);
 
         NullPointerException thrown = assertThrows(NullPointerException.class,
                 () -> client.chat(new ChatRequest()));
@@ -130,6 +130,32 @@ class AbstractChatClientTest {
 
         assertThrows(NullPointerException.class, () -> client.addChatRequestCustomizer(null));
         assertThrows(NullPointerException.class, () -> client.removeChatRequestCustomizer(null));
+    }
+
+    @Test
+    void customizersReceiveTheClientThatAppliesThem() {
+        StubChatClient client = new StubChatClient();
+        List<ChatClient> applied = new ArrayList<>();
+        client.addChatRequestCustomizer((it, request) -> {
+            applied.add(it);
+            return request;
+        });
+        client.addChatResponseCustomizer((it, response) -> {
+            applied.add(it);
+            return response;
+        });
+
+        client.chat(new ChatRequest());
+        ChatStream stream = client.stream(new ChatRequest());
+        var events = stream.iterator();
+        while (events.hasNext()) {
+            events.next();
+        }
+
+        // Four passes: the request and the response of each call — the streamed response once
+        // the stream is drained — and every one of them names this client.
+        assertEquals(4, applied.size());
+        applied.forEach(chatClient -> assertSame(client, chatClient));
     }
 
     @Test
@@ -201,7 +227,7 @@ class AbstractChatClientTest {
     void theContextCarriesTheRequestAsItWentOut() {
         StubChatClient client = new StubChatClient();
         ChatRequest replacement = new ChatRequest();
-        client.addChatRequestCustomizer(request -> replacement);
+        client.addChatRequestCustomizer((it, request) -> replacement);
 
         ChatResponse response = client.chat(new ChatRequest());
 
@@ -244,7 +270,7 @@ class AbstractChatClientTest {
         ChatRequest request = new ChatRequest();
         request.setContext(context);
         List<ChatContext> carried = new ArrayList<>();
-        client.addChatResponseCustomizer(response -> {
+        client.addChatResponseCustomizer((it, response) -> {
             carried.add(response.getContext());
             return response;
         });
@@ -260,7 +286,7 @@ class AbstractChatClientTest {
         StubChatClient client = new StubChatClient();
         ChatResponse replacement = new ChatResponse();
         replacement.setId("replacement");
-        client.addChatResponseCustomizer(response -> replacement);
+        client.addChatResponseCustomizer((it, response) -> replacement);
 
         ChatResponse response = client.chat(new ChatRequest());
 
@@ -270,7 +296,7 @@ class AbstractChatClientTest {
     @Test
     void aResponseCustomizerAnsweringNullFailsLoudly() {
         StubChatClient client = new StubChatClient();
-        client.addChatResponseCustomizer(response -> null);
+        client.addChatResponseCustomizer((it, response) -> null);
 
         NullPointerException thrown = assertThrows(NullPointerException.class,
                 () -> client.chat(new ChatRequest()));
@@ -281,7 +307,7 @@ class AbstractChatClientTest {
     @Test
     void aRemovedResponseCustomizerNoLongerRuns() {
         List<String> ran = new ArrayList<>();
-        ChatResponseCustomizer customizer = response -> {
+        ChatResponseCustomizer customizer = (it, response) -> {
             ran.add("run");
             return response;
         };
@@ -302,7 +328,7 @@ class AbstractChatClientTest {
         ChatRequest request = new ChatRequest();
         request.setContext(context);
         List<ChatResponse> seen = new ArrayList<>();
-        client.addChatResponseCustomizer(response -> {
+        client.addChatResponseCustomizer((it, response) -> {
             seen.add(response);
             return response;
         });
@@ -322,7 +348,7 @@ class AbstractChatClientTest {
     void anAbandonedStreamNeverRunsItsResponseCustomizers() {
         StubChatClient client = new StubChatClient();
         List<String> ran = new ArrayList<>();
-        client.addChatResponseCustomizer(response -> {
+        client.addChatResponseCustomizer((it, response) -> {
             ran.add("run");
             return response;
         });
@@ -340,7 +366,7 @@ class AbstractChatClientTest {
         client.addChatRequestCustomizer(namedRequest("late", ran), 10);
         client.addChatRequestCustomizer(namedRequest("early", ran), -5);
         client.addChatRequestCustomizer(namedRequest("first-default", ran), ChatClient.DEFAULT_ORDER);
-        client.addChatRequestCustomizer(request -> {
+        client.addChatRequestCustomizer((it, request) -> {
             ran.add("lambda");
             return request;
         });
@@ -357,7 +383,7 @@ class AbstractChatClientTest {
         StubChatClient client = new StubChatClient();
         client.addChatResponseCustomizer(namedResponse("late", ran), 10);
         client.addChatResponseCustomizer(namedResponse("early", ran), -5);
-        client.addChatResponseCustomizer(response -> {
+        client.addChatResponseCustomizer((it, response) -> {
             ran.add("lambda");
             return response;
         });
@@ -372,11 +398,11 @@ class AbstractChatClientTest {
     void theClientDefaultsApplyBetweenTheCustomizersThatStraddleThem() {
         List<String> ran = new ArrayList<>();
         DefaultsChatClient client = new DefaultsChatClient();
-        client.addChatRequestCustomizer(request -> {
+        client.addChatRequestCustomizer((it, request) -> {
             ran.add("before:" + request.getOptions().getModel());
             return request;
         }, ChatClient.DEFAULT_ORDER - 1);
-        client.addChatRequestCustomizer(request -> {
+        client.addChatRequestCustomizer((it, request) -> {
             ran.add("after:" + request.getOptions().getModel());
             return request;
         });
@@ -497,7 +523,7 @@ class AbstractChatClientTest {
     }
 
     private static ChatRequestCustomizer namedRequest(String name, List<String> ran) {
-        return request -> {
+        return (it, request) -> {
             ran.add(name);
             return request;
         };
@@ -505,7 +531,7 @@ class AbstractChatClientTest {
 
     /** A response customizer that records a name instead of touching the response. */
     private static ChatResponseCustomizer namedResponse(String name, List<String> ran) {
-        return response -> {
+        return (it, response) -> {
             ran.add(name);
             return response;
         };

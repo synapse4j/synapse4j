@@ -24,6 +24,14 @@ import io.github.synapse4j.data.ChatRequest;
  * or leave it alone and answer another one. A customizer that changes what it was given should make
  * that change once: the caller may reuse the request, and a request that is written again after a
  * failed attempt passes through here again.
+ *
+ * <p>
+ * The client passed in is the one applying the customizer, so one instance registered on several
+ * clients can tell them apart. It is there to be read: a decorating client applies its own list
+ * itself and the decorated client applies the inner one, so this is the layer the customizer was
+ * registered on, which may be within rather than the one the caller drove. Calling back into
+ * {@link ChatClient#chat(ChatRequest)} or {@link ChatClient#stream(ChatRequest)} from here
+ * re-enters this very pass and is not supported.
  */
 @FunctionalInterface
 public interface ChatRequestCustomizer {
@@ -31,9 +39,10 @@ public interface ChatRequestCustomizer {
     /**
      * Answers the request to send.
      *
+     * @param client  the client applying this customizer; never {@code null}
      * @param request the request as the caller built it; never {@code null}
      * @return the request to send, which may be the one that was given; never {@code null}
      */
-    ChatRequest customize(ChatRequest request);
+    ChatRequest customize(ChatClient client, ChatRequest request);
 
 }

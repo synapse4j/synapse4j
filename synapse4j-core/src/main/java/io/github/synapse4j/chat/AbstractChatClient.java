@@ -219,7 +219,7 @@ public abstract class AbstractChatClient implements ChatClient {
     private ChatResponse customize(ChatResponse response) {
         for (Registration<ChatResponseCustomizer> registration : responseCustomizers) {
             ChatResponseCustomizer customizer = registration.customizer();
-            response = Objects.requireNonNull(customizer.customize(response), "customizer answered null");
+            response = Objects.requireNonNull(customizer.customize(this, response), "customizer answered null");
         }
         return response;
     }
@@ -299,7 +299,7 @@ public abstract class AbstractChatClient implements ChatClient {
                 defaultsApplied = true;
             }
             ChatRequestCustomizer customizer = registration.customizer();
-            request = Objects.requireNonNull(customizer.customize(request), "customizer answered null");
+            request = Objects.requireNonNull(customizer.customize(this, request), "customizer answered null");
         }
         return defaultsApplied ? request : applyDefaultsChecked(request);
     }
@@ -330,7 +330,7 @@ public abstract class AbstractChatClient implements ChatClient {
      * end. A loop that breaks out early leaves them unrun: what it holds is a partial answer, and
      * so is a stream that fails or is closed before its last event.
      */
-    private static final class CustomizedStream implements ChatStream {
+    private final class CustomizedStream implements ChatStream {
 
         private final ChatStream delegate;
 
@@ -389,7 +389,8 @@ public abstract class AbstractChatClient implements ChatClient {
             ChatResponse response = delegate.aggregatedResponse();
             for (Registration<ChatResponseCustomizer> registration : customizers) {
                 ChatResponseCustomizer customizer = registration.customizer();
-                response = Objects.requireNonNull(customizer.customize(response), "customizer answered null");
+                response = Objects.requireNonNull(customizer.customize(AbstractChatClient.this, response),
+                        "customizer answered null");
             }
             result = response;
         }

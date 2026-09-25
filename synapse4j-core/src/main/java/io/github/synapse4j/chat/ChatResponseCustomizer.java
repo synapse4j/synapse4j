@@ -27,6 +27,11 @@ import io.github.synapse4j.data.ChatResponse;
  * <p>
  * The response handed in is the client's own, so a customizer may change it in place and answer
  * it, or leave it alone and answer another one.
+ *
+ * <p>
+ * The client passed in is the one applying the customizer, carrying the same meaning as in
+ * {@link ChatRequestCustomizer}: the layer the customizer was registered on, for reading rather
+ * than for calling back into.
  */
 @FunctionalInterface
 public interface ChatResponseCustomizer {
@@ -34,10 +39,11 @@ public interface ChatResponseCustomizer {
     /**
      * Answers the response to give the caller.
      *
+     * @param client   the client applying this customizer; never {@code null}
      * @param response the answer as the client produced it; never {@code null}
      * @return the response to give the caller, which may be the one that was given; never
      *         {@code null}
      */
-    ChatResponse customize(ChatResponse response);
+    ChatResponse customize(ChatClient client, ChatResponse response);
 
 }

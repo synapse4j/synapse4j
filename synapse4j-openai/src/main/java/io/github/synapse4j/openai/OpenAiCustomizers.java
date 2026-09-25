@@ -30,7 +30,7 @@ public class OpenAiCustomizers {
      * @return the customizer; never {@code null}
      */
     public static ChatRequestCustomizer legacyMaxTokens() {
-        return request -> {
+        return (client, request) -> {
             ChatOptions options = request.getOptions();
             Integer limit = options.getMaxOutputTokens();
             if (limit != null) {
