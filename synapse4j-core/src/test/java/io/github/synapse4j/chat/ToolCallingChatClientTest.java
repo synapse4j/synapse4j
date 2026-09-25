@@ -187,6 +187,32 @@ class ToolCallingChatClientTest {
     }
 
     @Test
+    void aProviderOnTheInnerClientIsAskedEachRoundAndOnceOnTheDecorator() {
+        inner.script.add(toolCallResponse("c1", "alpha"));
+        inner.script.add(textResponse("done"));
+        AtomicInteger innerAsks = new AtomicInteger();
+        AtomicInteger decoratorAsks = new AtomicInteger();
+        inner.addToolProvider((it, request) -> {
+            innerAsks.incrementAndGet();
+            return List.of();
+        });
+        ToolCallingChatClient client = new ToolCallingChatClient(inner);
+        client.addToolProvider((it, request) -> {
+            decoratorAsks.incrementAndGet();
+            return List.of();
+        });
+        ChatRequest request = new ChatRequest();
+        request.addTool(tool("alpha", arguments -> "A"));
+
+        client.chat(request);
+
+        // Registration decides the frequency: the inner client prepares every round, the
+        // decorator once for the whole call.
+        assertEquals(2, innerAsks.get());
+        assertEquals(1, decoratorAsks.get());
+    }
+
+    @Test
     void streamSplicesEveryRoundIntoOneSequence() {
         inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
         inner.streamScript.add(new StreamRound(textResponse("done"), "r2"));

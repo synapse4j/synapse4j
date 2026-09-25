@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +22,7 @@ import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.tool.FunctionTool;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolDefinition;
+import io.github.synapse4j.tool.ToolProvider;
 
 class AbstractChatClientTest {
 
@@ -640,6 +642,156 @@ class AbstractChatClientTest {
         client.chat(new ChatRequest());
 
         assertEquals(List.of("b"), names(client.seen.getTools()));
+    }
+
+    @Test
+    void aProviderIsAskedOncePerCallDuringPreparation() {
+        StubChatClient client = new StubChatClient();
+        List<String> asked = new ArrayList<>();
+        List<ChatRequest> handed = new ArrayList<>();
+        client.addToolProvider((it, request) -> {
+            assertSame(client, it);
+            asked.add("asked");
+            handed.add(request);
+            return List.of(tool("p"));
+        });
+        ChatRequest request = new ChatRequest();
+
+        client.chat(request);
+
+        assertEquals(List.of("asked"), asked);
+        assertSame(request, handed.get(0));
+        assertEquals(List.of("p"), names(client.seen.getTools()));
+    }
+
+    @Test
+    void everyCustomizerSeesWhatTheProvidersAnswered() {
+        StubChatClient client = new StubChatClient();
+        client.addToolProvider((it, request) -> List.of(tool("p")));
+        List<String> seen = new ArrayList<>();
+        client.addChatRequestCustomizer((it, request) -> {
+            seen.addAll(names(request.getTools()));
+            return request;
+        });
+
+        client.chat(new ChatRequest());
+
+        assertEquals(List.of("p"), seen);
+    }
+
+    @Test
+    void aProviderReplacesADefaultOfTheSameNameInItsSlot() {
+        StubChatClient client = new StubChatClient();
+        client.addDefaultTool(tool("a"));
+        client.addDefaultTool(tool("b"));
+        Tool provided = tool("a");
+        client.addToolProvider((it, request) -> List.of(provided, tool("c")));
+
+        client.chat(new ChatRequest());
+
+        assertEquals(List.of("a", "b", "c"), names(client.seen.getTools()));
+        assertSame(provided, client.seen.getTools().get(0));
+    }
+
+    @Test
+    void aRequestToolReplacesWhatAProviderAnswered() {
+        StubChatClient client = new StubChatClient();
+        client.addToolProvider((it, request) -> List.of(tool("a"), tool("b")));
+        ChatRequest request = new ChatRequest();
+        Tool requestA = tool("a");
+        request.addTool(requestA);
+
+        client.chat(request);
+
+        assertEquals(List.of("a", "b"), names(client.seen.getTools()));
+        assertSame(requestA, client.seen.getTools().get(0));
+    }
+
+    @Test
+    void duplicateNamesWithinTheRequestCollapseToTheLast() {
+        StubChatClient client = new StubChatClient();
+        client.addDefaultTool(tool("d"));
+        ChatRequest request = new ChatRequest();
+        Tool first = tool("a");
+        Tool second = tool("a");
+        request.addTool(first);
+        request.addTool(second);
+
+        client.chat(request);
+
+        // The caller was always told to keep names unique; when a merge runs anyway, one
+        // name means one tool and the last answer is the one that goes out.
+        assertEquals(List.of("d", "a"), names(client.seen.getTools()));
+        assertSame(second, client.seen.getTools().get(1));
+    }
+
+    @Test
+    void providersFillTheirAnswersInRegistrationOrder() {
+        StubChatClient client = new StubChatClient();
+        client.addDefaultTool(tool("d"));
+        Tool fromFirst = tool("x");
+        Tool sharedFromSecond = tool("s");
+        client.addToolProvider((it, request) -> List.of(fromFirst, tool("s")));
+        client.addToolProvider((it, request) -> List.of(sharedFromSecond, tool("y")));
+
+        client.chat(new ChatRequest());
+
+        assertEquals(List.of("d", "x", "s", "y"), names(client.seen.getTools()));
+        assertSame(sharedFromSecond, client.seen.getTools().get(2));
+    }
+
+    @Test
+    void aProviderAnsweringNullFailsLoudly() {
+        StubChatClient client = new StubChatClient();
+        client.addToolProvider((it, request) -> null);
+
+        NullPointerException thrown = assertThrows(NullPointerException.class,
+                () -> client.chat(new ChatRequest()));
+
+        assertEquals("tool provider answered null", thrown.getMessage());
+    }
+
+    @Test
+    void aRemovedProviderIsNoLongerAsked() {
+        StubChatClient client = new StubChatClient();
+        AtomicInteger asks = new AtomicInteger();
+        ToolProvider provider = (it, request) -> {
+            asks.incrementAndGet();
+            return List.of();
+        };
+        client.addToolProvider(provider);
+        assertTrue(client.removeToolProvider(provider));
+        assertFalse(client.removeToolProvider(provider));
+
+        client.chat(new ChatRequest());
+
+        assertEquals(0, asks.get());
+    }
+
+    @Test
+    void theSameProviderRegisteredTwiceIsAskedOnce() {
+        StubChatClient client = new StubChatClient();
+        AtomicInteger asks = new AtomicInteger();
+        ToolProvider provider = (it, request) -> {
+            asks.incrementAndGet();
+            return List.of(tool("p"));
+        };
+        client.addToolProvider(provider);
+        client.addToolProvider(provider);
+
+        client.chat(new ChatRequest());
+
+        // Registration records presence: the same source twice is still one source.
+        assertEquals(1, asks.get());
+        assertEquals(List.of("p"), names(client.seen.getTools()));
+    }
+
+    @Test
+    void aNullProviderIsRefused() {
+        StubChatClient client = new StubChatClient();
+
+        assertThrows(NullPointerException.class, () -> client.addToolProvider(null));
+        assertThrows(NullPointerException.class, () -> client.removeToolProvider(null));
     }
 
     @Test

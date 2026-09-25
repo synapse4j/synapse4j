@@ -4,6 +4,7 @@ import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.tool.ToolProvider;
 
 /**
  * The front door for one conversation turn with a model provider: send the whole request, get the
@@ -25,7 +26,8 @@ import io.github.synapse4j.exception.SynapseException;
  * validated and sent — where an application corrects a shared field whose mapping does not fit the
  * endpoint — {@link ChatResponseCustomizer}s, which adjust an answer on its way back,
  * {@link ChatStreamEventCustomizer}s, which adapt a stream's events before they are folded, and a
- * set of default tools merged into every request's own. {@link AbstractChatClient} implements these
+ * set of default tools merged into every request's own, and tool providers whose tools are
+ * fetched on every call instead. {@link AbstractChatClient} implements these
  * parts for an implementation; a client that implements this interface directly carries the same
  * obligation.
  *
@@ -164,5 +166,34 @@ public interface ChatClient {
      * @return whether a default tool of that name was registered
      */
     boolean removeDefaultTool(String name);
+
+    /**
+     * Adds a source whose tools are fetched on every call rather than registered up front —
+     * for a tool set that changes behind the client, or one too expensive to build while the
+     * client is being assembled.
+     *
+     * <p>
+     * The provider is asked on the calling thread while the request is being prepared, and
+     * given this client and the request about to go out. Registration records presence, not
+     * multiplicity: the same source registered twice is still one source and is asked once.
+     * Its answer joins the standing set under the merge the defaults step already runs: the
+     * defaults fill the slots first, each provider then fills them in registration order, and
+     * the request's own tools go last — a later source wins by name at the slot the name first
+     * took, a new name appends, so the caller always has the last word. A failure the
+     * provider throws fails the call, and an answer of {@code null} is refused where it
+     * lands.
+     *
+     * @param provider the source to ask; never {@code null}
+     */
+    void addToolProvider(ToolProvider provider);
+
+    /**
+     * Removes the given provider, so it is no longer asked. Since a lambda equals only
+     * itself, the caller has to keep the reference it added.
+     *
+     * @param provider the provider to remove; never {@code null}
+     * @return whether it was registered
+     */
+    boolean removeToolProvider(ToolProvider provider);
 
 }

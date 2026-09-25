@@ -1,11 +1,13 @@
 package io.github.synapse4j.chat;
 
-import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -14,6 +16,7 @@ import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.tool.Tool;
+import io.github.synapse4j.tool.ToolProvider;
 import lombok.NonNull;
 
 /**
@@ -50,12 +53,26 @@ public abstract class AbstractChatClient implements ChatClient {
     private final List<ChatStreamEventCustomizer> eventCustomizers = new CopyOnWriteArrayList<>();
 
     /**
-     * The standing tool set, in registration order. Copy-on-write for the same reason as the
-     * customizer lists: registration is a configuration-time write, every call reads, and a call
-     * in flight walks a snapshot no registration can change under it. Names are unique among
-     * these — see {@link #addDefaultTool(Tool)}.
+     * The standing tool set, keyed by name in registration order: a repeated name keeps the
+     * slot it first took, so the merge rule's slot is the map's insertion order. The tool
+     * containers follow one pattern — a rare writer copies the current container, mutates the
+     * copy, and publishes it through the atomic reference in one step; every call reads the
+     * reference once (a single {@code get()} into a local, used for the whole merge — two
+     * reads could straddle two versions) and traverses that snapshot lock-free. A published
+     * container is never mutated again; all changes go through this class's add and remove
+     * methods. Names are unique among these — see {@link #addDefaultTool(Tool)}.
      */
-    private final List<Tool> defaultTools = new CopyOnWriteArrayList<>();
+    private final AtomicReference<LinkedHashMap<String, Tool>> defaultTools = new AtomicReference<>(
+            new LinkedHashMap<>());
+
+    /**
+     * The tool sources asked on every call, in registration order, without duplicates —
+     * registration records presence, so the same instance registered twice is one source.
+     * Same pattern as the defaults above: writers publish a fresh container, readers hold
+     * one snapshot.
+     */
+    private final AtomicReference<LinkedHashSet<ToolProvider>> toolProviders = new AtomicReference<>(
+            new LinkedHashSet<>());
 
     @Override
     public void addChatRequestCustomizer(@NonNull ChatRequestCustomizer customizer) {
@@ -111,38 +128,77 @@ public abstract class AbstractChatClient implements ChatClient {
      * {@inheritDoc}
      *
      * <p>
-     * A name already registered has its tool replaced at the same slot, under the class monitor:
-     * finding the slot and taking it has to be one step, or two concurrent registrations of one
-     * name could both land — or a removal could shift the slot between the find and the write.
+     * A name already registered has its tool replaced at the same slot — a map put keeps the
+     * insertion order — so upgrading a tool never shuffles the rest.
      */
     @Override
-    public synchronized void addDefaultTool(Tool tool) {
+    public void addDefaultTool(Tool tool) {
         // The one entry where a tool arrives from outside: validate here, never again. The tool
         // itself needs no check — tool.name() below fails right here. The name does: an empty
-        // list never runs the equals, so without this a null name would sail straight in.
+        // map still accepts a null key, so without this a null name would sail straight in.
         String name = Objects.requireNonNull(tool.name(), "tool name must not be null");
-        int size = defaultTools.size();
-        for (int index = 0; index < size; index++) {
-            if (name.equals(defaultTools.get(index).name())) {
-                defaultTools.set(index, tool);
-                return;
-            }
-        }
-        defaultTools.add(tool);
+        defaultTools.updateAndGet(registered -> {
+            LinkedHashMap<String, Tool> next = new LinkedHashMap<>(registered);
+            next.put(name, tool);
+            return next;
+        });
     }
 
     /**
      * {@inheritDoc}
      *
      * <p>
-     * The monitor matches {@link #addDefaultTool(Tool)}'s so the two compose: {@code removeIf}
-     * is atomic on its own, but only against another single list operation — held apart from the
-     * add's find-and-write, it could drop an entry and shift the slot the add is about to write.
+     * Answered under concurrency too: {@code true} only when this call itself took the name
+     * out, never when it was already gone.
      */
     @Override
-    public synchronized boolean removeDefaultTool(String name) {
+    public boolean removeDefaultTool(String name) {
         Objects.requireNonNull(name, "name must not be null");
-        return defaultTools.removeIf(tool -> name.equals(tool.name()));
+        while (true) {
+            LinkedHashMap<String, Tool> registered = defaultTools.get();
+            if (!registered.containsKey(name)) {
+                return false;
+            }
+            LinkedHashMap<String, Tool> next = new LinkedHashMap<>(registered);
+            next.remove(name);
+            if (defaultTools.compareAndSet(registered, next)) {
+                return true;
+            }
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void addToolProvider(@NonNull ToolProvider provider) {
+        toolProviders.updateAndGet(registered -> {
+            LinkedHashSet<ToolProvider> next = new LinkedHashSet<>(registered);
+            next.add(provider);
+            return next;
+        });
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>
+     * Answered under concurrency too: {@code true} only when this call itself took the source
+     * out, never when it was already gone.
+     */
+    @Override
+    public boolean removeToolProvider(@NonNull ToolProvider provider) {
+        while (true) {
+            LinkedHashSet<ToolProvider> registered = toolProviders.get();
+            if (!registered.contains(provider)) {
+                return false;
+            }
+            LinkedHashSet<ToolProvider> next = new LinkedHashSet<>(registered);
+            next.remove(provider);
+            if (toolProviders.compareAndSet(registered, next)) {
+                return true;
+            }
+        }
     }
 
     /**
@@ -253,45 +309,48 @@ public abstract class AbstractChatClient implements ChatClient {
     /**
      * Applies this client's own defaults to the request — first, before any customizer runs, so
      * every customizer sees them applied and has the last word on what goes out. Runs exactly once
-     * per call. The base merges the default tools registered through {@link #addDefaultTool(Tool)}.
-     * A subclass with defaults of its own overrides this and must call
-     * {@code super.applyDefaults(request)} to keep that merge.
+     * per call. The base assembles the request's tool set from three sources in this order: the
+     * default tools registered through {@link #addDefaultTool(Tool)}, what each registered
+     * {@link ToolProvider} answers for this call, and the request's own tools — a later source
+     * wins by name at the slot the name first took, a new name appends. A subclass with defaults
+     * of its own overrides this and must call {@code super.applyDefaults(request)} to keep that
+     * merge.
      *
      * @param request the request as the caller built it
      * @return the request to continue with, which may be the one that was given; never
      *         {@code null}
      */
     protected ChatRequest applyDefaults(ChatRequest request) {
-        // One snapshot for both passes: registration mid-merge must not produce a set where the
-        // defaults were read once and tested against a different list.
-        List<Tool> defaults = List.copyOf(defaultTools);
-        if (defaults.isEmpty()) {
+        // One get each, held in a local: a second read could land after a registration and
+        // straddle two versions — each container is whole on its own, but this call should
+        // see one of each.
+        LinkedHashMap<String, Tool> defaults = defaultTools.get();
+        LinkedHashSet<ToolProvider> providers = toolProviders.get();
+        if (defaults.isEmpty() && providers.isEmpty()) {
+            return request;
+        }
+        // A map keyed by name is the merge rule: a put answers the slot a name first took
+        // with the later source, and a new name lands at the end.
+        LinkedHashMap<String, Tool> merged = new LinkedHashMap<>(defaults);
+        for (ToolProvider provider : providers) {
+            List<Tool> answered = Objects.requireNonNull(provider.tools(this, request),
+                    "tool provider answered null");
+            for (Tool tool : answered) {
+                // A null key would ride out as a nameless tool — the map would swallow it.
+                merged.put(Objects.requireNonNull(tool.name(), "tool name must not be null"), tool);
+            }
+        }
+        if (merged.isEmpty()) {
+            // Nothing to lend: the request keeps exactly the tools it brought.
             return request;
         }
         List<Tool> tools = request.getTools();
-        List<Tool> merged = new ArrayList<>(defaults.size() + tools.size());
-        for (Tool fallback : defaults) {
-            Tool replacement = named(tools, fallback.name());
-            merged.add(replacement != null ? replacement : fallback);
-        }
         for (Tool tool : tools) {
-            if (named(defaults, tool.name()) == null) {
-                merged.add(tool);
-            }
+            merged.put(Objects.requireNonNull(tool.name(), "tool name must not be null"), tool);
         }
         tools.clear();
-        tools.addAll(merged);
+        tools.addAll(merged.values());
         return request;
-    }
-
-    /** The tool in the given list carrying that name, or {@code null} when none does. */
-    private static Tool named(List<Tool> tools, String name) {
-        for (Tool tool : tools) {
-            if (name.equals(tool.name())) {
-                return tool;
-            }
-        }
-        return null;
     }
 
     /**
