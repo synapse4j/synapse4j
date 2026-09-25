@@ -207,7 +207,7 @@ public class JdkHttpClient implements HttpClient {
     }
 
     /** Publishes one buffer that is already in hand, on demand and without a thread. */
-    private static final class OneBufferPublisher implements Flow.Publisher<ByteBuffer> {
+    static final class OneBufferPublisher implements Flow.Publisher<ByteBuffer> {
 
         private final ByteBuffer buffer;
 
@@ -223,9 +223,20 @@ public class JdkHttpClient implements HttpClient {
 
                 @Override
                 public void request(long n) {
-                    if (!sent && n > 0) {
+                    if (n <= 0) {
+                        // The Flow contract asks for the error rather than silence: a demand of
+                        // zero or less is the subscriber's bug, and answering nothing would let
+                        // it wait on a reply that never comes.
                         sent = true;
-                        subscriber.onNext(buffer);
+                        subscriber.onError(new IllegalArgumentException("a request must be positive: " + n));
+                        return;
+                    }
+                    if (!sent) {
+                        sent = true;
+                        // A fresh view per send: what the subscriber is handed gets drained, and
+                        // a second subscription — a redirect, a retry — must start from the
+                        // beginning rather than inherit an emptied position.
+                        subscriber.onNext(buffer.asReadOnlyBuffer());
                         subscriber.onComplete();
                     }
                 }
@@ -253,7 +264,7 @@ public class JdkHttpClient implements HttpClient {
      * Each subscription gets its own run, since a request may be sent again: {@link HttpBody} promises
      * that a second write produces the same bytes, and a run is one write.
      */
-    private static final class StreamingBodyPublisher implements Flow.Publisher<ByteBuffer> {
+    static final class StreamingBodyPublisher implements Flow.Publisher<ByteBuffer> {
 
         private final HttpBody body;
 
@@ -309,6 +320,12 @@ public class JdkHttpClient implements HttpClient {
             @Override
             public void request(long n) {
                 if (n <= 0) {
+                    // The error goes out, and the producer is released with it: parked in
+                    // awaitDemand for a demand that will now never come, it would otherwise
+                    // outlive the subscription on a thread of its own. The cancelled flag keeps
+                    // its way out quiet — the subscriber has already been told.
+                    cancelled = true;
+                    LockSupport.unpark(producer);
                     subscriber.onError(new IllegalArgumentException("a request must be positive: " + n));
                     return;
                 }
