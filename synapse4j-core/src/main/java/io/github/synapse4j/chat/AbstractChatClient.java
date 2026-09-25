@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 import io.github.synapse4j.data.ChatContext;
@@ -41,6 +42,12 @@ public abstract class AbstractChatClient implements ChatClient {
      * stands, with no pass to re-sort it.
      */
     private record Registration<T>(T customizer, int order) {
+    }
+
+    /** How one customizer is asked: its own {@code customize}, given the client and the target. */
+    @FunctionalInterface
+    private interface CustomizerCall<C, T> {
+        T ask(C customizer, ChatClient client, T target);
     }
 
     /**
@@ -129,13 +136,7 @@ public abstract class AbstractChatClient implements ChatClient {
         if (snapshot.isEmpty()) {
             return UnaryOperator.identity();
         }
-        return event -> {
-            for (Registration<ChatStreamEventCustomizer> registration : snapshot) {
-                event = Objects.requireNonNull(registration.customizer().customize(this, event),
-                        "customizer answered null");
-            }
-            return event;
-        };
+        return event -> runCustomizers(snapshot, event, ChatStreamEventCustomizer::customize);
     }
 
     /**
@@ -273,13 +274,40 @@ public abstract class AbstractChatClient implements ChatClient {
      * answered one of its own.
      */
     private ChatResponse customize(ChatContext context, ChatResponse response) {
-        for (Registration<ChatResponseCustomizer> registration : responseCustomizers) {
-            ChatResponseCustomizer customizer = registration.customizer();
-            response = Objects.requireNonNull(customizer.customize(this, response), "customizer answered null");
-            response.setContext(context);
-            context.setResponse(response);
+        return runCustomizers(responseCustomizers, response, ChatResponseCustomizer::customize, stamped -> {
+            stamped.setContext(context);
+            context.setResponse(stamped);
+        });
+    }
+
+    /**
+     * Runs the chain in registration order: each customizer's answer is the next one's input, and
+     * the answer that comes out is the caller's; an answer of {@code null} fails loudly. The hook,
+     * when given, runs after each step — where bookkeeping has to follow the answer along, as the
+     * context does on a response.
+     *
+     * @param registrations the chain, in the order it was registered
+     * @param initial       what the first customizer is given
+     * @param invoke        how one customizer is asked — its own {@code customize} method
+     * @param afterEach     runs after each answer, or {@code null} for nothing
+     * @return the last answer; never {@code null}
+     */
+    private <T, C> T runCustomizers(List<Registration<C>> registrations, T initial,
+            CustomizerCall<C, T> invoke, Consumer<T> afterEach) {
+        T answer = initial;
+        for (Registration<C> registration : registrations) {
+            answer = Objects.requireNonNull(invoke.ask(registration.customizer(), this, answer),
+                    "customizer answered null");
+            if (afterEach != null) {
+                afterEach.accept(answer);
+            }
         }
-        return response;
+        return answer;
+    }
+
+    /** The same, with nothing to do after each step. */
+    private <T, C> T runCustomizers(List<Registration<C>> registrations, T initial, CustomizerCall<C, T> invoke) {
+        return runCustomizers(registrations, initial, invoke, null);
     }
 
     /**
@@ -449,15 +477,11 @@ public abstract class AbstractChatClient implements ChatClient {
                 return;
             }
             applied = true;
-            ChatResponse response = delegate.aggregatedResponse();
-            for (Registration<ChatResponseCustomizer> registration : customizers) {
-                ChatResponseCustomizer customizer = registration.customizer();
-                response = Objects.requireNonNull(customizer.customize(AbstractChatClient.this, response),
-                        "customizer answered null");
-                response.setContext(context);
-                context.setResponse(response);
-            }
-            result = response;
+            result = runCustomizers(customizers, delegate.aggregatedResponse(), ChatResponseCustomizer::customize,
+                    stamped -> {
+                        stamped.setContext(context);
+                        context.setResponse(stamped);
+                    });
         }
 
     }
