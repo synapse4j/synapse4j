@@ -26,6 +26,7 @@
     <module>synapse4j-core</module>
     <module>synapse4j-jackson</module>
     <module>synapse4j-http-jdk</module>
+    <module>synapse4j-http-restclient</module>
     <module>synapse4j-openai</module>
   </modules>
 

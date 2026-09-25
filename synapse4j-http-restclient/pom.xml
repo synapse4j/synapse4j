@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.github.synapse4j</groupId>
+    <artifactId>synapse4j-parent</artifactId>
+    <version>${revision}</version>
+    <relativePath>../synapse4j-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>synapse4j-http-restclient</artifactId>
+
+  <!-- The HTTP transport built on Spring's RestClient, for callers whose stack already configures
+       one: interceptors, Observation instrumentation, authentication and retries ride along, while
+       everything underneath the RestClient — request factory, redirects, socket configuration —
+       stays the caller's business and is never chosen here. -->
+  <dependencies>
+    <dependency>
+      <groupId>io.github.synapse4j</groupId>
+      <artifactId>synapse4j-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+</project>
