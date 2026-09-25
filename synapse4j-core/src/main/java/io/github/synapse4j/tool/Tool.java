@@ -1,4 +1,6 @@
-package io.github.synapse4j.data;
+package io.github.synapse4j.tool;
+
+import io.github.synapse4j.data.ChatContext;
 
 /**
  * A tool the model may call, in both of its halves: the declaration that is sent, and the execution

@@ -121,6 +121,12 @@ one would block extension by users and providers.
   `lombok.experimental`.
 - Package names are `io.github.synapse4j.*`. Implementation classes live in a `.<vendor>` subpackage
   naming their technology origin (for example `...victools`, `...jackson`).
+- **Group types by concept, not by dependency direction.** `...data` holds the inert call model —
+  structures and constant vocabularies, nothing that reaches the world. Types with behavior live in
+  their domain's package: `Tool` and `ToolDefinition` are in `...tool` even though `ChatRequest`, in
+  `...data`, references `Tool`. Cycles among these peer packages are accepted when they mirror a real
+  relationship (a request carries a tool; the client drives a tool loop): this is one module, where a
+  cycle costs the reader nothing, and a concept-wrong home would cost on every read.
 
 ## Build and test
 

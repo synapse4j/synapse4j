@@ -1,7 +1,6 @@
 package io.github.synapse4j.tool;
 
 import io.github.synapse4j.data.ChatContext;
-import io.github.synapse4j.data.ToolDefinition;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
 import java.lang.reflect.InvocationTargetException;

@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.tool.FunctionTool;
+import io.github.synapse4j.tool.ToolDefinition;
 
 class ChatRequestTest {
 

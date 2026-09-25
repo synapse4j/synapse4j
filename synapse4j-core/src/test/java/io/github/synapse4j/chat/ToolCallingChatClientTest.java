@@ -27,12 +27,12 @@ import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
-import io.github.synapse4j.data.Tool;
 import io.github.synapse4j.data.ToolCallPart;
-import io.github.synapse4j.data.ToolDefinition;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.tool.DefaultToolExecutor;
+import io.github.synapse4j.tool.Tool;
+import io.github.synapse4j.tool.ToolDefinition;
 
 class ToolCallingChatClientTest {
 

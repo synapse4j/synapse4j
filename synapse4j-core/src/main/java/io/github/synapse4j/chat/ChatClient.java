@@ -2,7 +2,7 @@ package io.github.synapse4j.chat;
 
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
-import io.github.synapse4j.data.Tool;
+import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.exception.SynapseException;
 
 /**

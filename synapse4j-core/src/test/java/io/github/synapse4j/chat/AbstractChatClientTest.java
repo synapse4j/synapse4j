@@ -18,9 +18,9 @@ import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
-import io.github.synapse4j.data.Tool;
-import io.github.synapse4j.data.ToolDefinition;
 import io.github.synapse4j.tool.FunctionTool;
+import io.github.synapse4j.tool.Tool;
+import io.github.synapse4j.tool.ToolDefinition;
 
 class AbstractChatClientTest {
 

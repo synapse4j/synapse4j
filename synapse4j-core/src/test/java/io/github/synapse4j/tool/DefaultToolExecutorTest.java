@@ -20,9 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.TextPart;
-import io.github.synapse4j.data.Tool;
 import io.github.synapse4j.data.ToolCallPart;
-import io.github.synapse4j.data.ToolDefinition;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.ToolNotFoundException;
 

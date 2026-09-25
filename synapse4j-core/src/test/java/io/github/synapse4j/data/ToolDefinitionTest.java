@@ -8,6 +8,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.synapse4j.tool.ToolDefinition;
+
 class ToolDefinitionTest {
 
     @Test

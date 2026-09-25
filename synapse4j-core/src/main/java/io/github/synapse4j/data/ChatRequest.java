@@ -3,6 +3,8 @@ package io.github.synapse4j.data;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.github.synapse4j.tool.Tool;
+
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;

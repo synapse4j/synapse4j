@@ -1,7 +1,6 @@
 package io.github.synapse4j.tool;
 
 import io.github.synapse4j.data.ChatContext;
-import io.github.synapse4j.data.Tool;
 
 /**
  * A Tool whose execution falls into fixed stages: resolve the arguments, make the call, render

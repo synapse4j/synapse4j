@@ -1,5 +1,7 @@
-package io.github.synapse4j.data;
+package io.github.synapse4j.tool;
 
+import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.ToolCallPart;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;

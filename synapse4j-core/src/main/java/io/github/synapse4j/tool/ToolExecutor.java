@@ -3,7 +3,6 @@ package io.github.synapse4j.tool;
 import java.util.List;
 
 import io.github.synapse4j.data.ChatContext;
-import io.github.synapse4j.data.Tool;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
 

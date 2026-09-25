@@ -9,7 +9,6 @@ import java.util.concurrent.Future;
 
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.TextPart;
-import io.github.synapse4j.data.Tool;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
