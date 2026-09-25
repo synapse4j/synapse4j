@@ -639,6 +639,23 @@ class OpenAiChatClientTest {
     }
 
     @Test
+    void aRefusalOnlyReadsAsMuchOfTheBodyAsItNeeds() {
+        ByteArrayInputStream body = new ByteArrayInputStream(new byte[256 * 1024]);
+        stub.canned.setStatusCode(500);
+        stub.canned.setBody(body);
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
+
+        assertEquals(500, assertInstanceOf(SynapseHttpException.class, thrown).getStatusCode());
+        // The rest of the body was never paid for: the reader stopped at its limit, and the
+        // close the refusal performs is what stops the gateway from sending more of it.
+        assertTrue(body.available() > 0);
+    }
+
+    @Test
     void missingApiKeyAndMissingModelAreCallerBugs() {
         OpenAiConfig noKey = new OpenAiConfig();
         client.setConfig(noKey);

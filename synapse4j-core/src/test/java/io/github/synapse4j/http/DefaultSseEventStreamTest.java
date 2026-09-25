@@ -5,14 +5,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 
@@ -258,6 +262,70 @@ class DefaultSseEventStreamTest {
         public void close() throws IOException {
             this.closed = true;
             super.close();
+        }
+    }
+
+    @Test
+    void aLineWithNoTerminatorStillStopsAtTheBudget() {
+        // The budget is enforced as bytes arrive: a server that never sends a newline cannot
+        // pin the memory first and fail the read afterwards.
+        byte[] endless = "x".repeat(64).getBytes(UTF_8);
+        DefaultSseEventStream reader = new DefaultSseEventStream(new ByteArrayInputStream(endless), 16);
+
+        SynapseException thrown = assertThrows(SynapseException.class, reader::hasNext);
+
+        assertTrue(thrown.getMessage().contains("16"), thrown.getMessage());
+    }
+
+    @Test
+    void closingWhileTheReaderIsParkedOnTheBodyUnblocksIt() throws InterruptedException {
+        SilentStream body = new SilentStream();
+        DefaultSseEventStream reader = new DefaultSseEventStream(body,
+                HttpOptions.defaults().getMaxFrameBytes());
+        List<Throwable> failures = new ArrayList<>();
+        Thread parked = new Thread(() -> {
+            try {
+                reader.hasNext();
+            } catch (Throwable thrown) {
+                failures.add(thrown);
+            }
+        });
+
+        parked.start();
+        assertTrue(body.reading.await(5, TimeUnit.SECONDS));
+        // The close must not queue behind the reader parked in the body: it is what unblocks
+        // the reader, and it returns the moment the body is shut.
+        assertTimeoutPreemptively(Duration.ofSeconds(5), reader::close);
+        parked.join(TimeUnit.SECONDS.toMillis(5));
+
+        assertFalse(parked.isAlive());
+        assertEquals(1, failures.size());
+    }
+
+    /** A body that parks its reader until it is closed, the way a silent provider does. */
+    private static class SilentStream extends InputStream {
+
+        private final CountDownLatch reading = new CountDownLatch(1);
+
+        private final CountDownLatch released = new CountDownLatch(1);
+
+        @Override
+        public int read() throws IOException {
+            reading.countDown();
+            try {
+                if (!released.await(5, TimeUnit.SECONDS)) {
+                    throw new IOException("never released");
+                }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IOException("interrupted", interrupted);
+            }
+            throw new IOException("stream closed");
+        }
+
+        @Override
+        public void close() {
+            released.countDown();
         }
     }
 

@@ -101,10 +101,11 @@ public class DefaultHttpResponse implements HttpResponse {
      * releases it through that stream, whose contract says closing it closes the body it reads —
      * and whatever else the stream holds is then its own business rather than this class's to
      * assume. A response that handed none out closes the body itself. Idempotent and safe to call
-     * from any thread.
+     * from any thread: the monitor is the one {@link #sseEventStream()} builds under, so a close
+     * can neither miss a stream that was just built nor race the build itself.
      */
     @Override
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
         SseEventStream stream = eventStream;
         if (stream != null) {
             stream.close();

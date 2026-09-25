@@ -57,6 +57,13 @@ public class OpenAiChatClient extends AbstractChatClient {
     /** Raw-body snippet kept in the message when the error body is not parseable JSON. */
     private static final int SNIPPET_LIMIT = 500;
 
+    /**
+     * The most bytes a refusal may spend reading its body: enough for any conventional error
+     * document, and enough for a snippet when it is not one — a gateway that answers a failure
+     * with an endless body is not paid for past this.
+     */
+    private static final int ERROR_BODY_LIMIT = 64 * 1024;
+
     private final HttpClient http;
     private final JsonCodec codec;
     private final ChatCompletionsWriter requestWriter;
@@ -207,7 +214,11 @@ public class OpenAiChatClient extends AbstractChatClient {
     }
 
     private byte[] readBody(io.github.synapse4j.http.HttpResponse httpResponse) throws IOException {
-        return httpResponse.getBody().readAllBytes();
+        // Bounded: a refusal needs enough of the body to parse the error document or show a
+        // snippet of it, and no hostile or broken gateway gets paid for more. What lies past the
+        // limit is never read — the caller's try-with-resources closes the response, connection
+        // and all, which is what stops it.
+        return httpResponse.getBody().readNBytes(ERROR_BODY_LIMIT);
     }
 
     /**
@@ -217,7 +228,7 @@ public class OpenAiChatClient extends AbstractChatClient {
      * than the status already says.
      *
      * @param status the HTTP status the answer carried
-     * @param body   the whole response body, buffered by the caller
+     * @param body   the refusal's body, as far as the caller was allowed to read it
      * @return the exception to throw
      */
     private SynapseHttpException failure(int status, byte[] body) {

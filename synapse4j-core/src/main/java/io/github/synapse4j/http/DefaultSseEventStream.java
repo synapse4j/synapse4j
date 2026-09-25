@@ -1,9 +1,8 @@
 package io.github.synapse4j.http;
 
-import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.PushbackInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
@@ -18,9 +17,11 @@ import io.github.synapse4j.exception.SynapseIOException;
  * <p>
  * One frame may buffer no more than {@code maxFrameBytes} bytes: a frame completes only when a
  * blank line arrives, so without that budget a server that keeps sending lines would pin an
- * ever-growing buffer. The count is the wire's — a character costs its UTF-8 length, so multibyte
- * payloads spend more of it — and it covers every line of the frame, comments included. Crossing
- * the budget fails the read; it never truncates, since half a frame is worse than none.
+ * ever-growing buffer. The count is the wire's — a byte arrives as a byte, so multibyte payloads
+ * spend more of it — it covers the lines of the frame with their terminators left out, comments
+ * included, and it is checked as the bytes arrive: a line whose newline never comes fails at the
+ * budget rather than after paying for more. Crossing it fails the read; it never truncates, since
+ * half a frame is worse than none.
  *
  * <p>
  * The body is not touched before the first pull, so constructing a reader never starts a
@@ -30,8 +31,6 @@ public class DefaultSseEventStream implements SseEventStream {
 
     private final PushbackInputStream source;
 
-    private final BufferedReader lines;
-
     /** How many bytes one frame may accumulate before the read fails. */
     private final int maxFrameBytes;
 
@@ -40,6 +39,23 @@ public class DefaultSseEventStream implements SseEventStream {
 
     /** Whether the stream's first bytes have been peeked at for a BOM. */
     private boolean bomChecked;
+
+    /**
+     * Bytes read ahead from the body, so a line is assembled from a fill rather than a read per
+     * byte. Owned by the reading thread — {@link #close()} reaches only {@link #source}, which is
+     * what unblocks a reader parked on a silent provider.
+     */
+    private final byte[] buffer = new byte[8192];
+
+    private int position;
+
+    private int limit;
+
+    /** A CR ended the last line: an LF arriving first is its partner, not the next line's. */
+    private boolean skipLf;
+
+    /** The line being assembled, decoded once its terminator arrives. */
+    private final ByteArrayOutputStream line = new ByteArrayOutputStream();
 
     private SseEvent pending;
 
@@ -58,7 +74,6 @@ public class DefaultSseEventStream implements SseEventStream {
             throw new IllegalArgumentException("maxFrameBytes must be positive: " + maxFrameBytes);
         }
         this.source = new PushbackInputStream(body, 3);
-        this.lines = new BufferedReader(new InputStreamReader(source, StandardCharsets.UTF_8));
         this.maxFrameBytes = maxFrameBytes;
     }
 
@@ -85,13 +100,15 @@ public class DefaultSseEventStream implements SseEventStream {
     }
 
     /**
-     * Closes the body this stream was given. Idempotent, and the reason a streaming response ends
-     * early when a caller closes it. A failure of the close is the transport's own, so it travels
-     * as an {@link IOException} rather than being wrapped.
+     * Closes the body this stream was given — directly, through no reader, so a thread parked on
+     * a silent provider is unblocked by the close rather than left holding a lock the reader
+     * wants. Idempotent, and the reason a streaming response ends early when a caller closes it.
+     * A failure of the close is the transport's own, so it travels as an {@link IOException}
+     * rather than being wrapped.
      */
     @Override
     public void close() throws IOException {
-        lines.close();
+        source.close();
     }
 
     /** Reads lines until one frame is complete, or the body ends. */
@@ -138,13 +155,66 @@ public class DefaultSseEventStream implements SseEventStream {
         }
     }
 
+    /**
+     * One line, its terminator neither in the text nor in the budget: LF, CR and CRLF all end
+     * one, and the LF of a CRLF is swallowed where the next line begins. The budget is checked
+     * as the bytes arrive — a line whose newline never comes fails at the budget instead of
+     * growing past it — and a line cut short by the end of the body comes back as it stands,
+     * the way a reader over buffered text has always answered.
+     *
+     * @return the line without its terminator, or {@code null} at the end of the body
+     */
     private String readLine() {
         skipLeadingBom();
-        try {
-            return lines.readLine();
-        } catch (IOException failure) {
-            throw new SynapseIOException("Reading the event stream failed", failure);
+        line.reset();
+        int next = nextByte();
+        if (skipLf) {
+            skipLf = false;
+            if (next == '\n') {
+                next = nextByte();
+            }
         }
+        if (next < 0) {
+            return null;
+        }
+        while (true) {
+            if (next == '\n') {
+                return line.toString(StandardCharsets.UTF_8);
+            }
+            if (next == '\r') {
+                skipLf = true;
+                return line.toString(StandardCharsets.UTF_8);
+            }
+            if (frameBytes + line.size() + 1 > maxFrameBytes) {
+                throw new SynapseException("one event frame exceeded the " + maxFrameBytes + " byte budget");
+            }
+            line.write(next);
+            next = nextByte();
+            if (next < 0) {
+                // The body ended mid-line: what stands comes back as the line it is, and the
+                // next call answers null — the frame it belongs to is then discarded incomplete.
+                return line.toString(StandardCharsets.UTF_8);
+            }
+        }
+    }
+
+    /**
+     * The body's next byte, filling the read-ahead buffer when it runs dry; {@code -1} at the end
+     * of the body. An {@link IOException} is the transport's own and travels as the library's.
+     */
+    private int nextByte() {
+        if (position >= limit) {
+            try {
+                limit = source.read(buffer);
+            } catch (IOException failure) {
+                throw new SynapseIOException("Reading the event stream failed", failure);
+            }
+            position = 0;
+            if (limit < 0) {
+                return -1;
+            }
+        }
+        return buffer[position++] & 0xFF;
     }
 
     /**
