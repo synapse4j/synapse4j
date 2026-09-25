@@ -82,17 +82,6 @@ public class ToolCallingChatClient extends AbstractChatClient {
      * {@inheritDoc}
      *
      * <p>
-     * Handed straight to the inner client, at the given order.
-     */
-    @Override
-    public void addChatStreamEventCustomizer(ChatStreamEventCustomizer customizer, int order) {
-        inner.addChatStreamEventCustomizer(customizer, order);
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * <p>
      * The registration was handed to the inner client, and it comes off there.
      */
     @Override

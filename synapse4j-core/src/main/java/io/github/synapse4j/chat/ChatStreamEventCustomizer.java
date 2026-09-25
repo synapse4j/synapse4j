@@ -22,28 +22,17 @@ import io.github.synapse4j.data.ChatStreamEvent;
  * dispatch belongs in the consuming loop instead, where it sits outside the fold by construction.
  *
  * <p>
- * Customizers belong to a {@link ChatClient} and run on the thread pulling the events, in
- * registration order — the order each was registered with, see {@link ChatClient#DEFAULT_ORDER} —
- * snapshotted when the stream opens: one registered mid-flight joins neither that stream nor its
- * fold. The client passed is the one whose stream runs the chain; a decorating client hands its
- * registrations to the client that folds, so that is the one named here. A blocking call has no
- * events — a registration there never runs.
+ * Customizers belong to a {@link ChatClient} and run on the thread pulling the events, in the
+ * order they were registered in, snapshotted when the stream opens: one registered mid-flight
+ * joins neither that stream nor its fold. The client passed is the one whose stream runs the
+ * chain; a decorating client hands its registrations to the client that folds, so that is the
+ * one named here. A blocking call has no events — a registration there never runs.
  *
  * <p>
  * The event handed in is the stream's own, so a customizer may change it in place and answer it,
  * or leave it alone and answer another one.
  */
 @FunctionalInterface
-public interface ChatStreamEventCustomizer {
-
-    /**
-     * Answers the event to carry on.
-     *
-     * @param client the client whose stream runs this customizer; never {@code null}
-     * @param event  the event as it came from the source; never {@code null}
-     * @return the event to fold and hand out, which may be the one that was given; never
-     *         {@code null}
-     */
-    ChatStreamEvent customize(ChatClient client, ChatStreamEvent event);
+public interface ChatStreamEventCustomizer extends ChatCustomizer<ChatStreamEvent> {
 
 }

@@ -17,9 +17,9 @@ import io.github.synapse4j.data.ChatResponse;
  * <p>
  * Customizers belong to a {@link ChatClient} and run on the calling thread after the client's own
  * steps, and the last one's answer is what the caller receives. The sequence among them is the
- * client's business — the order each was registered with, see {@link ChatClient#DEFAULT_ORDER} —
- * not a property of this interface: a customizer says what to do, the client decides when. For a
- * streamed answer they run once, when the stream runs to its end; a stream that fails, is closed
+ * order they were registered in — not a property of this interface: a customizer says what to do,
+ * the client decides when. For a streamed answer they run once, when the stream runs to its end; a stream that fails,
+ * is closed
  * or is left half-consumed never runs them, the same way a blocking call that failed runs none.
  * The pass happens exactly once per call, so a customizer that changes the response in place
  * should make each change once.
@@ -38,16 +38,6 @@ import io.github.synapse4j.data.ChatResponse;
  * than for calling back into.
  */
 @FunctionalInterface
-public interface ChatResponseCustomizer {
-
-    /**
-     * Answers the response to give the caller.
-     *
-     * @param client   the client applying this customizer; never {@code null}
-     * @param response the answer as the client produced it; never {@code null}
-     * @return the response to give the caller, which may be the one that was given; never
-     *         {@code null}
-     */
-    ChatResponse customize(ChatClient client, ChatResponse response);
+public interface ChatResponseCustomizer extends ChatCustomizer<ChatResponse> {
 
 }

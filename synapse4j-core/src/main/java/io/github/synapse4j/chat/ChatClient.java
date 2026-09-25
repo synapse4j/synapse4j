@@ -38,17 +38,6 @@ import io.github.synapse4j.exception.SynapseException;
 public interface ChatClient {
 
     /**
-     * The order a registration receives when it names none — and the order at which a client
-     * applies its own defaults to the request, between the customizers registered below this
-     * order and those at or above it. A request customizer at this order therefore runs after the
-     * defaults: a caller who never names an order still has the last word on what goes out, while
-     * one who wants the request before the defaults are applied registers at
-     * {@code DEFAULT_ORDER - 1}. A response has no such internal step among its customizers — for
-     * them this is only the default bucket.
-     */
-    int DEFAULT_ORDER = 0;
-
-    /**
      * Sends one chat request and blocks until the complete response arrives.
      *
      * @param request the whole call: messages so far, tools, the shape the answer should take, and
@@ -75,49 +64,33 @@ public interface ChatClient {
     ChatStream stream(ChatRequest request);
 
     /**
-     * Adds a customizer that prepares every request before this client validates and sends it,
-     * at {@link #DEFAULT_ORDER}.
+     * Adds a customizer that prepares every request before this client validates and sends it.
      *
      * <p>
-     * Customizers run by the order they were registered with — lower first, ties in the order
-     * they were added — on the calling thread. The same customizer may
-     * be added more than once, and then runs once per addition. A client shared across threads
-     * hands each call a consistent list, so a customizer must itself be safe to run concurrently.
+     * Customizers run in the order they were added, on the calling thread — the client applies
+     * its own defaults first, so every customizer sees them applied and has the last word on what
+     * goes out. The same customizer may be added more than once, and then runs once per addition.
+     * A client shared across threads hands each call a consistent list, so a customizer must
+     * itself be safe to run concurrently.
      *
      * @param customizer the customizer to add; never {@code null}
      */
     void addChatRequestCustomizer(ChatRequestCustomizer customizer);
 
     /**
-     * Adds a customizer at the given order: lower runs earlier, ties keep the sequence they were
-     * added in. The order is taken at this call and never changes afterwards.
-     *
-     * <p>
-     * Customizers run on the calling thread. The same customizer may be added more than once, and
-     * then runs once per addition. A client shared across threads hands each call a consistent
-     * list, so a customizer must itself be safe to run concurrently.
-     *
-     * @param customizer the customizer to add; never {@code null}
-     * @param order      this registration's position; see {@link #DEFAULT_ORDER}
-     */
-    void addChatRequestCustomizer(ChatRequestCustomizer customizer, int order);
-
-    /**
-     * Removes the first registration of the given customizer — the one that would run first among
-     * them. Since a lambda equals only itself, the caller has to keep the reference it added.
+     * Removes every registration of the given customizer. Since a lambda equals only itself, the
+     * caller has to keep the reference it added.
      *
      * @param customizer the customizer to remove; never {@code null}
-     * @return whether one was removed
+     * @return whether any was removed
      */
     boolean removeChatRequestCustomizer(ChatRequestCustomizer customizer);
 
     /**
-     * Adds a customizer that adjusts every answer after this client has finished with it, at
-     * {@link #DEFAULT_ORDER}.
+     * Adds a customizer that adjusts every answer after this client has finished with it.
      *
      * <p>
-     * Customizers run by the order they were registered with — lower first, ties in the order
-     * they were added — on the calling thread, after the client's own
+     * Customizers run in the order they were added, on the calling thread, after the client's own
      * steps, and the last one's answer is what the caller receives. For a streamed answer they run
      * once, when the stream runs to its end; an answer that failed runs none. The same customizer
      * may be added more than once, and then runs once per addition. A client shared across threads
@@ -128,69 +101,37 @@ public interface ChatClient {
     void addChatResponseCustomizer(ChatResponseCustomizer customizer);
 
     /**
-     * Adds a customizer at the given order: lower runs earlier, ties keep the sequence they were
-     * added in. The order is taken at this call and never changes afterwards.
-     *
-     * <p>
-     * Customizers run on the calling thread, after the client's own steps, and the last one's
-     * answer is what the caller receives. For a streamed answer they run once, when the stream
-     * runs to its end; an answer that failed runs none. The same customizer may be added more than
-     * once, and then runs once per addition. A client shared across threads hands each call a
-     * consistent list, so a customizer must itself be safe to run concurrently.
-     *
-     * @param customizer the customizer to add; never {@code null}
-     * @param order      this registration's position; see {@link #DEFAULT_ORDER}
-     */
-    void addChatResponseCustomizer(ChatResponseCustomizer customizer, int order);
-
-    /**
-     * Removes the first registration of the given customizer — the one that would run first among
-     * them. Since a lambda equals only itself, the caller has to keep the reference it added.
+     * Removes every registration of the given customizer. Since a lambda equals only itself, the
+     * caller has to keep the reference it added.
      *
      * @param customizer the customizer to remove; never {@code null}
-     * @return whether one was removed
+     * @return whether any was removed
      */
     boolean removeChatResponseCustomizer(ChatResponseCustomizer customizer);
 
     /**
      * Adds a customizer that adapts every event of every stream this client opens, between the
-     * stream's source and its folding, at {@link #DEFAULT_ORDER}.
+     * stream's source and its folding.
      *
      * <p>
-     * Customizers run by the order they were registered with — lower first, ties in the order
-     * they were added — on the thread pulling the events, and the fold and the caller both see
-     * their answers: what is folded and what is handed out is the same event. The chain is
-     * snapshotted when a stream opens; one registered mid-flight joins neither that stream nor
-     * its fold. A blocking call has no events, so a registration here runs only on streams. The
-     * same customizer may be added more than once, and then runs once per addition. A client
-     * shared across threads hands each call a consistent list, so a customizer must itself be
-     * safe to run concurrently.
+     * Customizers run in the order they were added, on the thread pulling the events, and the
+     * fold and the caller both see their answers: what is folded and what is handed out is the
+     * same event. The chain is snapshotted when a stream opens; one registered mid-flight joins
+     * neither that stream nor its fold. A blocking call has no events, so a registration here
+     * runs only on streams. The same customizer may be added more than once, and then runs once
+     * per addition. A client shared across threads hands each call a consistent list, so a
+     * customizer must itself be safe to run concurrently.
      *
      * @param customizer the customizer to add; never {@code null}
      */
     void addChatStreamEventCustomizer(ChatStreamEventCustomizer customizer);
 
     /**
-     * Adds a customizer at the given order: lower runs earlier, ties keep the sequence they were
-     * added in. The order is taken at this call and never changes afterwards.
-     *
-     * <p>
-     * Customizers run on the thread pulling the events, and the fold and the caller both see
-     * their answers. The same customizer may be added more than once, and then runs once per
-     * addition. A client shared across threads hands each call a consistent list, so a
-     * customizer must itself be safe to run concurrently.
-     *
-     * @param customizer the customizer to add; never {@code null}
-     * @param order      this registration's position; see {@link #DEFAULT_ORDER}
-     */
-    void addChatStreamEventCustomizer(ChatStreamEventCustomizer customizer, int order);
-
-    /**
-     * Removes the first registration of the given customizer — the one that would run first among
-     * them. Since a lambda equals only itself, the caller has to keep the reference it added.
+     * Removes every registration of the given customizer. Since a lambda equals only itself, the
+     * caller has to keep the reference it added.
      *
      * @param customizer the customizer to remove; never {@code null}
-     * @return whether one was removed
+     * @return whether any was removed
      */
     boolean removeChatStreamEventCustomizer(ChatStreamEventCustomizer customizer);
 

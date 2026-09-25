@@ -15,9 +15,9 @@ import io.github.synapse4j.data.ChatRequest;
  *
  * <p>
  * Customizers belong to a {@link ChatClient} and run on the calling thread, before the request is
- * validated and sent. The sequence among them is the client's business — the order each was
- * registered with, see {@link ChatClient#DEFAULT_ORDER} — not a property of this interface: a
- * customizer says what to do, the client decides when.
+ * validated and sent. The sequence among them is the order they were registered in — not a
+ * property of this interface: a customizer says what to do, the client decides when. The client
+ * applies its own defaults before any of them runs, so every customizer sees them applied.
  *
  * <p>
  * The request handed in is the caller's own, so a customizer may change it in place and answer it,
@@ -34,15 +34,6 @@ import io.github.synapse4j.data.ChatRequest;
  * re-enters this very pass and is not supported.
  */
 @FunctionalInterface
-public interface ChatRequestCustomizer {
-
-    /**
-     * Answers the request to send.
-     *
-     * @param client  the client applying this customizer; never {@code null}
-     * @param request the request as the caller built it; never {@code null}
-     * @return the request to send, which may be the one that was given; never {@code null}
-     */
-    ChatRequest customize(ChatClient client, ChatRequest request);
+public interface ChatRequestCustomizer extends ChatCustomizer<ChatRequest> {
 
 }

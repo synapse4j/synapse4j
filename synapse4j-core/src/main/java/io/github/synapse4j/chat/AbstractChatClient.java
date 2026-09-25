@@ -14,6 +14,7 @@ import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.Tool;
+import lombok.NonNull;
 
 /**
  * A {@link ChatClient} that runs its customizers around the exchange: a request customizer before
@@ -37,34 +38,16 @@ import io.github.synapse4j.data.Tool;
 public abstract class AbstractChatClient implements ChatClient {
 
     /**
-     * A customizer and the order it was registered with. The order is copied at registration and
-     * never changes: the list itself is the execution order, so a call in flight walks it as it
-     * stands, with no pass to re-sort it.
-     */
-    private record Registration<T>(T customizer, int order) {
-    }
-
-    /** How one customizer is asked: its own {@code customize}, given the client and the target. */
-    @FunctionalInterface
-    private interface CustomizerCall<C, T> {
-        T ask(C customizer, ChatClient client, T target);
-    }
-
-    /**
      * Copy-on-write, so a call in flight walks a list no other thread can change under it, and
-     * adding a customizer costs a copy only when one is added. Both customizer kinds get their
-     * own list for the same reason, and each list stays sorted by order — ties keeping the
-     * sequence they were added in.
+     * adding a customizer costs a copy only when one is added. All three chains keep the order
+     * they were registered in — the list itself is the execution order, so a call in flight walks
+     * it as it stands, with no pass to re-sort it.
      */
-    private final List<Registration<ChatRequestCustomizer>> requestCustomizers = new CopyOnWriteArrayList<>();
+    private final List<ChatRequestCustomizer> requestCustomizers = new CopyOnWriteArrayList<>();
 
-    private final List<Registration<ChatResponseCustomizer>> responseCustomizers = new CopyOnWriteArrayList<>();
+    private final List<ChatResponseCustomizer> responseCustomizers = new CopyOnWriteArrayList<>();
 
-    /**
-     * Copy-on-write and sorted like the two above; the snapshot a stream opens with is taken from
-     * here when the stream is built.
-     */
-    private final List<Registration<ChatStreamEventCustomizer>> eventCustomizers = new CopyOnWriteArrayList<>();
+    private final List<ChatStreamEventCustomizer> eventCustomizers = new CopyOnWriteArrayList<>();
 
     /**
      * The standing tool set, in registration order. Copy-on-write for the same reason as the
@@ -75,48 +58,33 @@ public abstract class AbstractChatClient implements ChatClient {
     private final List<Tool> defaultTools = new CopyOnWriteArrayList<>();
 
     @Override
-    public void addChatRequestCustomizer(ChatRequestCustomizer customizer) {
-        addChatRequestCustomizer(customizer, DEFAULT_ORDER);
+    public void addChatRequestCustomizer(@NonNull ChatRequestCustomizer customizer) {
+        requestCustomizers.add(customizer);
     }
 
     @Override
-    public synchronized void addChatRequestCustomizer(ChatRequestCustomizer customizer, int order) {
-        insert(requestCustomizers, Objects.requireNonNull(customizer, "customizer must not be null"), order);
+    public boolean removeChatRequestCustomizer(@NonNull ChatRequestCustomizer customizer) {
+        return requestCustomizers.removeIf(customizer::equals);
     }
 
     @Override
-    public synchronized boolean removeChatRequestCustomizer(ChatRequestCustomizer customizer) {
-        return remove(requestCustomizers, Objects.requireNonNull(customizer, "customizer must not be null"));
+    public void addChatResponseCustomizer(@NonNull ChatResponseCustomizer customizer) {
+        responseCustomizers.add(customizer);
     }
 
     @Override
-    public void addChatResponseCustomizer(ChatResponseCustomizer customizer) {
-        addChatResponseCustomizer(customizer, DEFAULT_ORDER);
+    public boolean removeChatResponseCustomizer(@NonNull ChatResponseCustomizer customizer) {
+        return responseCustomizers.removeIf(customizer::equals);
     }
 
     @Override
-    public synchronized void addChatResponseCustomizer(ChatResponseCustomizer customizer, int order) {
-        insert(responseCustomizers, Objects.requireNonNull(customizer, "customizer must not be null"), order);
+    public void addChatStreamEventCustomizer(@NonNull ChatStreamEventCustomizer customizer) {
+        eventCustomizers.add(customizer);
     }
 
     @Override
-    public synchronized boolean removeChatResponseCustomizer(ChatResponseCustomizer customizer) {
-        return remove(responseCustomizers, Objects.requireNonNull(customizer, "customizer must not be null"));
-    }
-
-    @Override
-    public void addChatStreamEventCustomizer(ChatStreamEventCustomizer customizer) {
-        addChatStreamEventCustomizer(customizer, DEFAULT_ORDER);
-    }
-
-    @Override
-    public synchronized void addChatStreamEventCustomizer(ChatStreamEventCustomizer customizer, int order) {
-        insert(eventCustomizers, Objects.requireNonNull(customizer, "customizer must not be null"), order);
-    }
-
-    @Override
-    public synchronized boolean removeChatStreamEventCustomizer(ChatStreamEventCustomizer customizer) {
-        return remove(eventCustomizers, Objects.requireNonNull(customizer, "customizer must not be null"));
+    public boolean removeChatStreamEventCustomizer(@NonNull ChatStreamEventCustomizer customizer) {
+        return eventCustomizers.removeIf(customizer::equals);
     }
 
     /**
@@ -132,11 +100,11 @@ public abstract class AbstractChatClient implements ChatClient {
      * @return the chain; never {@code null}
      */
     protected UnaryOperator<ChatStreamEvent> eventPipeline() {
-        List<Registration<ChatStreamEventCustomizer>> snapshot = List.copyOf(eventCustomizers);
+        List<ChatStreamEventCustomizer> snapshot = List.copyOf(eventCustomizers);
         if (snapshot.isEmpty()) {
             return UnaryOperator.identity();
         }
-        return event -> runCustomizers(snapshot, event, ChatStreamEventCustomizer::customize);
+        return event -> runCustomizers(snapshot, event);
     }
 
     /**
@@ -174,30 +142,6 @@ public abstract class AbstractChatClient implements ChatClient {
     public synchronized boolean removeDefaultTool(String name) {
         Objects.requireNonNull(name, "name must not be null");
         return defaultTools.removeIf(tool -> name.equals(tool.name()));
-    }
-
-    /**
-     * Inserts the registration after every entry with an order less or equal, so equal orders
-     * keep the sequence they were added in. Called under the class monitor: finding the slot and
-     * taking it has to be one step, or two concurrent registrations could land past their place.
-     */
-    private static <T> void insert(List<Registration<T>> list, T customizer, int order) {
-        int index = list.size();
-        while (index > 0 && list.get(index - 1).order() > order) {
-            index--;
-        }
-        list.add(index, new Registration<>(customizer, order));
-    }
-
-    /** Removes the first registration of the given customizer, whichever order it sits at. */
-    private static <T> boolean remove(List<Registration<T>> list, T customizer) {
-        for (int index = 0; index < list.size(); index++) {
-            if (list.get(index).customizer().equals(customizer)) {
-                list.remove(index);
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -274,7 +218,7 @@ public abstract class AbstractChatClient implements ChatClient {
      * answered one of its own.
      */
     private ChatResponse customize(ChatContext context, ChatResponse response) {
-        return runCustomizers(responseCustomizers, response, ChatResponseCustomizer::customize, stamped -> {
+        return runCustomizers(responseCustomizers, response, stamped -> {
             stamped.setContext(context);
             context.setResponse(stamped);
         });
@@ -286,18 +230,16 @@ public abstract class AbstractChatClient implements ChatClient {
      * when given, runs after each step — where bookkeeping has to follow the answer along, as the
      * context does on a response.
      *
-     * @param registrations the chain, in the order it was registered
+     * @param registrations the chain, in the order it was added
      * @param initial       what the first customizer is given
-     * @param invoke        how one customizer is asked — its own {@code customize} method
      * @param afterEach     runs after each answer, or {@code null} for nothing
      * @return the last answer; never {@code null}
      */
-    private <T, C> T runCustomizers(List<Registration<C>> registrations, T initial,
-            CustomizerCall<C, T> invoke, Consumer<T> afterEach) {
+    private <T> T runCustomizers(List<? extends ChatCustomizer<T>> registrations, T initial,
+            Consumer<T> afterEach) {
         T answer = initial;
-        for (Registration<C> registration : registrations) {
-            answer = Objects.requireNonNull(invoke.ask(registration.customizer(), this, answer),
-                    "customizer answered null");
+        for (ChatCustomizer<T> customizer : registrations) {
+            answer = Objects.requireNonNull(customizer.customize(this, answer), "customizer answered null");
             if (afterEach != null) {
                 afterEach.accept(answer);
             }
@@ -306,8 +248,8 @@ public abstract class AbstractChatClient implements ChatClient {
     }
 
     /** The same, with nothing to do after each step. */
-    private <T, C> T runCustomizers(List<Registration<C>> registrations, T initial, CustomizerCall<C, T> invoke) {
-        return runCustomizers(registrations, initial, invoke, null);
+    private <T> T runCustomizers(List<? extends ChatCustomizer<T>> registrations, T initial) {
+        return runCustomizers(registrations, initial, null);
     }
 
     /**
@@ -325,13 +267,13 @@ public abstract class AbstractChatClient implements ChatClient {
     }
 
     /**
-     * Applies this client's own defaults to the request, at {@link ChatClient#DEFAULT_ORDER}:
-     * after the customizers registered below it, before those at or above it. Runs exactly once
-     * per call, even when no customizer is registered. The base merges the default tools
-     * registered through {@link #addDefaultTool(Tool)}. A subclass with defaults of its own
-     * overrides this and must call {@code super.applyDefaults(request)} to keep that merge.
+     * Applies this client's own defaults to the request — first, before any customizer runs, so
+     * every customizer sees them applied and has the last word on what goes out. Runs exactly once
+     * per call. The base merges the default tools registered through {@link #addDefaultTool(Tool)}.
+     * A subclass with defaults of its own overrides this and must call
+     * {@code super.applyDefaults(request)} to keep that merge.
      *
-     * @param request the request so far, with the customizers below the defaults already run
+     * @param request the request as the caller built it
      * @return the request to continue with, which may be the one that was given; never
      *         {@code null}
      */
@@ -369,8 +311,8 @@ public abstract class AbstractChatClient implements ChatClient {
     }
 
     /**
-     * Applies the client's own defaults at {@link ChatClient#DEFAULT_ORDER}, then walks every
-     * request customizer by its registered order — lower runs first, ties in registration order.
+     * Applies this client's own defaults, then walks every request customizer in the order it was
+     * registered.
      *
      * @param request the request as the caller built it
      * @return the request to send, which is the one that was given when no customizer answered
@@ -378,16 +320,8 @@ public abstract class AbstractChatClient implements ChatClient {
      * @throws NullPointerException a customizer answered {@code null}
      */
     protected ChatRequest prepare(ChatRequest request) {
-        boolean defaultsApplied = false;
-        for (Registration<ChatRequestCustomizer> registration : requestCustomizers) {
-            if (!defaultsApplied && registration.order() >= DEFAULT_ORDER) {
-                request = applyDefaultsChecked(request);
-                defaultsApplied = true;
-            }
-            ChatRequestCustomizer customizer = registration.customizer();
-            request = Objects.requireNonNull(customizer.customize(this, request), "customizer answered null");
-        }
-        return defaultsApplied ? request : applyDefaultsChecked(request);
+        request = applyDefaultsChecked(request);
+        return runCustomizers(requestCustomizers, request);
     }
 
     /** The defaults step, failing as loudly as a customizer that answered {@code null}. */
@@ -420,7 +354,7 @@ public abstract class AbstractChatClient implements ChatClient {
 
         private final ChatStream delegate;
 
-        private final List<Registration<ChatResponseCustomizer>> customizers;
+        private final List<ChatResponseCustomizer> customizers;
 
         /** The exchange's context; stamped on every answer the pass hands on. */
         private final ChatContext context;
@@ -429,7 +363,7 @@ public abstract class AbstractChatClient implements ChatClient {
 
         private ChatResponse result;
 
-        private CustomizedStream(ChatStream delegate, List<Registration<ChatResponseCustomizer>> customizers,
+        private CustomizedStream(ChatStream delegate, List<ChatResponseCustomizer> customizers,
                 ChatContext context) {
             this.delegate = delegate;
             this.customizers = customizers;
@@ -477,11 +411,10 @@ public abstract class AbstractChatClient implements ChatClient {
                 return;
             }
             applied = true;
-            result = runCustomizers(customizers, delegate.aggregatedResponse(), ChatResponseCustomizer::customize,
-                    stamped -> {
-                        stamped.setContext(context);
-                        context.setResponse(stamped);
-                    });
+            result = runCustomizers(customizers, delegate.aggregatedResponse(), stamped -> {
+                stamped.setContext(context);
+                context.setResponse(stamped);
+            });
         }
 
     }

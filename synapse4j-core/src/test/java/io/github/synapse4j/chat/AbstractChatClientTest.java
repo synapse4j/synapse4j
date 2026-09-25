@@ -114,6 +114,23 @@ class AbstractChatClientTest {
     }
 
     @Test
+    void oneRemovalTakesEveryRegistrationOfTheCustomizer() {
+        List<String> ran = new ArrayList<>();
+        ChatRequestCustomizer customizer = (it, request) -> {
+            ran.add("run");
+            return request;
+        };
+        StubChatClient client = new StubChatClient();
+        client.addChatRequestCustomizer(customizer);
+        client.addChatRequestCustomizer(customizer);
+
+        assertTrue(client.removeChatRequestCustomizer(customizer));
+        client.chat(new ChatRequest());
+
+        assertTrue(ran.isEmpty());
+    }
+
+    @Test
     void aCustomizerAnsweringNullFailsLoudly() {
         StubChatClient client = new StubChatClient();
         client.addChatRequestCustomizer((it, request) -> null);
@@ -496,56 +513,47 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void requestCustomizersRunByTheirRegisteredOrderWithInsertionOrderAsTheTieBreak() {
+    void requestCustomizersRunInTheOrderTheyWereAdded() {
         List<String> ran = new ArrayList<>();
         StubChatClient client = new StubChatClient();
-        client.addChatRequestCustomizer(namedRequest("late", ran), 10);
-        client.addChatRequestCustomizer(namedRequest("early", ran), -5);
-        client.addChatRequestCustomizer(namedRequest("first-default", ran), ChatClient.DEFAULT_ORDER);
-        client.addChatRequestCustomizer((it, request) -> {
-            ran.add("lambda");
-            return request;
-        });
-        client.addChatRequestCustomizer(namedRequest("second-default", ran), ChatClient.DEFAULT_ORDER);
+        client.addChatRequestCustomizer(namedRequest("first", ran));
+        client.addChatRequestCustomizer(namedRequest("second", ran));
+        client.addChatRequestCustomizer(namedRequest("third", ran));
 
         client.chat(new ChatRequest());
 
-        assertEquals(List.of("early", "first-default", "lambda", "second-default", "late"), ran);
+        assertEquals(List.of("first", "second", "third"), ran);
     }
 
     @Test
-    void responseCustomizersRunByTheirRegisteredOrderWithInsertionOrderAsTheTieBreak() {
+    void responseCustomizersRunInTheOrderTheyWereAdded() {
         List<String> ran = new ArrayList<>();
         StubChatClient client = new StubChatClient();
-        client.addChatResponseCustomizer(namedResponse("late", ran), 10);
-        client.addChatResponseCustomizer(namedResponse("early", ran), -5);
-        client.addChatResponseCustomizer((it, response) -> {
-            ran.add("lambda");
-            return response;
-        });
-        client.addChatResponseCustomizer(namedResponse("after-lambda", ran), ChatClient.DEFAULT_ORDER);
+        client.addChatResponseCustomizer(namedResponse("first", ran));
+        client.addChatResponseCustomizer(namedResponse("second", ran));
+        client.addChatResponseCustomizer(namedResponse("third", ran));
 
         client.chat(new ChatRequest());
 
-        assertEquals(List.of("early", "lambda", "after-lambda", "late"), ran);
+        assertEquals(List.of("first", "second", "third"), ran);
     }
 
     @Test
-    void theClientDefaultsApplyBetweenTheCustomizersThatStraddleThem() {
+    void theClientDefaultsApplyBeforeEveryCustomizer() {
         List<String> ran = new ArrayList<>();
         DefaultsChatClient client = new DefaultsChatClient();
         client.addChatRequestCustomizer((it, request) -> {
-            ran.add("before:" + request.getOptions().getModel());
+            ran.add("first:" + request.getOptions().getModel());
             return request;
-        }, ChatClient.DEFAULT_ORDER - 1);
+        });
         client.addChatRequestCustomizer((it, request) -> {
-            ran.add("after:" + request.getOptions().getModel());
+            ran.add("second:" + request.getOptions().getModel());
             return request;
         });
 
         client.chat(new ChatRequest());
 
-        assertEquals(List.of("before:null", "after:inherited"), ran);
+        assertEquals(List.of("first:inherited", "second:inherited"), ran);
         assertEquals(1, client.defaultsApplied);
     }
 
