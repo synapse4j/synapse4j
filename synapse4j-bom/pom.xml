@@ -80,6 +80,11 @@
         <artifactId>synapse4j-openai</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>io.github.synapse4j</groupId>
+        <artifactId>synapse4j-spring-boot-starter</artifactId>
+        <version>${project.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 

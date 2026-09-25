@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.github.synapse4j</groupId>
+    <artifactId>synapse4j-parent</artifactId>
+    <version>${revision}</version>
+    <relativePath>../synapse4j-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>synapse4j-spring-boot-starter</artifactId>
+
+  <!-- The Spring Boot integration: it wires the Jackson codec, the RestClient transport and the
+       OpenAI chat client into the context, bound to synapse4j.* properties, and every bean backs
+       off as soon as the application declares one of its own. Versions of all Spring dependencies
+       come from the Boot BOM the parent imports — none are pinned here. -->
+  <dependencies>
+    <dependency>
+      <groupId>io.github.synapse4j</groupId>
+      <artifactId>synapse4j-jackson</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.synapse4j</groupId>
+      <artifactId>synapse4j-http-restclient</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.synapse4j</groupId>
+      <artifactId>synapse4j-openai</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <!-- Carries the auto-configuration that publishes the prototype RestClient.Builder this
+         starter builds its transport on, so Boot-side customizers, observations and
+         spring.http.client.* settings ride along. No type of this module is referenced in our
+         code: exclude it and the transport falls back to a plain RestClient.builder(). -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-restclient</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <!-- Generates the configuration metadata so synapse4j.* keys complete in the IDE. Optional:
+         build-time only, never a dependency of the consuming application. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+</project>
