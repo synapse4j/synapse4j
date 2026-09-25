@@ -127,6 +127,13 @@ one would block extension by users and providers.
   `...data`, references `Tool`. Cycles among these peer packages are accepted when they mirror a real
   relationship (a request carries a tool; the client drives a tool loop): this is one module, where a
   cycle costs the reader nothing, and a concept-wrong home would cost on every read.
+- **Tests pin decisions, not plumbing.** A test earns its place by pinning a decision that could go
+  wrong by mistake later — merge and ordering rules, contracts (a null answered loudly, a request
+  handed on unchanged, one iterator pass), failure paths — and the assertion itself must be
+  defensible: a test that faithfully records a bug is worse than no test at all. Never pad for a
+  count: coverage is not measured in this build, and a test whose assertion can be re-derived by
+  reading the code beside it — a Lombok accessor, a generated toString, a literal constant, an
+  empty default — proves the source works, not us.
 
 ## Build and test
 
