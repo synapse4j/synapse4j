@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -18,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
+import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.Tool;
 import io.github.synapse4j.data.ToolDefinition;
 import io.github.synapse4j.tool.FunctionTool;
@@ -360,6 +360,76 @@ class AbstractChatClientTest {
     }
 
     @Test
+    void eventCustomizersRunBeforeTheFoldAndTheCallerSeesTheSameEvent() {
+        StubChatClient client = new StubChatClient();
+        client.addChatStreamEventCustomizer((it, event) -> {
+            event.setEventType("fixed");
+            return event;
+        });
+
+        ChatStream stream = client.stream(new ChatRequest());
+        List<String> seen = new ArrayList<>();
+        for (ChatStreamEvent event : stream) {
+            seen.add(event.getEventType());
+        }
+
+        assertEquals(List.of("fixed"), seen);
+        assertEquals("fixed", stream.aggregatedResponse().getFinishReason());
+    }
+
+    @Test
+    void eventCustomizersRunInOrderEachAnsweringTheNext() {
+        StubChatClient client = new StubChatClient();
+        client.addChatStreamEventCustomizer((it, event) -> {
+            event.setEventType(event.getEventType() + "+first");
+            return event;
+        });
+        client.addChatStreamEventCustomizer((it, event) -> {
+            event.setEventType(event.getEventType() + "+second");
+            return event;
+        });
+
+        ChatStream stream = client.stream(new ChatRequest());
+        var events = stream.iterator();
+        while (events.hasNext()) {
+            events.next();
+        }
+
+        assertEquals("stub+first+second", stream.aggregatedResponse().getFinishReason());
+    }
+
+    @Test
+    void anEventCustomizerRegisteredAfterTheStreamOpenedDoesNotJoinIt() {
+        StubChatClient client = new StubChatClient();
+        ChatStream stream = client.stream(new ChatRequest());
+        client.addChatStreamEventCustomizer((it, event) -> {
+            event.setEventType("late");
+            return event;
+        });
+
+        var events = stream.iterator();
+        while (events.hasNext()) {
+            events.next();
+        }
+
+        assertEquals("stub", stream.aggregatedResponse().getFinishReason());
+    }
+
+    @Test
+    void anEventCustomizerNeverRunsOnABlockingCall() {
+        List<String> ran = new ArrayList<>();
+        StubChatClient client = new StubChatClient();
+        client.addChatStreamEventCustomizer((it, event) -> {
+            ran.add("run");
+            return event;
+        });
+
+        client.chat(new ChatRequest());
+
+        assertTrue(ran.isEmpty());
+    }
+
+    @Test
     void aResponseCustomizerAnsweringNullFailsLoudly() {
         StubChatClient client = new StubChatClient();
         client.addChatResponseCustomizer((it, response) -> null);
@@ -630,9 +700,11 @@ class AbstractChatClientTest {
         @Override
         protected ChatStream doStream(ChatRequest request) {
             this.seen = request;
-            return new DefaultChatStream(Collections.emptyIterator(), (response, event) -> {
-            }, () -> {
-            });
+            ChatStreamEvent event = new ChatStreamEvent();
+            event.setEventType("stub");
+            return new DefaultChatStream(List.of(event).iterator(), eventPipeline(),
+                    (response, pulled) -> response.setFinishReason(pulled.getEventType()), () -> {
+                    });
         }
     }
 

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.UnaryOperator;
 
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ChatRequest;
@@ -15,14 +16,17 @@ import io.github.synapse4j.data.Tool;
 
 /**
  * A {@link ChatClient} that runs its customizers around the exchange: a request customizer before
- * the subclass sees the request, a response customizer before the caller sees the answer.
+ * the subclass sees the request, a response customizer before the caller sees the answer, and —
+ * inside the streams it builds — the event customizers between their source and their folding.
  *
  * <p>
  * A subclass implements {@link #doChat(ChatRequest)} and {@link #doStream(ChatRequest)} with the
  * exchange itself, and receives {@link #chat(ChatRequest)} and {@link #stream(ChatRequest)} from
- * here, already prepared. Extending this class is a convenience, not a requirement: implementing
- * {@link ChatClient} directly is equally valid — running the customizers is then the implementer's
- * to do, and forgetting it fails silently, which is why this class exists.
+ * here, already prepared; the stream it builds in {@code doStream} carries {@link #eventPipeline()}
+ * so its events run the chain before they are folded. Extending this class is a convenience, not
+ * a requirement: implementing {@link ChatClient} directly is equally valid — running the
+ * customizers is then the implementer's to do, and forgetting it fails silently, which is why this
+ * class exists.
  *
  * <p>
  * Nothing here is final. A subclass that needs to prepare a request its own way can override
@@ -48,6 +52,12 @@ public abstract class AbstractChatClient implements ChatClient {
     private final List<Registration<ChatRequestCustomizer>> requestCustomizers = new CopyOnWriteArrayList<>();
 
     private final List<Registration<ChatResponseCustomizer>> responseCustomizers = new CopyOnWriteArrayList<>();
+
+    /**
+     * Copy-on-write and sorted like the two above; the snapshot a stream opens with is taken from
+     * here when the stream is built.
+     */
+    private final List<Registration<ChatStreamEventCustomizer>> eventCustomizers = new CopyOnWriteArrayList<>();
 
     /**
      * The standing tool set, in registration order. Copy-on-write for the same reason as the
@@ -85,6 +95,47 @@ public abstract class AbstractChatClient implements ChatClient {
     @Override
     public synchronized boolean removeChatResponseCustomizer(ChatResponseCustomizer customizer) {
         return remove(responseCustomizers, Objects.requireNonNull(customizer, "customizer must not be null"));
+    }
+
+    @Override
+    public void addChatStreamEventCustomizer(ChatStreamEventCustomizer customizer) {
+        addChatStreamEventCustomizer(customizer, DEFAULT_ORDER);
+    }
+
+    @Override
+    public synchronized void addChatStreamEventCustomizer(ChatStreamEventCustomizer customizer, int order) {
+        insert(eventCustomizers, Objects.requireNonNull(customizer, "customizer must not be null"), order);
+    }
+
+    @Override
+    public synchronized boolean removeChatStreamEventCustomizer(ChatStreamEventCustomizer customizer) {
+        return remove(eventCustomizers, Objects.requireNonNull(customizer, "customizer must not be null"));
+    }
+
+    /**
+     * The chain this client's event customizers form, ready for a stream to run every event
+     * through before folding it and handing it out. A subclass builds its stream in
+     * {@link #doStream(ChatRequest)} with this; the snapshot is taken now, so a customizer
+     * registered after the stream opens joins neither it nor its fold.
+     *
+     * <p>
+     * The chain runs on the thread pulling the events, once per event, between the source and
+     * the fold, and its answers are both folded and handed out.
+     *
+     * @return the chain; never {@code null}
+     */
+    protected UnaryOperator<ChatStreamEvent> eventPipeline() {
+        List<Registration<ChatStreamEventCustomizer>> snapshot = List.copyOf(eventCustomizers);
+        if (snapshot.isEmpty()) {
+            return UnaryOperator.identity();
+        }
+        return event -> {
+            for (Registration<ChatStreamEventCustomizer> registration : snapshot) {
+                event = Objects.requireNonNull(registration.customizer().customize(this, event),
+                        "customizer answered null");
+            }
+            return event;
+        };
     }
 
     /**

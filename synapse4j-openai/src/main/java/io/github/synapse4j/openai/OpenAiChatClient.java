@@ -137,7 +137,7 @@ public class OpenAiChatClient extends AbstractChatClient {
             }
             // The response is deliberately left open: the stream owns it from here, and closing
             // the stream is what cancels an answer that is still in flight.
-            ChatStream stream = new ChatCompletionsStream(codec, events, httpResponse::close);
+            ChatStream stream = new ChatCompletionsStream(codec, events, eventPipeline(), httpResponse::close);
             // The headers arrive with the response, before any frame does, so they go onto the
             // answer now: aggregatedResponse() carries them the moment the stream exists, the
             // same way the answer of a blocking call does.

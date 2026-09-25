@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -23,6 +22,7 @@ import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatRole;
+import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.Tool;
@@ -260,6 +260,27 @@ class ToolCallingChatClientTest {
         String apply(String arguments) throws Exception;
     }
 
+    @Test
+    void eventCustomizersRegisteredOnTheDecoratorRunInTheInnerStream() {
+        ToolCallingChatClient client = new ToolCallingChatClient(inner);
+        List<ChatClient> runners = new ArrayList<>();
+        client.addChatStreamEventCustomizer((it, event) -> {
+            runners.add(it);
+            event.setEventType("fixed");
+            return event;
+        });
+
+        ChatStream stream = client.stream(new ChatRequest());
+        List<String> seen = new ArrayList<>();
+        for (ChatStreamEvent event : stream) {
+            seen.add(event.getEventType());
+        }
+
+        assertEquals(List.of("fixed"), seen);
+        // The registration was handed over: the inner client's stream is what ran the chain.
+        assertSame(inner, runners.get(0));
+    }
+
     /** An inner client answering from a script, recording what each trip looked like. */
     private static class ScriptedChatClient extends AbstractChatClient {
 
@@ -280,7 +301,9 @@ class ToolCallingChatClientTest {
         @Override
         protected ChatStream doStream(ChatRequest request) {
             streamTrips.incrementAndGet();
-            return new DefaultChatStream(Collections.emptyIterator(), (response, event) -> {
+            ChatStreamEvent event = new ChatStreamEvent();
+            event.setEventType("stub");
+            return new DefaultChatStream(List.of(event).iterator(), eventPipeline(), (response, pulled) -> {
             }, () -> {
             });
         }

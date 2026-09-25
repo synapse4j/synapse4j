@@ -25,8 +25,10 @@ import io.github.synapse4j.tool.ToolExecutor;
  * <p>
  * Everything else passes through: the rounds all go to the inner client, so its customizers
  * and defaults run per turn, while this class's own run at the round's start and once on the
- * final answer. {@link #stream} never loops — events come straight from the inner client for
- * the caller to drive by hand.
+ * final answer. Event customizers registered on this decorator are handed to the inner client
+ * as they are registered — its streams fold the events, and that is where the chain has to run.
+ * {@link #stream} never loops — events come straight from the inner client for the caller to
+ * drive by hand.
  *
  * <p>
  * The request grows in place: each turn appends the assistant's answer — the tool calls
@@ -62,6 +64,40 @@ public class ToolCallingChatClient extends AbstractChatClient {
     public ToolCallingChatClient(ChatClient inner, ToolExecutor executor) {
         this.inner = Objects.requireNonNull(inner, "inner must not be null");
         this.executor = executor != null ? executor : new DefaultToolExecutor();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>
+     * Handed straight to the inner client — its streams are where the events are folded, and
+     * the chain has to run there.
+     */
+    @Override
+    public void addChatStreamEventCustomizer(ChatStreamEventCustomizer customizer) {
+        inner.addChatStreamEventCustomizer(customizer);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>
+     * Handed straight to the inner client, at the given order.
+     */
+    @Override
+    public void addChatStreamEventCustomizer(ChatStreamEventCustomizer customizer, int order) {
+        inner.addChatStreamEventCustomizer(customizer, order);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>
+     * The registration was handed to the inner client, and it comes off there.
+     */
+    @Override
+    public boolean removeChatStreamEventCustomizer(ChatStreamEventCustomizer customizer) {
+        return inner.removeChatStreamEventCustomizer(customizer);
     }
 
     /**

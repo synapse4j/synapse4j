@@ -173,6 +173,28 @@ class DefaultChatStreamTest {
         }));
         assertThrows(NullPointerException.class, () -> new DefaultChatStream(source, (r, e) -> {
         }, null));
+        assertThrows(NullPointerException.class, () -> new DefaultChatStream(source, null, (r, e) -> {
+        }, () -> {
+        }));
+    }
+
+    @Test
+    void theEventPipelineRunsBeforeTheFoldAndTheCallerSeesWhatWasFolded() {
+        List<ChatStreamEvent> arrived = events("one", "two");
+        List<String> folded = new ArrayList<>();
+        List<String> seen = new ArrayList<>();
+        try (ChatStream stream = new DefaultChatStream(arrived.iterator(), event -> {
+            event.setEventType(event.getEventType() + "-fixed");
+            return event;
+        }, (response, event) -> folded.add(event.getEventType()), () -> {
+        })) {
+            for (ChatStreamEvent event : stream) {
+                seen.add(event.getEventType());
+            }
+        }
+
+        assertEquals(List.of("one-fixed", "two-fixed"), seen);
+        assertEquals(List.of("one-fixed", "two-fixed"), folded);
     }
 
     private static List<ChatStreamEvent> events(String... types) {

@@ -5,6 +5,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.BiConsumer;
+import java.util.function.UnaryOperator;
 
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
@@ -12,13 +13,17 @@ import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
 
 /**
- * The {@link ChatStream} every provider module reuses. It wires the three things only a provider
- * knows: where the events come from, how one event folds into the aggregated response, and what
- * releasing the stream means.
+ * The {@link ChatStream} every provider module reuses. It wires the things only a provider knows:
+ * where the events come from, how one event folds into the aggregated response, and what
+ * releasing the stream means. The client's event customizer chain is wired in beside them: it
+ * runs on each event between the source and the fold, so what is folded and what is handed out
+ * are the same event.
  */
 public class DefaultChatStream implements ChatStream {
 
     private final Iterator<ChatStreamEvent> source;
+
+    private final UnaryOperator<ChatStreamEvent> eventPipeline;
 
     private final BiConsumer<ChatResponse, ChatStreamEvent> aggregation;
 
@@ -38,7 +43,7 @@ public class DefaultChatStream implements ChatStream {
     private boolean exhausted;
 
     /**
-     * A stream over the given source.
+     * A stream over the given source, with no event customizers.
      *
      * @param source      where events come from, in arrival order; never {@code null}
      * @param aggregation how one consumed event updates the aggregated response; never {@code null}
@@ -47,7 +52,24 @@ public class DefaultChatStream implements ChatStream {
      */
     public DefaultChatStream(Iterator<ChatStreamEvent> source, BiConsumer<ChatResponse, ChatStreamEvent> aggregation,
             AutoCloseable closeAction) {
+        this(source, UnaryOperator.identity(), aggregation, closeAction);
+    }
+
+    /**
+     * A stream over the given source.
+     *
+     * @param source        where events come from, in arrival order; never {@code null}
+     * @param eventPipeline the client's event customizer chain, run on each event between the
+     *                          source and the fold; never {@code null} — identity when there
+     *                          are no customizers
+     * @param aggregation   how one consumed event updates the aggregated response; never {@code null}
+     * @param closeAction   what releasing the stream does — typically closing the HTTP response
+     *                          behind it; never {@code null}
+     */
+    public DefaultChatStream(Iterator<ChatStreamEvent> source, UnaryOperator<ChatStreamEvent> eventPipeline,
+            BiConsumer<ChatResponse, ChatStreamEvent> aggregation, AutoCloseable closeAction) {
         this.source = Objects.requireNonNull(source, "source must not be null");
+        this.eventPipeline = Objects.requireNonNull(eventPipeline, "eventPipeline must not be null");
         this.aggregation = Objects.requireNonNull(aggregation, "aggregation must not be null");
         this.closeAction = Objects.requireNonNull(closeAction, "closeAction must not be null");
     }
@@ -91,7 +113,7 @@ public class DefaultChatStream implements ChatStream {
         }
     }
 
-    /** The one iterator: pulls from the source and folds each handed-out event into the aggregation. */
+    /** The one iterator: pulls from the source, runs the event chain, and folds what comes out. */
     private final class StreamIterator implements Iterator<ChatStreamEvent> {
 
         @Override
@@ -128,7 +150,7 @@ public class DefaultChatStream implements ChatStream {
             if (!hasNext()) {
                 throw new NoSuchElementException("the stream is exhausted");
             }
-            ChatStreamEvent event = source.next();
+            ChatStreamEvent event = eventPipeline.apply(source.next());
             aggregation.accept(aggregated, event);
             return event;
         }

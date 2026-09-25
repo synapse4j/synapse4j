@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.function.UnaryOperator;
 
 import io.github.synapse4j.chat.DefaultChatStream;
 import io.github.synapse4j.data.ChatMessage;
@@ -54,13 +55,16 @@ class ChatCompletionsStream extends DefaultChatStream {
     /**
      * A stream over the given frames.
      *
-     * @param codec       the application's codec, for opening a reader over each frame's payload
-     * @param sse         the frames of the answer, in arrival order; the caller owns the body
-     * @param closeAction what releasing the stream does — typically closing the HTTP response
-     *                        behind it; never {@code null}
+     * @param codec         the application's codec, for opening a reader over each frame's payload
+     * @param sse           the frames of the answer, in arrival order; the caller owns the body
+     * @param eventPipeline the client's event customizer chain, run on each event between the
+     *                          frames and the fold
+     * @param closeAction   what releasing the stream does — typically closing the HTTP response
+     *                          behind it; never {@code null}
      */
-    ChatCompletionsStream(JsonCodec codec, SseEventStream sse, AutoCloseable closeAction) {
-        super(events(codec, sse), ChatCompletionsStream::aggregate, closeAction);
+    ChatCompletionsStream(JsonCodec codec, SseEventStream sse, UnaryOperator<ChatStreamEvent> eventPipeline,
+            AutoCloseable closeAction) {
+        super(events(codec, sse), eventPipeline, ChatCompletionsStream::aggregate, closeAction);
     }
 
     /**
