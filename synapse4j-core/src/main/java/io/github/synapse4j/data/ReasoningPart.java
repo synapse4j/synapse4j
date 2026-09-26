@@ -1,5 +1,7 @@
 package io.github.synapse4j.data;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,6 +29,6 @@ import lombok.ToString;
 public class ReasoningPart extends ContentPart {
 
     /** The reasoning text. */
-    private String text;
+    private @Nullable String text;
 
 }

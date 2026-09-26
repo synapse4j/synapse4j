@@ -1,5 +1,7 @@
 package io.github.synapse4j.data;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -40,23 +42,23 @@ public class ChatResponseFormat {
     public static final String TYPE_JSON_SCHEMA = "json_schema";
 
     /** One of the {@code TYPE_*} constants, or any other value a provider understands. */
-    private String type;
+    private @Nullable String type;
 
     /** Name of the schema; the protocol that requires a name needs one. */
-    private String name;
+    private @Nullable String name;
 
     /** What the schema describes, for the model to read. */
-    private String description;
+    private @Nullable String description;
 
     /** The schema, as JSON Schema text. */
-    private String schema;
+    private @Nullable String schema;
 
     /**
      * Whether the provider has to enforce the schema rather than merely aim at it; {@code null}
      * leaves the decision to the protocol's default. Only the protocols that carry the flag inside
      * a schema-shaped answer send it, and only for {@link #TYPE_JSON_SCHEMA}.
      */
-    private Boolean strict;
+    private @Nullable Boolean strict;
 
     /** Provider-specific fields of this requirement. */
     private final ProviderExtras extras = new ProviderExtras();

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.github.synapse4j.tool.Tool;
+import org.jspecify.annotations.Nullable;
 
 import lombok.Getter;
 import lombok.NonNull;
@@ -49,7 +50,7 @@ public class ChatRequest {
      * The context tying this call to a conversation; {@code null} until one is attached. It travels
      * inside the library only and is never serialized.
      */
-    private ChatContext context;
+    private @Nullable ChatContext context;
 
     /**
      * Adds a message to the conversation.
@@ -57,7 +58,7 @@ public class ChatRequest {
      * @param message the message to add, oldest first
      * @return this call
      */
-    public ChatRequest addMessage(ChatMessage message) {
+    public ChatRequest addMessage(@NonNull ChatMessage message) {
         messages.add(message);
         return this;
     }
@@ -68,7 +69,7 @@ public class ChatRequest {
      * @param tool the tool to add
      * @return this call
      */
-    public ChatRequest addTool(Tool tool) {
+    public ChatRequest addTool(@NonNull Tool tool) {
         tools.add(tool);
         return this;
     }

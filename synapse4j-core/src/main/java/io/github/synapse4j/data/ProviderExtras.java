@@ -5,9 +5,11 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+
+import org.jspecify.annotations.Nullable;
 
 import lombok.EqualsAndHashCode;
+import lombok.NonNull;
 
 /**
  * Extra, provider-specific fields attached to a single node of a request (the request itself, a
@@ -107,7 +109,7 @@ public class ProviderExtras {
      * @param path one or more path segments; must not be empty
      * @return the value, or {@code null} if nothing is set at that path
      */
-    public Object get(String... path) {
+    public @Nullable Object get(String... path) {
         return values.get(encode(path));
     }
 
@@ -138,7 +140,7 @@ public class ProviderExtras {
      * @param value the value; stored as-is, may be {@code null}
      * @return this bag
      */
-    public ProviderExtras put(String key, Object value) {
+    public ProviderExtras put(@NonNull String key, @Nullable Object value) {
         return putPath(value, List.of(key));
     }
 
@@ -151,7 +153,7 @@ public class ProviderExtras {
      * @param value the value; stored as-is, may be {@code null}
      * @return this bag
      */
-    public ProviderExtras put(List<String> path, Object value) {
+    public ProviderExtras put(@NonNull List<String> path, @Nullable Object value) {
         return putPath(value, path);
     }
 
@@ -160,15 +162,15 @@ public class ProviderExtras {
      * neither split nor escaped, and its shape is not checked.
      *
      * <p>
-     * This is the writing counterpart of {@link #rawMap()}. An entry set at that key is replaced, and
-     * an ancestor or a descendant of it is cleared, as with the other {@code put} methods.
+     * This is the writing counterpart of {@link #rawMap()}: an entry set here is read back from that
+     * view, not through {@link #get(String...)}, which addresses path segments and so spells the
+     * same tree differently.
      *
      * @param key   the assembled key; must not be {@code null}
      * @param value the value; stored as-is, may be {@code null}
      * @return this bag
      */
-    public ProviderExtras putRaw(String key, Object value) {
-        Objects.requireNonNull(key, "key must not be null");
+    public ProviderExtras putRaw(@NonNull String key, @Nullable Object value) {
         clearAround(key);
         values.put(key, value);
         return this;
@@ -181,8 +183,7 @@ public class ProviderExtras {
      * @param other the bag to merge in; must not be {@code null}
      * @return this bag
      */
-    public ProviderExtras putAll(ProviderExtras other) {
-        Objects.requireNonNull(other, "other must not be null");
+    public ProviderExtras putAll(@NonNull ProviderExtras other) {
         if (other == this) {
             return this;
         }
@@ -194,8 +195,9 @@ public class ProviderExtras {
     }
 
     /**
-     * Returns a read-only view of the entries under their assembled keys, the form
-     * {@link #putRaw(String, Object)} accepts.
+     * Returns a read-only view of the entries under their assembled keys — the form
+     * {@link #putRaw(String, Object)} accepts, and the one an entry set with an assembled key is
+     * read back from.
      *
      * <p>
      * The view is live: entries set afterwards appear in it. Writing through it is refused, and the
@@ -219,24 +221,7 @@ public class ProviderExtras {
      */
     public Map<String, Object> nestedMap() {
         Map<String, Object> root = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : values.entrySet()) {
-            List<String> segments = decode(entry.getKey());
-            Map<String, Object> node = root;
-            for (int i = 0; i < segments.size() - 1; i++) {
-                // The bag never holds a path and something under it — put clears what stands in the
-                // way — so what is here is absent or the container this path continues through; an
-                // entry where a container should be fails, rather than being quietly replaced.
-                Object child = node.get(segments.get(i));
-                if (child == null) {
-                    child = new LinkedHashMap<String, Object>();
-                    node.put(segments.get(i), child);
-                }
-                @SuppressWarnings("unchecked")
-                Map<String, Object> childMap = (Map<String, Object>) child;
-                node = childMap;
-            }
-            node.put(segments.get(segments.size() - 1), entry.getValue());
-        }
+        mergeInto(root);
         return root;
     }
 
@@ -258,8 +243,7 @@ public class ProviderExtras {
      * @param members the tree to write into; the containers it already holds must be mutable
      * @return this bag
      */
-    public ProviderExtras mergeInto(Map<String, Object> members) {
-        Objects.requireNonNull(members, "members must not be null");
+    public ProviderExtras mergeInto(@NonNull Map<String, Object> members) {
         for (Map.Entry<String, Object> entry : values.entrySet()) {
             List<String> segments = decode(entry.getKey());
             Map<String, Object> node = members;
@@ -285,8 +269,7 @@ public class ProviderExtras {
         return "ProviderExtras" + rawMap();
     }
 
-    private ProviderExtras putPath(Object value, List<String> path) {
-        Objects.requireNonNull(path, "path must not be null");
+    private ProviderExtras putPath(Object value, @NonNull List<String> path) {
         String key = encode(path.toArray(new String[0]));
         clearAround(key);
         values.put(key, value);

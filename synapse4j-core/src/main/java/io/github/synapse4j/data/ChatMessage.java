@@ -3,8 +3,11 @@ package io.github.synapse4j.data;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.NonNull;
 import lombok.Setter;
 
 /**
@@ -27,7 +30,7 @@ import lombok.Setter;
 public class ChatMessage {
 
     /** Who contributes this message: a {@link ChatRole} constant, or any other value. */
-    private String role;
+    private @Nullable String role;
 
     /** What the message contributes. Never {@code null}; empty is allowed. */
     private final List<ContentPart> parts = new ArrayList<>();
@@ -36,7 +39,7 @@ public class ChatMessage {
      * Provider-specific fields to merge into this message when the request is sent. Absent until one
      * is set: a message nobody configures carries no bag at all.
      */
-    private ProviderExtras extras;
+    private @Nullable ProviderExtras extras;
 
     /**
      * The extras bag, created on first use — never {@code null}, unlike {@code getExtras()}.
@@ -55,9 +58,10 @@ public class ChatMessage {
     /**
      * A message from the given speaker, with nothing said yet.
      *
-     * @param role the {@link ChatRole} constant, or any other value
+     * @param role the {@link ChatRole} constant, or any other value; {@code null} leaves the role
+     *                 unset, as a message nobody has given one has it
      */
-    public ChatMessage(String role) {
+    public ChatMessage(@Nullable String role) {
         this.role = role;
     }
 
@@ -67,9 +71,20 @@ public class ChatMessage {
      * @param part the part to add
      * @return this message
      */
-    public ChatMessage addPart(ContentPart part) {
+    public ChatMessage addPart(@NonNull ContentPart part) {
         parts.add(part);
         return this;
+    }
+
+    /**
+     * Adds a text part to what this message contributes — the shorthand for the one kind of part
+     * nearly every message carries.
+     *
+     * @param text the text to add
+     * @return this message
+     */
+    public ChatMessage addText(@NonNull String text) {
+        return addPart(new TextPart(text));
     }
 
     /**

@@ -1,5 +1,7 @@
 package io.github.synapse4j.data;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,12 +23,12 @@ import lombok.ToString;
 public class ToolCallPart extends ContentPart {
 
     /** Identifier that ties this call to the {@link ToolResultPart} answering it. */
-    private String callId;
+    private @Nullable String callId;
 
     /** Name of the tool being called; the application resolves it against its own registry. */
-    private String name;
+    private @Nullable String name;
 
     /** The arguments as JSON text, exactly as they arrived from the provider. */
-    private String argumentsJson;
+    private @Nullable String argumentsJson;
 
 }

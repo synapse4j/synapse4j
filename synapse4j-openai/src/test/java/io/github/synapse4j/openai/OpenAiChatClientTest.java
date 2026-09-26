@@ -563,7 +563,7 @@ class OpenAiChatClientTest {
         request.getOptions().setModel("gpt-test");
         ChatMessage result = new ChatMessage();
         result.setRole(ChatRole.TOOL);
-        result.getParts().add(new ToolResultPart("call_9", "get_weather", List.of(new TextPart("sunny")), false));
+        result.getParts().add(new ToolResultPart("call_9", "get_weather", false).addText("sunny"));
         request.getMessages().add(result);
 
         client.chat(request);
@@ -967,7 +967,7 @@ class OpenAiChatClientTest {
         request.getOptions().setModel("gpt-test");
         ChatMessage result = new ChatMessage();
         result.setRole(ChatRole.TOOL);
-        ToolResultPart part = new ToolResultPart("call_1", "get_weather", List.of(new TextPart("sunny")), false);
+        ToolResultPart part = new ToolResultPart("call_1", "get_weather", false).addText("sunny");
         part.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
         result.getParts().add(part);
         request.getMessages().add(result);
@@ -994,8 +994,8 @@ class OpenAiChatClientTest {
         ChatMessage results = new ChatMessage();
         results.setRole(ChatRole.TOOL);
         results.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
-        results.getParts().add(new ToolResultPart("call_1", "get_weather", List.of(new TextPart("sunny")), false));
-        results.getParts().add(new ToolResultPart("call_2", "get_time", List.of(new TextPart("noon")), false));
+        results.getParts().add(new ToolResultPart("call_1", "get_weather", false).addText("sunny"));
+        results.getParts().add(new ToolResultPart("call_2", "get_time", false).addText("noon"));
         request.getMessages().add(results);
 
         client.chat(request);
@@ -1094,7 +1094,7 @@ class OpenAiChatClientTest {
         result.setRole(ChatRole.TOOL);
         TextPart text = new TextPart("sunny");
         text.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
-        result.getParts().add(new ToolResultPart("call_1", "get_weather", List.of(text), false));
+        result.getParts().add(new ToolResultPart("call_1", "get_weather", false).addPart(text));
         request.getMessages().add(result);
 
         // The tool message's content is a plain string, so a part carrying extras would have them

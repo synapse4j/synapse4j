@@ -130,13 +130,17 @@ one would block extension by users and providers.
   `...data`, references `Tool`. Cycles among these peer packages are accepted when they mirror a real
   relationship (a request carries a tool; the client drives a tool loop): this is one module, where a
   cycle costs the reader nothing, and a concept-wrong home would cost on every read.
-- **Null is answered where it crosses, and never re-detected.** A check on a value the next
-  statement dereferences anyway adds nothing — the NPE would say the same thing, just a day
-  later — so it is omitted. A parameter that must not be null carries Lombok's `@NonNull`; a
-  value arriving from anywhere else that would otherwise travel on silently (stored, returned,
-  handed to code that treats absence as a value) is answered loudly where it crosses, with a
-  message naming what answered null. Where null is part of the contract instead — a documented
-  "returns null when …" — the Javadoc says so, and no check contradicts it.
+- **Nullness is declared where the type permits it.** `@NonNull` is forbidden on a field a no-args
+  constructor can leave null — one with no initializer, in a class that has such a constructor,
+  explicit or implicit: Lombok's check lives in setters and in the constructors that take the field,
+  never in that one. `@Nullable` marks exactly what the type can produce and nothing else, because it
+  is the one form of the contract a user's IDE, checker or Kotlin compiler reads. Both on one value is
+  a contradiction.
+- **A null is answered where it crosses, and never re-detected.** A check the next statement
+  dereferences anyway says only what the NPE would have said a day later. A parameter that must not be
+  null carries Lombok's `@NonNull`. A null that would otherwise travel on silently — stored, returned,
+  handed to code that treats absence as a value — is refused where it crosses, naming what answered
+  null. A documented "returns null when …" is a contract, and no check contradicts it.
 - **Tests pin decisions, not plumbing.** A test earns its place by pinning a decision that could go
   wrong by mistake later — merge and ordering rules, contracts (a null answered loudly, a request
   handed on unchanged, one iterator pass), failure paths — and the assertion itself must be

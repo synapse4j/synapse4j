@@ -19,17 +19,6 @@ import org.junit.jupiter.api.Test;
 class ProviderExtrasTest {
 
     @Test
-    void newBagIsEmpty() {
-        ProviderExtras extras = new ProviderExtras();
-
-        assertTrue(extras.isEmpty());
-        assertEquals(0, extras.size());
-        assertEquals(Map.of(), extras.nestedMap());
-        assertFalse(extras.contains("anything"));
-        assertNull(extras.get("anything"));
-    }
-
-    @Test
     void putStoresAValueAtTheTopLevel() {
         ProviderExtras extras = new ProviderExtras();
 

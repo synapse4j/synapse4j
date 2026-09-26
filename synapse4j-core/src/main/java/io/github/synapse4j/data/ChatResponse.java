@@ -3,6 +3,8 @@ package io.github.synapse4j.data;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
@@ -34,22 +36,22 @@ public class ChatResponse {
     private ChatMessage message = new ChatMessage();
 
     /** Why generation stopped: a {@link ChatFinishReason} constant, or any other provider value. */
-    private String finishReason;
+    private @Nullable String finishReason;
 
     /** What the call consumed and produced, or {@code null} when the provider reported none. */
-    private Usage usage;
+    private @Nullable Usage usage;
 
     /** The model that answered; the provider's own echo, which may differ from the one requested. */
-    private String model;
+    private @Nullable String model;
 
     /** The provider's identifier for this response, or {@code null} when it gives none. */
-    private String id;
+    private @Nullable String id;
 
     /**
      * The context this answer rides back on — the instance the prepared request carried, or
      * {@code null} when none did. Filled by the client; never serialized.
      */
-    private ChatContext context;
+    private @Nullable ChatContext context;
 
     /**
      * Headers the transport reported for this response — a request id, rate-limit counts — and empty

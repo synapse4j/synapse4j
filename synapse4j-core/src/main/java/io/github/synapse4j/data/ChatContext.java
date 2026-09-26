@@ -3,6 +3,8 @@ package io.github.synapse4j.data;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -41,7 +43,7 @@ public class ChatContext {
      * The application sets it, and the library writes it too — a provider's id is adopted
      * during the exchange, but only while this one is still empty, so the caller's wins.
      */
-    private String sessionId;
+    private @Nullable String sessionId;
 
     /**
      * Which interaction of the current round this exchange is on, counting from 1; {@code 0}
@@ -55,13 +57,13 @@ public class ChatContext {
      * The request as it went out — the one after every customizer ran — recorded by the client
      * before sending and overwritten on every call; never a history of what was sent.
      */
-    private ChatRequest request;
+    private @Nullable ChatRequest request;
 
     /**
      * The most recent response, recorded by the client when it arrives and overwritten on every
      * call.
      */
-    private ChatResponse response;
+    private @Nullable ChatResponse response;
 
     /**
      * The application's own entries for this conversation. Never {@code null}; the library never

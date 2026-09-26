@@ -1,6 +1,8 @@
 package io.github.synapse4j.data;
 
 import io.github.synapse4j.util.InputStreamSupplier;
+import org.jspecify.annotations.Nullable;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,15 +32,15 @@ import lombok.ToString;
 public class MediaPart extends ContentPart {
 
     /** MIME type of the payload, for example {@code image/png}. */
-    private String mediaType;
+    private @Nullable String mediaType;
 
     /** Where the payload can be fetched from; in practice set instead of {@link #source}. */
-    private String uri;
+    private @Nullable String uri;
 
     /** Where the payload's bytes come from; in practice set instead of {@link #uri}. */
-    private InputStreamSupplier source;
+    private @Nullable InputStreamSupplier source;
 
     /** File name, when the payload has one. */
-    private String name;
+    private @Nullable String name;
 
 }

@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import io.github.synapse4j.http.HttpOptions;
+import org.jspecify.annotations.Nullable;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -34,23 +35,23 @@ import lombok.ToString;
 public class ChatOptions {
 
     /** Identifier of the model to call. */
-    private String model;
+    private @Nullable String model;
 
     /** Sampling temperature. */
-    private Double temperature;
+    private @Nullable Double temperature;
 
     /** Upper bound on the tokens generated, reasoning tokens included where the provider counts them. */
-    private Integer maxOutputTokens;
+    private @Nullable Integer maxOutputTokens;
 
     /** Nucleus sampling threshold. */
-    private Double topP;
+    private @Nullable Double topP;
 
     /**
      * HTTP-level settings for this call's request, or {@code null} to leave every one of them to
      * the {@link io.github.synapse4j.http.HttpClient} in use. Set it when one call needs different
      * HTTP behavior than the client's defaults — a longer response timeout, a larger frame budget.
      */
-    private HttpOptions httpOptions;
+    private @Nullable HttpOptions httpOptions;
 
     /** Headers for this call's HTTP request. */
     private final Map<String, String> headers = new LinkedHashMap<>();

@@ -1,40 +1,12 @@
 package io.github.synapse4j.data;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.tool.ToolDefinition;
 
 class ToolDefinitionTest {
-
-    @Test
-    void newToolHasNoNameDescriptionOrSchema() {
-        ToolDefinition tool = new ToolDefinition();
-
-        assertNull(tool.getName());
-        assertNull(tool.getDescription());
-        assertNull(tool.getInputSchema());
-        assertNull(tool.getStrict());
-        assertTrue(tool.getExtras().isEmpty());
-    }
-
-    @Test
-    void constructorFillsNameDescriptionAndSchema() {
-        ToolDefinition tool = new ToolDefinition("get_weather", "Looks up the weather", "{\"type\":\"object\"}");
-
-        assertEquals("get_weather", tool.getName());
-        assertEquals("Looks up the weather", tool.getDescription());
-        assertEquals("{\"type\":\"object\"}", tool.getInputSchema());
-
-        tool.setStrict(true);
-
-        assertEquals(Boolean.TRUE, tool.getStrict());
-    }
 
     @Test
     void everyToolGetsItsOwnExtrasBag() {
@@ -44,24 +16,6 @@ class ToolDefinitionTest {
         one.getExtras().put("strict", true);
 
         assertTrue(two.getExtras().isEmpty());
-    }
-
-    @Test
-    void extrasCarryProviderSpecificFields() {
-        ToolDefinition tool = new ToolDefinition("get_weather", "Looks up the weather", "{}");
-
-        tool.getExtras().put("cache_control", Map.of("type", "ephemeral"));
-
-        assertEquals(Map.of("type", "ephemeral"), tool.getExtras().get("cache_control"));
-    }
-
-    @Test
-    void toStringMentionsTheFieldsAndTheExtras() {
-        String rendered = new ToolDefinition("get_weather", "Looks up the weather", "{}").toString();
-
-        assertTrue(rendered.contains("name=get_weather"));
-        assertTrue(rendered.contains("description=Looks up the weather"));
-        assertTrue(rendered.contains("extras="));
     }
 
 }

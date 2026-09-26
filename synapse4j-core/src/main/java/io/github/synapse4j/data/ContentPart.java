@@ -1,5 +1,7 @@
 package io.github.synapse4j.data;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -32,7 +34,7 @@ public abstract class ContentPart {
      * Provider-specific fields to merge into this part when the request is sent. Absent until one is
      * set: a part nobody configures carries no bag at all.
      */
-    private ProviderExtras extras;
+    private @Nullable ProviderExtras extras;
 
     /**
      * The extras bag, created on first use — never {@code null}, unlike {@code getExtras()}.

@@ -1,5 +1,7 @@
 package io.github.synapse4j.data;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -28,13 +30,13 @@ import lombok.ToString;
 public class Usage {
 
     /** Every input token the request sent, cache reads and cache writes included. */
-    private Integer inputTokens;
+    private @Nullable Integer inputTokens;
 
     /** Every token the model generated, reasoning tokens included. */
-    private Integer outputTokens;
+    private @Nullable Integer outputTokens;
 
     /** The part of {@link #inputTokens} that came from the cache; already counted in it. */
-    private Integer cachedInputTokens;
+    private @Nullable Integer cachedInputTokens;
 
     /** Counts outside the model above, as paths: cache writes, audio, billing units, and so on. */
     private final ProviderExtras extras = new ProviderExtras();

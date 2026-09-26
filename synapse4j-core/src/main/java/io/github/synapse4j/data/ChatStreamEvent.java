@@ -1,11 +1,10 @@
 package io.github.synapse4j.data;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.NonNull;
 import lombok.Setter;
 import lombok.ToString;
+
+import org.jspecify.annotations.Nullable;
 
 /**
  * One event of a streaming answer: a protocol event, mapped one to one and kept in arrival order.
@@ -26,38 +25,36 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
-@NoArgsConstructor
-@AllArgsConstructor
 public class ChatStreamEvent {
 
     /**
      * The protocol event this instance maps: the {@code event:} field of an SSE frame, or the
-     * payload's discriminator when the protocol has no {@code event:} field. Never {@code null}.
+     * payload's discriminator when the protocol has no {@code event:} field. {@code null} until an
+     * adapter sets it, since an event is built and then filled.
      */
-    @NonNull
-    private String eventType;
+    private @Nullable String eventType;
 
     /**
      * The normalized content of this event — what it adds to the assistant's turn — or {@code null}
      * when the event carries none. A block-start or stop event has nothing to add; a delta event
      * fills the parts with just what arrived in it.
      */
-    private ChatMessage delta;
+    private @Nullable ChatMessage delta;
 
     /**
      * Why generation stopped, when this event says so: a {@link ChatFinishReason} constant, or any
      * other provider value.
      */
-    private String finishReason;
+    private @Nullable String finishReason;
 
     /** What the provider reported consumed and produced, when this event reports it. */
-    private Usage usage;
+    private @Nullable Usage usage;
 
     /** The provider's identifier for the response, or {@code null} when this event gives none. */
-    private String id;
+    private @Nullable String id;
 
     /** The model answering, or {@code null} when this event does not repeat the echo. */
-    private String model;
+    private @Nullable String model;
 
     /** The event's own provider-specific fields — the raw payload's, for events with no normalized view. */
     private final ProviderExtras extras = new ProviderExtras();

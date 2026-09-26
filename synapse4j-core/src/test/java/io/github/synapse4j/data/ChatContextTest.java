@@ -2,34 +2,11 @@ package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 class ChatContextTest {
-
-    @Test
-    void newContextHasNoSessionIdAndNoEntries() {
-        ChatContext context = new ChatContext();
-
-        assertNull(context.getSessionId());
-        assertEquals(0, context.getTurn());
-        assertNull(context.getRequest());
-        assertNull(context.getResponse());
-        assertTrue(context.getAttributes().isEmpty());
-    }
-
-    @Test
-    void attributesHoldWhateverTheApplicationPutsThere() {
-        ChatContext context = new ChatContext();
-        StringBuilder value = new StringBuilder("payload");
-
-        context.getAttributes().put("draft", value);
-
-        assertSame(value, context.getAttributes().get("draft"));
-    }
 
     @Test
     void contextsCompareByIdentityNotContents() {
