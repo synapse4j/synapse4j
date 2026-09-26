@@ -266,15 +266,16 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void aLineWithNoTerminatorStillStopsAtTheBudget() {
+    void aLineWithNoTerminatorStillStopsAtTheBudget() throws IOException {
         // The budget is enforced as bytes arrive: a server that never sends a newline cannot
         // pin the memory first and fail the read afterwards.
         byte[] endless = "x".repeat(64).getBytes(UTF_8);
-        DefaultSseEventStream reader = new DefaultSseEventStream(new ByteArrayInputStream(endless), 16);
 
-        SynapseException thrown = assertThrows(SynapseException.class, reader::hasNext);
+        try (DefaultSseEventStream reader = new DefaultSseEventStream(new ByteArrayInputStream(endless), 16)) {
+            SynapseException thrown = assertThrows(SynapseException.class, reader::hasNext);
 
-        assertTrue(thrown.getMessage().contains("16"), thrown.getMessage());
+            assertTrue(thrown.getMessage().contains("16"), thrown.getMessage());
+        }
     }
 
     @Test

@@ -280,7 +280,9 @@ class OpenAiChatClientTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> second = (Map<String, Object>) response.getExtras().get("choices", "1");
         assertEquals(1, second.get("index"));
-        assertEquals("second", ((Map<String, Object>) second.get("message")).get("content"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> secondMessage = (Map<String, Object>) second.get("message");
+        assertEquals("second", secondMessage.get("content"));
         // The fields after the second choice were still read, so the walk stayed in step.
         assertEquals(Integer.valueOf(1), response.getUsage().getInputTokens());
         assertEquals(Integer.valueOf(2), response.getUsage().getOutputTokens());

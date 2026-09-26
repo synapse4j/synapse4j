@@ -140,7 +140,10 @@ one would block extension by users and providers.
   dereferences anyway says only what the NPE would have said a day later. A parameter that must not be
   null carries Lombok's `@NonNull`. A null that would otherwise travel on silently — stored, returned,
   handed to code that treats absence as a value — is refused where it crosses, naming what answered
-  null. A documented "returns null when …" is a contract, and no check contradicts it.
+  null. A documented "returns null when …" is a contract, and no check contradicts it. Neither is a
+  value a contract says is non-null checked again: believing the contract is what the annotation is
+  for, and if it cannot be believed the declaration is the thing to fix. What is answered at a
+  crossing is the null that would otherwise travel on silently, whoever wrote the value.
 - **Tests pin decisions, not plumbing.** A test earns its place by pinning a decision that could go
   wrong by mistake later — merge and ordering rules, contracts (a null answered loudly, a request
   handed on unchanged, one iterator pass), failure paths — and the assertion itself must be
