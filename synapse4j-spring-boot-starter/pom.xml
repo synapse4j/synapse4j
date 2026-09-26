@@ -44,6 +44,15 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-restclient</artifactId>
     </dependency>
+    <!-- Carries the auto-configuration that publishes the JsonMapper the codec is built on, so
+         spring.jackson.* and every JsonMapperBuilderCustomizer bean reach the schemas and the
+         bindings the tools use. Since Boot 4 this auto-configuration lives here rather than in
+         spring-boot-autoconfigure, so without this dependency an application that never asked
+         for JSON support would silently get a codec of our own making. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-jackson</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>

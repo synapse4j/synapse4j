@@ -11,6 +11,7 @@ import java.util.Collections;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import io.github.synapse4j.chat.ChatClient;
@@ -19,6 +20,7 @@ import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.http.restclient.RestClientHttpClient;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.json.JsonCodec;
+import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.openai.OpenAiChatClient;
 import io.github.synapse4j.openai.OpenAiConfig;
 
@@ -75,6 +77,28 @@ class Synapse4jAutoConfigurationTest {
                     assertThat(http.getMaxFrameBytes()).isEqualTo(8192);
                     assertThat(http.getBodyWriteMode()).isEqualTo("buffered");
                 });
+    }
+
+    @Test
+    void theApplicationsJacksonConfigurationReachesTheCodec() {
+        // Goes through Boot's own Jackson auto-configuration rather than a mapper registered by
+        // hand, because the dependency on spring-boot-jackson is what makes the mapper exist in a
+        // real application — drop it and this test stops compiling, which is the point.
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(Synapse4jAutoConfiguration.class,
+                        JacksonAutoConfiguration.class))
+                .withPropertyValues("spring.jackson.property-naming-strategy=SNAKE_CASE")
+                .run(context -> {
+                    // The schema describes the application's type the way the application's own
+                    // mapper names it; a codec built on a mapper of our own would say userName.
+                    JsonSchema schema = context.getBean(JsonCodec.class)
+                            .generateEncodeSchema(Payload.class);
+                    assertThat(schema.getProperties()).containsOnlyKeys("user_name");
+                });
+    }
+
+    /** A type the model is asked to fill in, named the way the application names it. */
+    record Payload(String userName) {
     }
 
     @Test

@@ -15,6 +15,7 @@ import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.openai.OpenAiChatClient;
 import io.github.synapse4j.openai.OpenAiConfig;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Wires a complete synapse4j stack into a Spring Boot application: the Jackson codec, the
@@ -27,7 +28,10 @@ import io.github.synapse4j.openai.OpenAiConfig;
  * auto-configured {@link RestClient.Builder} when Boot publishes one, so interceptors,
  * observations, SSL bundles and {@code spring.http.client.*} settings configured for the rest of
  * the application apply to LLM calls too; with no such bean a plain builder is used instead, so
- * excluding Boot's restclient support degrades the wiring rather than failing it.
+ * excluding Boot's restclient support degrades the wiring rather than failing it. The codec takes
+ * the auto-configured {@link JsonMapper} the same way, and for a sharper reason: the mapper is what
+ * decides the names and the shapes of the application's own types, and those are exactly what the
+ * schemas sent to the model describe and what tool arguments are bound with.
  *
  * <p>
  * Nothing here reaches for a secret or invents a default the library would not make itself: the
@@ -41,14 +45,25 @@ import io.github.synapse4j.openai.OpenAiConfig;
 public class Synapse4jAutoConfiguration {
 
     /**
-     * The codec the whole stack serializes through. The Jackson implementation is this starter's
+     * The codec the whole stack serializes through, over the application's own {@code JsonMapper}
+     * when one exists and a plain mapper otherwise. The Jackson implementation is this starter's
      * opinion; an application that wants another JSON library declares its own {@link JsonCodec}
      * and this bean never exists.
+     *
+     * <p>
+     * The mapper matters beyond its own configuration: the schemas this codec generates describe the
+     * application's types as that mapper names and shapes them, and the same mapper binds the JSON
+     * a model sends back. Boot's auto-configured {@code JsonMapper} is the application's mapper in
+     * every sense — {@code spring.jackson.*} and every {@code JsonMapperBuilderCustomizer} have
+     * already been applied to it — so anything configured for the rest of the application holds for
+     * tool arguments and structured output too. A mapper tuned for a web layer travels with its
+     * stricter policies; the schema comes from the same mapper, so the two still agree.
      */
     @Bean
     @ConditionalOnMissingBean
-    public JsonCodec jsonCodec() {
-        return new JacksonJsonCodec();
+    public JsonCodec jsonCodec(ObjectProvider<JsonMapper> mappers) {
+        JsonMapper mapper = mappers.getIfAvailable();
+        return mapper == null ? new JacksonJsonCodec() : new JacksonJsonCodec(mapper);
     }
 
     /**
