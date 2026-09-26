@@ -73,6 +73,14 @@ framework; efficiency is why it would be better.
   must not leak into the shared model.
 - Fields that are not modeled — or not yet known — must be preservable and passable through. The
   library's own structures must never block them.
+- What travels untouched is passed through, never translated: a module writes what it read, and what
+  another provider would make of it is the application's decision.
+- A concept is promoted from that bag into the shared model only when the application needs it to
+  survive a provider switch *and* the providers' shapes map onto one neutral value space. Two
+  providers carrying a similarly named field is not a reason.
+- A provider's spelling of a common field is a configuration field on that module's config, used for
+  reading and writing alike, with a default that suits the provider that fails loudly when wrong. It
+  is never inferred from what a response happened to contain.
 
 ### 7. Extensible core structures
 
@@ -121,7 +129,11 @@ one would block extension by users and providers.
 - **All comments are in English** — Javadoc (including on private members), inline comments and
   TODOs. Comments explain *why*; do not restate what the code does.
 - **Use Lombok instead of hand-writing boilerplate**, and only its stable annotations — nothing from
-  `lombok.experimental`.
+  `lombok.experimental`. Constructors count: one that only assigns its parameters is
+  `@RequiredArgsConstructor`/`@AllArgsConstructor`/`@NoArgsConstructor`, with `@NonNull` where a null
+  must be refused — hand-writing it is a defect to fix on sight. Hand-write one only for what Lombok
+  cannot say: a `super` call with arguments, a derived value, validation beyond `@NonNull`,
+  delegation — never to carry javadoc, which goes on the class or the field.
 - Package names are `io.github.synapse4j.*`. Implementation classes live in a `.<vendor>` subpackage
   naming their technology origin (for example `...victools`, `...jackson`).
 - **Group types by concept, not by dependency direction.** `...data` holds the inert call model —
@@ -130,10 +142,12 @@ one would block extension by users and providers.
   `...data`, references `Tool`. Cycles among these peer packages are accepted when they mirror a real
   relationship (a request carries a tool; the client drives a tool loop): this is one module, where a
   cycle costs the reader nothing, and a concept-wrong home would cost on every read.
-- **Nullness is declared where the type permits it.** `@NonNull` is forbidden on a field a no-args
-  constructor can leave null — one with no initializer, in a class that has such a constructor,
-  explicit or implicit: Lombok's check lives in setters and in the constructors that take the field,
-  never in that one. `@Nullable` marks exactly what the type can produce and nothing else, because it
+- **Nullness is declared where the type permits it.** A field with an initializer carries `@NonNull`
+  freely, no-args constructor or not: nothing can leave it null, and the check Lombok puts in the
+  setter is the whole contract. A field *without* an initializer may not, in a class that has such a
+  constructor, explicit or implicit — Lombok's check lives in setters and in the constructors that
+  take the field, never in that one, so the annotation would be false from the first `new`.
+  `@Nullable` marks exactly what the type can produce and nothing else, because it
   is the one form of the contract a user's IDE, checker or Kotlin compiler reads. Both on one value is
   a contradiction.
 - **A null is answered where it crosses, and never re-detected.** A check the next statement

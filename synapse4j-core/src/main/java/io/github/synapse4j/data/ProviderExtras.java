@@ -63,6 +63,11 @@ import lombok.NonNull;
  * Values are kept by reference and are never copied when stored: mutating a stored value (a
  * collection, say) afterwards is visible to whoever reads the bag back, including the
  * serialization path.
+ *
+ * <p>
+ * The bag is a pass-through, not a translation layer: what a module read from a provider goes back
+ * to that provider under the same name, and what another provider would make of it is the
+ * application's decision.
  */
 @EqualsAndHashCode
 public class ProviderExtras {
