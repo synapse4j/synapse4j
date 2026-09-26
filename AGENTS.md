@@ -25,8 +25,11 @@ design rather than working around it.
 
 - Keep third-party dependencies in `synapse4j-core` to a minimum. Prefer the JDK, and add a library
   only when it earns its place — "minimal" is a matter of degree, not a ban on third-party code.
-- **The public API may only mention JDK types and types owned by this library.** Types from Jackson,
-  victools, HTTP clients and the like must never appear in a public signature.
+- **The public API may mention JDK types, types owned by this library, and types from the
+  dependencies this module declares.** Exposing a library a module already depends on is not a
+  problem — the discipline is how few dependencies there are, not hiding them. What a user must
+  stay free to swap is carried by the rule below: JSON and HTTP libraries live only in
+  implementation classes, so core's abstractions never lean on them.
 - Dependencies on external capabilities (JSON, HTTP) may exist only inside implementation classes.
 
 Rationale: a user must be able to swap the JSON library or the HTTP client without touching the
@@ -127,6 +130,13 @@ one would block extension by users and providers.
   `...data`, references `Tool`. Cycles among these peer packages are accepted when they mirror a real
   relationship (a request carries a tool; the client drives a tool loop): this is one module, where a
   cycle costs the reader nothing, and a concept-wrong home would cost on every read.
+- **Null is answered where it crosses, and never re-detected.** A check on a value the next
+  statement dereferences anyway adds nothing — the NPE would say the same thing, just a day
+  later — so it is omitted. A parameter that must not be null carries Lombok's `@NonNull`; a
+  value arriving from anywhere else that would otherwise travel on silently (stored, returned,
+  handed to code that treats absence as a value) is answered loudly where it crosses, with a
+  message naming what answered null. Where null is part of the contract instead — a documented
+  "returns null when …" — the Javadoc says so, and no check contradicts it.
 - **Tests pin decisions, not plumbing.** A test earns its place by pinning a decision that could go
   wrong by mistake later — merge and ordering rules, contracts (a null answered loudly, a request
   handed on unchanged, one iterator pass), failure paths — and the assertion itself must be
