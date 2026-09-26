@@ -79,6 +79,10 @@
                  constructor parameters reflectively, so dropping them would change behaviour for
                  users even though this build itself never reads them. -->
             <parameters>true</parameters>
+            <!-- The javac packages Error Prone's plugin needs are opened in .mvn/jvm.config rather
+                 than here: the compiler runs inside Maven's own JVM, so the flags belong to the JVM
+                 that starts it — and that file carries no explanation of its own, because Maven
+                 reads every one of its lines as a single JVM argument. -->
             <compilerArgs>
               <arg>-XDcompilePolicy=simple</arg>
               <!-- javac's default stop policy on error is not one Error Prone can work with, and on
