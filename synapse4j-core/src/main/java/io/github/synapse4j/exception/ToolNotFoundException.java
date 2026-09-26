@@ -1,5 +1,7 @@
 package io.github.synapse4j.exception;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A call named a tool the request did not carry — the model asking for something that was never
  * offered to it.
@@ -12,7 +14,7 @@ package io.github.synapse4j.exception;
  */
 public class ToolNotFoundException extends SynapseException {
 
-    public ToolNotFoundException(String name) {
+    public ToolNotFoundException(@Nullable String name) {
         super("no tool named \"" + name + '"');
     }
 

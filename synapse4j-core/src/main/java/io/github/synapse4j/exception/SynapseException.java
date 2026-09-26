@@ -1,5 +1,7 @@
 package io.github.synapse4j.exception;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * The base of everything this library throws.
  *
@@ -16,11 +18,11 @@ package io.github.synapse4j.exception;
  */
 public class SynapseException extends RuntimeException {
 
-    public SynapseException(String message) {
+    public SynapseException(@Nullable String message) {
         super(message);
     }
 
-    public SynapseException(String message, Throwable cause) {
+    public SynapseException(@Nullable String message, @Nullable Throwable cause) {
         super(message, cause);
     }
 

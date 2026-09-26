@@ -1,5 +1,7 @@
 package io.github.synapse4j.exception;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A call the provider answered with a non-2xx status.
  *
@@ -21,7 +23,7 @@ public class SynapseHttpException extends SynapseException {
      * @param message    what the failure says, detail included
      * @param statusCode the HTTP status the answer carried
      */
-    public SynapseHttpException(String message, int statusCode) {
+    public SynapseHttpException(@Nullable String message, int statusCode) {
         super(message);
         this.statusCode = statusCode;
     }

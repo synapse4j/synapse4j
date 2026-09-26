@@ -2,6 +2,8 @@ package io.github.synapse4j.exception;
 
 import java.io.IOException;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A failure of the stream underneath: the sink or source a writer or reader was given could not be
  * written to or read from.
@@ -23,12 +25,12 @@ public class SynapseIOException extends SynapseException {
      * @param message what was being done when the stream failed
      * @param cause   the stream failure
      */
-    public SynapseIOException(String message, IOException cause) {
+    public SynapseIOException(@Nullable String message, @Nullable IOException cause) {
         super(message, cause);
     }
 
     @Override
-    public IOException getCause() {
+    public @Nullable IOException getCause() {
         return (IOException) super.getCause();
     }
 
