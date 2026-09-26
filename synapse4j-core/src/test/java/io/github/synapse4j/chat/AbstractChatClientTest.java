@@ -19,7 +19,7 @@ import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
-import io.github.synapse4j.tool.FunctionTool;
+import io.github.synapse4j.tool.ManualTool;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolDefinition;
 import io.github.synapse4j.tool.ToolProvider;
@@ -801,12 +801,12 @@ class AbstractChatClientTest {
         assertThrows(NullPointerException.class, () -> client.addDefaultTool(null));
         assertThrows(NullPointerException.class, () -> client.removeDefaultTool(null));
         assertThrows(NullPointerException.class,
-                () -> client.addDefaultTool(FunctionTool.of(new ToolDefinition(null, "does things", "{}"))));
+                () -> client.addDefaultTool(new ManualTool(new ToolDefinition(null, "does things", "{}"))));
     }
 
     /** A declare-only tool carrying the given name — all the merge looks at. */
     private static Tool tool(String name) {
-        return FunctionTool.of(new ToolDefinition(name, "does things", "{}"));
+        return new ManualTool(new ToolDefinition(name, "does things", "{}"));
     }
 
     /** The tools' names, in the order they would go out. */

@@ -2,6 +2,8 @@ package io.github.synapse4j.tool;
 
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ContentPart;
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -15,10 +17,10 @@ import java.util.List;
  * and its answer becomes the result handed back to the model.
  *
  * <p>
- * A declaration with no executor behind it is the other half of the story: a wrapper among the
- * implementations carries one. An implementation is registered once and may be shared across
- * concurrent requests, so it holds no per-call state; everything a particular call needs arrives
- * as arguments.
+ * A declaration the library must not run is the application's own to implement: this interface is
+ * two methods, and carrying that on its own costs a few lines. An implementation is registered
+ * once and may be shared across concurrent requests, so it holds no per-call state; everything a
+ * particular call needs arrives as arguments.
  *
  * <p>
  * Executing a tool does I/O against the world, so a failure is whatever the tool itself throws,
@@ -60,6 +62,6 @@ public interface Tool {
      * @return the parts the model will read, in order; never {@code null}, possibly empty
      * @throws Exception if execution fails — carried openly, decided by the caller
      */
-    List<ContentPart> execute(String arguments, ChatContext context) throws Exception;
+    List<ContentPart> execute(@Nullable String arguments, @Nullable ChatContext context) throws Exception;
 
 }

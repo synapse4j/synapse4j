@@ -5,8 +5,11 @@ import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
-import java.util.Objects;
+
+import lombok.NonNull;
 
 /**
  * A {@link StagedTool} for one typed lambda: the model's arguments are decoded into a single
@@ -19,12 +22,6 @@ import java.util.Objects;
  * introspect, so {@code inputType} is where the knowledge lives. It has to describe an object,
  * because the protocol's arguments are an object — a scalar input type is refused at the
  * factory, with a pointer to wrap the parameters in a record.
- *
- * <p>
- * The other construction is a declaration with nothing behind it: {@link #of(ToolDefinition)}
- * answers a tool the model may see and the library may not run. Such an instance carries no
- * executor, no input type and no codec; {@link #execute} reaches the missing executor and
- * fails, saying so.
  */
 public class FunctionTool<I, O> implements StagedTool {
 
@@ -50,41 +47,35 @@ public class FunctionTool<I, O> implements StagedTool {
          *         is rendered by the codec
          * @throws Exception if the tool fails — carried openly, decided by the caller
          */
-        O execute(I input, ChatContext context) throws Exception;
+        O execute(I input, @Nullable ChatContext context) throws Exception;
     }
 
     /** The declaration, whether generated from the token or handed in. */
     private final ToolDefinition definition;
 
-    /** What the model's arguments decode into; {@code null} when this tool is a declaration only. */
+    /** What the model's arguments decode into. */
     private final Class<I> inputType;
 
-    /** The middle stage; {@code null} when this tool is a declaration only. */
+    /** The middle stage. */
     private final Executor<I, O> executor;
 
-    /** The codec for both directions; {@code null} when this tool is a declaration only. */
+    /** The codec for both directions. */
     private final JsonCodec codec;
 
     /**
-     * Assembles the tool. An executor brings its own requirements: a type to decode into and a
-     * codec to decode with.
+     * Assembles the tool.
      *
      * @param definition the declaration to carry; never {@code null}
-     * @param inputType  what the arguments decode into; required with an executor, {@code
-     *                   null} for a declaration only
-     * @param executor   the middle stage; {@code null} for a declaration only
-     * @param codec      the codec for both directions; required with an executor, {@code null}
-     *                       for a declaration only
+     * @param inputType  what the arguments decode into; never {@code null}
+     * @param executor   the middle stage; never {@code null}
+     * @param codec      the codec for both directions; never {@code null}
      */
-    protected FunctionTool(ToolDefinition definition, Class<I> inputType, Executor<I, O> executor, JsonCodec codec) {
-        this.definition = Objects.requireNonNull(definition, "definition must not be null");
+    protected FunctionTool(@NonNull ToolDefinition definition, @NonNull Class<I> inputType,
+            @NonNull Executor<I, O> executor, @NonNull JsonCodec codec) {
+        this.definition = definition;
         this.inputType = inputType;
         this.executor = executor;
         this.codec = codec;
-        if (executor != null) {
-            Objects.requireNonNull(inputType, "inputType must not be null when there is an executor");
-            Objects.requireNonNull(codec, "codec must not be null when there is an executor");
-        }
     }
 
     /**
@@ -102,13 +93,8 @@ public class FunctionTool<I, O> implements StagedTool {
      * @throws IllegalArgumentException if the input type does not describe an object — wrap
      *                                      the parameters in a record or a class
      */
-    public static <I, O> FunctionTool<I, O> of(String name, String description, Class<I> inputType,
-            Executor<I, O> executor, JsonCodec codec) {
-        Objects.requireNonNull(name, "name must not be null");
-        Objects.requireNonNull(description, "description must not be null");
-        Objects.requireNonNull(inputType, "inputType must not be null");
-        Objects.requireNonNull(executor, "executor must not be null");
-        Objects.requireNonNull(codec, "codec must not be null");
+    public static <I, O> FunctionTool<I, O> of(@NonNull String name, @NonNull String description,
+            @NonNull Class<I> inputType, @NonNull Executor<I, O> executor, @NonNull JsonCodec codec) {
         JsonSchema schema = codec.generateDecodeSchema(inputType);
         if (!schema.getType().contains("object")) {
             throw new IllegalArgumentException("inputType " + inputType.getTypeName()
@@ -131,24 +117,9 @@ public class FunctionTool<I, O> implements StagedTool {
      * @param <O>        the type the executor returns
      * @return the assembled tool
      */
-    public static <I, O> FunctionTool<I, O> of(ToolDefinition definition, Class<I> inputType,
-            Executor<I, O> executor, JsonCodec codec) {
-        Objects.requireNonNull(inputType, "inputType must not be null");
-        Objects.requireNonNull(executor, "executor must not be null");
-        Objects.requireNonNull(codec, "codec must not be null");
+    public static <I, O> FunctionTool<I, O> of(@NonNull ToolDefinition definition, @NonNull Class<I> inputType,
+            @NonNull Executor<I, O> executor, @NonNull JsonCodec codec) {
         return new FunctionTool<>(definition, inputType, executor, codec);
-    }
-
-    /**
-     * A tool the model may see and the library may not run: the declaration alone, for callers
-     * that execute tools themselves or hand them elsewhere. The type parameters say nothing —
-     * nothing ever runs — so they answer {@code Object}.
-     *
-     * @param definition the declaration to carry; never {@code null}
-     * @return the declaration-backed tool
-     */
-    public static FunctionTool<Object, Object> of(ToolDefinition definition) {
-        return new FunctionTool<>(definition, null, null, null);
     }
 
     /**
@@ -162,33 +133,19 @@ public class FunctionTool<I, O> implements StagedTool {
     }
 
     /**
-     * The middle stage to run, once the model calls — the automatic loops ask; a declaration
-     * only has none.
-     *
-     * @return the executor; {@code null} when this tool is a declaration only
-     */
-    public Executor<I, O> executor() {
-        return executor;
-    }
-
-    /**
-     * The model's arguments decoded into one value of the input type. A declaration only has
-     * nothing to decode and answers an empty array on its way to the missing executor; arguments
-     * that never arrived decode as {@code {}} — the stage's contract spells that "the model
-     * produced none", and an empty object is what every protocol spells none as.
+     * The model's arguments decoded into one value of the input type; arguments that never
+     * arrived decode as {@code {}} — the stage's contract spells that "the model produced none",
+     * and an empty object is what every protocol spells none as.
      *
      * @param arguments the arguments the model produced, as JSON text; {@code null} or blank
      *                      means the model produced none
      * @param context   the conversation this call belongs to; unused in this stage
-     * @return the decoded value as the single element of an array; an empty array for a
-     *         declaration only
+     * @return the decoded value as the single element of an array
      * @throws Exception if the text cannot be decoded into the input type
      */
     @Override
-    public Object[] resolveArguments(String arguments, ChatContext context) throws Exception {
-        if (inputType == null) {
-            return new Object[0];
-        }
+    public @Nullable Object[] resolveArguments(@Nullable String arguments, @Nullable ChatContext context)
+            throws Exception {
         if (arguments == null || arguments.isBlank()) {
             arguments = "{}";
         }
@@ -196,22 +153,16 @@ public class FunctionTool<I, O> implements StagedTool {
     }
 
     /**
-     * The lambda itself. A declaration only fails here, saying so — the reflection-less
-     * counterpart of {@link MethodTool}'s invoke.
+     * The lambda itself — the reflection-less counterpart of {@link MethodTool}'s invoke.
      *
-     * @param values  the decoded value from {@link #resolveArguments}; never {@code null} when
-     *                    this tool has an executor
+     * @param values  the decoded value from {@link #resolveArguments}; the array itself is never
+     *                    {@code null}, while its single element may be {@code null}
      * @param context the conversation this call belongs to; passed straight through
      * @return what the lambda returned
-     * @throws UnsupportedOperationException if this tool is a declaration with no executor
-     * @throws Exception                     if the lambda fails — carried openly
+     * @throws Exception if the lambda fails — carried openly
      */
     @Override
-    public Object call(Object[] values, ChatContext context) throws Exception {
-        if (executor == null) {
-            throw new UnsupportedOperationException(
-                    "tool '" + definition.getName() + "' was declared without an executor");
-        }
+    public @Nullable Object call(@Nullable Object[] values, @Nullable ChatContext context) throws Exception {
         return executor.execute(inputType.cast(values[0]), context);
     }
 
@@ -225,7 +176,7 @@ public class FunctionTool<I, O> implements StagedTool {
      * @return the result as the model sees it; never {@code null}
      */
     @Override
-    public List<ContentPart> resolveResult(Object returnValue, ChatContext context) {
+    public List<ContentPart> resolveResult(@Nullable Object returnValue, @Nullable ChatContext context) {
         if (returnValue instanceof String text) {
             return List.of(new TextPart(text));
         }

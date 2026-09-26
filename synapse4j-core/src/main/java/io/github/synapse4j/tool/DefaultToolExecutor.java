@@ -14,6 +14,9 @@ import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.ToolNotFoundException;
+import org.jspecify.annotations.Nullable;
+
+import lombok.NonNull;
 
 /**
  * The default {@link ToolExecutor}: a name resolves against the tools at hand, a failure goes
@@ -45,7 +48,7 @@ public class DefaultToolExecutor implements ToolExecutor {
     /** The marking a failure carries when the caller configured no handler of their own. */
     private static final String DEFAULT_PREFIX = "Error: ";
 
-    private final ExecutorService workers;
+    private final @Nullable ExecutorService workers;
 
     private final ToolExecutor.ErrorHandler failures;
 
@@ -62,7 +65,7 @@ public class DefaultToolExecutor implements ToolExecutor {
      * @param failures where a failed call goes; {@code null} for the failure's message under
      *                     {@code "Error: "}
      */
-    public DefaultToolExecutor(ExecutorService workers, ToolExecutor.ErrorHandler failures) {
+    public DefaultToolExecutor(@Nullable ExecutorService workers, ToolExecutor.@Nullable ErrorHandler failures) {
         this(workers, failures, 0);
     }
 
@@ -76,17 +79,16 @@ public class DefaultToolExecutor implements ToolExecutor {
      *                     against the context's turn, which only a loop maintains — a bare call
      *                     still reads {@code 0} and runs
      */
-    public DefaultToolExecutor(ExecutorService workers, ToolExecutor.ErrorHandler failures, int maxTurns) {
+    public DefaultToolExecutor(@Nullable ExecutorService workers, ToolExecutor.@Nullable ErrorHandler failures,
+            int maxTurns) {
         this.workers = workers;
         this.failures = failures != null ? failures : ErrorHandlers.message(DEFAULT_PREFIX);
         this.maxTurns = maxTurns;
     }
 
     @Override
-    public List<ToolResultPart> execute(List<ToolCallPart> calls, List<Tool> available, ChatContext context)
-            throws Exception {
-        Objects.requireNonNull(calls, "calls must not be null");
-        Objects.requireNonNull(available, "available must not be null");
+    public @Nullable List<ToolResultPart> execute(@NonNull List<ToolCallPart> calls, @NonNull List<Tool> available,
+            @Nullable ChatContext context) throws Exception {
         if (calls.isEmpty()) {
             return new ArrayList<>();
         }
@@ -168,7 +170,7 @@ public class DefaultToolExecutor implements ToolExecutor {
     }
 
     /** The first tool carrying that name, or {@code null} when none does. */
-    private static Tool resolve(List<Tool> available, String name) {
+    private static @Nullable Tool resolve(List<Tool> available, String name) {
         for (Tool tool : available) {
             if (name.equals(tool.name())) {
                 return tool;

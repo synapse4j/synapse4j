@@ -155,28 +155,6 @@ class FunctionToolTest {
         assertSame(original, thrown);
     }
 
-    // ===== declaration only =====
-
-    @Test
-    void declarationOnlyCarriesNothingBehindIt() throws Exception {
-        ToolDefinition declaration = new ToolDefinition("bare", "Just the words", "{\"type\":\"object\"}");
-
-        FunctionTool<Object, Object> tool = FunctionTool.of(declaration);
-
-        assertSame(declaration, tool.definition());
-        assertNull(tool.executor());
-        assertEquals(0, tool.resolveArguments(null, null).length);
-
-        UnsupportedOperationException failure = assertThrows(UnsupportedOperationException.class,
-                () -> tool.execute("{}", null));
-        assertEquals("tool 'bare' was declared without an executor", failure.getMessage());
-    }
-
-    @Test
-    void declarationOnlyFactoryRefusesNull() {
-        assertThrows(NullPointerException.class, () -> FunctionTool.of((ToolDefinition) null));
-    }
-
     // ===== harness =====
 
     private <T> T lastOf(List<T> list) {

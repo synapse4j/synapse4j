@@ -5,6 +5,7 @@ import java.util.List;
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Runs one round's worth of tool calls: each call the model made, resolved by name against the
@@ -39,9 +40,10 @@ public interface ToolExecutor {
      * @throws Exception if the batch aborts — the error policy rethrew, or resolution itself
      *                       failed; carried openly, decided by the caller
      */
+    @Nullable
     List<ToolResultPart> execute(List<ToolCallPart> calls,
             List<Tool> available,
-            ChatContext context) throws Exception;
+            @Nullable ChatContext context) throws Exception;
 
     /**
      * Where a failed call goes: back to the model as text it can read and retry against, or out

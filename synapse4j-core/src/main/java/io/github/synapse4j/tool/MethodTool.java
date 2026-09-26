@@ -5,6 +5,8 @@ import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
+import org.jspecify.annotations.Nullable;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -13,6 +15,8 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import lombok.NonNull;
 
 /**
  * A {@link StagedTool} backed by a Java method: the signature becomes the declaration, the
@@ -40,7 +44,7 @@ public class MethodTool implements StagedTool {
     private final Method method;
 
     /** The instance to run an instance method on; {@code null} for a static method. */
-    private final Object target;
+    private final @Nullable Object target;
 
     /** The codec reading arguments and rendering results. */
     private final JsonCodec codec;
@@ -64,7 +68,7 @@ public class MethodTool implements StagedTool {
     private final boolean returnsVoid;
 
     /** The declaration; set exactly once by {@link #define}. */
-    private ToolDefinition definition;
+    private @Nullable ToolDefinition definition;
 
     /**
      * Reads the signature and holds everything the stages need; builds nothing yet. An instance
@@ -75,9 +79,9 @@ public class MethodTool implements StagedTool {
      * @param target the instance for an instance method, {@code null} for a static one
      * @param codec  the codec reading arguments and rendering results; never {@code null}
      */
-    protected MethodTool(Method method, Object target, JsonCodec codec) {
-        this.method = Objects.requireNonNull(method, "method must not be null");
-        this.codec = Objects.requireNonNull(codec, "codec must not be null");
+    protected MethodTool(@NonNull Method method, @Nullable Object target, @NonNull JsonCodec codec) {
+        this.method = method;
+        this.codec = codec;
         if (!Modifier.isStatic(method.getModifiers())) {
             Objects.requireNonNull(target, "target must not be null: " + method + " is an instance method");
         }
@@ -108,7 +112,8 @@ public class MethodTool implements StagedTool {
      * @param codec       the codec reading arguments and rendering results; never {@code null}
      * @return the assembled tool, defined and ready
      */
-    public static MethodTool of(String name, String description, Method method, Object target, JsonCodec codec) {
+    public static MethodTool of(String name, String description, Method method, @Nullable Object target,
+            JsonCodec codec) {
         MethodTool tool = new MethodTool(method, target, codec);
         tool.define(name, description);
         return tool;
@@ -125,7 +130,7 @@ public class MethodTool implements StagedTool {
      * @param codec      the codec reading arguments and rendering results; never {@code null}
      * @return the assembled tool, defined and ready
      */
-    public static MethodTool of(ToolDefinition definition, Method method, Object target, JsonCodec codec) {
+    public static MethodTool of(ToolDefinition definition, Method method, @Nullable Object target, JsonCodec codec) {
         MethodTool tool = new MethodTool(method, target, codec);
         tool.define(definition);
         return tool;
@@ -140,9 +145,7 @@ public class MethodTool implements StagedTool {
      * @param name        the name the model calls the tool by; never {@code null}
      * @param description what the tool does; never {@code null}
      */
-    protected final void define(String name, String description) {
-        Objects.requireNonNull(name, "name must not be null");
-        Objects.requireNonNull(description, "description must not be null");
+    protected final void define(@NonNull String name, @NonNull String description) {
         JsonSchema envelope = new JsonSchema();
         envelope.setType("object");
         for (int i = 0; i < parameters.length; i++) {
@@ -165,8 +168,7 @@ public class MethodTool implements StagedTool {
      *
      * @param definition the declaration to carry; never {@code null}, and its name must be set
      */
-    protected final void define(ToolDefinition definition) {
-        Objects.requireNonNull(definition, "definition must not be null");
+    protected final void define(@NonNull ToolDefinition definition) {
         Objects.requireNonNull(definition.getName(), "definition must have a name");
         for (int i = 0; i < parameters.length; i++) {
             fromModel[i] = schemaFor(parameters[i]) != null;
@@ -188,7 +190,7 @@ public class MethodTool implements StagedTool {
      * @param parameter the declared parameter
      * @return the schema to send, or {@code null} to leave the parameter off the wire
      */
-    protected JsonSchema schemaFor(Parameter parameter) {
+    protected @Nullable JsonSchema schemaFor(Parameter parameter) {
         if (ChatContext.class.isAssignableFrom(parameter.getType())) {
             return null;
         }
@@ -210,7 +212,7 @@ public class MethodTool implements StagedTool {
      * @throws IllegalStateException if the parameter is off the wire but no value is provided
      *                                   for its type — override this method for it
      */
-    protected Object valueFor(Parameter parameter, ChatContext context) {
+    protected @Nullable Object valueFor(Parameter parameter, @Nullable ChatContext context) {
         if (ChatContext.class.isAssignableFrom(parameter.getType())) {
             return context;
         }
@@ -242,11 +244,13 @@ public class MethodTool implements StagedTool {
      * @param arguments the arguments the model produced, as JSON text; {@code null} or blank
      *                      means the model produced none
      * @param context   the conversation this call belongs to; {@code null} when none was attached
-     * @return one value per declared parameter; never {@code null}
+     * @return one value per declared parameter; the array itself is never {@code null}, while an
+     *         element is {@code null} when its parameter has no value
      * @throws Exception if the text cannot be read or a value does not fit its parameter
      */
     @Override
-    public Object[] resolveArguments(String arguments, ChatContext context) throws Exception {
+    public @Nullable Object[] resolveArguments(@Nullable String arguments, @Nullable ChatContext context)
+            throws Exception {
         Object[] values = new Object[parameters.length];
         Map<String, Object> args = null;
         for (int i = 0; i < parameters.length; i++) {
@@ -267,13 +271,14 @@ public class MethodTool implements StagedTool {
      * threw arrives as itself. The context is here for the stage's signature; reflection does
      * not use it.
      *
-     * @param values  the values resolved for this call; never {@code null}
+     * @param values  the values resolved for this call; the array itself is never {@code null},
+     *                    while an element is {@code null} when its parameter has no value
      * @param context the conversation this call belongs to; unused by this implementation
      * @return what the method returned; {@code null} for void
      * @throws Exception if the method fails — the cause out of reflection's wrapper, unwrapped
      */
     @Override
-    public Object call(Object[] values, ChatContext context) throws Exception {
+    public @Nullable Object call(@Nullable Object[] values, @Nullable ChatContext context) throws Exception {
         try {
             return method.invoke(target, values);
         } catch (InvocationTargetException e) {
@@ -299,7 +304,7 @@ public class MethodTool implements StagedTool {
      * @return the result as the model sees it; never {@code null}
      */
     @Override
-    public List<ContentPart> resolveResult(Object returnValue, ChatContext context) {
+    public List<ContentPart> resolveResult(@Nullable Object returnValue, @Nullable ChatContext context) {
         if (returnsVoid) {
             return List.of(new TextPart("Success"));
         }
@@ -309,7 +314,7 @@ public class MethodTool implements StagedTool {
         return List.of(new TextPart(codec.encode(returnValue)));
     }
 
-    private Map<String, Object> decodeArguments(String arguments) {
+    private Map<String, Object> decodeArguments(@Nullable String arguments) {
         if (arguments == null || arguments.isBlank()) {
             return Map.of();
         }
@@ -317,7 +322,7 @@ public class MethodTool implements StagedTool {
         return decoded == null ? Map.of() : decoded;
     }
 
-    private Object bind(int i, Object raw) {
+    private @Nullable Object bind(int i, @Nullable Object raw) {
         if (raw == null) {
             if (types[i].isPrimitive()) {
                 throw new IllegalArgumentException("parameter '" + names[i] + "' of "

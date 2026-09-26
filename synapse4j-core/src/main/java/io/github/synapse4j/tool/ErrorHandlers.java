@@ -1,9 +1,8 @@
 package io.github.synapse4j.tool;
 
-import java.util.Objects;
-
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import lombok.NonNull;
 
 /**
  * Ready-made error policies for {@link ToolExecutor} — each a named way of turning a failed
@@ -16,7 +15,7 @@ import lombok.NoArgsConstructor;
  * its own keeps full control of the text, verbatim from handler to result.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class ErrorHandlers {
+public final class ErrorHandlers {
 
     /**
      * Answers with the exception's message, carrying the given prefix so the model reads a
@@ -29,8 +28,7 @@ public class ErrorHandlers {
      *                   {@code null}
      * @return the handler; never {@code null}
      */
-    public static ToolExecutor.ErrorHandler message(String prefix) {
-        Objects.requireNonNull(prefix, "prefix must not be null");
+    public static ToolExecutor.ErrorHandler message(@NonNull String prefix) {
         return (call, failure) -> {
             String message = failure.getMessage();
             if (message == null) {
@@ -49,8 +47,7 @@ public class ErrorHandlers {
      * @param message the text handed back as this call's result, verbatim; never {@code null}
      * @return the handler; never {@code null}
      */
-    public static ToolExecutor.ErrorHandler fixed(String message) {
-        Objects.requireNonNull(message, "message must not be null");
+    public static ToolExecutor.ErrorHandler fixed(@NonNull String message) {
         return (call, failure) -> message;
     }
 

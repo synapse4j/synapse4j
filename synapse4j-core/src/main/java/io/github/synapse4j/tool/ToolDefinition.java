@@ -2,6 +2,8 @@ package io.github.synapse4j.tool;
 
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.ToolCallPart;
+import org.jspecify.annotations.Nullable;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -32,19 +34,19 @@ import lombok.ToString;
 public class ToolDefinition {
 
     /** Name the model calls the tool by; the application resolves it against its own registry. */
-    private String name;
+    private @Nullable String name;
 
     /** What the tool does, which is how the model decides whether to call it. */
-    private String description;
+    private @Nullable String description;
 
     /** The arguments schema, as JSON Schema text. */
-    private String inputSchema;
+    private @Nullable String inputSchema;
 
     /**
      * Whether the provider has to fill in an invocation that enforces this schema rather than
      * merely aiming at it; {@code null} leaves the decision to the protocol's default.
      */
-    private Boolean strict;
+    private @Nullable Boolean strict;
 
     /** Provider-specific fields to merge into this tool when the request is sent. */
     private final ProviderExtras extras = new ProviderExtras();
