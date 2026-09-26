@@ -1,13 +1,18 @@
 {
     "java.configuration.updateBuildConfiguration": "automatic",
 
+    // Nullness is enforced by the build: NullAway runs inside the compiler over the main sources,
+    // with the rules the annotations state. jdt.ls runs a second checker with a different
+    // calibration -- it reports every conversion from the JDK's unknown nullness to a non-null
+    // type, which is hundreds of warnings about code nobody here can change.
+    "java.compile.nullAnalysis.mode": "disabled",
+
     // Formatting comes from .vscode/eclipse-formatter.xml -- an Eclipse JDT formatter profile with
     // tabulation.char=space -- which is the same file Spotless uses at build time, so the editor
     // and `mvn spotless:apply` produce the same output.
     "java.format.settings.url": "${workspaceFolder}/.vscode/eclipse-formatter.xml",
     "java.format.settings.profile": "Eclipse",
     "editor.formatOnSave": true,
-
     // jdt.ls takes indentation from these client-side options rather than from the formatter
     // profile, so they must be pinned here (with detection off) to stay in sync with it.
     "[java]": {
