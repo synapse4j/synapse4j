@@ -251,6 +251,7 @@ public class MethodTool implements StagedTool {
     @Override
     public @Nullable Object[] resolveArguments(@Nullable String arguments, @Nullable ChatContext context)
             throws Exception {
+        @Nullable
         Object[] values = new Object[parameters.length];
         Map<String, Object> args = null;
         for (int i = 0; i < parameters.length; i++) {

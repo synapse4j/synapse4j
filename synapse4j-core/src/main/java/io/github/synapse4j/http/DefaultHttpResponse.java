@@ -70,7 +70,7 @@ public class DefaultHttpResponse implements HttpResponse {
     @Override
     public synchronized @Nullable SseEventStream sseEventStream() {
         if (eventStream == null && isEventStream()) {
-            eventStream = new DefaultSseEventStream(body, frameBudget());
+            eventStream = new DefaultSseEventStream(getBody(), frameBudget());
         }
         return eventStream;
     }

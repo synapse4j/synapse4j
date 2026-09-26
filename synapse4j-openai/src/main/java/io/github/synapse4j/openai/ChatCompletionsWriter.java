@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatRequest;
@@ -226,10 +227,10 @@ class ChatCompletionsWriter {
      */
     private static Map<String, Object> mediaPart(MediaPart part) {
         String mediaType = part.getMediaType();
-        boolean typeStated = mediaType != null && !mediaType.isEmpty();
-        if (typeStated && !mediaType.startsWith(IMAGE_TYPE_PREFIX)) {
+        if (mediaType != null && !mediaType.isEmpty() && !mediaType.startsWith(IMAGE_TYPE_PREFIX)) {
             throw new SynapseException("unsupported media type for OpenAI: " + mediaType);
         }
+        boolean typeStated = mediaType != null && !mediaType.isEmpty();
         if (part.getUri() == null && part.getSource() == null) {
             throw new SynapseException(
                     "unsupported media part for OpenAI: neither uri nor source is set");
@@ -242,7 +243,8 @@ class ChatCompletionsWriter {
         entry.put("type", "image_url");
         Map<String, Object> imageUrl = new LinkedHashMap<>();
         imageUrl.put("url", part.getUri() != null ? part.getUri()
-                : new Base64Reader("data:" + mediaType + ";base64,", part.getSource()));
+                : new Base64Reader("data:" + mediaType + ";base64,",
+                        Objects.requireNonNull(part.getSource(), "a media part with no uri carries a source")));
         entry.put("image_url", imageUrl);
         ProviderExtras partExtras = part.getExtras();
         if (partExtras != null) {

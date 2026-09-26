@@ -140,7 +140,8 @@ public class DefaultToolExecutor implements ToolExecutor {
      * goes wrong — the handler's text coming back as a failed result, the handler itself
      * throwing to let the failure out of here.
      */
-    private ToolResultPart run(ToolCallPart call, List<Tool> available, ChatContext context) throws Exception {
+    private ToolResultPart run(ToolCallPart call, List<Tool> available, @Nullable ChatContext context)
+            throws Exception {
         ToolResultPart result = new ToolResultPart();
         result.setCallId(call.getCallId());
         result.setName(call.getName());
@@ -170,7 +171,10 @@ public class DefaultToolExecutor implements ToolExecutor {
     }
 
     /** The first tool carrying that name, or {@code null} when none does. */
-    private static @Nullable Tool resolve(List<Tool> available, String name) {
+    private static @Nullable Tool resolve(List<Tool> available, @Nullable String name) {
+        if (name == null) {
+            return null;
+        }
         for (Tool tool : available) {
             if (name.equals(tool.name())) {
                 return tool;

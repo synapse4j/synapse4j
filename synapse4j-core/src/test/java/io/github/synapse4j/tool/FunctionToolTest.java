@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
+import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.AbstractJsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
@@ -147,12 +148,22 @@ class FunctionToolTest {
     @Test
     void executorFailureArrivesAsItself() {
         IllegalStateException original = new IllegalStateException("boom");
+        codec.decoded = new Input("x");
         FunctionTool<Input, String> tool = FunctionTool.of("fail", "Always fails", Input.class, (input, context) -> {
             throw original;
         }, codec);
 
         IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> tool.execute("{}", null));
         assertSame(original, thrown);
+    }
+
+    @Test
+    void aDocumentThatDecodesToNothingIsRefusedBeforeTheExecutor() {
+        FunctionTool<Input, String> tool = FunctionTool.of("maybe", "Sometimes silent", Input.class,
+                (input, context) -> "ran", codec);
+
+        SynapseException thrown = assertThrows(SynapseException.class, () -> tool.execute("{}", null));
+        assertTrue(thrown.getMessage().contains("null document"));
     }
 
     // ===== harness =====

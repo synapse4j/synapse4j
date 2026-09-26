@@ -48,7 +48,8 @@ public abstract class AbstractJsonCodec implements JsonCodec {
     @Override
     public <T> @Nullable T decode(String json, Type type) {
         if (type instanceof Class<?> asked && JsonSchema.class.isAssignableFrom(asked)) {
-            return cast(JsonSchema.fromMap(decodeValue(json, Map.class)));
+            Map<String, Object> document = decodeValue(json, Map.class);
+            return document == null ? null : cast(JsonSchema.fromMap(document));
         }
         return decodeValue(json, type);
     }

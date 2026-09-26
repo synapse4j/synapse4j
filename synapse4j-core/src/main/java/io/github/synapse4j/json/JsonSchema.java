@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 import io.github.synapse4j.data.ProviderExtras;
@@ -393,7 +394,7 @@ public class JsonSchema {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> asMap(@Nullable Object value) {
-        return (Map<String, Object>) value;
+        return (Map<String, Object>) Objects.requireNonNull(value, "a schema document is a map");
     }
 
 }

@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.jspecify.annotations.Nullable;
 
@@ -41,7 +42,7 @@ public abstract class AbstractJsonReader implements JsonReader {
             case START_OBJECT -> captureObject();
             case START_ARRAY -> captureArray();
             case STRING -> string();
-            case NUMBER -> captureNumber(string());
+            case NUMBER -> captureNumber(Objects.requireNonNull(string(), "a number token carries its text"));
             case TRUE -> Boolean.TRUE;
             case FALSE -> Boolean.FALSE;
             case NULL -> null;

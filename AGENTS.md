@@ -153,6 +153,10 @@ one would block extension by users and providers.
 
 - Compile: `mvn -q -DskipTests package`
 - Full check — compiles, enforces formatting, runs tests: `mvn verify`
+- The build also enforces the nullness contracts: NullAway runs inside the compiler (as an Error
+  Prone plugin, from `.mvn/jvm.config`'s exports), so handing null to a parameter that is not
+  nullable, or answering a non-null method with null, fails the build. Tests are left out of the
+  analysis on purpose — several of them pass null to pin a refusal.
 - Tests only: `mvn test`
 - There is no Maven wrapper; use `mvn` directly. Run Maven from the repository root: Spotless
   resolves its config file relative to the directory Maven was invoked from.

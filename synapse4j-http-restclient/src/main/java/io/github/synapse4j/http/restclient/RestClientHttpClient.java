@@ -220,7 +220,7 @@ public class RestClientHttpClient implements HttpClient {
      * caller who asked for one thing must not silently get another. It is checked before the body is
      * looked at, so a mode that is wrong is wrong whatever the body happens to be.
      */
-    private static void requireKnown(String mode) {
+    private static void requireKnown(@Nullable String mode) {
         if (!HttpOptions.STREAMED.equals(mode) && !HttpOptions.BUFFERED.equals(mode)) {
             throw new IllegalArgumentException("unsupported bodyWriteMode '" + mode + "': this implementation "
                     + "supports " + HttpOptions.STREAMED + " and " + HttpOptions.BUFFERED);

@@ -1,6 +1,7 @@
 package io.github.synapse4j.openai;
 
 import java.util.List;
+import java.util.Objects;
 
 import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatResponse;
@@ -45,7 +46,7 @@ class ChatCompletionsReader {
         ChatResponse response = new ChatResponse();
         boolean choicesRead = false;
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             switch (field) {
                 case "id" -> response.setId(reader.string());
@@ -85,7 +86,7 @@ class ChatCompletionsReader {
 
     private static void readChoice(JsonReader reader, ChatResponse response, int position) {
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             switch (field) {
                 case "finish_reason" -> response.setFinishReason(reader.string());
@@ -104,7 +105,7 @@ class ChatCompletionsReader {
             return;
         }
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             switch (field) {
                 case "role" -> message.setRole(reader.string());
@@ -118,7 +119,7 @@ class ChatCompletionsReader {
     private static void readContent(JsonReader reader, ChatMessage message) {
         JsonReader.Token token = reader.token();
         if (token == JsonReader.Token.STRING) {
-            String text = reader.string();
+            String text = Objects.requireNonNull(reader.string(), "a string token carries a string");
             if (!text.isEmpty()) {
                 message.getParts().add(new TextPart(text));
             }
@@ -152,7 +153,7 @@ class ChatCompletionsReader {
         String text = null;
         ProviderExtras collected = new ProviderExtras();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             switch (field) {
                 case "type" -> type = reader.string();
@@ -190,7 +191,7 @@ class ChatCompletionsReader {
     private static void readToolCall(JsonReader reader, ChatMessage message) {
         ToolCallPart call = new ToolCallPart();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             switch (field) {
                 case "id" -> call.setCallId(reader.string());
@@ -207,7 +208,7 @@ class ChatCompletionsReader {
             return;
         }
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             switch (field) {
                 case "name" -> call.setName(reader.string());
@@ -233,7 +234,7 @@ class ChatCompletionsReader {
             throw new SynapseException("OpenAI stream event was not a JSON object");
         }
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             switch (field) {
                 case "id" -> event.setId(reader.string());
@@ -290,7 +291,7 @@ class ChatCompletionsReader {
 
     private static void readChoice(JsonReader reader, ChatStreamEvent event, int position) {
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             switch (field) {
                 case "finish_reason" -> readFinishReason(reader, event);
@@ -318,7 +319,7 @@ class ChatCompletionsReader {
         }
         ChatMessage delta = new ChatMessage();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             switch (field) {
                 case "role" -> delta.setRole(reader.string());
@@ -337,7 +338,7 @@ class ChatCompletionsReader {
             reader.skipValue();
             return;
         }
-        String fragment = reader.string();
+        String fragment = Objects.requireNonNull(reader.string(), "a string token carries a string");
         if (!fragment.isEmpty()) {
             // An empty fragment is the provider announcing a turn it has not started saying yet;
             // it adds nothing, and a part for it would outlive the chunks it came in.
@@ -362,7 +363,7 @@ class ChatCompletionsReader {
     private static void readDeltaToolCall(JsonReader reader, ChatMessage delta) {
         ToolCallPart call = new ToolCallPart();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             switch (field) {
                 case "id" -> call.setCallId(reader.string());
@@ -379,7 +380,7 @@ class ChatCompletionsReader {
             return;
         }
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             switch (field) {
                 case "name" -> call.setName(reader.string());
@@ -405,7 +406,7 @@ class ChatCompletionsReader {
             return null;
         }
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             if ("error".equals(field)) {
                 // A scalar where the conventional object belongs says less than the raw body does.
@@ -446,7 +447,7 @@ class ChatCompletionsReader {
         String type = null;
         String code = null;
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             switch (field) {
                 case "message" -> message = errorText(reader);
@@ -494,7 +495,7 @@ class ChatCompletionsReader {
         }
         Usage usage = new Usage();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             switch (field) {
                 case "prompt_tokens" -> usage.setInputTokens(asInteger(reader));
@@ -512,7 +513,7 @@ class ChatCompletionsReader {
             return;
         }
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = reader.name();
+            String field = name(reader);
             reader.nextToken();
             if ("cached_tokens".equals(field)) {
                 usage.setCachedInputTokens(asInteger(reader));
@@ -535,7 +536,7 @@ class ChatCompletionsReader {
         return (int) reader.longValue();
     }
 
-    private static String describe(JsonReader.Token token) {
+    private static String describe(JsonReader.@Nullable Token token) {
         if (token == JsonReader.Token.NUMBER) {
             return "Number";
         }
@@ -543,6 +544,15 @@ class ChatCompletionsReader {
             return "Boolean";
         }
         return "unexpected";
+    }
+
+    /**
+     * The property name the reader is on, for the member loops below: a loop over an object's
+     * members only runs while the reader is on a name, so a null here is a broken reader rather
+     * than a document without that name.
+     */
+    private static String name(JsonReader reader) {
+        return Objects.requireNonNull(reader.name(), "the reader is not on a property name");
     }
 
 }

@@ -4,6 +4,7 @@ import java.io.InputStream;
 import java.io.Writer;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 import io.github.synapse4j.exception.SynapseException;
@@ -59,8 +60,10 @@ class JacksonJsonReader extends AbstractJsonReader {
      * that promises this library's own.
      */
     static JacksonJsonReader open(JsonFactory factory, InputStream in) {
-        return translate("Opening the JSON reader failed",
-                () -> new JacksonJsonReader(factory.createParser(ObjectReadContext.empty(), in)));
+        return Objects.requireNonNull(
+                translate("Opening the JSON reader failed",
+                        () -> new JacksonJsonReader(factory.createParser(ObjectReadContext.empty(), in))),
+                "opening a reader answers one");
     }
 
     @Override
@@ -93,7 +96,7 @@ class JacksonJsonReader extends AbstractJsonReader {
     public long longValue() {
         require("longValue()", JsonToken.VALUE_NUMBER_INT, JsonToken.VALUE_NUMBER_FLOAT);
         if (parser.currentToken() == JsonToken.VALUE_NUMBER_INT) {
-            return read(parser::getLongValue);
+            return readRequired(parser::getLongValue);
         }
         // A number spelled with a fraction can still be whole — "11.0" is the number eleven — so it
         // is read exactly when it is, and refused as a failed read, not as a misuse, when it is not.
@@ -108,13 +111,13 @@ class JacksonJsonReader extends AbstractJsonReader {
     @Override
     public double doubleValue() {
         require("doubleValue()", JsonToken.VALUE_NUMBER_INT, JsonToken.VALUE_NUMBER_FLOAT);
-        return read(parser::getDoubleValue);
+        return readRequired(parser::getDoubleValue);
     }
 
     @Override
     public boolean booleanValue() {
         require("booleanValue()", JsonToken.VALUE_TRUE, JsonToken.VALUE_FALSE);
-        return read(parser::getBooleanValue);
+        return readRequired(parser::getBooleanValue);
     }
 
     @Override
@@ -125,7 +128,7 @@ class JacksonJsonReader extends AbstractJsonReader {
     @Override
     public long string(Writer out) {
         require("string(Writer)", JsonToken.VALUE_STRING);
-        return read(() -> parser.readString(out));
+        return readRequired(() -> parser.readString(out));
     }
 
     @Override
@@ -177,6 +180,15 @@ class JacksonJsonReader extends AbstractJsonReader {
     /** Reads one value, translating what Jackson reports into what this library reports. */
     private <T> @Nullable T read(Supplier<T> read) {
         return translate("Reading the JSON document failed", read);
+    }
+
+    /**
+     * The same read, where the token has already been checked and Jackson's own contract says a
+     * value is there: a supplier answering nothing would be a broken parser rather than a document
+     * without that value, so it is answered here instead of unboxed into a wrong number.
+     */
+    private <T> T readRequired(Supplier<T> read) {
+        return Objects.requireNonNull(read(read), "Jackson answered no value where one was due");
     }
 
     /** Performs one read whose result is not handed back, with the same translation as {@link #read}. */

@@ -71,6 +71,7 @@ public interface StagedTool extends Tool {
      */
     @Override
     default List<ContentPart> execute(@Nullable String arguments, @Nullable ChatContext context) throws Exception {
+        @Nullable
         Object[] values = resolveArguments(arguments, context);
         Object result = call(values, context);
         return resolveResult(result, context);

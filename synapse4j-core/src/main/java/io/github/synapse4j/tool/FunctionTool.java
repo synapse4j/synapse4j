@@ -3,6 +3,7 @@ package io.github.synapse4j.tool;
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
+import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
 import org.jspecify.annotations.Nullable;
@@ -159,11 +160,16 @@ public class FunctionTool<I, O> implements StagedTool {
      *                    {@code null}, while its single element may be {@code null}
      * @param context the conversation this call belongs to; passed straight through
      * @return what the lambda returned
-     * @throws Exception if the lambda fails — carried openly
+     * @throws SynapseException if the arguments decoded to JSON null, which no executor is handed
+     * @throws Exception        if the lambda fails — carried openly
      */
     @Override
     public @Nullable Object call(@Nullable Object[] values, @Nullable ChatContext context) throws Exception {
-        return executor.execute(inputType.cast(values[0]), context);
+        Object input = values[0];
+        if (input == null) {
+            throw new SynapseException("tool '" + definition.getName() + "' was called with a null document");
+        }
+        return executor.execute(inputType.cast(input), context);
     }
 
     /**

@@ -22,6 +22,13 @@
 
     <jsonschema-generator.version>5.0.0</jsonschema-generator.version>
 
+    <!-- The static checker that gives the @NullMarked declarations above their teeth: NullAway
+         runs as an Error Prone plugin inside javac, so handing null to a parameter that is not
+         nullable — or answering a non-null method with null — fails the build instead of a
+         caller's runtime. Not managed by the Boot BOM, so pinned here. -->
+    <error-prone.version>2.50.0</error-prone.version>
+    <nullaway.version>0.14.2</nullaway.version>
+
     <!-- The one line this build rides: whatever spring-boot-dependencies pins is the version of
          Spring, Jackson, JUnit, Lombok and the rest. Nothing here pins a second version of
          anything it manages — one authority per artifact, and nothing to keep in sync. -->
@@ -72,7 +79,48 @@
                  constructor parameters reflectively, so dropping them would change behaviour for
                  users even though this build itself never reads them. -->
             <parameters>true</parameters>
+            <compilerArgs>
+              <arg>-XDcompilePolicy=simple</arg>
+              <!-- javac's default stop policy on error is not one Error Prone can work with, and on
+                   JDK 21 it has to be told to keep type annotations on symbols for the plugin. -->
+              <arg>-XDshould-stop.ifError=FLOW</arg>
+              <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
+              <!-- Only NullAway runs, and as an error: Error Prone's own checks would be a second
+                   standard to keep up with, unrelated to nullness. -->
+              <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:ERROR
+                -XepOpt:NullAway:AnnotatedPackages=io.github.synapse4j
+                -XepOpt:NullAway:JSpecifyMode=true</arg>
+            </compilerArgs>
+            <annotationProcessorPaths>
+              <!-- Lombok generates the accessors and their null checks, so it has to be on the
+                   processor path beside the checker; its version comes from the Boot BOM. -->
+              <path>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+              </path>
+              <path>
+                <groupId>com.google.errorprone</groupId>
+                <artifactId>error_prone_core</artifactId>
+                <version>${error-prone.version}</version>
+              </path>
+              <path>
+                <groupId>com.uber.nullaway</groupId>
+                <artifactId>nullaway</artifactId>
+                <version>${nullaway.version}</version>
+              </path>
+            </annotationProcessorPaths>
           </configuration>
+          <executions>
+            <execution>
+              <!-- The checker runs on main sources only: tests hand null to things on purpose —
+                   asserting a refusal is how several of them pin a contract — and NullAway has no
+                   path-based exclusion, so the plugin flag comes off this execution instead. -->
+              <id>default-testCompile</id>
+              <configuration>
+                <compilerArgs combine.self="override" />
+              </configuration>
+            </execution>
+          </executions>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>

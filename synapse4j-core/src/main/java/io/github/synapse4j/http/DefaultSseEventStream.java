@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.io.PushbackInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
@@ -95,7 +96,7 @@ public class DefaultSseEventStream implements SseEventStream {
         if (!hasNext()) {
             throw new NoSuchElementException("the event stream is over");
         }
-        SseEvent event = pending;
+        SseEvent event = Objects.requireNonNull(pending, "hasNext answered true, so an event is pending");
         pending = null;
         return event;
     }

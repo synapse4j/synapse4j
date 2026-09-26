@@ -269,7 +269,7 @@ public class ProviderExtras {
         return "ProviderExtras" + rawMap();
     }
 
-    private ProviderExtras putPath(Object value, @NonNull List<String> path) {
+    private ProviderExtras putPath(@Nullable Object value, @NonNull List<String> path) {
         String key = encode(path.toArray(new String[0]));
         clearAround(key);
         values.put(key, value);

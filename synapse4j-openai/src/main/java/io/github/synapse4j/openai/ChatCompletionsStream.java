@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.function.UnaryOperator;
 
 import io.github.synapse4j.chat.DefaultChatStream;
@@ -115,7 +116,8 @@ class ChatCompletionsStream extends DefaultChatStream {
                 if (!hasNext()) {
                     throw new NoSuchElementException("the event stream is over");
                 }
-                ChatStreamEvent event = pending;
+                ChatStreamEvent event = Objects.requireNonNull(pending,
+                        "hasNext answered true, so an event is pending");
                 pending = null;
                 return event;
             }
@@ -245,7 +247,7 @@ class ChatCompletionsStream extends DefaultChatStream {
     }
 
     /** The arguments as they arrive: a fragment is a piece of the JSON text, not a value. */
-    private static String join(@Nullable String current, @Nullable String fragment) {
+    private static @Nullable String join(@Nullable String current, @Nullable String fragment) {
         if (fragment == null) {
             return current;
         }
