@@ -22,6 +22,7 @@ import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.http.HttpRequest;
 import io.github.synapse4j.http.HttpResponse;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The {@link HttpClient} SPI implemented on the JDK's {@code java.net.http.HttpClient}, adding no
@@ -94,7 +95,7 @@ public class JdkHttpClient implements HttpClient {
      * @param delegate the JDK client to send through; never {@code null}
      * @param options  the options to fall back to, or {@code null} for the standard ones
      */
-    public JdkHttpClient(java.net.http.HttpClient delegate, HttpOptions options) {
+    public JdkHttpClient(java.net.http.HttpClient delegate, @Nullable HttpOptions options) {
         this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
         this.options = HttpOptions.effective(options, HttpOptions.defaults());
     }
@@ -143,7 +144,7 @@ public class JdkHttpClient implements HttpClient {
      * know is refused rather than taken for the default: a caller who asked for one thing must not
      * silently get another.
      */
-    private static BodyPublisher bodyPublisher(HttpRequest request, String mode) {
+    private static BodyPublisher bodyPublisher(HttpRequest request, @Nullable String mode) {
         requireKnown(mode);
         HttpBody body = request.getBody();
         if (body == null) {
@@ -164,7 +165,7 @@ public class JdkHttpClient implements HttpClient {
      * who asked for one thing must not silently get another. It is checked before the body is looked at,
      * so a mode that is wrong is wrong whatever the body happens to be.
      */
-    private static void requireKnown(String mode) {
+    private static void requireKnown(@Nullable String mode) {
         if (!HttpOptions.STREAMED.equals(mode) && !HttpOptions.BUFFERED.equals(mode)) {
             throw new IllegalArgumentException("unsupported bodyWriteMode '" + mode + "': this implementation "
                     + "supports " + HttpOptions.STREAMED + " and " + HttpOptions.BUFFERED);
@@ -303,7 +304,7 @@ public class JdkHttpClient implements HttpClient {
                 }
             };
 
-            private volatile Thread producer;
+            private volatile @Nullable Thread producer;
 
             private volatile boolean cancelled;
 
