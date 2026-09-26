@@ -11,6 +11,7 @@ import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.Usage;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonReader;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Walks a protocol document from a caller-supplied {@link JsonReader} into the shared model.
@@ -399,7 +400,7 @@ class ChatCompletionsReader {
      * @param reader the reader, before its first token; the caller owns it
      * @return the detail after the caller's own prefix, or {@code null} when there is none to read
      */
-    static String readError(JsonReader reader) {
+    static @Nullable String readError(JsonReader reader) {
         if (reader.nextToken() != JsonReader.Token.START_OBJECT) {
             return null;
         }
@@ -468,7 +469,7 @@ class ChatCompletionsReader {
     }
 
     /** A member's text as the message spells it, or {@code null} where it carries no text. */
-    private static String errorText(JsonReader reader) {
+    private static @Nullable String errorText(JsonReader reader) {
         JsonReader.Token token = reader.token();
         if (token == JsonReader.Token.START_OBJECT || token == JsonReader.Token.START_ARRAY) {
             // A structured member has no place in the message, and leaving it unread would lose
@@ -486,7 +487,7 @@ class ChatCompletionsReader {
      * @param reader the reader, positioned on the usage value
      * @return the usage
      */
-    private static Usage readUsage(JsonReader reader) {
+    private static @Nullable Usage readUsage(JsonReader reader) {
         if (reader.token() != JsonReader.Token.START_OBJECT) {
             reader.skipValue();
             return null;
@@ -523,7 +524,7 @@ class ChatCompletionsReader {
         }
     }
 
-    private static Integer asInteger(JsonReader reader) {
+    private static @Nullable Integer asInteger(JsonReader reader) {
         if (reader.token() != JsonReader.Token.NUMBER) {
             // A count spelled some other way is left alone rather than guessed at; the value still
             // has to be consumed, or the walk would lose its place.

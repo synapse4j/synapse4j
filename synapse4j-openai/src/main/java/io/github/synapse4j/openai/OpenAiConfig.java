@@ -1,5 +1,7 @@
 package io.github.synapse4j.openai;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.Data;
 import lombok.ToString;
 
@@ -22,12 +24,12 @@ public class OpenAiConfig {
      * credential belongs in the header it authenticates, not in a log line or an error message.
      */
     @ToString.Exclude
-    private String apiKey;
+    private @Nullable String apiKey;
 
     /** Optional {@code OpenAI-Organization} header value. */
-    private String organization;
+    private @Nullable String organization;
 
     /** Optional {@code OpenAI-Project} header value. */
-    private String project;
+    private @Nullable String project;
 
 }

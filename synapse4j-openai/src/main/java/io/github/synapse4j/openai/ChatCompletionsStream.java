@@ -20,6 +20,7 @@ import io.github.synapse4j.http.SseEvent;
 import io.github.synapse4j.http.SseEventStream;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The chat-completions stream: one streamed exchange, pulled frame by frame, that assembles the
@@ -84,7 +85,7 @@ class ChatCompletionsStream extends DefaultChatStream {
     private static Iterator<ChatStreamEvent> events(JsonCodec codec, SseEventStream sse) {
         return new Iterator<ChatStreamEvent>() {
 
-            private ChatStreamEvent pending;
+            private @Nullable ChatStreamEvent pending;
 
             private boolean ended;
 
@@ -212,7 +213,7 @@ class ChatCompletionsStream extends DefaultChatStream {
     }
 
     /** The call a fragment continues, or {@code null} when it opens a new one. */
-    private static ToolCallPart toolCallFor(ChatMessage message, ToolCallPart fragment) {
+    private static @Nullable ToolCallPart toolCallFor(ChatMessage message, ToolCallPart fragment) {
         List<ContentPart> parts = message.getParts();
         if (fragment.getCallId() != null) {
             for (ContentPart part : parts) {
@@ -244,7 +245,7 @@ class ChatCompletionsStream extends DefaultChatStream {
     }
 
     /** The arguments as they arrive: a fragment is a piece of the JSON text, not a value. */
-    private static String join(String current, String fragment) {
+    private static String join(@Nullable String current, @Nullable String fragment) {
         if (fragment == null) {
             return current;
         }

@@ -20,6 +20,8 @@ import io.github.synapse4j.json.JsonWriter;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolDefinition;
 import io.github.synapse4j.util.Base64Reader;
+import org.jspecify.annotations.Nullable;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 
@@ -199,7 +201,7 @@ class ChatCompletionsWriter {
      * A text part as the entry it becomes, or {@code null} when it carries neither text nor extras —
      * a part with nothing to say, which the protocol has no place for.
      */
-    private static Map<String, Object> textPart(TextPart part) {
+    private static @Nullable Map<String, Object> textPart(TextPart part) {
         boolean hasText = part.getText() != null && !part.getText().isEmpty();
         if (!hasText && (part.getExtras() == null || part.getExtras().isEmpty())) {
             return null;
@@ -249,7 +251,7 @@ class ChatCompletionsWriter {
         return entry;
     }
 
-    private Map<String, Object> toolResult(ToolResultPart result, ProviderExtras messageExtras) {
+    private Map<String, Object> toolResult(ToolResultPart result, @Nullable ProviderExtras messageExtras) {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("role", "tool");
         entry.put("content", textOf(result.getParts()));
@@ -347,13 +349,13 @@ class ChatCompletionsWriter {
     }
 
     /** Puts a member, or nothing at all when the value is not set. */
-    private static void putIfSet(Map<String, Object> members, String name, Object value) {
+    private static void putIfSet(Map<String, Object> members, String name, @Nullable Object value) {
         if (value != null) {
             members.put(name, value);
         }
     }
 
-    private Map<String, Object> parseSchema(String schema) {
+    private @Nullable Map<String, Object> parseSchema(@Nullable String schema) {
         if (schema == null) {
             return null;
         }
