@@ -8,6 +8,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 import io.github.synapse4j.data.ChatContext;
+import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
@@ -146,10 +147,10 @@ public class DefaultToolExecutor implements ToolExecutor {
             if (tool == null) {
                 throw new ToolNotFoundException(call.getName());
             }
-            String answer = Objects.requireNonNull(
+            List<ContentPart> answer = Objects.requireNonNull(
                     tool.execute(call.getArgumentsJson(), context),
                     "tool answered null");
-            result.getParts().add(new TextPart(answer));
+            result.getParts().addAll(answer);
         } catch (InterruptedException interruption) {
             // The caller's thread being told to stop is not this call's failure to report: the
             // status comes back and the interruption leaves, no handler seeing it — the way the

@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.data.ChatContext;
+import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
@@ -335,8 +336,9 @@ class DefaultToolExecutorTest {
             }
 
             @Override
-            public String execute(String arguments, ChatContext context) throws Exception {
-                return body.apply(arguments);
+            public List<ContentPart> execute(String arguments, ChatContext context) throws Exception {
+                String text = body.apply(arguments);
+                return text == null ? null : List.of(new TextPart(text));
             }
         };
     }

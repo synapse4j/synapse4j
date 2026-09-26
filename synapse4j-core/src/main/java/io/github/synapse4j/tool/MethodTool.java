@@ -1,6 +1,8 @@
 package io.github.synapse4j.tool;
 
 import io.github.synapse4j.data.ChatContext;
+import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
 import java.lang.reflect.InvocationTargetException;
@@ -8,6 +10,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.Type;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -286,24 +289,24 @@ public class MethodTool implements StagedTool {
     }
 
     /**
-     * The text for the answer: {@code "Success"} for a void method, the text itself for a
-     * String, and the codec's rendering for anything else — {@code null} included, which
-     * renders as JSON null. The context is here for the stage's signature; the default does not
-     * use it.
+     * The parts for the answer: a single text part carrying {@code "Success"} for a void method,
+     * the text itself for a String, and the codec's rendering for anything else — {@code null}
+     * included, which renders as JSON null. The context is here for the stage's signature; the
+     * default does not use it.
      *
      * @param returnValue what the method returned; {@code null} for void and for a null return
      * @param context     the conversation this call belongs to; unused by this implementation
      * @return the result as the model sees it; never {@code null}
      */
     @Override
-    public String resolveResult(Object returnValue, ChatContext context) {
+    public List<ContentPart> resolveResult(Object returnValue, ChatContext context) {
         if (returnsVoid) {
-            return "Success";
+            return List.of(new TextPart("Success"));
         }
         if (returnValue instanceof String text) {
-            return text;
+            return List.of(new TextPart(text));
         }
-        return codec.encode(returnValue);
+        return List.of(new TextPart(codec.encode(returnValue)));
     }
 
     private Map<String, Object> decodeArguments(String arguments) {

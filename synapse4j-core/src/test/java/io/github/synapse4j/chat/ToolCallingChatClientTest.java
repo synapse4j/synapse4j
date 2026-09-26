@@ -487,8 +487,9 @@ class ToolCallingChatClientTest {
             }
 
             @Override
-            public String execute(String arguments, ChatContext context) throws Exception {
-                return body.apply(arguments);
+            public List<ContentPart> execute(String arguments, ChatContext context) throws Exception {
+                String text = body.apply(arguments);
+                return text == null ? null : List.of(new TextPart(text));
             }
         };
     }

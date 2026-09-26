@@ -1,6 +1,8 @@
 package io.github.synapse4j.tool;
 
 import io.github.synapse4j.data.ChatContext;
+import io.github.synapse4j.data.ContentPart;
+import java.util.List;
 
 /**
  * A tool the model may call, in both of its halves: the declaration that is sent, and the execution
@@ -46,11 +48,18 @@ public interface Tool {
     /**
      * Runs this tool against the given arguments.
      *
+     * <p>
+     * The answer is parts rather than text: both protocols accept a result as a list of content
+     * blocks, so a tool that one day returns an image beside its text needs no change here. The
+     * mainstream answer is a single {@link io.github.synapse4j.data.TextPart}, which is what the
+     * implementations shipped with this library produce; an empty list answers with nothing to
+     * say.
+     *
      * @param arguments the arguments the model produced, as JSON text
      * @param context   the conversation this call belongs to; {@code null} when none was attached
-     * @return the result to hand back to the model; never {@code null}
+     * @return the parts the model will read, in order; never {@code null}, possibly empty
      * @throws Exception if execution fails — carried openly, decided by the caller
      */
-    String execute(String arguments, ChatContext context) throws Exception;
+    List<ContentPart> execute(String arguments, ChatContext context) throws Exception;
 
 }

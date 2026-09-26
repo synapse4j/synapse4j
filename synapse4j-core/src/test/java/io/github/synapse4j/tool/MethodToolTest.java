@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.synapse4j.data.ChatContext;
+import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.json.AbstractJsonCodec;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
@@ -267,7 +269,7 @@ class MethodToolTest {
         assertFalse(properties.containsKey("user"));
 
         // binding side: the claimed parameter comes from the context — one override pair, both ends
-        assertEquals("ada", tool.execute("{\"unused\":1}", context));
+        assertEquals("ada", execute(tool, "{\"unused\":1}", context));
     }
 
     @Test
@@ -316,7 +318,9 @@ class MethodToolTest {
     }
 
     private String execute(MethodTool tool, String arguments, ChatContext context) throws Exception {
-        return tool.execute(arguments, context);
+        List<ContentPart> parts = tool.execute(arguments, context);
+        assertEquals(1, parts.size());
+        return ((TextPart) parts.get(0)).getText();
     }
 
     @SuppressWarnings("unchecked")

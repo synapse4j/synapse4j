@@ -1,8 +1,11 @@
 package io.github.synapse4j.tool;
 
 import io.github.synapse4j.data.ChatContext;
+import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -213,19 +216,20 @@ public class FunctionTool<I, O> implements StagedTool {
     }
 
     /**
-     * The text for the answer: the text itself for a String, the codec's rendering for
-     * anything else — {@code null} included, which renders as JSON null.
+     * The parts for the answer: a single text part with the text itself for a String, and one
+     * carrying the codec's rendering for anything else — {@code null} included, which renders as
+     * JSON null.
      *
      * @param returnValue what the lambda returned; may be {@code null}
      * @param context     the conversation this call belongs to; unused in this stage
      * @return the result as the model sees it; never {@code null}
      */
     @Override
-    public String resolveResult(Object returnValue, ChatContext context) {
+    public List<ContentPart> resolveResult(Object returnValue, ChatContext context) {
         if (returnValue instanceof String text) {
-            return text;
+            return List.of(new TextPart(text));
         }
-        return codec.encode(returnValue);
+        return List.of(new TextPart(codec.encode(returnValue)));
     }
 
 }

@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.synapse4j.data.ChatContext;
+import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.json.AbstractJsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
@@ -119,7 +121,7 @@ class FunctionToolTest {
         FunctionTool<Input, String> tool = FunctionTool.of("echo", "Echoes back", Input.class,
                 (input, context) -> "already text", codec);
 
-        assertEquals("already text", tool.execute("{\"value\":\"plain\"}", null));
+        assertEquals("already text", execute(tool, "{\"value\":\"plain\"}"));
     }
 
     @Test
@@ -128,7 +130,7 @@ class FunctionToolTest {
         FunctionTool<Input, Input> tool = FunctionTool.of("self", "Returns the input", Input.class,
                 (input, context) -> input, codec);
 
-        assertEquals("encoded", tool.execute("{\"value\":\"x\"}", null));
+        assertEquals("encoded", execute(tool, "{\"value\":\"x\"}"));
         assertInstanceOf(Input.class, lastOf(codec.encoded));
     }
 
@@ -138,7 +140,7 @@ class FunctionToolTest {
         FunctionTool<Input, String> tool = FunctionTool.of("maybe", "Sometimes silent", Input.class,
                 (input, context) -> null, codec);
 
-        assertEquals("encoded", tool.execute("{\"value\":\"x\"}", null));
+        assertEquals("encoded", execute(tool, "{\"value\":\"x\"}"));
         assertNull(lastOf(codec.encoded));
     }
 
@@ -179,6 +181,12 @@ class FunctionToolTest {
 
     private <T> T lastOf(List<T> list) {
         return list.get(list.size() - 1);
+    }
+
+    private String execute(FunctionTool<?, ?> tool, String arguments) throws Exception {
+        List<ContentPart> parts = tool.execute(arguments, null);
+        assertEquals(1, parts.size());
+        return ((TextPart) parts.get(0)).getText();
     }
 
     /**

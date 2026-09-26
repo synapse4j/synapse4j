@@ -1,6 +1,8 @@
 package io.github.synapse4j.tool;
 
 import io.github.synapse4j.data.ChatContext;
+import io.github.synapse4j.data.ContentPart;
+import java.util.List;
 
 /**
  * A Tool whose execution falls into fixed stages: resolve the arguments, make the call, render
@@ -41,15 +43,15 @@ public interface StagedTool extends Tool {
     Object call(Object[] values, ChatContext context) throws Exception;
 
     /**
-     * Stage three: what the call produced, as the text the model will read.
+     * Stage three: what the call produced, as the parts the model will read.
      *
      * @param returnValue what {@link #call} returned; may be {@code null}
      * @param context     the conversation this call belongs to; {@code null} when none was
      *                        attached
-     * @return the result as the model sees it; never {@code null}
+     * @return the result as the model sees it, in order; never {@code null}, possibly empty
      * @throws Exception if the value cannot be rendered — carried openly, decided by the caller
      */
-    String resolveResult(Object returnValue, ChatContext context) throws Exception;
+    List<ContentPart> resolveResult(Object returnValue, ChatContext context) throws Exception;
 
     /**
      * Runs the three stages in order: resolve, call, render. A failure from any stage passes
@@ -58,11 +60,11 @@ public interface StagedTool extends Tool {
      *
      * @param arguments the arguments the model produced, as JSON text
      * @param context   the conversation this call belongs to; {@code null} when none was attached
-     * @return the result to hand back to the model; never {@code null}
+     * @return the parts to hand back to the model; never {@code null}
      * @throws Exception if any stage fails — carried openly, decided by the caller
      */
     @Override
-    default String execute(String arguments, ChatContext context) throws Exception {
+    default List<ContentPart> execute(String arguments, ChatContext context) throws Exception {
         Object[] values = resolveArguments(arguments, context);
         Object result = call(values, context);
         return resolveResult(result, context);
