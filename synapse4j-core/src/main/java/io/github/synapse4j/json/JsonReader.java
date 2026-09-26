@@ -5,6 +5,7 @@ import java.io.Writer;
 
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Reads one JSON document from a source, token by token.
@@ -102,6 +103,7 @@ public interface JsonReader extends AutoCloseable {
      *
      * @return the current token, or {@code null} before the first {@link #nextToken()} call
      */
+    @Nullable
     Token token();
 
     /**
@@ -109,6 +111,7 @@ public interface JsonReader extends AutoCloseable {
      *
      * @return the name, or {@code null} when the current token is not {@link Token#NAME}
      */
+    @Nullable
     String name();
 
     /**
@@ -122,6 +125,7 @@ public interface JsonReader extends AutoCloseable {
      *
      * @return the text, or {@code null} when the current token carries none
      */
+    @Nullable
     String string();
 
     /**
@@ -189,6 +193,7 @@ public interface JsonReader extends AutoCloseable {
      * @return the value; {@code null} for JSON {@code null}
      * @throws IllegalStateException if the reader is not positioned on a value
      */
+    @Nullable
     Object captureValue();
 
     /**

@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.exception.SynapseIOException;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Writes one JSON document to a sink, token by token.
@@ -62,7 +63,7 @@ public interface JsonWriter extends Flushable, AutoCloseable {
      *
      * @param text the text, or {@code null} to write JSON {@code null}
      */
-    JsonWriter writeString(String text);
+    JsonWriter writeString(@Nullable String text);
 
     /**
      * Writes a string value whose characters come from a reader, so that a value too large to hold —
@@ -140,7 +141,7 @@ public interface JsonWriter extends Flushable, AutoCloseable {
      *
      * @param value the value to write; {@code null} writes JSON {@code null}
      */
-    JsonWriter writeValue(Object value);
+    JsonWriter writeValue(@Nullable Object value);
 
     /**
      * Pushes what is buffered into the sink and flushes it.

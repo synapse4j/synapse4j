@@ -4,6 +4,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Writes Java values as JSON text, reads JSON text back into Java values, derives the schema of the
  * JSON that crosses in either direction, and opens the writer and reader that move a document token
@@ -78,7 +80,7 @@ public interface JsonCodec {
      * @param value the value to write; may be {@code null}
      * @return the JSON text; never {@code null}
      */
-    String encode(Object value);
+    String encode(@Nullable Object value);
 
     /**
      * Reads JSON text into a value of the given type.
@@ -88,7 +90,7 @@ public interface JsonCodec {
      * @param type the type to read into, type arguments included; must not be {@code null}
      * @return the value; may be {@code null}
      */
-    <T> T decode(String json, Type type);
+    <T> @Nullable T decode(String json, Type type);
 
     /**
      * Opens a writer that puts one JSON document into the given sink.

@@ -5,10 +5,11 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Consumer;
 
 import io.github.synapse4j.data.ProviderExtras;
+import org.jspecify.annotations.Nullable;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
@@ -92,10 +93,10 @@ public class JsonSchema {
     private List<String> required = new ArrayList<>();
 
     /** Shorthand for the schema of the array's elements. */
-    private JsonSchema items;
+    private @Nullable JsonSchema items;
 
     /** Whether properties beyond {@link #properties} are allowed; {@code null} means the schema is silent. */
-    private Boolean additionalProperties;
+    private @Nullable Boolean additionalProperties;
 
     /** The allowed values. Empty means the value is not constrained to a set. */
     @NonNull
@@ -106,7 +107,7 @@ public class JsonSchema {
     private Map<String, JsonSchema> defs = new LinkedHashMap<>();
 
     /** A reference to a sub-schema, such as {@code #/$defs/Location}. */
-    private String ref;
+    private @Nullable String ref;
 
     /** Sub-schemas of which at least one has to match. Empty means this keyword is absent. */
     @NonNull
@@ -121,10 +122,10 @@ public class JsonSchema {
     private List<JsonSchema> allOf = new ArrayList<>();
 
     /** Name of the schema, for readers of the document. */
-    private String title;
+    private @Nullable String title;
 
     /** What the value means, for the model to read. */
-    private String description;
+    private @Nullable String description;
 
     /** Keywords this class does not model, carried through as the JSON data they arrived as. */
     private final ProviderExtras extras = new ProviderExtras();
@@ -138,8 +139,8 @@ public class JsonSchema {
      *
      * @param type the types; must not be {@code null}
      */
-    public void setType(List<String> type) {
-        this.type = Objects.requireNonNull(type, "type must not be null");
+    public void setType(@NonNull List<String> type) {
+        this.type = type;
     }
 
     /**
@@ -151,8 +152,8 @@ public class JsonSchema {
      *
      * @param type one type, for example {@code object}; must not be {@code null}
      */
-    public void setType(String type) {
-        setType(new ArrayList<>(List.of(Objects.requireNonNull(type, "type must not be null"))));
+    public void setType(@NonNull String type) {
+        setType(new ArrayList<>(List.of(type)));
     }
 
     /**
@@ -166,8 +167,7 @@ public class JsonSchema {
      *
      * @param visitor what to do with each schema; must not be {@code null}
      */
-    public void visit(Consumer<JsonSchema> visitor) {
-        Objects.requireNonNull(visitor, "visitor must not be null");
+    public void visit(@NonNull Consumer<JsonSchema> visitor) {
         visitor.accept(this);
         for (JsonSchema subSchema : subSchemas()) {
             subSchema.visit(visitor);
@@ -269,8 +269,7 @@ public class JsonSchema {
      * @param map the schema as a map; must not be {@code null}
      * @return the schema; never {@code null}
      */
-    public static JsonSchema fromMap(Map<String, Object> map) {
-        Objects.requireNonNull(map, "map must not be null");
+    public static JsonSchema fromMap(@NonNull Map<String, Object> map) {
         JsonSchema schema = new JsonSchema();
         map.forEach(schema::read);
         return schema;
@@ -287,7 +286,7 @@ public class JsonSchema {
         return "JsonSchema" + toMap();
     }
 
-    private void read(String keyword, Object value) {
+    private void read(String keyword, @Nullable Object value) {
         switch (keyword) {
             case TYPE -> readType(keyword, value);
             case TITLE -> readText(keyword, value, this::setTitle);
@@ -306,7 +305,7 @@ public class JsonSchema {
         }
     }
 
-    private void readType(String keyword, Object value) {
+    private void readType(String keyword, @Nullable Object value) {
         if (value instanceof String single) {
             setType(single);
         } else if (value instanceof List<?> types && types.stream().allMatch(String.class::isInstance)) {
@@ -316,7 +315,7 @@ public class JsonSchema {
         }
     }
 
-    private void readText(String keyword, Object value, Consumer<String> setter) {
+    private void readText(String keyword, @Nullable Object value, Consumer<String> setter) {
         if (value instanceof String text) {
             setter.accept(text);
         } else {
@@ -324,7 +323,7 @@ public class JsonSchema {
         }
     }
 
-    private void readTexts(String keyword, Object value, Consumer<List<String>> setter) {
+    private void readTexts(String keyword, @Nullable Object value, Consumer<List<String>> setter) {
         if (value instanceof List<?> texts && texts.stream().allMatch(String.class::isInstance)) {
             setter.accept(new ArrayList<>(texts.stream().map(String.class::cast).toList()));
         } else {
@@ -332,7 +331,7 @@ public class JsonSchema {
         }
     }
 
-    private void readValues(String keyword, Object value) {
+    private void readValues(String keyword, @Nullable Object value) {
         if (value instanceof List<?> values) {
             setEnumValues(new ArrayList<>(values));
         } else {
@@ -340,7 +339,7 @@ public class JsonSchema {
         }
     }
 
-    private void readAdditionalProperties(String keyword, Object value) {
+    private void readAdditionalProperties(String keyword, @Nullable Object value) {
         if (value instanceof Boolean allowed) {
             setAdditionalProperties(allowed);
         } else {
@@ -348,7 +347,7 @@ public class JsonSchema {
         }
     }
 
-    private void readSchemas(String keyword, Object value, Consumer<Map<String, JsonSchema>> setter) {
+    private void readSchemas(String keyword, @Nullable Object value, Consumer<Map<String, JsonSchema>> setter) {
         if (value instanceof Map<?, ?> map && map.values().stream().allMatch(Map.class::isInstance)) {
             Map<String, JsonSchema> schemas = new LinkedHashMap<>();
             map.forEach((name, nested) -> schemas.put(String.valueOf(name), fromMap(asMap(nested))));
@@ -358,7 +357,7 @@ public class JsonSchema {
         }
     }
 
-    private void readSchema(String keyword, Object value, Consumer<JsonSchema> setter) {
+    private void readSchema(String keyword, @Nullable Object value, Consumer<JsonSchema> setter) {
         if (value instanceof Map<?, ?> map) {
             setter.accept(fromMap(asMap(map)));
         } else {
@@ -366,7 +365,7 @@ public class JsonSchema {
         }
     }
 
-    private void readSchemaList(String keyword, Object value, Consumer<List<JsonSchema>> setter) {
+    private void readSchemaList(String keyword, @Nullable Object value, Consumer<List<JsonSchema>> setter) {
         if (value instanceof List<?> list && list.stream().allMatch(Map.class::isInstance)) {
             List<JsonSchema> schemas = new ArrayList<>();
             list.forEach(nested -> schemas.add(fromMap(asMap(nested))));
@@ -376,7 +375,7 @@ public class JsonSchema {
         }
     }
 
-    private void carry(String keyword, Object value) {
+    private void carry(String keyword, @Nullable Object value) {
         extras.put(keyword, value);
     }
 
@@ -393,7 +392,7 @@ public class JsonSchema {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> asMap(Object value) {
+    private static Map<String, Object> asMap(@Nullable Object value) {
         return (Map<String, Object>) value;
     }
 

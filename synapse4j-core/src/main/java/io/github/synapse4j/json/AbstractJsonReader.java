@@ -6,6 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A {@link JsonReader} that adds the operations this library can read over the primitives, leaving
  * the primitives themselves to a subclass.
@@ -30,7 +32,7 @@ public abstract class AbstractJsonReader implements JsonReader {
      * the accessors say what is in it.
      */
     @Override
-    public Object captureValue() {
+    public @Nullable Object captureValue() {
         Token current = token();
         if (current == null) {
             throw new IllegalStateException("captureValue() needs a value, but the reader has not advanced");

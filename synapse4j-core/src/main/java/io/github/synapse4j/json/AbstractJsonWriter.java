@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.synapse4j.data.ProviderExtras;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A {@link JsonWriter} that adds the writing of a whole value over the tokens, leaving the tokens
@@ -37,7 +38,7 @@ public abstract class AbstractJsonWriter implements JsonWriter {
      * recognized wherever it sits rather than only at the top.
      */
     @Override
-    public JsonWriter writeValue(Object value) {
+    public JsonWriter writeValue(@Nullable Object value) {
         if (value == null) {
             return writeNull();
         }

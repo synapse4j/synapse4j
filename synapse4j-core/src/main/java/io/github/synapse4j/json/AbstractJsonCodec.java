@@ -3,6 +3,8 @@ package io.github.synapse4j.json;
 import java.lang.reflect.Type;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A {@link JsonCodec} that leaves the binding itself to a subclass and takes care of this library's
  * own types in both directions — the ones whose document form is not the shape of their class.
@@ -29,7 +31,7 @@ public abstract class AbstractJsonCodec implements JsonCodec {
      * {@link #encodeValue(Object)} untouched.
      */
     @Override
-    public String encode(Object value) {
+    public String encode(@Nullable Object value) {
         return encodeValue(value instanceof JsonSchema schema ? schema.toMap() : value);
     }
 
@@ -44,7 +46,7 @@ public abstract class AbstractJsonCodec implements JsonCodec {
      * collection's element type would have it, not as a schema this method recognises.
      */
     @Override
-    public <T> T decode(String json, Type type) {
+    public <T> @Nullable T decode(String json, Type type) {
         if (type instanceof Class<?> asked && JsonSchema.class.isAssignableFrom(asked)) {
             return cast(JsonSchema.fromMap(decodeValue(json, Map.class)));
         }
@@ -57,7 +59,7 @@ public abstract class AbstractJsonCodec implements JsonCodec {
      * @param value the value to write; may be {@code null}
      * @return the JSON text; never {@code null}
      */
-    protected abstract String encodeValue(Object value);
+    protected abstract String encodeValue(@Nullable Object value);
 
     /**
      * Reads JSON text as a value of the given type, knowing nothing of this library's own types.
@@ -67,7 +69,7 @@ public abstract class AbstractJsonCodec implements JsonCodec {
      * @param type the type to read into; must not be {@code null}
      * @return the value; may be {@code null}
      */
-    protected abstract <T> T decodeValue(String json, Type type);
+    protected abstract <T> @Nullable T decodeValue(String json, Type type);
 
     @SuppressWarnings("unchecked")
     private static <T> T cast(Object value) {
