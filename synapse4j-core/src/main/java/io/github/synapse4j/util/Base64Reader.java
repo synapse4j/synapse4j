@@ -6,7 +6,10 @@ import java.io.Reader;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.Objects;
+
+import org.jspecify.annotations.Nullable;
+
+import lombok.NonNull;
 
 /**
  * A reader over some text followed by the base64 of a byte source — {@code data:image/png;base64,} and
@@ -41,7 +44,7 @@ public class Base64Reader extends Reader {
 
     private final byte[] input = new byte[CHUNK];
 
-    private InputStream stream;
+    private @Nullable InputStream stream;
 
     private int prefixPosition;
 
@@ -68,14 +71,13 @@ public class Base64Reader extends Reader {
      * @param prefix the text to hand out first, or {@code null} for none
      * @param source where the bytes come from; never {@code null}
      */
-    public Base64Reader(String prefix, InputStreamSupplier source) {
+    public Base64Reader(@Nullable String prefix, @NonNull InputStreamSupplier source) {
         this.prefix = prefix == null ? "" : prefix;
-        this.source = Objects.requireNonNull(source, "source must not be null");
+        this.source = source;
     }
 
     @Override
-    public int read(char[] target, int offset, int length) throws IOException {
-        Objects.requireNonNull(target, "target must not be null");
+    public int read(@NonNull char[] target, int offset, int length) throws IOException {
         if (offset < 0 || length < 0 || length > target.length - offset) {
             throw new IndexOutOfBoundsException(
                     "offset " + offset + " and length " + length + " do not fit in a buffer of " + target.length);

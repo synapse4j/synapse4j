@@ -7,9 +7,10 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
+
+import lombok.NonNull;
 
 /**
  * A source of bytes that can be opened more than once: every call answers with a stream over the same
@@ -43,8 +44,7 @@ public interface InputStreamSupplier {
      *
      * @param bytes the content; never {@code null}
      */
-    static InputStreamSupplier of(byte[] bytes) {
-        Objects.requireNonNull(bytes, "bytes must not be null");
+    static InputStreamSupplier of(@NonNull byte[] bytes) {
         return () -> new ByteArrayInputStream(bytes);
     }
 
@@ -63,9 +63,7 @@ public interface InputStreamSupplier {
      * @param text    the content; never {@code null}
      * @param charset the charset the text is encoded in; never {@code null}
      */
-    static InputStreamSupplier of(String text, Charset charset) {
-        Objects.requireNonNull(text, "text must not be null");
-        Objects.requireNonNull(charset, "charset must not be null");
+    static InputStreamSupplier of(@NonNull String text, @NonNull Charset charset) {
         return of(text.getBytes(charset));
     }
 
@@ -75,8 +73,7 @@ public interface InputStreamSupplier {
      *
      * @param file the file; never {@code null}
      */
-    static InputStreamSupplier of(Path file) {
-        Objects.requireNonNull(file, "file must not be null");
+    static InputStreamSupplier of(@NonNull Path file) {
         return () -> Files.newInputStream(file);
     }
 
@@ -86,8 +83,7 @@ public interface InputStreamSupplier {
      *
      * @param supplier the supplier to adapt; never {@code null}
      */
-    static InputStreamSupplier of(Supplier<? extends InputStream> supplier) {
-        Objects.requireNonNull(supplier, "supplier must not be null");
+    static InputStreamSupplier of(@NonNull Supplier<? extends InputStream> supplier) {
         return supplier::get;
     }
 
@@ -101,8 +97,7 @@ public interface InputStreamSupplier {
      *                                   content again is the caller's mistake rather than a failure of
      *                                   the content
      */
-    static InputStreamSupplier once(InputStream stream) {
-        Objects.requireNonNull(stream, "stream must not be null");
+    static InputStreamSupplier once(@NonNull InputStream stream) {
         return new InputStreamSupplier() {
 
             private final AtomicBoolean opened = new AtomicBoolean();
