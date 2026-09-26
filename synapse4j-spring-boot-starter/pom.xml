@@ -49,6 +49,10 @@
       <artifactId>lombok</artifactId>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>org.jspecify</groupId>
+      <artifactId>jspecify</artifactId>
+    </dependency>
     <!-- Generates the configuration metadata so synapse4j.* keys complete in the IDE. Optional:
          build-time only, never a dependency of the consuming application. -->
     <dependency>
