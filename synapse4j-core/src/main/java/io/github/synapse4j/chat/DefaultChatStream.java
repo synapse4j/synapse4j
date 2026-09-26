@@ -3,7 +3,6 @@ package io.github.synapse4j.chat;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.UnaryOperator;
 
@@ -11,6 +10,9 @@ import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
+import org.jspecify.annotations.Nullable;
+
+import lombok.NonNull;
 
 /**
  * The {@link ChatStream} every provider module reuses. It wires the things only a provider knows:
@@ -31,7 +33,7 @@ public class DefaultChatStream implements ChatStream {
 
     private final ChatResponse aggregated = new ChatResponse();
 
-    private StreamIterator iterator;
+    private @Nullable StreamIterator iterator;
 
     /** Set by {@link #close()} from any thread; read by the consuming thread. */
     private volatile boolean cancelled;
@@ -50,8 +52,8 @@ public class DefaultChatStream implements ChatStream {
      * @param closeAction what releasing the stream does — typically closing the HTTP response
      *                        behind it; never {@code null}
      */
-    public DefaultChatStream(Iterator<ChatStreamEvent> source, BiConsumer<ChatResponse, ChatStreamEvent> aggregation,
-            AutoCloseable closeAction) {
+    public DefaultChatStream(@NonNull Iterator<ChatStreamEvent> source,
+            @NonNull BiConsumer<ChatResponse, ChatStreamEvent> aggregation, @NonNull AutoCloseable closeAction) {
         this(source, UnaryOperator.identity(), aggregation, closeAction);
     }
 
@@ -66,12 +68,13 @@ public class DefaultChatStream implements ChatStream {
      * @param closeAction   what releasing the stream does — typically closing the HTTP response
      *                          behind it; never {@code null}
      */
-    public DefaultChatStream(Iterator<ChatStreamEvent> source, UnaryOperator<ChatStreamEvent> eventPipeline,
-            BiConsumer<ChatResponse, ChatStreamEvent> aggregation, AutoCloseable closeAction) {
-        this.source = Objects.requireNonNull(source, "source must not be null");
-        this.eventPipeline = Objects.requireNonNull(eventPipeline, "eventPipeline must not be null");
-        this.aggregation = Objects.requireNonNull(aggregation, "aggregation must not be null");
-        this.closeAction = Objects.requireNonNull(closeAction, "closeAction must not be null");
+    public DefaultChatStream(@NonNull Iterator<ChatStreamEvent> source,
+            @NonNull UnaryOperator<ChatStreamEvent> eventPipeline,
+            @NonNull BiConsumer<ChatResponse, ChatStreamEvent> aggregation, @NonNull AutoCloseable closeAction) {
+        this.source = source;
+        this.eventPipeline = eventPipeline;
+        this.aggregation = aggregation;
+        this.closeAction = closeAction;
     }
 
     @Override

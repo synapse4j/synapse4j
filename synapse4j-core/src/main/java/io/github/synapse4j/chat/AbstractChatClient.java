@@ -17,6 +17,8 @@ import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolProvider;
+import org.jspecify.annotations.Nullable;
+
 import lombok.NonNull;
 
 /**
@@ -132,7 +134,7 @@ public abstract class AbstractChatClient implements ChatClient {
      * insertion order — so upgrading a tool never shuffles the rest.
      */
     @Override
-    public void addDefaultTool(Tool tool) {
+    public void addDefaultTool(@NonNull Tool tool) {
         // The one entry where a tool arrives from outside: validate here, never again. The tool
         // itself needs no check — tool.name() below fails right here. The name does: an empty
         // map still accepts a null key, so without this a null name would sail straight in.
@@ -152,8 +154,7 @@ public abstract class AbstractChatClient implements ChatClient {
      * out, never when it was already gone.
      */
     @Override
-    public boolean removeDefaultTool(String name) {
-        Objects.requireNonNull(name, "name must not be null");
+    public boolean removeDefaultTool(@NonNull String name) {
         while (true) {
             LinkedHashMap<String, Tool> registered = defaultTools.get();
             if (!registered.containsKey(name)) {
@@ -290,7 +291,7 @@ public abstract class AbstractChatClient implements ChatClient {
      * @return the last answer; never {@code null}
      */
     private <T> T runCustomizers(List<? extends ChatCustomizer<T>> registrations, T initial,
-            Consumer<T> afterEach) {
+            @Nullable Consumer<T> afterEach) {
         T answer = initial;
         for (ChatCustomizer<T> customizer : registrations) {
             answer = Objects.requireNonNull(customizer.customize(this, answer), "customizer answered null");
@@ -399,7 +400,7 @@ public abstract class AbstractChatClient implements ChatClient {
 
         private boolean applied;
 
-        private ChatResponse result;
+        private @Nullable ChatResponse result;
 
         private CustomizedStream(ChatStream delegate, List<ChatResponseCustomizer> customizers,
                 ChatContext context) {

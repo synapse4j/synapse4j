@@ -18,6 +18,9 @@ import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.tool.DefaultToolExecutor;
 import io.github.synapse4j.tool.ToolExecutor;
+import org.jspecify.annotations.Nullable;
+
+import lombok.NonNull;
 
 /**
  * A {@link ChatClient} that runs the tool-calling loop its inner client leaves to the caller:
@@ -74,9 +77,14 @@ public class ToolCallingChatClient extends AbstractChatClient {
      *                     {@link DefaultToolExecutor} — inline, in order, prefixed failure text,
      *                     no turn cap
      */
-    public ToolCallingChatClient(ChatClient inner, ToolExecutor executor) {
-        this.inner = Objects.requireNonNull(inner, "inner must not be null");
+    public ToolCallingChatClient(@NonNull ChatClient inner, @Nullable ToolExecutor executor) {
+        this.inner = inner;
         this.executor = executor != null ? executor : new DefaultToolExecutor();
+    }
+
+    /** The context the loop attached before the round ran; a request reaching a round carries one. */
+    private static ChatContext contextOf(ChatRequest request) {
+        return Objects.requireNonNull(request.getContext(), "the loop attaches the context before a round runs");
     }
 
     /**
@@ -112,7 +120,7 @@ public class ToolCallingChatClient extends AbstractChatClient {
      */
     @Override
     protected ChatResponse doChat(ChatRequest request) {
-        ChatContext context = request.getContext();
+        ChatContext context = contextOf(request);
         context.setTurn(1);
         ChatResponse response = inner.chat(request);
         List<ToolCallPart> calls = toolCalls(response);
@@ -135,7 +143,7 @@ public class ToolCallingChatClient extends AbstractChatClient {
      * they are, checked ones arrive under a {@link SynapseException} — {@code chat()} carries
      * nothing else.
      */
-    private List<ToolResultPart> execute(List<ToolCallPart> calls, ChatRequest request, ChatContext context) {
+    private @Nullable List<ToolResultPart> execute(List<ToolCallPart> calls, ChatRequest request, ChatContext context) {
         try {
             return executor.execute(calls, request.getTools(), context);
         } catch (RuntimeException | Error e) {
@@ -157,7 +165,7 @@ public class ToolCallingChatClient extends AbstractChatClient {
      */
     @Override
     protected ChatStream doStream(ChatRequest request) {
-        request.getContext().setTurn(1);
+        contextOf(request).setTurn(1);
         return new LoopingStream(request);
     }
 
@@ -212,7 +220,7 @@ public class ToolCallingChatClient extends AbstractChatClient {
 
         private Iterator<ChatStreamEvent> events;
 
-        private Iterator<ChatStreamEvent> iterator;
+        private @Nullable Iterator<ChatStreamEvent> iterator;
 
         private boolean exhausted;
 
@@ -222,7 +230,7 @@ public class ToolCallingChatClient extends AbstractChatClient {
          * must not open twice, and a failure must not leave the round's connection open, so
          * ending here releases it.
          */
-        private Throwable failure;
+        private @Nullable Throwable failure;
 
         /** Set by {@link #close()} from any thread; read by the consuming thread. */
         private volatile boolean cancelled;
@@ -303,7 +311,7 @@ public class ToolCallingChatClient extends AbstractChatClient {
                         exhausted = true;
                         return false;
                     }
-                    List<ToolResultPart> results = execute(calls, request, request.getContext());
+                    List<ToolResultPart> results = execute(calls, request, contextOf(request));
                     if (results == null) {
                         // The executor declined: the round ends where it stands, calls unanswered.
                         exhausted = true;
@@ -316,7 +324,8 @@ public class ToolCallingChatClient extends AbstractChatClient {
                     }
                     request.getMessages().add(round.getMessage());
                     request.getMessages().add(toolResults(results));
-                    request.getContext().setTurn(request.getContext().getTurn() + 1);
+                    ChatContext context = contextOf(request);
+                    context.setTurn(context.getTurn() + 1);
                     ChatStream next = inner.stream(request);
                     current = next;
                     events = next.iterator();
