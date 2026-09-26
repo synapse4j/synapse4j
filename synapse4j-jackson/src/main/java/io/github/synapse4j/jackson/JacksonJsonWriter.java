@@ -10,6 +10,8 @@ import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
 import io.github.synapse4j.json.AbstractJsonWriter;
 import io.github.synapse4j.json.JsonWriter;
+import org.jspecify.annotations.Nullable;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import tools.jackson.core.JacksonException;
@@ -78,7 +80,7 @@ class JacksonJsonWriter extends AbstractJsonWriter {
     }
 
     @Override
-    public JsonWriter writeString(String text) {
+    public JsonWriter writeString(@Nullable String text) {
         return write(() -> generator.writeString(text));
     }
 

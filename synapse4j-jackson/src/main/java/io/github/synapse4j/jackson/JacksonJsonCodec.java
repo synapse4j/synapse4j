@@ -4,7 +4,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
 import java.util.Map;
-import java.util.Objects;
+
+import org.jspecify.annotations.Nullable;
 
 import com.github.victools.jsonschema.generator.SchemaGenerator;
 
@@ -18,6 +19,8 @@ import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
+
+import lombok.NonNull;
 
 /**
  * A {@link io.github.synapse4j.json.JsonCodec} over Jackson and victools: values are (de)serialized
@@ -99,13 +102,11 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
      * @param decodeSchemaGenerator the generator for the schema of what this codec reads; must not be
      *                                  {@code null}
      */
-    public JacksonJsonCodec(JsonMapper jsonMapper, SchemaGenerator encodeSchemaGenerator,
-            SchemaGenerator decodeSchemaGenerator) {
-        this.jsonMapper = Objects.requireNonNull(jsonMapper, "jsonMapper must not be null");
-        this.encodeSchemaGenerator = Objects
-                .requireNonNull(encodeSchemaGenerator, "encodeSchemaGenerator must not be null");
-        this.decodeSchemaGenerator = Objects
-                .requireNonNull(decodeSchemaGenerator, "decodeSchemaGenerator must not be null");
+    public JacksonJsonCodec(@NonNull JsonMapper jsonMapper, @NonNull SchemaGenerator encodeSchemaGenerator,
+            @NonNull SchemaGenerator decodeSchemaGenerator) {
+        this.jsonMapper = jsonMapper;
+        this.encodeSchemaGenerator = encodeSchemaGenerator;
+        this.decodeSchemaGenerator = decodeSchemaGenerator;
         this.tokenStreamFactory = jsonMapper.tokenStreamFactory()
                 .rebuild()
                 .disable(StreamReadFeature.AUTO_CLOSE_SOURCE)
@@ -134,12 +135,12 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
     }
 
     @Override
-    protected String encodeValue(Object value) {
+    protected String encodeValue(@Nullable Object value) {
         return jsonMapper.writeValueAsString(value);
     }
 
     @Override
-    protected <T> T decodeValue(String json, Type type) {
+    protected <T> @Nullable T decodeValue(String json, Type type) {
         return jsonMapper.readValue(json, jsonMapper.getTypeFactory().constructType(type));
     }
 

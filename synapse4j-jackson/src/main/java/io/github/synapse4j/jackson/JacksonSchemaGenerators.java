@@ -13,6 +13,7 @@ import com.github.victools.jsonschema.module.jackson.JacksonSchemaModule;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import lombok.NonNull;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -120,8 +121,7 @@ public final class JacksonSchemaGenerators {
      * @param encoding   whether the schema describes JSON this codec writes
      * @return the configuration builder; never {@code null}
      */
-    private static SchemaGeneratorConfigBuilder configBuilder(JsonMapper jsonMapper, boolean encoding) {
-        Objects.requireNonNull(jsonMapper, "jsonMapper must not be null");
+    private static SchemaGeneratorConfigBuilder configBuilder(@NonNull JsonMapper jsonMapper, boolean encoding) {
         SchemaGeneratorConfigBuilder configBuilder = new SchemaGeneratorConfigBuilder(jsonMapper,
                 SchemaVersion.DRAFT_2020_12,
                 OptionPreset.PLAIN_JSON)
@@ -140,10 +140,8 @@ public final class JacksonSchemaGenerators {
      * @param customizers   what to change about the defaults, applied in the order given
      * @return the configuration; never {@code null}
      */
-    private static SchemaGeneratorConfig config(SchemaGeneratorConfigBuilder configBuilder,
-            SchemaGeneratorConfigBuilderCustomizer... customizers) {
-        Objects.requireNonNull(configBuilder, "configBuilder must not be null");
-        Objects.requireNonNull(customizers, "customizers must not be null");
+    private static SchemaGeneratorConfig config(@NonNull SchemaGeneratorConfigBuilder configBuilder,
+            @NonNull SchemaGeneratorConfigBuilderCustomizer... customizers) {
         for (SchemaGeneratorConfigBuilderCustomizer customizer : customizers) {
             Objects.requireNonNull(customizer, "customizer must not be null").customize(configBuilder);
         }

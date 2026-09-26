@@ -14,6 +14,8 @@ import com.github.victools.jsonschema.generator.Option;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 
 import io.github.synapse4j.exception.SynapseException;
+import org.jspecify.annotations.Nullable;
+
 import lombok.RequiredArgsConstructor;
 import tools.jackson.databind.BeanDescription;
 import tools.jackson.databind.JavaType;
@@ -86,7 +88,7 @@ final class JacksonPropertyDiscovery implements SchemaGeneratorConfigBuilderCust
         configBuilder.forTypesInGeneral().withPropertySorter(Comparator.comparingInt(this::positionOf));
     }
 
-    private String nameOf(MemberScope<?, ?> member) {
+    private @Nullable String nameOf(MemberScope<?, ?> member) {
         return propertiesOf(member.getDeclaringType().getErasedType()).names.get(rawMemberOf(member));
     }
 

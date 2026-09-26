@@ -10,6 +10,8 @@ import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
 import io.github.synapse4j.json.AbstractJsonReader;
 import io.github.synapse4j.json.JsonReader;
+import org.jspecify.annotations.Nullable;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import tools.jackson.core.JacksonException;
@@ -45,7 +47,7 @@ class JacksonJsonReader extends AbstractJsonReader {
      * Kept here rather than asked of the parser, because Jackson reports the same {@code null} both
      * before a document starts and after it has ended.
      */
-    private Token current;
+    private @Nullable Token current;
 
     /**
      * Opens a reader over the given source.
@@ -68,17 +70,17 @@ class JacksonJsonReader extends AbstractJsonReader {
     }
 
     @Override
-    public Token token() {
+    public @Nullable Token token() {
         return current;
     }
 
     @Override
-    public String name() {
+    public @Nullable String name() {
         return parser.currentToken() == JsonToken.PROPERTY_NAME ? parser.currentName() : null;
     }
 
     @Override
-    public String string() {
+    public @Nullable String string() {
         JsonToken current = parser.currentToken();
         if (current == JsonToken.VALUE_STRING || current == JsonToken.VALUE_NUMBER_INT
                 || current == JsonToken.VALUE_NUMBER_FLOAT) {
@@ -135,7 +137,7 @@ class JacksonJsonReader extends AbstractJsonReader {
      * Maps Jackson's tokens onto the ones this library publishes. The unmapped kinds are the ones no
      * reader of a document can be handed: a value with no textual form, and "no token".
      */
-    private static Token toToken(JsonToken token) {
+    private static Token toToken(@Nullable JsonToken token) {
         if (token == null) {
             return Token.END_DOCUMENT;
         }
@@ -173,7 +175,7 @@ class JacksonJsonReader extends AbstractJsonReader {
     }
 
     /** Reads one value, translating what Jackson reports into what this library reports. */
-    private <T> T read(Supplier<T> read) {
+    private <T> @Nullable T read(Supplier<T> read) {
         return translate("Reading the JSON document failed", read);
     }
 
@@ -186,7 +188,7 @@ class JacksonJsonReader extends AbstractJsonReader {
     }
 
     /** Runs one read, translating what Jackson reports into what this library reports. */
-    private static <T> T translate(String message, Supplier<T> read) {
+    private static <T> @Nullable T translate(String message, Supplier<T> read) {
         try {
             return read.get();
         } catch (JacksonIOException failure) {
