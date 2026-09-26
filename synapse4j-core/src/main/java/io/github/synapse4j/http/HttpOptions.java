@@ -1,9 +1,11 @@
 package io.github.synapse4j.http;
 
 import java.time.Duration;
-import java.util.Objects;
+
+import org.jspecify.annotations.Nullable;
 
 import lombok.Data;
+import lombok.NonNull;
 
 /**
  * The HTTP-level settings a request can carry, and the ones an implementation falls back to.
@@ -49,14 +51,14 @@ public class HttpOptions {
      * refuse the request rather than treat it as the default — a caller who asked for one thing must
      * not silently get another.
      */
-    private String bodyWriteMode;
+    private @Nullable String bodyWriteMode;
 
     /**
      * How long to wait for the response to start arriving (its headers), measured by the implementation
      * from when the request is sent. Does not bound reading the body — body stalls are the caller's or a
      * higher layer's concern.
      */
-    private Duration responseTimeout;
+    private @Nullable Duration responseTimeout;
 
     /**
      * The most bytes one server-sent event frame may accumulate before the blank line that
@@ -73,7 +75,7 @@ public class HttpOptions {
      * traces — and small enough that a server which never dispatches a frame cannot pin an
      * unbounded buffer.
      */
-    private Integer maxFrameBytes;
+    private @Nullable Integer maxFrameBytes;
 
     /**
      * The frame budget nothing states otherwise: what {@link #defaults()} carries, and what a
@@ -107,8 +109,7 @@ public class HttpOptions {
      *         defaults — never {@code defaults} itself or {@code options} itself, so the caller may
      *         change the answer without touching either
      */
-    public static HttpOptions effective(HttpOptions options, HttpOptions defaults) {
-        Objects.requireNonNull(defaults, "defaults must not be null");
+    public static HttpOptions effective(@Nullable HttpOptions options, @NonNull HttpOptions defaults) {
         HttpOptions carried = options == null ? new HttpOptions() : options;
         HttpOptions effective = new HttpOptions();
         effective.bodyWriteMode = carried.bodyWriteMode != null ? carried.bodyWriteMode : defaults.bodyWriteMode;

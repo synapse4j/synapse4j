@@ -5,7 +5,10 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Objects;
+
+import org.jspecify.annotations.Nullable;
+
+import lombok.NonNull;
 
 /**
  * The bytes of one request body: written into the sink an {@link HttpClient} implementation hands
@@ -59,7 +62,7 @@ public interface HttpBody {
      *
      * @return the content, or {@code null} when this body has to be written to be read
      */
-    default ByteBuffer buffer() {
+    default @Nullable ByteBuffer buffer() {
         return null;
     }
 
@@ -69,8 +72,7 @@ public interface HttpBody {
      *
      * @param bytes the body; never {@code null}
      */
-    static HttpBody of(byte[] bytes) {
-        Objects.requireNonNull(bytes, "bytes must not be null");
+    static HttpBody of(@NonNull byte[] bytes) {
         return new HttpBody() {
 
             @Override
@@ -100,9 +102,7 @@ public interface HttpBody {
      * @param text    the body; never {@code null}
      * @param charset the charset the text is encoded in; never {@code null}
      */
-    static HttpBody of(String text, Charset charset) {
-        Objects.requireNonNull(text, "text must not be null");
-        Objects.requireNonNull(charset, "charset must not be null");
+    static HttpBody of(@NonNull String text, @NonNull Charset charset) {
         return of(text.getBytes(charset));
     }
 

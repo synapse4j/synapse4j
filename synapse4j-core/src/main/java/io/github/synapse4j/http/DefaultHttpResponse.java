@@ -5,6 +5,9 @@ import java.io.InputStream;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+
+import org.jspecify.annotations.Nullable;
 
 import lombok.Getter;
 import lombok.NonNull;
@@ -30,11 +33,23 @@ public class DefaultHttpResponse implements HttpResponse {
     @Getter
     private final Map<String, List<String>> headers = new LinkedHashMap<>();
 
-    /** The body stream. Read on the caller's thread; closed by {@link #close()}. */
-    @NonNull
-    @Getter
+    /**
+     * The body stream, or {@code null} until the transport that produced this response sets one.
+     * Read on the caller's thread; closed by {@link #close()}.
+     */
     @Setter
-    private InputStream body;
+    private @Nullable InputStream body;
+
+    /**
+     * The body stream. The interface promises one, so a response the transport never gave a body to
+     * is answered here rather than met as a null wherever the body is first read.
+     *
+     * @return the body stream; never {@code null}
+     */
+    @Override
+    public InputStream getBody() {
+        return Objects.requireNonNull(body, "the transport has not set a body");
+    }
 
     /**
      * The options in effect for the exchange this response answers: what the request asked for, with
@@ -47,13 +62,13 @@ public class DefaultHttpResponse implements HttpResponse {
      * carries, falling back to the library's default when it was handed none.
      */
     @Setter
-    private HttpOptions options;
+    private @Nullable HttpOptions options;
 
     /** The one event stream of this response, built on the first call and handed out after that. */
-    private SseEventStream eventStream;
+    private @Nullable SseEventStream eventStream;
 
     @Override
-    public synchronized SseEventStream sseEventStream() {
+    public synchronized @Nullable SseEventStream sseEventStream() {
         if (eventStream == null && isEventStream()) {
             eventStream = new DefaultSseEventStream(body, frameBudget());
         }

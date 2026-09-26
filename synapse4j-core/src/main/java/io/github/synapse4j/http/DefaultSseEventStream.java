@@ -9,6 +9,7 @@ import java.util.NoSuchElementException;
 
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The default {@link SseEventStream}: reads the body as UTF-8, the encoding every mainstream
@@ -57,7 +58,7 @@ public class DefaultSseEventStream implements SseEventStream {
     /** The line being assembled, decoded once its terminator arrives. */
     private final ByteArrayOutputStream line = new ByteArrayOutputStream();
 
-    private SseEvent pending;
+    private @Nullable SseEvent pending;
 
     private boolean finished;
 
@@ -112,7 +113,7 @@ public class DefaultSseEventStream implements SseEventStream {
     }
 
     /** Reads lines until one frame is complete, or the body ends. */
-    private SseEvent readFrame() {
+    private @Nullable SseEvent readFrame() {
         StringBuilder data = new StringBuilder();
         String event = null;
         while (true) {
@@ -164,7 +165,7 @@ public class DefaultSseEventStream implements SseEventStream {
      *
      * @return the line without its terminator, or {@code null} at the end of the body
      */
-    private String readLine() {
+    private @Nullable String readLine() {
         skipLeadingBom();
         line.reset();
         int next = nextByte();

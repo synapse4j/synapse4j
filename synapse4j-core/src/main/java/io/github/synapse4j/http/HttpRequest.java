@@ -4,6 +4,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.Data;
 import lombok.NonNull;
 
@@ -50,13 +52,13 @@ public class HttpRequest {
      * is not the same as no body: one goes out as a request with an empty body, while {@code null} sends
      * none at all.
      */
-    private HttpBody body;
+    private @Nullable HttpBody body;
 
     /**
      * What this request wants from the HTTP layer, or {@code null} when it has no opinion and the
      * implementation's own {@link HttpOptions} are to be used as they are. {@link HttpOptions#effective}
      * is how the two come together.
      */
-    private HttpOptions options;
+    private @Nullable HttpOptions options;
 
 }

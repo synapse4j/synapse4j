@@ -5,6 +5,8 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * One HTTP response: status, headers, and the body as a stream.
  *
@@ -46,6 +48,7 @@ public interface HttpResponse extends AutoCloseable {
      *
      * @return the event stream, or {@code null} when this response carries none
      */
+    @Nullable
     SseEventStream sseEventStream();
 
     /**

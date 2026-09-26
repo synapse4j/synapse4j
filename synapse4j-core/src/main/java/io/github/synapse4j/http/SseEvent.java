@@ -2,8 +2,9 @@ package io.github.synapse4j.http;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.NonNull;
+
+import org.jspecify.annotations.Nullable;
 
 /**
  * One server-sent event as it arrived: the frame of the {@code text/event-stream} format, before
@@ -16,7 +17,6 @@ import lombok.NonNull;
  * the transport's job is to cut the bytes into frames faithfully.
  */
 @Data
-@NoArgsConstructor
 @AllArgsConstructor
 public class SseEvent {
 
@@ -25,7 +25,7 @@ public class SseEvent {
      * name their events put the name here; those that discriminate inside the payload leave it
      * empty.
      */
-    private String event;
+    private @Nullable String event;
 
     /**
      * The frame's {@code data:} lines joined with a newline, never {@code null}. A frame with no
