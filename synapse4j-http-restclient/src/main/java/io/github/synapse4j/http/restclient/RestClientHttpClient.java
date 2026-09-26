@@ -4,9 +4,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import lombok.NonNull;
 import lombok.extern.java.Log;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.StreamingHttpOutputMessage;
@@ -20,6 +20,7 @@ import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.http.HttpRequest;
 import io.github.synapse4j.http.HttpResponse;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The {@link HttpClient} SPI implemented on Spring's {@link RestClient}.
@@ -116,8 +117,8 @@ public class RestClientHttpClient implements HttpClient {
      * @param delegate the RestClient to send through; never {@code null}
      * @param options  the options to fall back to, or {@code null} for the standard ones
      */
-    public RestClientHttpClient(RestClient delegate, HttpOptions options) {
-        this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
+    public RestClientHttpClient(@NonNull RestClient delegate, @Nullable HttpOptions options) {
+        this.delegate = delegate;
         this.options = HttpOptions.effective(options, HttpOptions.defaults());
     }
 
@@ -173,7 +174,7 @@ public class RestClientHttpClient implements HttpClient {
      * gathered first when {@link HttpOptions#BUFFERED} asks for that. The mode was checked before
      * this is reached, so every route here is one this implementation knows.
      */
-    private static void setBody(RestClient.RequestBodySpec spec, HttpRequest request, String mode) {
+    private static void setBody(RestClient.RequestBodySpec spec, HttpRequest request, @Nullable String mode) {
         HttpBody body = request.getBody();
         if (body == null) {
             return;
