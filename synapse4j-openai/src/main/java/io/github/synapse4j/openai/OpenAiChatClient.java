@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import io.github.synapse4j.chat.AbstractChatClient;
 import io.github.synapse4j.chat.ChatStream;
@@ -17,6 +18,8 @@ import io.github.synapse4j.http.SseEventStream;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonWriter;
+
+import lombok.NonNull;
 
 /**
  * The OpenAI chat-completions client: speaks {@code POST /chat/completions} and answers in the
@@ -48,7 +51,7 @@ import io.github.synapse4j.json.JsonWriter;
  * Header precedence is deliberate: the module sets {@code Content-Type}, {@code Authorization} and
  * the organization/project headers first, then applies the call's own headers last, so a caller
  * can override anything — the escape-hatch philosophy this library applies everywhere. The same
- * applies to validation: a misconfigured call (no config, no API key, no model) fails with
+ * applies to validation: a misconfigured call (no API key, no model) fails with
  * {@link IllegalArgumentException} before anything goes out, matching the restricted-header
  * precedent — the call never happened, so it is a caller bug, not a transport failure.
  */
@@ -64,40 +67,49 @@ public class OpenAiChatClient extends AbstractChatClient {
      */
     private static final int ERROR_BODY_LIMIT = 64 * 1024;
 
+    @NonNull
     private final HttpClient http;
+
+    @NonNull
     private final JsonCodec codec;
-    private final ChatCompletionsWriter requestWriter;
 
     /**
-     * The family configuration in effect. Volatile, and read once per exchange: a
-     * {@link #setConfig(OpenAiConfig)} landing mid-call must not send one request partly under
-     * the old configuration and partly under the new.
+     * The family configuration in effect, replaceable while the client is in use. The reference
+     * follows the same pattern as the tool containers in {@link AbstractChatClient}: a rare writer
+     * publishes a whole new instance through it in one step, and every exchange reads it once into
+     * a local — two reads could straddle two versions, and a request must not go out partly under
+     * one configuration and partly under another.
      */
-    private volatile OpenAiConfig config = new OpenAiConfig();
+    private final AtomicReference<OpenAiConfig> config;
 
-    public OpenAiChatClient(HttpClient http, JsonCodec codec) {
+    /**
+     * Creates the client.
+     *
+     * @param http   the transport to send through; must not be {@code null}
+     * @param codec  the application's JSON codec; must not be {@code null}
+     * @param config the family configuration to send with; must not be {@code null}
+     */
+    public OpenAiChatClient(@NonNull HttpClient http, @NonNull JsonCodec codec, @NonNull OpenAiConfig config) {
         this.http = http;
         this.codec = codec;
-        this.requestWriter = new ChatCompletionsWriter(codec);
+        this.config = new AtomicReference<>(config);
     }
 
     /**
-     * Replaces the family configuration this client sends with.
+     * Replaces the family configuration this client sends with. In flight exchanges keep the
+     * instance they started with; the next one sees the new value.
      *
      * @param config the new configuration; must not be {@code null}
      */
-    public void setConfig(OpenAiConfig config) {
-        if (config == null) {
-            throw new IllegalArgumentException("config must not be null");
-        }
-        this.config = config;
+    public void setConfig(@NonNull OpenAiConfig config) {
+        this.config.set(config);
     }
 
     @Override
     protected ChatResponse doChat(ChatRequest request) {
         // One snapshot for the whole exchange: a setConfig landing mid-call must not send this
         // request partly under the old configuration and partly under the new.
-        OpenAiConfig config = this.config;
+        OpenAiConfig config = this.config.get();
         requireCallable(config, request);
 
         io.github.synapse4j.http.HttpRequest httpRequest = httpRequest(config, request, out -> {
@@ -105,7 +117,7 @@ public class OpenAiChatClient extends AbstractChatClient {
             // or redirect: the document goes into whatever sink the implementation hands over, so it
             // never exists as bytes here.
             try (JsonWriter writer = codec.writer(out)) {
-                requestWriter.write(request, writer);
+                new ChatCompletionsWriter(codec, config).write(request, writer);
             }
         });
 
@@ -115,7 +127,7 @@ public class OpenAiChatClient extends AbstractChatClient {
             int status = httpResponse.getStatusCode();
             if (status >= 200 && status < 300) {
                 try (JsonReader reader = codec.reader(httpResponse.getBody())) {
-                    ChatResponse response = ChatCompletionsReader.read(reader);
+                    ChatResponse response = new ChatCompletionsReader(config).read(reader);
                     copyHeaders(response, httpResponse.getHeaders());
                     return response;
                 }
@@ -129,12 +141,12 @@ public class OpenAiChatClient extends AbstractChatClient {
     @Override
     protected ChatStream doStream(ChatRequest request) {
         // The same once-per-exchange snapshot the blocking path takes.
-        OpenAiConfig config = this.config;
+        OpenAiConfig config = this.config.get();
         requireCallable(config, request);
 
         io.github.synapse4j.http.HttpRequest httpRequest = httpRequest(config, request, out -> {
             try (JsonWriter writer = codec.writer(out)) {
-                requestWriter.writeStreaming(request, writer);
+                new ChatCompletionsWriter(codec, config).writeStreaming(request, writer);
             }
         });
 
@@ -154,7 +166,8 @@ public class OpenAiChatClient extends AbstractChatClient {
             }
             // The response is deliberately left open: the stream owns it from here, and closing
             // the stream is what cancels an answer that is still in flight.
-            ChatStream stream = new ChatCompletionsStream(codec, events, eventPipeline(), httpResponse::close);
+            ChatStream stream = new ChatCompletionsStream(codec, events, eventPipeline(), httpResponse::close,
+                    config);
             // The headers arrive with the response, before any frame does, so they go onto the
             // answer now: aggregatedResponse() carries them the moment the stream exists, the
             // same way the answer of a blocking call does.

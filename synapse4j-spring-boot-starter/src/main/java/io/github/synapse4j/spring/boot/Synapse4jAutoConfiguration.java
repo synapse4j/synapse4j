@@ -100,9 +100,7 @@ public class Synapse4jAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(ChatClient.class)
     public OpenAiChatClient openAiChatClient(HttpClient http, JsonCodec codec, OpenAiConfig config) {
-        OpenAiChatClient client = new OpenAiChatClient(http, codec);
-        client.setConfig(config);
-        return client;
+        return new OpenAiChatClient(http, codec, config);
     }
 
 }

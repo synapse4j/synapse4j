@@ -12,6 +12,7 @@ import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
@@ -24,11 +25,15 @@ import io.github.synapse4j.util.Base64Reader;
 import org.jspecify.annotations.Nullable;
 
 import lombok.AccessLevel;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Writes the shared chat model as the chat-completions wire document. Stateless; holds only the
- * application's codec, for embedding schema strings as parsed maps.
+ * Writes the shared chat model as the chat-completions wire document. Stateless; one instance
+ * writes one exchange, and it holds what the whole exchange writes by — the application's codec,
+ * for embedding schema strings as parsed maps, and the endpoint's conventions, for the members
+ * whose name varies between servers. The document being written is the opposite case and stays an
+ * argument of each call: it is the thing that varies.
  *
  * <p>
  * A request is assembled as the object it goes out as — one map per node, the members this module
@@ -60,6 +65,10 @@ class ChatCompletionsWriter {
 
     private final JsonCodec codec;
 
+    /** The endpoint's conventions, as they were when this exchange began. */
+    @NonNull
+    private final OpenAiConfig config;
+
     /**
      * Writes the request as the wire document.
      *
@@ -90,9 +99,9 @@ class ChatCompletionsWriter {
             document.put("tools", tools(request.getTools()));
         }
         putIfSet(document, "temperature", request.getOptions().getTemperature());
-        // The modern name for the limit; an endpoint that only answers to the legacy one gets it
-        // through OpenAiCustomizers.legacyMaxTokens().
-        putIfSet(document, "max_completion_tokens", request.getOptions().getMaxOutputTokens());
+        if (!config.getMaxTokensField().isBlank()) {
+            putIfSet(document, config.getMaxTokensField(), request.getOptions().getMaxOutputTokens());
+        }
         putIfSet(document, "top_p", request.getOptions().getTopP());
         if (request.getResponseFormat().getType() != null
                 || !request.getResponseFormat().getExtras().isEmpty()) {
@@ -160,7 +169,7 @@ class ChatCompletionsWriter {
                     // A tool call is a member of the message rather than an entry of its content,
                     // so it is held back and written beside the array.
                     toolCalls.add(toolCall(toolCall));
-                } else {
+                } else if (!(part instanceof ReasoningPart)) {
                     throw unsupportedPart(part);
                 }
             }
@@ -168,10 +177,11 @@ class ChatCompletionsWriter {
         } else {
             StringBuilder text = new StringBuilder();
             for (ContentPart part : message.getParts()) {
-                if (!(part instanceof TextPart textPart)) {
+                if (part instanceof TextPart textPart) {
+                    text.append(textPart.getText());
+                } else if (!(part instanceof ReasoningPart)) {
                     throw unsupportedPart(part);
                 }
-                text.append(textPart.getText());
             }
             if (text.length() > 0) {
                 entry.put("content", text.toString());
@@ -180,6 +190,7 @@ class ChatCompletionsWriter {
         if (!toolCalls.isEmpty()) {
             entry.put("tool_calls", toolCalls);
         }
+        writeReasoning(message, entry);
         ProviderExtras messageExtras = message.getExtras();
         if (messageExtras != null) {
             messageExtras.mergeInto(entry);
@@ -188,14 +199,39 @@ class ChatCompletionsWriter {
     }
 
     /**
+     * Writes the turn's reasoning as the one member this endpoint carries it in, beside the content
+     * rather than inside it: this protocol has no reasoning entry of its own, and the member is what
+     * a provider that requires its reasoning back expects to find.
+     *
+     * <p>
+     * Reasoning that came from another endpoint travels with its own name in extras, so it goes out
+     * as it arrived — the configured name covers what this endpoint's own answers carried.
+     */
+    private void writeReasoning(ChatMessage message, Map<String, Object> entry) {
+        if (config.getReasoningField().isBlank()) {
+            return;
+        }
+        StringBuilder reasoning = new StringBuilder();
+        for (ContentPart part : message.getParts()) {
+            if (part instanceof ReasoningPart reasoningPart && reasoningPart.getText() != null) {
+                reasoning.append(reasoningPart.getText());
+            }
+        }
+        if (reasoning.length() > 0) {
+            entry.put(config.getReasoningField(), reasoning.toString());
+        }
+    }
+
+    /**
      * Whether the message takes the array form of content: it does as soon as it is not text alone,
-     * because neither an image nor a replayed tool call can be spelled inside a string — nor can a
-     * field this module does not model.
+     * because neither an image nor a replayed tool call can be spelled inside a string. A field this
+     * module does not model forces it too — a string content cannot carry extras — but a reasoning
+     * part does not: its member sits beside the content, not in it.
      */
     private static boolean arrayContent(ChatMessage message) {
         return message.getParts().stream().anyMatch(part -> part instanceof MediaPart
                 || part instanceof ToolCallPart
-                || (part.getExtras() != null && !part.getExtras().isEmpty()));
+                || (part instanceof TextPart && part.getExtras() != null && !part.getExtras().isEmpty()));
     }
 
     /**

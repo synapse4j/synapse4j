@@ -30,8 +30,10 @@ import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ChatStreamEvent;
+import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
@@ -92,16 +94,16 @@ class OpenAiChatClientTest {
 
     private StubHttpClient stub;
     private JacksonJsonCodec codec;
+    private OpenAiConfig config;
     private OpenAiChatClient client;
 
     @BeforeEach
     void setUp() {
         stub = new StubHttpClient();
         codec = new JacksonJsonCodec(JsonMapper.builder().build());
-        client = new OpenAiChatClient(stub, codec);
-        OpenAiConfig config = new OpenAiConfig();
+        config = new OpenAiConfig();
         config.setApiKey("sk-test");
-        client.setConfig(config);
+        client = new OpenAiChatClient(stub, codec, config);
     }
 
     @Test
@@ -157,15 +159,38 @@ class OpenAiChatClientTest {
     }
 
     @Test
-    void aCustomizerPreparesTheRequestBeforeItIsWritten() {
+    void theConfiguredTokenLimitMemberIsTheOneThatGoesOut() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-3\",\"model\":\"gpt-test\","
                 + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
                 + "\"message\":{\"role\":\"assistant\",\"content\":\"Hi\"}}]}").getBytes(UTF_8)));
-        // The preset is a customizer like any other: it runs before the request is written, so the
-        // limit goes out under the legacy name and the shared field — which the adapter would spell
-        // the modern way — has been cleared by the time the document is assembled.
-        client.addChatRequestCustomizer(OpenAiCustomizers.legacyMaxTokens());
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        request.getOptions().setMaxOutputTokens(64);
+
+        client.chat(request);
+        assertEquals(64, parseCaptured().get("max_completion_tokens"));
+
+        // The endpoints that answer only to the legacy name get it by declaring it, and the modern
+        // one is not sent beside it: the limit is one member, under one name.
+        config.setMaxTokensField("max_tokens");
+        stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-3\",\"model\":\"gpt-test\","
+                + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
+                + "\"message\":{\"role\":\"assistant\",\"content\":\"Hi\"}}]}").getBytes(UTF_8)));
+        client.chat(request);
+        Map<String, Object> wire = parseCaptured();
+        assertEquals(64, wire.get("max_tokens"));
+        assertFalse(wire.containsKey("max_completion_tokens"));
+    }
+
+    @Test
+    void aBlankTokenLimitMemberSendsNoLimit() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-3\",\"model\":\"gpt-test\","
+                + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
+                + "\"message\":{\"role\":\"assistant\",\"content\":\"Hi\"}}]}").getBytes(UTF_8)));
+        config.setMaxTokensField(" ");
 
         ChatRequest request = new ChatRequest();
         request.getOptions().setModel("gpt-test");
@@ -174,28 +199,8 @@ class OpenAiChatClientTest {
         client.chat(request);
 
         Map<String, Object> wire = parseCaptured();
-        assertEquals(64, wire.get("max_tokens"));
         assertFalse(wire.containsKey("max_completion_tokens"));
-    }
-
-    @Test
-    void theLegacyMaxTokensPresetIsIdempotentAndQuietWithoutALimit() {
-        ChatRequest request = new ChatRequest();
-
-        // No limit set: the preset moves nothing and adds nothing.
-        OpenAiCustomizers.legacyMaxTokens().customize(client, request);
-        assertTrue(request.getOptions().getExtras().isEmpty());
-
-        request.getOptions().setMaxOutputTokens(64);
-        OpenAiCustomizers.legacyMaxTokens().customize(client, request);
-        assertEquals(64, request.getOptions().getExtras().get("max_tokens"));
-        assertNull(request.getOptions().getMaxOutputTokens());
-
-        // A retry passes through the same request: the change was made once, so the bag still
-        // carries exactly one entry under one name.
-        OpenAiCustomizers.legacyMaxTokens().customize(client, request);
-        assertEquals(1, request.getOptions().getExtras().rawMap().size());
-        assertEquals(64, request.getOptions().getExtras().get("max_tokens"));
+        assertFalse(wire.containsKey("max_tokens"));
     }
 
     @Test
@@ -1111,10 +1116,109 @@ class OpenAiChatClientTest {
         request.getOptions().setModel("gpt-test");
         ChatMessage message = new ChatMessage();
         message.setRole(ChatRole.USER);
-        message.getParts().add(new io.github.synapse4j.data.ReasoningPart());
+        message.getParts().add(new UnmodelledPart());
         request.getMessages().add(message);
 
         assertThrows(SynapseException.class, () -> client.chat(request));
+    }
+
+    @Test
+    void reasoningIsReadApartFromTheAnswer() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
+                + "\"message\":{\"role\":\"assistant\",\"reasoning_content\":\"weighing it up\","
+                + "\"content\":\"42\"}}]}").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        List<ContentPart> parts = client.chat(request).getMessage().getParts();
+
+        // Reasoning is its own part rather than text: an application hides or renders it apart from
+        // the answer, and the next turn may have to send it back.
+        assertEquals(2, parts.size());
+        assertEquals("weighing it up", assertInstanceOf(ReasoningPart.class, parts.get(0)).getText());
+        assertEquals("42", assertInstanceOf(TextPart.class, parts.get(1)).getText());
+    }
+
+    @Test
+    void reasoningUnderAnotherNameStaysInExtras() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
+                + "\"message\":{\"role\":\"assistant\",\"reasoning\":\"weighing it up\","
+                + "\"content\":\"42\"}}]}").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        ChatMessage message = client.chat(request).getMessage();
+
+        // The member is not the name this endpoint was configured with, so it is not reasoning as
+        // far as this client is concerned — and it is not lost either: it stays where every
+        // unmodelled member stays, which is how an application sees what to configure.
+        assertEquals(1, message.getParts().size());
+        assertEquals("weighing it up", message.getExtras().get("reasoning"));
+    }
+
+    @Test
+    void streamedReasoningFragmentsFoldIntoOnePart() {
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                "{\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"weighing \"}}]}",
+                "{\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"it up\"}}]}",
+                "{\"choices\":[{\"index\":0,\"delta\":{\"content\":\"42\"},\"finish_reason\":\"stop\"}]}",
+                "[DONE]").getBytes(UTF_8)));
+
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+
+        ChatStream stream = client.stream(request);
+        for (ChatStreamEvent ignored : stream) {
+            // Pulling is what reads the body; the fold runs as the events go by.
+        }
+
+        // One part however many chunks it took: a fold that kept the last fragment alone would send
+        // a silently truncated reasoning back to a provider that requires it.
+        List<ContentPart> parts = stream.aggregatedResponse().getMessage().getParts();
+        assertEquals(2, parts.size());
+        assertEquals("weighing it up", assertInstanceOf(ReasoningPart.class, parts.get(0)).getText());
+        assertEquals("42", assertInstanceOf(TextPart.class, parts.get(1)).getText());
+    }
+
+    @Test
+    void theConfiguredReasoningMemberCarriesTheTurnReasoning() {
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        ChatMessage assistant = new ChatMessage();
+        assistant.setRole(ChatRole.ASSISTANT);
+        ReasoningPart reasoning = new ReasoningPart();
+        reasoning.setText("weighing it up");
+        assistant.getParts().add(reasoning);
+        assistant.getParts().add(new TextPart("42"));
+        request.getMessages().add(assistant);
+
+        // The default name, which is the one the providers that require their reasoning back use.
+        stubCompletion();
+        client.chat(request);
+        assertEquals("weighing it up", firstMessage(parseCaptured()).get("reasoning_content"));
+
+        // An endpoint that spells it otherwise gets that name, and only that name.
+        config.setReasoningField("reasoning");
+        stubCompletion();
+        client.chat(request);
+        Map<String, Object> renamed = firstMessage(parseCaptured());
+        assertEquals("weighing it up", renamed.get("reasoning"));
+        assertFalse(renamed.containsKey("reasoning_content"));
+
+        // An endpoint that takes no reasoning takes none, while the answer still goes out.
+        config.setReasoningField(" ");
+        stubCompletion();
+        client.chat(request);
+        Map<String, Object> without = firstMessage(parseCaptured());
+        assertFalse(without.containsKey("reasoning"));
+        assertFalse(without.containsKey("reasoning_content"));
+        assertEquals("42", without.get("content"));
     }
 
     @Test
@@ -1540,6 +1644,20 @@ class OpenAiChatClientTest {
                 + "x".repeat(100) + "\"},\"finish_reason\":null}]}";
     }
 
+    /** A canned completion the client can parse, for tests that only care about the request. */
+    private void stubCompletion() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
+                        + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
+    }
+
+    /** The first message of a captured request body. */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> firstMessage(Map<String, Object> wire) {
+        return ((List<Map<String, Object>>) wire.get("messages")).get(0);
+    }
+
     private Map<String, Object> parseCaptured() {
         try {
             // The client streams its body, so the captured body has to be written out to be read.
@@ -1594,6 +1712,10 @@ class OpenAiChatClientTest {
         message.setRole(role);
         message.getParts().add(new TextPart(text));
         return message;
+    }
+
+    /** A part type this module has no wire shape for: the model is open, the protocol is not. */
+    static class UnmodelledPart extends ContentPart {
     }
 
     /** A value only the JSON library behind the codec can turn into JSON. */

@@ -105,7 +105,7 @@ class Synapse4jAutoConfigurationTest {
     void applicationBeansWinOverEveryDefault() {
         JsonCodec codec = new JacksonJsonCodec();
         HttpClient http = new RestClientHttpClient();
-        ChatClient client = new OpenAiChatClient(http, codec);
+        ChatClient client = new OpenAiChatClient(http, codec, new OpenAiConfig());
         runner.withBean(JsonCodec.class, () -> codec)
                 .withBean(HttpClient.class, () -> http)
                 .withBean(ChatClient.class, () -> client)

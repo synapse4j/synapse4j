@@ -7,12 +7,17 @@ import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.Usage;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonReader;
 import org.jspecify.annotations.Nullable;
+
+import lombok.AccessLevel;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Walks a protocol document from a caller-supplied {@link JsonReader} into the shared model.
@@ -27,8 +32,23 @@ import org.jspecify.annotations.Nullable;
  * The reader is handed in, and where its bytes come from is not this class's business and must not
  * become so: response headers, the HTTP status and a stream's {@code [DONE]} sentinel all belong
  * to the orchestration layer that opens the reader and drives what happens around it.
+ *
+ * <p>
+ * One instance walks one exchange, and it holds the endpoint's conventions rather than taking them
+ * as arguments: they are consulted in the middle of the walk, and a module that grows another one
+ * must not have to thread it through every method on the way there. The document is the opposite
+ * case — one exchange reads several of them, a frame per pull on the streaming path, plus a body
+ * when something went wrong — so it stays an argument of each call.
  */
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class ChatCompletionsReader {
+
+    /**
+     * The endpoint's conventions, as they were when this exchange began; never {@code null}, which is
+     * what the constructor's check is for.
+     */
+    @NonNull
+    private final OpenAiConfig config;
 
     /**
      * Builds the shared response from the wire document the reader is positioned on. Every field
@@ -39,7 +59,7 @@ class ChatCompletionsReader {
      * @param reader the reader, before its first token; the caller owns it
      * @return the response
      */
-    static ChatResponse read(JsonReader reader) {
+    ChatResponse read(JsonReader reader) {
         if (reader.nextToken() != JsonReader.Token.START_OBJECT) {
             throw new SynapseException("OpenAI chat completion was not a JSON object");
         }
@@ -65,7 +85,7 @@ class ChatCompletionsReader {
         return response;
     }
 
-    private static void readChoices(JsonReader reader, ChatResponse response) {
+    private void readChoices(JsonReader reader, ChatResponse response) {
         // The reader is on the value the "choices" name introduced, so the array's own start token
         // is the current one rather than the next.
         if (reader.token() != JsonReader.Token.START_ARRAY
@@ -84,7 +104,7 @@ class ChatCompletionsReader {
         }
     }
 
-    private static void readChoice(JsonReader reader, ChatResponse response, int position) {
+    private void readChoice(JsonReader reader, ChatResponse response, int position) {
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
             String field = name(reader);
             reader.nextToken();
@@ -99,20 +119,48 @@ class ChatCompletionsReader {
         }
     }
 
-    private static void readMessage(JsonReader reader, ChatMessage message) {
+    private void readMessage(JsonReader reader, ChatMessage message) {
         if (reader.token() != JsonReader.Token.START_OBJECT) {
             reader.skipValue();
             return;
         }
+        String reasoningField = config.getReasoningField();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
             String field = name(reader);
             reader.nextToken();
+            if (field.equals(reasoningField)) {
+                readReasoning(reader, message);
+                continue;
+            }
             switch (field) {
                 case "role" -> message.setRole(reader.string());
                 case "content" -> readContent(reader, message);
                 case "tool_calls" -> readToolCalls(reader, message);
                 default -> message.getOrCreateExtras().put(field, reader.captureValue());
             }
+        }
+    }
+
+    /**
+     * The model's reasoning, as the one member the endpoint was configured to carry it in. It goes
+     * into a {@link ReasoningPart}, apart from the answer: applications hide it, count it or render
+     * it differently, and the next turn may have to send it back.
+     *
+     * <p>
+     * Reasoning under any other name never reaches here — it stays in the message's extras under the
+     * name it came with, which is how an application sees that the configured name is the thing to
+     * change.
+     */
+    private static void readReasoning(JsonReader reader, ChatMessage message) {
+        if (reader.token() != JsonReader.Token.STRING) {
+            reader.skipValue();
+            return;
+        }
+        String text = Objects.requireNonNull(reader.string(), "a string token carries a string");
+        if (!text.isEmpty()) {
+            ReasoningPart reasoning = new ReasoningPart();
+            reasoning.setText(text);
+            message.getParts().add(reasoning);
         }
     }
 
@@ -227,7 +275,7 @@ class ChatCompletionsReader {
      * @param reader the reader, before its first token; the caller owns it
      * @return the event
      */
-    static ChatStreamEvent readEvent(JsonReader reader) {
+    ChatStreamEvent readEvent(JsonReader reader) {
         ChatStreamEvent event = new ChatStreamEvent();
         event.setEventType(OpenAiEventTypes.CHUNK);
         if (reader.nextToken() != JsonReader.Token.START_OBJECT) {
@@ -263,7 +311,7 @@ class ChatCompletionsReader {
         }
     }
 
-    private static void readChoices(JsonReader reader, ChatStreamEvent event) {
+    private void readChoices(JsonReader reader, ChatStreamEvent event) {
         if (reader.token() != JsonReader.Token.START_ARRAY) {
             reader.skipValue();
             return;
@@ -289,7 +337,7 @@ class ChatCompletionsReader {
         }
     }
 
-    private static void readChoice(JsonReader reader, ChatStreamEvent event, int position) {
+    private void readChoice(JsonReader reader, ChatStreamEvent event, int position) {
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
             String field = name(reader);
             reader.nextToken();
@@ -312,15 +360,20 @@ class ChatCompletionsReader {
         }
     }
 
-    private static void readDelta(JsonReader reader, ChatStreamEvent event) {
+    private void readDelta(JsonReader reader, ChatStreamEvent event) {
         if (reader.token() != JsonReader.Token.START_OBJECT) {
             reader.skipValue();
             return;
         }
         ChatMessage delta = new ChatMessage();
+        String reasoningField = config.getReasoningField();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
             String field = name(reader);
             reader.nextToken();
+            if (field.equals(reasoningField)) {
+                readReasoning(reader, delta);
+                continue;
+            }
             switch (field) {
                 case "role" -> delta.setRole(reader.string());
                 case "content" -> readDeltaContent(reader, delta);

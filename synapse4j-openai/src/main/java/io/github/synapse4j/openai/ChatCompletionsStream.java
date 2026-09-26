@@ -14,6 +14,7 @@ import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.exception.SynapseException;
@@ -63,10 +64,13 @@ class ChatCompletionsStream extends DefaultChatStream {
      *                          frames and the fold
      * @param closeAction   what releasing the stream does — typically closing the HTTP response
      *                          behind it; never {@code null}
+     * @param config        the endpoint's conventions, for the members whose name varies between
+     *                          endpoints
      */
     ChatCompletionsStream(JsonCodec codec, SseEventStream sse, UnaryOperator<ChatStreamEvent> eventPipeline,
-            AutoCloseable closeAction) {
-        super(events(codec, sse), eventPipeline, ChatCompletionsStream::aggregate, closeAction);
+            AutoCloseable closeAction, OpenAiConfig config) {
+        super(events(codec, sse, new ChatCompletionsReader(config)), eventPipeline, ChatCompletionsStream::aggregate,
+                closeAction);
     }
 
     /**
@@ -83,7 +87,8 @@ class ChatCompletionsStream extends DefaultChatStream {
      *                  stream's close action
      * @return the events; never {@code null}
      */
-    private static Iterator<ChatStreamEvent> events(JsonCodec codec, SseEventStream sse) {
+    private static Iterator<ChatStreamEvent> events(JsonCodec codec, SseEventStream sse,
+            ChatCompletionsReader eventReader) {
         return new Iterator<ChatStreamEvent>() {
 
             private @Nullable ChatStreamEvent pending;
@@ -104,7 +109,7 @@ class ChatCompletionsStream extends DefaultChatStream {
                     // folded into the aggregated response the caller already holds.
                     throw new SynapseException("OpenAI stream ended without [DONE]: the answer was cut short");
                 }
-                pending = toEvent(codec, sse.next());
+                pending = toEvent(codec, sse.next(), eventReader);
                 // The frame that ends the answer is the last one there is: a provider that sent
                 // something after it would be contradicting itself, and nothing here waits for it.
                 ended = OpenAiEventTypes.DONE.equals(pending.getEventType());
@@ -125,7 +130,7 @@ class ChatCompletionsStream extends DefaultChatStream {
     }
 
     /** Maps one frame to its event. */
-    private static ChatStreamEvent toEvent(JsonCodec codec, SseEvent frame) {
+    private static ChatStreamEvent toEvent(JsonCodec codec, SseEvent frame, ChatCompletionsReader eventReader) {
         if (OpenAiEventTypes.DONE.equals(frame.getData())) {
             ChatStreamEvent done = new ChatStreamEvent();
             done.setEventType(OpenAiEventTypes.DONE);
@@ -133,7 +138,7 @@ class ChatCompletionsStream extends DefaultChatStream {
         }
         byte[] payload = frame.getData().getBytes(StandardCharsets.UTF_8);
         try (JsonReader reader = codec.reader(new ByteArrayInputStream(payload))) {
-            return ChatCompletionsReader.readEvent(reader);
+            return eventReader.readEvent(reader);
         }
     }
 
@@ -179,8 +184,29 @@ class ChatCompletionsStream extends DefaultChatStream {
                 appendText(message, text);
             } else if (part instanceof ToolCallPart call) {
                 mergeToolCall(message, call);
+            } else if (part instanceof ReasoningPart reasoning) {
+                appendReasoning(message, reasoning);
             }
         }
+    }
+
+    /**
+     * Appends a fragment to the turn's reasoning, which is one part however many chunks it took.
+     * The fold is what makes a streamed answer carry the same reasoning a blocking call returns as
+     * one member — and, before it, what stops a multi-chunk answer from keeping only the last
+     * fragment of it.
+     */
+    private static void appendReasoning(ChatMessage message, ReasoningPart fragment) {
+        List<ContentPart> parts = message.getParts();
+        if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof ReasoningPart reasoning) {
+            reasoning.setText(join(reasoning.getText(), fragment.getText()));
+            ProviderExtras fragmentExtras = fragment.getExtras();
+            if (fragmentExtras != null) {
+                reasoning.getOrCreateExtras().putAll(fragmentExtras);
+            }
+            return;
+        }
+        parts.add(fragment);
     }
 
     /** Appends a fragment to the turn's text, which is one part however many chunks it took. */
