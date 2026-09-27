@@ -45,7 +45,7 @@ class ToolCallingChatClientTest {
         AtomicBoolean ran = new AtomicBoolean();
         ToolCallingChatClient client = new ToolCallingChatClient(inner);
         ChatRequest request = new ChatRequest();
-        request.addMessage(userMessage("hi?"));
+        request.addUserMessage("hi?");
         request.addTool(tool("alpha", arguments -> {
             ran.set(true);
             return "A";
@@ -71,7 +71,7 @@ class ToolCallingChatClientTest {
         inner.script.add(textResponse("done"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner);
         ChatRequest request = new ChatRequest();
-        request.addMessage(userMessage("hi?"));
+        request.addUserMessage("hi?");
         request.addTool(tool("alpha", arguments -> "A"));
 
         client.chat(request);
@@ -115,7 +115,7 @@ class ToolCallingChatClientTest {
         inner.script.add(toolCallResponse("c1", "alpha"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner, (calls, available, context) -> null);
         ChatRequest request = new ChatRequest();
-        request.addMessage(userMessage("hi?"));
+        request.addUserMessage("hi?");
 
         ChatResponse response = client.chat(request);
 
@@ -219,7 +219,7 @@ class ToolCallingChatClientTest {
         AtomicBoolean ran = new AtomicBoolean();
         ToolCallingChatClient client = new ToolCallingChatClient(inner);
         ChatRequest request = new ChatRequest();
-        request.addMessage(userMessage("hi?"));
+        request.addUserMessage("hi?");
         request.addTool(tool("alpha", arguments -> {
             ran.set(true);
             return "A";
@@ -277,7 +277,7 @@ class ToolCallingChatClientTest {
         inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner, (calls, available, context) -> null);
         ChatRequest request = new ChatRequest();
-        request.addMessage(userMessage("hi?"));
+        request.addUserMessage("hi?");
 
         ChatStream stream = client.stream(request);
         Iterator<ChatStreamEvent> events = stream.iterator();
@@ -404,9 +404,7 @@ class ToolCallingChatClientTest {
         ToolCallingChatClient client = new ToolCallingChatClient(inner);
         client.addChatResponseCustomizer((runner, response) -> {
             passes.incrementAndGet();
-            ChatMessage message = new ChatMessage(ChatRole.ASSISTANT);
-            message.addPart(new TextPart("custom"));
-            response.setMessage(message);
+            response.setMessage(ChatMessage.assistant("custom"));
             return response;
         });
         ChatRequest request = new ChatRequest();
@@ -427,11 +425,7 @@ class ToolCallingChatClientTest {
     private static List<ToolResultPart> resultsFor(List<ToolCallPart> calls) {
         List<ToolResultPart> results = new ArrayList<>();
         for (ToolCallPart call : calls) {
-            ToolResultPart result = new ToolResultPart();
-            result.setCallId(call.getCallId());
-            result.setName(call.getName());
-            result.getParts().add(new TextPart("A"));
-            results.add(result);
+            results.add(new ToolResultPart(call.getCallId(), call.getName()).addText("A"));
         }
         return results;
     }
@@ -448,24 +442,14 @@ class ToolCallingChatClientTest {
 
     private static ChatResponse toolCallResponse(String callId, String tool) {
         ChatResponse response = new ChatResponse();
-        ChatMessage message = new ChatMessage(ChatRole.ASSISTANT);
-        message.addPart(new ToolCallPart(callId, tool, "{}"));
-        response.setMessage(message);
+        response.setMessage(new ChatMessage(ChatRole.ASSISTANT).addPart(new ToolCallPart(callId, tool, "{}")));
         return response;
     }
 
     private static ChatResponse textResponse(String text) {
         ChatResponse response = new ChatResponse();
-        ChatMessage message = new ChatMessage(ChatRole.ASSISTANT);
-        message.addPart(new TextPart(text));
-        response.setMessage(message);
+        response.setMessage(ChatMessage.assistant(text));
         return response;
-    }
-
-    private static ChatMessage userMessage(String text) {
-        ChatMessage message = new ChatMessage(ChatRole.USER);
-        message.addPart(new TextPart(text));
-        return message;
     }
 
     private static String text(ChatResponse response) {

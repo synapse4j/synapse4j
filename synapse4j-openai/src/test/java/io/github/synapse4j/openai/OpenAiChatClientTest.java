@@ -116,10 +116,9 @@ class OpenAiChatClientTest {
                 + "\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7,\"total_tokens\":18,"
                 + "\"prompt_tokens_details\":{\"cached_tokens\":3}}}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getMessages().add(message(ChatRole.SYSTEM, "You are helpful."));
-        request.getMessages().add(message(ChatRole.USER, "Hello"));
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
+        request.addSystemMessage("You are helpful.");
+        request.addUserMessage("Hello");
         request.getOptions().setTemperature(0.5);
         request.getOptions().setMaxOutputTokens(64);
         request.getOptions().setTopP(0.9);
@@ -166,8 +165,7 @@ class OpenAiChatClientTest {
                 + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
                 + "\"message\":{\"role\":\"assistant\",\"content\":\"Hi\"}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         request.getOptions().setMaxOutputTokens(64);
 
         client.chat(request);
@@ -193,8 +191,7 @@ class OpenAiChatClientTest {
                 + "\"message\":{\"role\":\"assistant\",\"content\":\"Hi\"}}]}").getBytes(UTF_8)));
         config.setMaxTokensField(" ");
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         request.getOptions().setMaxOutputTokens(64);
 
         client.chat(request);
@@ -216,8 +213,7 @@ class OpenAiChatClientTest {
                 + "\"completion_tokens_details\":{\"reasoning_tokens\":4},"
                 + "\"prompt_tokens_details\":{\"cached_tokens\":3,\"audio_tokens\":2}}}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         ChatResponse response = client.chat(request);
 
@@ -254,8 +250,7 @@ class OpenAiChatClientTest {
                 + "\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"hi\","
                 + "\"annotations\":[{\"type\":\"url_citation\"}]}]}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         ChatResponse response = client.chat(request);
 
@@ -274,8 +269,7 @@ class OpenAiChatClientTest {
                 + "\"message\":{\"role\":\"assistant\",\"content\":\"second\"}}],"
                 + "\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2}}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         ChatResponse response = client.chat(request);
 
@@ -302,8 +296,7 @@ class OpenAiChatClientTest {
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         ChatResponse response = client.chat(request);
 
@@ -323,8 +316,7 @@ class OpenAiChatClientTest {
                         + "\"finish_reason\":\"stop\"}]}",
                 "[DONE]").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         ChatStream stream = client.stream(request);
         // The headers are on the response before a single frame has been consumed, the way they
@@ -346,8 +338,7 @@ class OpenAiChatClientTest {
                 + "\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"visible\"},"
                 + "{\"type\":\"audio\",\"id\":\"a_1\"}]}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
         assertTrue(thrown.getMessage().contains("audio"), thrown.getMessage());
@@ -362,9 +353,8 @@ class OpenAiChatClientTest {
                 + "\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\"}}]}}],"
                 + "\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":6}}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getMessages().add(message(ChatRole.USER, "weather?"));
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
+        request.addUserMessage("weather?");
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather",
                 "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}}}");
         request.getTools().add(new ManualTool(tool));
@@ -405,13 +395,11 @@ class OpenAiChatClientTest {
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
                         + "\"content\":[{\"type\":\"text\",\"text\":\"mixed\"}]}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage replay = new ChatMessage();
-        replay.setRole(ChatRole.ASSISTANT);
-        replay.getParts().add(new TextPart("Earlier text"));
-        replay.getParts().add(new ToolCallPart("call_9", "get_weather", "{\"city\":\"Rome\"}"));
-        request.getMessages().add(replay);
+        ChatRequest request = requestWithModel();
+        ChatMessage replay = new ChatMessage(ChatRole.ASSISTANT);
+        replay.addPart(new TextPart("Earlier text"));
+        replay.addPart(new ToolCallPart("call_9", "get_weather", "{\"city\":\"Rome\"}"));
+        request.addMessage(replay);
 
         client.chat(request);
 
@@ -437,12 +425,10 @@ class OpenAiChatClientTest {
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
         byte[] bytes = { (byte) 0x89, 'P', 'N', 'G', 0, 1, 2, (byte) 0xff, 0x7f };
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage message = new ChatMessage();
-        message.setRole(ChatRole.USER);
-        message.getParts().add(new MediaPart("image/png", null, InputStreamSupplier.of(bytes), null));
-        request.getMessages().add(message);
+        ChatRequest request = requestWithModel();
+        ChatMessage message = new ChatMessage(ChatRole.USER);
+        message.addPart(new MediaPart("image/png", null, InputStreamSupplier.of(bytes), null));
+        request.addMessage(message);
 
         client.chat(request);
 
@@ -465,12 +451,10 @@ class OpenAiChatClientTest {
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage message = new ChatMessage();
-        message.setRole(ChatRole.USER);
-        message.getParts().add(new MediaPart("image/png", "https://example.test/cat.png", null, null));
-        request.getMessages().add(message);
+        ChatRequest request = requestWithModel();
+        ChatMessage message = new ChatMessage(ChatRole.USER);
+        message.addPart(new MediaPart("image/png", "https://example.test/cat.png", null, null));
+        request.addMessage(message);
 
         client.chat(request);
 
@@ -488,13 +472,11 @@ class OpenAiChatClientTest {
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
         byte[] bytes = { 1, 2, 3 };
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage message = new ChatMessage();
-        message.setRole(ChatRole.USER);
-        message.getParts().add(new TextPart("what is this?"));
-        message.getParts().add(new MediaPart("image/png", null, InputStreamSupplier.of(bytes), null));
-        request.getMessages().add(message);
+        ChatRequest request = requestWithModel();
+        ChatMessage message = new ChatMessage(ChatRole.USER);
+        message.addPart(new TextPart("what is this?"));
+        message.addPart(new MediaPart("image/png", null, InputStreamSupplier.of(bytes), null));
+        request.addMessage(message);
 
         client.chat(request);
 
@@ -513,12 +495,10 @@ class OpenAiChatClientTest {
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage message = new ChatMessage();
-        message.setRole(ChatRole.USER);
-        message.getParts().add(new MediaPart("audio/wav", null, InputStreamSupplier.of(new byte[] { 1 }), null));
-        request.getMessages().add(message);
+        ChatRequest request = requestWithModel();
+        ChatMessage message = new ChatMessage(ChatRole.USER);
+        message.addPart(new MediaPart("audio/wav", null, InputStreamSupplier.of(new byte[] { 1 }), null));
+        request.addMessage(message);
 
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
         assertTrue(thrown.getMessage().contains("audio/wav"), thrown.getMessage());
@@ -531,12 +511,10 @@ class OpenAiChatClientTest {
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage message = new ChatMessage();
-        message.setRole(ChatRole.USER);
-        message.getParts().add(new MediaPart("image/png", null, null, null));
-        request.getMessages().add(message);
+        ChatRequest request = requestWithModel();
+        ChatMessage message = new ChatMessage(ChatRole.USER);
+        message.addPart(new MediaPart("image/png", null, null, null));
+        request.addMessage(message);
 
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
         assertTrue(thrown.getMessage().contains("neither uri nor source"), thrown.getMessage());
@@ -549,12 +527,10 @@ class OpenAiChatClientTest {
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage message = new ChatMessage();
-        message.setRole(ChatRole.USER);
-        message.getParts().add(new MediaPart(null, null, InputStreamSupplier.of(new byte[] { 1 }), null));
-        request.getMessages().add(message);
+        ChatRequest request = requestWithModel();
+        ChatMessage message = new ChatMessage(ChatRole.USER);
+        message.addPart(new MediaPart(null, null, InputStreamSupplier.of(new byte[] { 1 }), null));
+        request.addMessage(message);
 
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
         assertTrue(thrown.getMessage().contains("mediaType"), thrown.getMessage());
@@ -567,12 +543,10 @@ class OpenAiChatClientTest {
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage result = new ChatMessage();
-        result.setRole(ChatRole.TOOL);
-        result.getParts().add(new ToolResultPart("call_9", "get_weather", false).addText("sunny"));
-        request.getMessages().add(result);
+        ChatRequest request = requestWithModel();
+        ChatMessage result = new ChatMessage(ChatRole.TOOL);
+        result.addPart(new ToolResultPart("call_9", "get_weather", false).addText("sunny"));
+        request.addMessage(result);
 
         client.chat(request);
 
@@ -592,8 +566,7 @@ class OpenAiChatClientTest {
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
                         + "\"content\":\"{}\"}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         ChatResponseFormat format = request.getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setName("answer");
@@ -619,8 +592,7 @@ class OpenAiChatClientTest {
                 ("{\"error\":{\"message\":\"Rate limit reached\",\"type\":\"rate_limit_exceeded\","
                         + "\"code\":\"rpm\",\"param\":null}}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
         String message = thrown.getMessage();
@@ -636,8 +608,7 @@ class OpenAiChatClientTest {
         stub.canned.setStatusCode(502);
         stub.canned.setBody(new ByteArrayInputStream("<html>Bad Gateway</html>".getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
         String message = thrown.getMessage();
@@ -652,8 +623,7 @@ class OpenAiChatClientTest {
         stub.canned.setStatusCode(500);
         stub.canned.setBody(body);
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
 
@@ -667,8 +637,7 @@ class OpenAiChatClientTest {
     void missingApiKeyAndMissingModelAreCallerBugs() {
         OpenAiConfig noKey = new OpenAiConfig();
         client.setConfig(noKey);
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         assertThrows(IllegalArgumentException.class, () -> client.chat(request));
 
         OpenAiConfig withKey = new OpenAiConfig();
@@ -685,8 +654,7 @@ class OpenAiChatClientTest {
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         request.getOptions().getExtras().put("service_tier", "priority");
         request.getOptions().getExtras().put("reasoning_effort", Map.of("effort", "low"));
 
@@ -701,16 +669,14 @@ class OpenAiChatClientTest {
 
     @Test
     void extrasGoOutOnTheNodeTheyWereAddedTo() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         request.getOptions().getExtras().put("seed", 7);
-        ChatMessage user = message(ChatRole.USER, "Hello");
+        ChatMessage user = ChatMessage.user("Hello");
         user.setExtras(new ProviderExtras().put("name", "roger"));
         user.getParts().get(0).setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
-        request.getMessages().add(user);
+        request.addMessage(user);
 
         client.chat(request);
 
@@ -729,11 +695,9 @@ class OpenAiChatClientTest {
 
     @Test
     void anExtraReplacesAModelledMemberOfTheSameName() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         request.getOptions().setTemperature(0.5);
         request.getOptions().getExtras().put("temperature", 0.9);
 
@@ -745,11 +709,9 @@ class OpenAiChatClientTest {
 
     @Test
     void anExtraSetOverAWholeModelledObjectReplacesIt() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
         tool.getExtras().put("function", Map.of("name", "other"));
         request.getTools().add(new ManualTool(tool));
@@ -766,11 +728,9 @@ class OpenAiChatClientTest {
 
     @Test
     void aToolDefinitionCarriesItsFunctionExtras() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
         tool.getExtras().put(List.of("function", "strict"), true);
         request.getTools().add(new ManualTool(tool));
@@ -790,11 +750,9 @@ class OpenAiChatClientTest {
 
     @Test
     void aStrictResponseFormatGoesOutInsideTheJsonSchema() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         ChatResponseFormat format = request.getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setSchema("{\"type\":\"object\"}");
@@ -814,11 +772,9 @@ class OpenAiChatClientTest {
 
     @Test
     void aStrictToolGoesOutInsideItsFunction() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
         tool.setStrict(true);
         request.getTools().add(new ManualTool(tool));
@@ -836,11 +792,9 @@ class OpenAiChatClientTest {
 
     @Test
     void anUnsetStrictIsNotSent() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         ChatResponseFormat format = request.getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setSchema("{\"type\":\"object\"}");
@@ -865,17 +819,14 @@ class OpenAiChatClientTest {
 
     @Test
     void aReplayedToolCallCarriesItsFunctionExtras() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage replay = new ChatMessage();
-        replay.setRole(ChatRole.ASSISTANT);
+        ChatRequest request = requestWithModel();
+        ChatMessage replay = new ChatMessage(ChatRole.ASSISTANT);
         ToolCallPart call = new ToolCallPart("call_1", "get_weather", "{}");
         call.setExtras(new ProviderExtras().put(List.of("function", "provider_field"), "x"));
-        replay.getParts().add(call);
-        request.getMessages().add(replay);
+        replay.addPart(call);
+        request.addMessage(replay);
 
         client.chat(request);
 
@@ -893,17 +844,14 @@ class OpenAiChatClientTest {
 
     @Test
     void aMediaPartCarriesItsImageUrlExtras() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage user = new ChatMessage();
-        user.setRole(ChatRole.USER);
+        ChatRequest request = requestWithModel();
+        ChatMessage user = new ChatMessage(ChatRole.USER);
         MediaPart image = new MediaPart("image/png", "https://example.com/a.png", null, null);
         image.setExtras(new ProviderExtras().put(List.of("image_url", "detail"), "high"));
-        user.getParts().add(image);
-        request.getMessages().add(user);
+        user.addPart(image);
+        request.addMessage(user);
 
         client.chat(request);
 
@@ -917,11 +865,9 @@ class OpenAiChatClientTest {
 
     @Test
     void aResponseFormatCarriesItsJsonSchemaExtras() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         ChatResponseFormat format = request.getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setName("answer");
@@ -942,11 +888,9 @@ class OpenAiChatClientTest {
 
     @Test
     void aPathUnderAModelledObjectReachesIntoIt() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         ChatResponseFormat format = request.getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setName("answer");
@@ -968,8 +912,7 @@ class OpenAiChatClientTest {
 
     @Test
     void aReasoningEffortOfTheEndpointsOwnGoesOutAsItStands() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
         ChatRequest request = requestWithModel();
         request.getOptions().setReasoningEffort("extreme");
@@ -983,8 +926,7 @@ class OpenAiChatClientTest {
 
     @Test
     void aToolChoiceModeGoesOutAsTheProtocolsOwnString() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
         ChatRequest request = requestWithModel();
         request.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_REQUIRED);
@@ -998,8 +940,7 @@ class OpenAiChatClientTest {
 
     @Test
     void namingAToolTakesTheObjectForm() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
         ChatRequest request = requestWithModel();
         request.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_TOOL);
@@ -1037,17 +978,14 @@ class OpenAiChatClientTest {
 
     @Test
     void aToolResultCarriesItsOwnExtras() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage result = new ChatMessage();
-        result.setRole(ChatRole.TOOL);
+        ChatRequest request = requestWithModel();
+        ChatMessage result = new ChatMessage(ChatRole.TOOL);
         ToolResultPart part = new ToolResultPart("call_1", "get_weather", false).addText("sunny");
         part.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
-        result.getParts().add(part);
-        request.getMessages().add(result);
+        result.addPart(part);
+        request.addMessage(result);
 
         client.chat(request);
 
@@ -1063,17 +1001,14 @@ class OpenAiChatClientTest {
 
     @Test
     void aToolRoleMessageCarriesItsOwnExtrasOntoEveryEntryItBecomes() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage results = new ChatMessage();
-        results.setRole(ChatRole.TOOL);
+        ChatRequest request = requestWithModel();
+        ChatMessage results = new ChatMessage(ChatRole.TOOL);
         results.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
-        results.getParts().add(new ToolResultPart("call_1", "get_weather", false).addText("sunny"));
-        results.getParts().add(new ToolResultPart("call_2", "get_time", false).addText("noon"));
-        request.getMessages().add(results);
+        results.addPart(new ToolResultPart("call_1", "get_weather", false).addText("sunny"));
+        results.addPart(new ToolResultPart("call_2", "get_time", false).addText("noon"));
+        request.addMessage(results);
 
         client.chat(request);
 
@@ -1089,11 +1024,9 @@ class OpenAiChatClientTest {
 
     @Test
     void anExtraNoneOfTheShapesCoversGoesOutAsTheCodecWritesIt() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         request.getOptions().getExtras().put("metadata", new Marker());
 
         client.chat(request);
@@ -1104,13 +1037,11 @@ class OpenAiChatClientTest {
 
     @Test
     void aSchemaInAnExtraGoesOutAsTheDocumentItDescribes() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
         JsonSchema schema = new JsonSchema();
         schema.setType("object");
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         request.getOptions().getExtras().put("schema", schema);
 
         client.chat(request);
@@ -1121,12 +1052,10 @@ class OpenAiChatClientTest {
 
     @Test
     void anExtrasBagInsideAnExtraGoesOutAsTheObjectItDescribes() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
         ProviderExtras nested = new ProviderExtras().put(List.of("annotations", "title"), "x");
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         request.getOptions().getExtras().put("metadata", nested);
 
         client.chat(request);
@@ -1137,17 +1066,14 @@ class OpenAiChatClientTest {
 
     @Test
     void anEmptyTextPartWithExtrasStillGoesOut() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage user = new ChatMessage();
-        user.setRole(ChatRole.USER);
+        ChatRequest request = requestWithModel();
+        ChatMessage user = new ChatMessage(ChatRole.USER);
         TextPart part = new TextPart("");
         part.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
-        user.getParts().add(part);
-        request.getMessages().add(user);
+        user.addPart(part);
+        request.addMessage(user);
 
         client.chat(request);
 
@@ -1162,17 +1088,14 @@ class OpenAiChatClientTest {
 
     @Test
     void aToolResultContentPartWithExtrasFailsLoudly() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
+        stubCompletion();
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage result = new ChatMessage();
-        result.setRole(ChatRole.TOOL);
+        ChatRequest request = requestWithModel();
+        ChatMessage result = new ChatMessage(ChatRole.TOOL);
         TextPart text = new TextPart("sunny");
         text.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
-        result.getParts().add(new ToolResultPart("call_1", "get_weather", false).addPart(text));
-        request.getMessages().add(result);
+        result.addPart(new ToolResultPart("call_1", "get_weather", false).addPart(text));
+        request.addMessage(result);
 
         // The tool message's content is a plain string, so a part carrying extras would have them
         // dropped on the way out without a word.
@@ -1182,12 +1105,10 @@ class OpenAiChatClientTest {
 
     @Test
     void unsupportedPartsFailLoudly() {
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage message = new ChatMessage();
-        message.setRole(ChatRole.USER);
-        message.getParts().add(new UnmodelledPart());
-        request.getMessages().add(message);
+        ChatRequest request = requestWithModel();
+        ChatMessage message = new ChatMessage(ChatRole.USER);
+        message.addPart(new UnmodelledPart());
+        request.addMessage(message);
 
         assertThrows(SynapseException.class, () -> client.chat(request));
     }
@@ -1199,8 +1120,7 @@ class OpenAiChatClientTest {
                 + "\"message\":{\"role\":\"assistant\",\"reasoning_content\":\"weighing it up\","
                 + "\"content\":\"42\"}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         List<ContentPart> parts = client.chat(request).getMessage().getParts();
 
@@ -1218,8 +1138,7 @@ class OpenAiChatClientTest {
                 + "\"message\":{\"role\":\"assistant\",\"reasoning\":\"weighing it up\","
                 + "\"content\":\"42\"}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         ChatMessage message = client.chat(request).getMessage();
 
@@ -1240,12 +1159,13 @@ class OpenAiChatClientTest {
                 "{\"choices\":[{\"index\":0,\"delta\":{\"content\":\"42\"},\"finish_reason\":\"stop\"}]}",
                 "[DONE]").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         ChatStream stream = client.stream(request);
-        for (ChatStreamEvent ignored : stream) {
-            // Pulling is what reads the body; the fold runs as the events go by.
+        // Pulling is what reads the body; the fold runs as the events go by.
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        while (events.hasNext()) {
+            events.next();
         }
 
         // One part however many chunks it took: a fold that kept the last fragment alone would send
@@ -1258,15 +1178,13 @@ class OpenAiChatClientTest {
 
     @Test
     void theConfiguredReasoningMemberCarriesTheTurnReasoning() {
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        ChatMessage assistant = new ChatMessage();
-        assistant.setRole(ChatRole.ASSISTANT);
+        ChatRequest request = requestWithModel();
+        ChatMessage assistant = new ChatMessage(ChatRole.ASSISTANT);
         ReasoningPart reasoning = new ReasoningPart();
         reasoning.setText("weighing it up");
-        assistant.getParts().add(reasoning);
-        assistant.getParts().add(new TextPart("42"));
-        request.getMessages().add(assistant);
+        assistant.addPart(reasoning);
+        assistant.addPart(new TextPart("42"));
+        request.addMessage(assistant);
 
         // The default name, which is the one the providers that require their reasoning back use.
         stubCompletion();
@@ -1298,8 +1216,7 @@ class OpenAiChatClientTest {
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         request.getOptions().getHeaders().put("Authorization", "Bearer sk-override");
         request.getOptions().getHeaders().put("X-Custom", "yes");
 
@@ -1316,9 +1233,8 @@ class OpenAiChatClientTest {
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        request.getMessages().add(message(ChatRole.USER, "Hello"));
+        ChatRequest request = requestWithModel();
+        request.addUserMessage("Hello");
 
         client.chat(request);
 
@@ -1350,9 +1266,8 @@ class OpenAiChatClientTest {
                         + "\"choices\":[],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7}}",
                 "[DONE]").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        request.getMessages().add(message(ChatRole.USER, "Hello"));
+        ChatRequest request = requestWithModel();
+        request.addUserMessage("Hello");
 
         ChatStream stream = client.stream(request);
         List<ChatStreamEvent> events = new ArrayList<>();
@@ -1427,8 +1342,7 @@ class OpenAiChatClientTest {
                         + "{\"arguments\":\"\\\"Paris\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}",
                 "[DONE]").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         ChatStream stream = client.stream(request);
         Iterator<ChatStreamEvent> events = stream.iterator();
@@ -1457,15 +1371,14 @@ class OpenAiChatClientTest {
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
                         + "\"message\":{\"role\":\"assistant\",\"content\":\"ok\"}}]}").getBytes(UTF_8)));
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         // What a drained tool-call stream leaves on the part: the association index the fold
         // matched fragments by, parked in extras where the wire first spelled it.
         ChatMessage assistant = new ChatMessage(ChatRole.ASSISTANT);
         ToolCallPart call = new ToolCallPart("call_1", "get_weather", "{\"city\":\"Paris\"}");
         call.getOrCreateExtras().put("index", 0);
         assistant.addPart(call);
-        request.getMessages().add(assistant);
+        request.addMessage(assistant);
 
         client.chat(request);
 
@@ -1509,8 +1422,7 @@ class OpenAiChatClientTest {
                         + "{\"arguments\":\"\\\"Paris\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}",
                 "[DONE]").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         ChatStream stream = client.stream(request);
         Iterator<ChatStreamEvent> events = stream.iterator();
@@ -1544,8 +1456,7 @@ class OpenAiChatClientTest {
                 .getBytes(UTF_8));
         stub.canned.setBody(body);
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         ChatStream stream = client.stream(request);
         Iterator<ChatStreamEvent> events = stream.iterator();
@@ -1573,8 +1484,7 @@ class OpenAiChatClientTest {
                         + "\"code\":\"rpm\"}}")
                 .getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         Iterator<ChatStreamEvent> events = client.stream(request).iterator();
         // The answer had already started, so the failure arrives with the frame that reports it.
@@ -1592,8 +1502,7 @@ class OpenAiChatClientTest {
                 ("{\"error\":{\"message\":\"Rate limit reached\",\"type\":\"rate_limit_exceeded\","
                         + "\"code\":\"rpm\",\"param\":null}}").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.stream(request));
         assertTrue(thrown.getMessage().contains("429"), thrown.getMessage());
@@ -1610,8 +1519,7 @@ class OpenAiChatClientTest {
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("application/json")));
         stub.canned.setBody(body);
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         // A streamed request answered with something other than an event stream is a provider
         // contradicting itself; parsing the body as frames would only produce nonsense.
@@ -1631,8 +1539,7 @@ class OpenAiChatClientTest {
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(body);
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         ChatStream stream = client.stream(request);
         assertFalse(body.closed);
@@ -1647,8 +1554,7 @@ class OpenAiChatClientTest {
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse("[DONE]").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         client.stream(request).close();
 
@@ -1664,8 +1570,7 @@ class OpenAiChatClientTest {
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(bigChunk(), "[DONE]").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
         io.github.synapse4j.http.HttpOptions http = new io.github.synapse4j.http.HttpOptions();
         http.setMaxFrameBytes(64);
         request.getOptions().setHttpOptions(http);
@@ -1682,8 +1587,7 @@ class OpenAiChatClientTest {
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse("x".repeat(300 * 1024), "[DONE]").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         Iterator<ChatStreamEvent> events = client.stream(request).iterator();
 
@@ -1698,8 +1602,7 @@ class OpenAiChatClientTest {
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(bigChunk(), "[DONE]").getBytes(UTF_8)));
 
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
+        ChatRequest request = requestWithModel();
 
         Iterator<ChatStreamEvent> events = client.stream(request).iterator();
 
@@ -1714,7 +1617,7 @@ class OpenAiChatClientTest {
                 + "x".repeat(100) + "\"},\"finish_reason\":null}]}";
     }
 
-    /** A canned completion the client can parse, for tests that only care about the request. */
+    /** A canned completion, for the tests that only care about the request. */
     private void stubCompletion() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
@@ -1777,13 +1680,6 @@ class OpenAiChatClientTest {
         return ((TextPart) event.getDelta().getParts().get(0)).getText();
     }
 
-    private static ChatMessage message(String role, String text) {
-        ChatMessage message = new ChatMessage();
-        message.setRole(role);
-        message.getParts().add(new TextPart(text));
-        return message;
-    }
-
     /** A request with a model set, which is all the request-writing tests here need. */
     private static ChatRequest requestWithModel() {
         ChatRequest request = new ChatRequest();
@@ -1800,13 +1696,6 @@ class OpenAiChatClientTest {
 
         public String source = "test";
 
-    }
-
-    /** A canned 200 body the request-writing tests answer with, since none of them read it. */
-    private static ByteArrayInputStream okBody() {
-        return new ByteArrayInputStream(
-                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
-                        + "\"content\":\"ok\"}}]}").getBytes(UTF_8));
     }
 
 }
