@@ -967,13 +967,58 @@ class OpenAiChatClientTest {
     }
 
     @Test
+    void eachReasoningEffortGoesOutAsTheProtocolsOwnLevel() {
+        for (String effort : List.of(ChatOptions.REASONING_EFFORT_NONE, ChatOptions.REASONING_EFFORT_MINIMAL,
+                ChatOptions.REASONING_EFFORT_LOW, ChatOptions.REASONING_EFFORT_MEDIUM,
+                ChatOptions.REASONING_EFFORT_HIGH, ChatOptions.REASONING_EFFORT_XHIGH,
+                ChatOptions.REASONING_EFFORT_MAX)) {
+            stub.canned.setStatusCode(200);
+            stub.canned.setBody(okBody());
+
+            ChatRequest request = requestWithModel();
+            request.getOptions().setReasoningEffort(effort);
+
+            client.chat(request);
+
+            // The ladder is one vocabulary, and this protocol's levels are the same words.
+            assertEquals(effort, parseCaptured().get("reasoning_effort"));
+        }
+    }
+
+    @Test
+    void noReasoningEffortLeavesTheMemberOffTheWire() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        client.chat(requestWithModel());
+
+        // No opinion is not the same as the middle of the ladder: the model's own default stands.
+        assertFalse(parseCaptured().containsKey("reasoning_effort"));
+    }
+
+    @Test
+    void aReasoningEffortOfTheEndpointsOwnGoesOutAsItStands() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = requestWithModel();
+        request.getOptions().setReasoningEffort("extreme");
+
+        client.chat(request);
+
+        // No protocol fixes the set of levels, so a value this library has never heard of is the
+        // endpoint's to judge rather than ours to refuse.
+        assertEquals("extreme", parseCaptured().get("reasoning_effort"));
+    }
+
+    @Test
     void eachToolChoiceModeGoesOutAsTheProtocolsOwnString() {
         for (String mode : List.of(ChatOptions.TOOL_CHOICE_AUTO, ChatOptions.TOOL_CHOICE_NONE,
                 ChatOptions.TOOL_CHOICE_REQUIRED)) {
             stub.canned.setStatusCode(200);
             stub.canned.setBody(okBody());
 
-            ChatRequest request = toolChoiceRequest();
+            ChatRequest request = requestWithModel();
             request.getOptions().setToolChoice(mode);
 
             client.chat(request);
@@ -989,7 +1034,7 @@ class OpenAiChatClientTest {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(okBody());
 
-        ChatRequest request = toolChoiceRequest();
+        ChatRequest request = requestWithModel();
         request.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_TOOL);
         request.getOptions().setToolChoiceName("get_weather");
 
@@ -1009,7 +1054,7 @@ class OpenAiChatClientTest {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(okBody());
 
-        ChatRequest request = toolChoiceRequest();
+        ChatRequest request = requestWithModel();
         request.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_TOOL);
         request.getOptions().setToolChoiceName("get_weather");
         request.getOptions().getExtras().put(List.of("tool_choice", "disable_parallel_tool_use"), true);
@@ -1028,7 +1073,7 @@ class OpenAiChatClientTest {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(okBody());
 
-        client.chat(toolChoiceRequest());
+        client.chat(requestWithModel());
 
         assertFalse(parseCaptured().containsKey("tool_choice"));
     }
@@ -1036,19 +1081,19 @@ class OpenAiChatClientTest {
     @Test
     void aToolChoiceThisProtocolCannotSpellIsRefused() {
         // A mode the open vocabulary allows and this protocol has no member for.
-        ChatRequest unknownMode = toolChoiceRequest();
+        ChatRequest unknownMode = requestWithModel();
         unknownMode.getOptions().setToolChoice("any");
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(unknownMode));
         assertTrue(thrown.getMessage().contains("any"), thrown.getMessage());
 
         // A name beside a mode that names no tool is half a requirement.
-        ChatRequest strayName = toolChoiceRequest();
+        ChatRequest strayName = requestWithModel();
         strayName.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_REQUIRED);
         strayName.getOptions().setToolChoiceName("get_weather");
         assertThrows(SynapseException.class, () -> client.chat(strayName));
 
         // ... and so is a tool mode that names nothing.
-        ChatRequest noName = toolChoiceRequest();
+        ChatRequest noName = requestWithModel();
         noName.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_TOOL);
         assertThrows(SynapseException.class, () -> client.chat(noName));
     }
@@ -1802,8 +1847,8 @@ class OpenAiChatClientTest {
         return message;
     }
 
-    /** A request the tool-choice tests set one thing on. */
-    private static ChatRequest toolChoiceRequest() {
+    /** A request with a model set, which is all the request-writing tests here need. */
+    private static ChatRequest requestWithModel() {
         ChatRequest request = new ChatRequest();
         request.getOptions().setModel("gpt-test");
         return request;

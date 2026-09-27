@@ -34,6 +34,27 @@ import lombok.ToString;
 @ToString
 public class ChatOptions {
 
+    /** Do not reason. */
+    public static final String REASONING_EFFORT_NONE = "none";
+
+    /** Reason as briefly as the model can. */
+    public static final String REASONING_EFFORT_MINIMAL = "minimal";
+
+    /** Reason a little. */
+    public static final String REASONING_EFFORT_LOW = "low";
+
+    /** The middle of the ladder, and where several providers put their own default. */
+    public static final String REASONING_EFFORT_MEDIUM = "medium";
+
+    /** Reason substantially. */
+    public static final String REASONING_EFFORT_HIGH = "high";
+
+    /** Beyond {@link #REASONING_EFFORT_HIGH}, on the models that go further. */
+    public static final String REASONING_EFFORT_XHIGH = "xhigh";
+
+    /** As much as the model offers. */
+    public static final String REASONING_EFFORT_MAX = "max";
+
     /** Let the model decide whether to call a tool. */
     public static final String TOOL_CHOICE_AUTO = "auto";
 
@@ -57,6 +78,15 @@ public class ChatOptions {
 
     /** Nucleus sampling threshold. */
     private @Nullable Double topP;
+
+    /**
+     * How much the model should reason before it answers: one of the {@code REASONING_EFFORT_*}
+     * constants, or any other level the endpoint understands. The constants name the rungs that mean
+     * the same thing from one provider to the next; a level of one endpoint's own is written as it
+     * stands, since no protocol fixes the set. {@code null} leaves the decision to the protocol, which
+     * is the only way to ask for a model's own default rather than a level.
+     */
+    private @Nullable String reasoningEffort;
 
     /**
      * Which tools the model may call: one of the {@code TOOL_CHOICE_*} constants, or any other mode a

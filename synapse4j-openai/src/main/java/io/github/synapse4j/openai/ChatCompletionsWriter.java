@@ -105,6 +105,7 @@ class ChatCompletionsWriter {
             putIfSet(document, config.getMaxTokensField(), request.getOptions().getMaxOutputTokens());
         }
         putIfSet(document, "top_p", request.getOptions().getTopP());
+        putIfSet(document, "reasoning_effort", request.getOptions().getReasoningEffort());
         if (request.getResponseFormat().getType() != null
                 || !request.getResponseFormat().getExtras().isEmpty()) {
             document.put("response_format", responseFormat(request.getResponseFormat()));
