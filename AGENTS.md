@@ -78,6 +78,9 @@ framework; efficiency is why it would be better.
 - A concept is promoted from that bag into the shared model only when the application needs it to
   survive a provider switch *and* the providers' shapes map onto one neutral value space. Two
   providers carrying a similarly named field is not a reason.
+- A promoted concept is translated or refused, never dropped: a module whose protocol cannot express
+  it fails the call, because a knob that quietly does nothing reads from above as a model that
+  ignored its instructions.
 - A provider's spelling of a common field is a configuration field on that module's config, used for
   reading and writing alike, with a default that suits the provider that fails loudly when wrong. It
   is never inferred from what a response happened to contain.

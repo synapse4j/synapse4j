@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import io.github.synapse4j.chat.ChatStream;
 import io.github.synapse4j.data.ChatFinishReason;
 import io.github.synapse4j.data.ChatMessage;
+import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatResponseFormat;
@@ -966,6 +967,93 @@ class OpenAiChatClientTest {
     }
 
     @Test
+    void eachToolChoiceModeGoesOutAsTheProtocolsOwnString() {
+        for (String mode : List.of(ChatOptions.TOOL_CHOICE_AUTO, ChatOptions.TOOL_CHOICE_NONE,
+                ChatOptions.TOOL_CHOICE_REQUIRED)) {
+            stub.canned.setStatusCode(200);
+            stub.canned.setBody(okBody());
+
+            ChatRequest request = toolChoiceRequest();
+            request.getOptions().setToolChoice(mode);
+
+            client.chat(request);
+
+            // The shared vocabulary and this protocol's are the same three words, so a mode travels
+            // as it was written rather than through a table of names.
+            assertEquals(mode, parseCaptured().get("tool_choice"));
+        }
+    }
+
+    @Test
+    void namingAToolTakesTheObjectForm() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = toolChoiceRequest();
+        request.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_TOOL);
+        request.getOptions().setToolChoiceName("get_weather");
+
+        client.chat(request);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> choice = (Map<String, Object>) parseCaptured().get("tool_choice");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> function = (Map<String, Object>) choice.get("function");
+        // A name is the only thing this protocol needs the object form for.
+        assertEquals("function", choice.get("type"));
+        assertEquals("get_weather", function.get("name"));
+    }
+
+    @Test
+    void aPathUnderTheToolChoiceReachesIntoIt() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        ChatRequest request = toolChoiceRequest();
+        request.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_TOOL);
+        request.getOptions().setToolChoiceName("get_weather");
+        request.getOptions().getExtras().put(List.of("tool_choice", "disable_parallel_tool_use"), true);
+
+        client.chat(request);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> choice = (Map<String, Object>) parseCaptured().get("tool_choice");
+        // A provider field of this object has a way in without a bag of its own on the model.
+        assertEquals("function", choice.get("type"));
+        assertEquals(Boolean.TRUE, choice.get("disable_parallel_tool_use"));
+    }
+
+    @Test
+    void aToolChoiceNothingWasAskedOfIsLeftOffTheWire() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
+
+        client.chat(toolChoiceRequest());
+
+        assertFalse(parseCaptured().containsKey("tool_choice"));
+    }
+
+    @Test
+    void aToolChoiceThisProtocolCannotSpellIsRefused() {
+        // A mode the open vocabulary allows and this protocol has no member for.
+        ChatRequest unknownMode = toolChoiceRequest();
+        unknownMode.getOptions().setToolChoice("any");
+        SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(unknownMode));
+        assertTrue(thrown.getMessage().contains("any"), thrown.getMessage());
+
+        // A name beside a mode that names no tool is half a requirement.
+        ChatRequest strayName = toolChoiceRequest();
+        strayName.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_REQUIRED);
+        strayName.getOptions().setToolChoiceName("get_weather");
+        assertThrows(SynapseException.class, () -> client.chat(strayName));
+
+        // ... and so is a tool mode that names nothing.
+        ChatRequest noName = toolChoiceRequest();
+        noName.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_TOOL);
+        assertThrows(SynapseException.class, () -> client.chat(noName));
+    }
+
+    @Test
     void aToolResultCarriesItsOwnExtras() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(okBody());
@@ -1712,6 +1800,13 @@ class OpenAiChatClientTest {
         message.setRole(role);
         message.getParts().add(new TextPart(text));
         return message;
+    }
+
+    /** A request the tool-choice tests set one thing on. */
+    private static ChatRequest toolChoiceRequest() {
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setModel("gpt-test");
+        return request;
     }
 
     /** A part type this module has no wire shape for: the model is open, the protocol is not. */

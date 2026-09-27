@@ -34,6 +34,18 @@ import lombok.ToString;
 @ToString
 public class ChatOptions {
 
+    /** Let the model decide whether to call a tool. */
+    public static final String TOOL_CHOICE_AUTO = "auto";
+
+    /** Call no tool. */
+    public static final String TOOL_CHOICE_NONE = "none";
+
+    /** Call at least one tool. */
+    public static final String TOOL_CHOICE_REQUIRED = "required";
+
+    /** Call the tool {@link #toolChoiceName} names, and no other. */
+    public static final String TOOL_CHOICE_TOOL = "tool";
+
     /** Identifier of the model to call. */
     private @Nullable String model;
 
@@ -45,6 +57,19 @@ public class ChatOptions {
 
     /** Nucleus sampling threshold. */
     private @Nullable Double topP;
+
+    /**
+     * Which tools the model may call: one of the {@code TOOL_CHOICE_*} constants, or any other mode a
+     * provider understands. {@code null} leaves the decision to the protocol, which every provider
+     * this library speaks to reads as "decide for yourself".
+     */
+    private @Nullable String toolChoice;
+
+    /**
+     * The tool {@link #TOOL_CHOICE_TOOL} names, and no other; unset for every other mode, since a name
+     * beside a mode that names no tool has nowhere to go.
+     */
+    private @Nullable String toolChoiceName;
 
     /**
      * HTTP-level settings for this call's request, or {@code null} to leave every one of them to

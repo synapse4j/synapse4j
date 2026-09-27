@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import io.github.synapse4j.data.ChatMessage;
+import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ContentPart;
@@ -98,6 +99,7 @@ class ChatCompletionsWriter {
         if (!request.getTools().isEmpty()) {
             document.put("tools", tools(request.getTools()));
         }
+        putIfSet(document, "tool_choice", toolChoice(request.getOptions()));
         putIfSet(document, "temperature", request.getOptions().getTemperature());
         if (!config.getMaxTokensField().isBlank()) {
             putIfSet(document, config.getMaxTokensField(), request.getOptions().getMaxOutputTokens());
@@ -336,6 +338,47 @@ class ChatCompletionsWriter {
             }
         }
         return rest;
+    }
+
+    /**
+     * The tool choice as the member it goes out as, or {@code null} when the call states none. The
+     * modes that constrain nothing in particular are this protocol's bare strings; naming a tool
+     * takes the object form, which is the only shape that carries a name.
+     *
+     * <p>
+     * Every mode the call states is translated or refused here, and the name with it: a knob that
+     * quietly did nothing would read from above as a model that ignored its instructions. Provider
+     * fields of the object form ride in through the options bag — a {@code tool_choice.…} path merges
+     * over what is written here.
+     */
+    private @Nullable Object toolChoice(ChatOptions options) {
+        String mode = options.getToolChoice();
+        if (mode == null) {
+            return null;
+        }
+        switch (mode) {
+            case ChatOptions.TOOL_CHOICE_AUTO:
+            case ChatOptions.TOOL_CHOICE_NONE:
+            case ChatOptions.TOOL_CHOICE_REQUIRED:
+                if (options.getToolChoiceName() != null) {
+                    throw new SynapseException("unsupported tool choice for OpenAI: mode '" + mode
+                            + "' names no tool, so a tool name has nowhere to go");
+                }
+                return mode;
+            case ChatOptions.TOOL_CHOICE_TOOL:
+                if (options.getToolChoiceName() == null) {
+                    throw new SynapseException("unsupported tool choice for OpenAI: mode '"
+                            + ChatOptions.TOOL_CHOICE_TOOL + "' has to name a tool");
+                }
+                Map<String, Object> function = new LinkedHashMap<>();
+                function.put("name", options.getToolChoiceName());
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("type", "function");
+                entry.put("function", function);
+                return entry;
+            default:
+                throw new SynapseException("unsupported tool choice mode for OpenAI: " + mode);
+        }
     }
 
     private List<Map<String, Object>> tools(List<Tool> requestTools) {
