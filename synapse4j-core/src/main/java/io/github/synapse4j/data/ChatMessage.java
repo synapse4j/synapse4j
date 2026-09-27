@@ -66,6 +66,38 @@ public class ChatMessage {
     }
 
     /**
+     * A message from the system saying the given text — the instructions a conversation usually opens
+     * with.
+     *
+     * @param text what the message says
+     * @return the message
+     */
+    public static ChatMessage system(@NonNull String text) {
+        return new ChatMessage(ChatRole.SYSTEM).addText(text);
+    }
+
+    /**
+     * A message from the user saying the given text — the shape most of a conversation is built from.
+     *
+     * @param text what the message says
+     * @return the message
+     */
+    public static ChatMessage user(@NonNull String text) {
+        return new ChatMessage(ChatRole.USER).addText(text);
+    }
+
+    /**
+     * A message from the assistant saying the given text: a model's turn written back by hand, for a
+     * replayed exchange or the examples of a few-shot prompt.
+     *
+     * @param text what the message says
+     * @return the message
+     */
+    public static ChatMessage assistant(@NonNull String text) {
+        return new ChatMessage(ChatRole.ASSISTANT).addText(text);
+    }
+
+    /**
      * Adds a part to what this message contributes.
      *
      * @param part the part to add
