@@ -75,6 +75,28 @@ public class ChatRequest {
     }
 
     /**
+     * Adds a message from the system saying the given text — the instructions a conversation usually
+     * opens with.
+     *
+     * @param text what the message says
+     * @return this call
+     */
+    public ChatRequest addSystemMessage(@NonNull String text) {
+        return addMessage(ChatMessage.system(text));
+    }
+
+    /**
+     * Adds a message from the user saying the given text — the shape most of a conversation is built
+     * from.
+     *
+     * @param text what the message says
+     * @return this call
+     */
+    public ChatRequest addUserMessage(@NonNull String text) {
+        return addMessage(ChatMessage.user(text));
+    }
+
+    /**
      * Continues this call from an answer: the answer's turn joins the conversation, and the context
      * the answer rode back on becomes this call's.
      *
