@@ -75,6 +75,28 @@ public class ChatRequest {
     }
 
     /**
+     * Continues this call from an answer: the answer's turn joins the conversation, and the context
+     * the answer rode back on becomes this call's.
+     *
+     * <p>
+     * The context is the one the exchange ran on — it holds the request as it went out, the answer,
+     * the turn, and whatever session id was adopted — so taking it is what keeps the next call part
+     * of the same conversation when the caller builds a fresh request rather than growing this one.
+     * An answer carrying no context leaves whatever this call already has; in the ordinary case the
+     * two are the same instance and there is nothing to take.
+     *
+     * @param answer the answer whose turn continues the conversation
+     * @return this call
+     */
+    public ChatRequest continueWith(@NonNull ChatResponse answer) {
+        messages.add(answer.getMessage());
+        if (answer.getContext() != null) {
+            context = answer.getContext();
+        }
+        return this;
+    }
+
+    /**
      * The messages and tools are counted rather than printed: they grow with the conversation, and a
      * printout that carried them would grow just as long.
      *
