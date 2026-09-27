@@ -967,36 +967,6 @@ class OpenAiChatClientTest {
     }
 
     @Test
-    void eachReasoningEffortGoesOutAsTheProtocolsOwnLevel() {
-        for (String effort : List.of(ChatOptions.REASONING_EFFORT_NONE, ChatOptions.REASONING_EFFORT_MINIMAL,
-                ChatOptions.REASONING_EFFORT_LOW, ChatOptions.REASONING_EFFORT_MEDIUM,
-                ChatOptions.REASONING_EFFORT_HIGH, ChatOptions.REASONING_EFFORT_XHIGH,
-                ChatOptions.REASONING_EFFORT_MAX)) {
-            stub.canned.setStatusCode(200);
-            stub.canned.setBody(okBody());
-
-            ChatRequest request = requestWithModel();
-            request.getOptions().setReasoningEffort(effort);
-
-            client.chat(request);
-
-            // The ladder is one vocabulary, and this protocol's levels are the same words.
-            assertEquals(effort, parseCaptured().get("reasoning_effort"));
-        }
-    }
-
-    @Test
-    void noReasoningEffortLeavesTheMemberOffTheWire() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
-
-        client.chat(requestWithModel());
-
-        // No opinion is not the same as the middle of the ladder: the model's own default stands.
-        assertFalse(parseCaptured().containsKey("reasoning_effort"));
-    }
-
-    @Test
     void aReasoningEffortOfTheEndpointsOwnGoesOutAsItStands() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(okBody());
@@ -1012,21 +982,18 @@ class OpenAiChatClientTest {
     }
 
     @Test
-    void eachToolChoiceModeGoesOutAsTheProtocolsOwnString() {
-        for (String mode : List.of(ChatOptions.TOOL_CHOICE_AUTO, ChatOptions.TOOL_CHOICE_NONE,
-                ChatOptions.TOOL_CHOICE_REQUIRED)) {
-            stub.canned.setStatusCode(200);
-            stub.canned.setBody(okBody());
+    void aToolChoiceModeGoesOutAsTheProtocolsOwnString() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(okBody());
 
-            ChatRequest request = requestWithModel();
-            request.getOptions().setToolChoice(mode);
+        ChatRequest request = requestWithModel();
+        request.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_REQUIRED);
 
-            client.chat(request);
+        client.chat(request);
 
-            // The shared vocabulary and this protocol's are the same three words, so a mode travels
-            // as it was written rather than through a table of names.
-            assertEquals(mode, parseCaptured().get("tool_choice"));
-        }
+        // A mode that constrains nothing in particular is this protocol's bare string; only a name
+        // needs the object form.
+        assertEquals("required", parseCaptured().get("tool_choice"));
     }
 
     @Test
@@ -1044,38 +1011,8 @@ class OpenAiChatClientTest {
         Map<String, Object> choice = (Map<String, Object>) parseCaptured().get("tool_choice");
         @SuppressWarnings("unchecked")
         Map<String, Object> function = (Map<String, Object>) choice.get("function");
-        // A name is the only thing this protocol needs the object form for.
         assertEquals("function", choice.get("type"));
         assertEquals("get_weather", function.get("name"));
-    }
-
-    @Test
-    void aPathUnderTheToolChoiceReachesIntoIt() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
-
-        ChatRequest request = requestWithModel();
-        request.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_TOOL);
-        request.getOptions().setToolChoiceName("get_weather");
-        request.getOptions().getExtras().put(List.of("tool_choice", "disable_parallel_tool_use"), true);
-
-        client.chat(request);
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> choice = (Map<String, Object>) parseCaptured().get("tool_choice");
-        // A provider field of this object has a way in without a bag of its own on the model.
-        assertEquals("function", choice.get("type"));
-        assertEquals(Boolean.TRUE, choice.get("disable_parallel_tool_use"));
-    }
-
-    @Test
-    void aToolChoiceNothingWasAskedOfIsLeftOffTheWire() {
-        stub.canned.setStatusCode(200);
-        stub.canned.setBody(okBody());
-
-        client.chat(requestWithModel());
-
-        assertFalse(parseCaptured().containsKey("tool_choice"));
     }
 
     @Test

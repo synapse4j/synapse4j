@@ -16,6 +16,15 @@ HTTP client, pick the provider) rather than be locked into a framework.
 
 Baseline: **Java 21**.
 
+## What belongs in this file
+
+A rule earns a place here when it is settled and expected to hold for years: a principle that shapes
+new code, or a convention that keeps the tree consistent. Anything narrower — how one class works,
+why a field is spelled as it is, what was decided about one knob — belongs with the code: in javadoc,
+in the name of the test that pins it, or in the commit that made the decision. One sentence where a
+reader will need it beats a paragraph here, and a file that grows with every incident stops being
+read.
+
 ## Design principles
 
 These are hard constraints. When new code or a refactor conflicts with one of them, change the
@@ -80,7 +89,9 @@ framework; efficiency is why it would be better.
   providers carrying a similarly named field is not a reason.
 - A promoted concept is translated or refused, never dropped: a module whose protocol cannot express
   it fails the call, because a knob that quietly does nothing reads from above as a model that
-  ignored its instructions.
+  ignored its instructions. A value the protocol takes as it stands goes as it stands — the constants
+  name what means the same thing across providers, and a module invents no whitelist the protocol
+  never fixed.
 - A provider's spelling of a common field is a configuration field on that module's config, used for
   reading and writing alike, with a default that suits the provider that fails loudly when wrong. It
   is never inferred from what a response happened to contain.
@@ -119,16 +130,9 @@ one would block extension by users and providers.
 
 - **Formatting is enforced by Spotless.** Run `mvn spotless:apply` right after editing Java — keep the
   tree formatted as you go rather than fixing it up later, so review sees the committed form. Do not
-  hand-format. (In VS Code this already happens on save; the command is for edits made without the
-  editor, and it is the fix when `verify` reports violations.) The rules come from
-  `.vscode/eclipse-formatter.xml` — the Eclipse JDT formatter profile the VS Code Java extension
-  ships, with three deviations recorded in the file. Block indentation is 4 spaces; line width 120.
-  Note: after editing that profile, run `mvn clean` first — Spotless's freshness index does not
-  notice the profile changing on its own.
-- **The editor uses the same profile.** `.vscode/settings.json` points `java.format.settings.url` at
-  that same file and turns on format-on-save, so VS Code and `mvn spotless:apply` produce the same
-  output. Indentation is additionally pinned under `[java]`, because jdt.ls takes it from the client
-  rather than from the profile. Import ordering is deliberately not enforced by either side.
+  hand-format. The profile is `.vscode/eclipse-formatter.xml`, the one the editor also uses, so both
+  sides produce the same output; import ordering is deliberately not enforced by either. Editing that
+  profile needs `mvn clean` first — Spotless's freshness index does not notice it changing on its own.
 - **All comments are in English** — Javadoc (including on private members), inline comments and
   TODOs. Comments explain *why*; do not restate what the code does.
 - **Use Lombok instead of hand-writing boilerplate**, and only its stable annotations — nothing from
@@ -164,10 +168,13 @@ one would block extension by users and providers.
 - **Tests pin decisions, not plumbing.** A test earns its place by pinning a decision that could go
   wrong by mistake later — merge and ordering rules, contracts (a null answered loudly, a request
   handed on unchanged, one iterator pass), failure paths — and the assertion itself must be
-  defensible: a test that faithfully records a bug is worse than no test at all. Never pad for a
-  count: coverage is not measured in this build, and a test whose assertion can be re-derived by
-  reading the code beside it — a Lombok accessor, a generated toString, a literal constant, an
-  empty default — proves the source works, not us.
+  defensible: a test that faithfully records a bug is worse than no test at all. A test whose
+  assertion can be re-derived by reading the code beside it — a Lombok accessor, a generated
+  toString, a literal constant, an empty default, a member left out because nothing set it — proves
+  the source works, not us. One test per decision, never one per parameter, field or case, and a
+  method of a few straight-line statements earns none: a test is paid for twice, once written and
+  again on every later change, so name the wrong future change it would catch, and if there is none,
+  write nothing. Coverage is not measured in this build.
 
 ## Build and test
 
