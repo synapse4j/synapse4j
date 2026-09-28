@@ -114,6 +114,18 @@ public abstract class AbstractOpenAiChatClient extends AbstractChatClient {
         this.config.set(config);
     }
 
+    /**
+     * The family configuration in effect. A subclass that has to consult it outside an exchange —
+     * the Responses adapter reads it while folding an answer in — reads it here once, the way
+     * {@link #doChat} and {@link #doStream} snapshot it for one exchange: two reads could straddle
+     * a {@link #setConfig} and answer under two configurations.
+     *
+     * @return the configuration in effect; never {@code null}
+     */
+    protected final OpenAiConfig config() {
+        return config.get();
+    }
+
     @Override
     protected ChatResponse doChat(ChatRequest request) {
         // One snapshot for the whole exchange: a setConfig landing mid-call must not send this

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -58,8 +59,8 @@ class OpenAiResponsesChatClientTest {
             this.captured = request;
             // A transport asks for the body before it answers, so this one does too: a request the
             // module cannot spell fails here, the way it would fail on the way out. What it wrote
-            // is kept, because the request itself moves on once the exchange succeeds — the client
-            // archives what it sent — and what the tests assert is what actually went out.
+            // is kept, so the tests assert what actually went out rather than what the request
+            // looks like once the answer has been folded into it.
             try {
                 sent = new ByteArrayOutputStream();
                 request.getBody().writeTo(sent);
@@ -157,15 +158,84 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void anAnswerWithNoIdLeavesTheChainUnanchored() {
+    void anAnswerWithNoIdCannotAdvanceTheChain() {
         ChatRequest request = requestWithModel();
         request.getOptions().getExtras().put(ResponsesWriter.PREVIOUS_RESPONSE_ID, "resp_old");
+        request.addPendingMessage(ChatMessage.user("sent"));
         ChatResponse answer = new ChatResponse();
 
         client.continueWith(request, answer);
 
-        // No id means nowhere to chain from: keeping the old name would fork the next call from a
-        // point the server has moved past, dropping everything sent since. It re-sends instead.
+        // An id is what the chain would move to, and this answer carries none: the anchor stays on
+        // the response it names, and the answer joins the pending messages — with the anchor
+        // pointing at the older response, anything archived would be skipped on the next call.
+        assertEquals("resp_old", request.getOptions().getExtras().get(ResponsesWriter.PREVIOUS_RESPONSE_ID));
+        assertEquals(2, request.getPendingMessages().size());
+        assertSame(answer.getMessage(), request.getPendingMessages().get(1));
+        assertTrue(request.getHistoryMessages().isEmpty());
+    }
+
+    @Test
+    void theStoreResolvesFromTheRequestThenTheFamilyConfigThenTheEndpointDefault() {
+        stubCompletion();
+        client.chat(requestWithModel());
+        // Nothing set anywhere: the member stays off the wire and the endpoint's own default —
+        // keep — stands.
+        assertFalse(parseCaptured().containsKey(ResponsesWriter.STORE));
+
+        OpenAiConfig configured = new OpenAiConfig();
+        configured.setApiKey("sk-test");
+        configured.setStoreResponses(false);
+        client.setConfig(configured);
+        stubCompletion();
+        client.chat(requestWithModel());
+        assertEquals(Boolean.FALSE, parseCaptured().get(ResponsesWriter.STORE));
+
+        stubCompletion();
+        ChatRequest overridden = requestWithModel();
+        overridden.getOptions().getExtras().put(ResponsesWriter.STORE, true);
+        client.chat(overridden);
+        // The request's own member wins with no special-casing: the extras merge over what the
+        // config wrote.
+        assertEquals(Boolean.TRUE, parseCaptured().get(ResponsesWriter.STORE));
+    }
+
+    @Test
+    void anUnkeptAnswerUnderAnAnchorStaysPendingAndLeavesTheAnchor() {
+        ChatRequest request = requestWithModel();
+        request.getOptions().getExtras().put(ResponsesWriter.STORE, false);
+        request.getOptions().getExtras().put(ResponsesWriter.PREVIOUS_RESPONSE_ID, "resp_old");
+        request.addPendingMessage(ChatMessage.user("sent"));
+        ChatResponse answer = new ChatResponse();
+        answer.setId("resp_next");
+
+        client.continueWith(request, answer);
+
+        // The anchor did not move, so the next call sends only the pending messages: anything
+        // archived here would be skipped while the chain still points at the older response. The
+        // id cannot become the new anchor either — an answer the endpoint does not keep cannot be
+        // chained on.
+        assertEquals("resp_old", request.getOptions().getExtras().get(ResponsesWriter.PREVIOUS_RESPONSE_ID));
+        assertEquals(2, request.getPendingMessages().size());
+        assertSame(answer.getMessage(), request.getPendingMessages().get(1));
+        assertTrue(request.getHistoryMessages().isEmpty());
+    }
+
+    @Test
+    void anUnkeptAnswerWithNoAnchorStillArchives() {
+        ChatRequest request = requestWithModel();
+        request.getOptions().getExtras().put(ResponsesWriter.STORE, false);
+        request.addPendingMessage(ChatMessage.user("sent"));
+        ChatResponse answer = new ChatResponse();
+        answer.setId("resp_next");
+
+        client.continueWith(request, answer);
+
+        // Nothing is chained, so the whole conversation is re-sent anyway: recording it here keeps
+        // historyMessages meaningful at no cost. The id is not written as the anchor — a response
+        // the endpoint does not keep cannot be chained on.
+        assertEquals(2, request.getHistoryMessages().size());
+        assertTrue(request.getPendingMessages().isEmpty());
         assertFalse(request.getOptions().getExtras().contains(ResponsesWriter.PREVIOUS_RESPONSE_ID));
     }
 
@@ -429,8 +499,8 @@ class OpenAiResponsesChatClientTest {
 
     private Map<String, Object> parseCaptured() {
         try {
-            // What the transport was handed, kept at send time: the request itself moves on once
-            // the exchange succeeds, and what is asserted here is what actually went out.
+            // What the transport was handed, kept at send time: the request moves on once the
+            // answer is folded into it, and what is asserted here is what actually went out.
             return codec.decode(stub.sent.toString(UTF_8), Map.class);
         } catch (RuntimeException e) {
             throw new AssertionError("captured wire body is not JSON", e);

@@ -56,8 +56,10 @@ class ToolCallingChatClientTest {
         assertEquals("done", text(response));
         assertTrue(ran.get());
         assertEquals(2, inner.trips.get());
-        assertEquals(3, request.getHistoryMessages().size());
-        ChatMessage results = request.getHistoryMessages().get(2);
+        // The sent round and the answer the loop folded in are in the history; the batch's results
+        // wait in the pending messages until the caller folds in the final answer.
+        assertEquals(2, request.getHistoryMessages().size());
+        ChatMessage results = request.getPendingMessages().get(0);
         assertEquals(ChatRole.TOOL, results.getRole());
         ToolResultPart result = (ToolResultPart) results.getParts().get(0);
         assertEquals("c1", result.getCallId());
@@ -120,7 +122,10 @@ class ToolCallingChatClientTest {
         ChatResponse response = client.chat(request);
 
         assertEquals(1, inner.trips.get());
-        assertEquals(1, request.getHistoryMessages().size());
+        // Nothing was folded in — the declined answer never reaches continueWith — so the sent
+        // message is still what a retry would send.
+        assertEquals(0, request.getHistoryMessages().size());
+        assertEquals(1, request.getPendingMessages().size());
         assertTrue(toolCalls(response) == 1);
     }
 
@@ -237,8 +242,10 @@ class ToolCallingChatClientTest {
         assertEquals(List.of(1, 2), inner.streamTurns);
         assertTrue(ran.get());
         assertEquals("done", text(stream.aggregatedResponse()));
-        assertEquals(3, request.getHistoryMessages().size());
-        ChatMessage results = request.getHistoryMessages().get(2);
+        // The sent round and the answer the loop folded in are in the history; the final batch's
+        // results wait in the pending messages until the caller folds in the final answer.
+        assertEquals(2, request.getHistoryMessages().size());
+        ChatMessage results = request.getPendingMessages().get(0);
         assertEquals(ChatRole.TOOL, results.getRole());
         assertEquals("A", text((ToolResultPart) results.getParts().get(0)));
     }
@@ -286,7 +293,10 @@ class ToolCallingChatClientTest {
         }
 
         assertEquals(1, inner.streamTrips.get());
-        assertEquals(1, request.getHistoryMessages().size());
+        // Nothing was folded in — the declined answer never reaches continueWith — so the sent
+        // message is still what a retry would send.
+        assertEquals(0, request.getHistoryMessages().size());
+        assertEquals(1, request.getPendingMessages().size());
         assertEquals(1, toolCalls(stream.aggregatedResponse()));
     }
 

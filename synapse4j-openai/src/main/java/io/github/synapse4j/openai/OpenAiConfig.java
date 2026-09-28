@@ -14,7 +14,9 @@ import lombok.ToString;
  * adapter: both speak to the same API with the same credentials, so neither owns a config of its
  * own. {@link #maxTokensField} and {@link #reasoningField} are the chat-completions adapter's
  * conventions: the Responses protocol fixes the name of its token limit and carries reasoning in a
- * structure of its own, so that adapter reads neither.
+ * structure of its own, so that adapter reads neither. {@link #storeResponses} answers the same
+ * question in reverse: {@code store} is a Responses-protocol request member the chat-completions
+ * protocol has no word for, so that adapter never writes it.
  */
 @Data
 public class OpenAiConfig {
@@ -64,5 +66,19 @@ public class OpenAiConfig {
      */
     @NonNull
     private String reasoningField = "reasoning_content";
+
+    /**
+     * Whether the endpoint keeps the answer this call produces, sent as the Responses protocol's
+     * {@code store} member. {@code null} is no opinion: the member stays off the wire and the
+     * endpoint's own default — keep — stands.
+     *
+     * <p>
+     * It lives here for the same reason the fields above live here, in reverse: {@code store} is a
+     * Responses-protocol request member the chat-completions adapter never writes, and chaining
+     * depends on the answer — {@code previous_response_id} can only name a response the endpoint
+     * kept, so whether this call keeps its answers is a decision the fold reads before it decides
+     * whether the next call can chain.
+     */
+    private @Nullable Boolean storeResponses;
 
 }

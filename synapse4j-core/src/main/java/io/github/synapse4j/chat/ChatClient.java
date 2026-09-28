@@ -71,15 +71,17 @@ public interface ChatClient {
      * for the last one.
      *
      * <p>
-     * This is not the bookkeeping that moves what was sent into the history — that is
-     * {@link #chat(ChatRequest)}'s, and it runs when the exchange succeeds. What this method
-     * records is the answer's own turn.
+     * This is also where the conversation is recorded: what the call sent moves from the pending
+     * messages into the history before the answer joins it, so one call per answer archives the
+     * sent round and folds the new turn in together. Skipping a call leaves its input pending, and
+     * the next call sends it again.
      *
      * <p>
      * The default folds the answer's turn into the request's history and adopts the answer's
      * context onto a request that carries none of its own, so a request rebuilt from storage —
      * with a conversation but no context — picks up the session id the answer rode back on. A
-     * protocol client overrides this to also record what its own continuation needs.
+     * protocol client overrides this to also record what its own continuation needs — and to
+     * decide, as this default does not, which of the two lists the answer belongs in.
      *
      * @param request the request the conversation goes on with; never {@code null}
      * @param answer  the answer whose turn joins the conversation; never {@code null}
@@ -88,6 +90,8 @@ public interface ChatClient {
         if (request.getContext() == null && answer.getContext() != null) {
             request.setContext(answer.getContext());
         }
+        request.getHistoryMessages().addAll(request.getPendingMessages());
+        request.getPendingMessages().clear();
         request.addHistoryMessage(answer.getMessage());
     }
 

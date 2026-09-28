@@ -27,6 +27,7 @@ import io.github.synapse4j.util.Base64Reader;
 import org.jspecify.annotations.Nullable;
 
 import lombok.AccessLevel;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -78,7 +79,18 @@ class ResponsesWriter {
      */
     static final String PREVIOUS_RESPONSE_ID = "previous_response_id";
 
+    /**
+     * The wire name of the member that says whether the endpoint keeps the answer, read from the
+     * family configuration here and from the request's extras by the client that folds answers
+     * in — one name, spelled once for both sides.
+     */
+    static final String STORE = "store";
+
     private final JsonCodec codec;
+
+    /** The endpoint's conventions, as they were when this exchange began. */
+    @NonNull
+    private final OpenAiConfig config;
 
     /**
      * Writes the request as the wire document.
@@ -135,6 +147,10 @@ class ResponsesWriter {
         if (stream) {
             document.put("stream", true);
         }
+        // Null means no opinion: the member stays off the wire and the endpoint's own default —
+        // keep — stands. Written before the extras merge, so a bag that sets store itself wins
+        // with no special-casing here.
+        putIfSet(document, STORE, config.getStoreResponses());
         // The extras of the request itself merge into the document's own members, so a path lands as
         // a member of this object rather than a level below it. Merged last, so a path set on both
         // sides is the caller's value that goes out.

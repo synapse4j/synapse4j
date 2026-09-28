@@ -17,7 +17,8 @@ import lombok.Setter;
  * <p>
  * The conversation is carried in two lists plus one slot. {@code historyMessages} is the
  * conversation as it stands — everything an exchange has already covered; {@code pendingMessages}
- * is what this call will send and has not sent yet. Together they are the whole conversation:
+ * is what this call sends, every message in it going out on every call. Together they are the
+ * whole conversation:
  * neither list is ever trimmed here, so trimming is the application's deliberate act. The system
  * message sits outside the turn sequence as the framing the model answers under — one slot that
  * replaces rather than accumulates, and may hold none.
@@ -46,7 +47,7 @@ public class ChatRequest {
     /** The conversation as it stands — everything an exchange has already covered, oldest first. Never {@code null}. */
     private final List<ChatMessage> historyMessages = new ArrayList<>();
 
-    /** What this call will send and has not sent yet, oldest first. Never {@code null}. */
+    /** Everything this call sends, oldest first — every message here goes out on every call. Never {@code null}. */
     private final List<ChatMessage> pendingMessages = new ArrayList<>();
 
     /**

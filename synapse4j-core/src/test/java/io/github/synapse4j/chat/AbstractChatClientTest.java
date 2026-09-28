@@ -173,28 +173,37 @@ class AbstractChatClientTest {
 
         client.continueWith(request, answer);
 
-        // The answer's turn joins the history; what was sent stays pending until the exchange
-        // that carried it succeeds and the client archives it.
-        assertEquals(1, request.getHistoryMessages().size());
-        assertSame(answer.getMessage(), request.getHistoryMessages().get(0));
-        assertEquals(1, request.getPendingMessages().size());
+        // One call records the whole thing: what the call sent joins the history and the answer
+        // lands behind it.
+        assertEquals(2, request.getHistoryMessages().size());
+        assertSame(answer.getMessage(), request.getHistoryMessages().get(1));
+        assertTrue(request.getPendingMessages().isEmpty());
         // The exchange's own context is the one the conversation goes on with, since that is where
         // an adopted session id and the turn live.
         assertSame(context, request.getContext());
     }
 
     @Test
-    void whatTheCallSentJoinsTheHistoryWhenTheExchangeSucceeds() {
+    void foldingTheAnswerInArchivesWhatTheCallSent() {
         StubChatClient client = new StubChatClient();
         ChatRequest request = new ChatRequest();
         ChatMessage sent = ChatMessage.user("hi");
         request.addPendingMessage(sent);
 
-        client.chat(request);
+        ChatResponse answer = client.chat(request);
 
+        // The exchange alone records nothing: what went out stays pending, so an answer that never
+        // arrives leaves a retry with the same messages to send.
+        assertEquals(1, request.getPendingMessages().size());
+        assertTrue(request.getHistoryMessages().isEmpty());
+
+        client.continueWith(request, answer);
+
+        // The archive runs with the fold, not with the send.
         assertTrue(request.getPendingMessages().isEmpty());
-        assertEquals(1, request.getHistoryMessages().size());
+        assertEquals(2, request.getHistoryMessages().size());
         assertSame(sent, request.getHistoryMessages().get(0));
+        assertSame(answer.getMessage(), request.getHistoryMessages().get(1));
     }
 
     @Test

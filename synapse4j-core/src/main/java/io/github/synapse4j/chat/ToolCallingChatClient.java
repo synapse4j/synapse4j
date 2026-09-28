@@ -38,13 +38,13 @@ import lombok.NonNull;
  * its batch there and opens the next round before the next event arrives.
  *
  * <p>
- * The request fills in place, across its two lists: the inner client archives what each round
- * sends, so the rounds already out join {@code historyMessages}; the loop folds each answer it
- * consumes into that history through {@link ChatClient#continueWith} and puts the batch's results
- * into {@code pendingMessages}, where the next round picks them up. After the round the request
- * carries the transcript split across the two lists: the sent rounds and the answers the loop
- * consumed are in the history, and the last answer is not — folding that one in is the caller's
- * {@link ChatClient#continueWith} call, the same obligation it had before this method existed.
+ * The request fills in place, across its two lists. The loop folds each answer it consumes in
+ * through {@link ChatClient#continueWith}, and that same call also moves the round the answer
+ * answered — input and answer are recorded together, and which list they land in is the client's
+ * to decide (the default puts both in {@code historyMessages}). The batch's results go into
+ * {@code pendingMessages}, where the next round picks them up. The last answer of a round is
+ * never folded in by the loop: that {@link ChatClient#continueWith} call belongs to the caller,
+ * the same obligation it had before this method existed.
  * The context rides along on the request, attached when this decorator had to create one, and
  * carries the turn: 1 when the round starts, one up per trip around — which is what an executor's
  * turn cap reads.
