@@ -13,7 +13,7 @@ import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.restclient.RestClientHttpClient;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.json.JsonCodec;
-import io.github.synapse4j.openai.OpenAiChatClient;
+import io.github.synapse4j.openai.OpenAiCompletionsChatClient;
 import io.github.synapse4j.openai.OpenAiConfig;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -99,8 +99,9 @@ public class Synapse4jAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(ChatClient.class)
-    public OpenAiChatClient openAiChatClient(HttpClient http, JsonCodec codec, OpenAiConfig config) {
-        return new OpenAiChatClient(http, codec, config);
+    public OpenAiCompletionsChatClient openAiCompletionsChatClient(HttpClient http, JsonCodec codec,
+            OpenAiConfig config) {
+        return new OpenAiCompletionsChatClient(http, codec, config);
     }
 
 }

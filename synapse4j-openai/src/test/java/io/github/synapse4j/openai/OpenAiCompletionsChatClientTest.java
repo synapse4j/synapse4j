@@ -50,7 +50,7 @@ import io.github.synapse4j.tool.ToolDefinition;
 import io.github.synapse4j.util.InputStreamSupplier;
 import tools.jackson.databind.json.JsonMapper;
 
-class OpenAiChatClientTest {
+class OpenAiCompletionsChatClientTest {
 
     /** Captures the outgoing request and replays a canned response. */
     static class StubHttpClient implements HttpClient {
@@ -96,7 +96,7 @@ class OpenAiChatClientTest {
     private StubHttpClient stub;
     private JacksonJsonCodec codec;
     private OpenAiConfig config;
-    private OpenAiChatClient client;
+    private OpenAiCompletionsChatClient client;
 
     @BeforeEach
     void setUp() {
@@ -104,7 +104,7 @@ class OpenAiChatClientTest {
         codec = new JacksonJsonCodec(JsonMapper.builder().build());
         config = new OpenAiConfig();
         config.setApiKey("sk-test");
-        client = new OpenAiChatClient(stub, codec, config);
+        client = new OpenAiCompletionsChatClient(stub, codec, config);
     }
 
     @Test

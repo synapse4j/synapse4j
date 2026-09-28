@@ -34,19 +34,19 @@ import org.jspecify.annotations.Nullable;
  * say — is still handed out, because whether it is worth an event is the application's decision.
  * The event type is the payload's own {@code object} member, so a kind of chunk this module has
  * never heard of reaches the caller under the name the provider gave it. Each payload's document is
- * walked by {@link ChatCompletionsReader}; this class owns the frames around it — the reader opened
+ * walked by {@link CompletionsReader}; this class owns the frames around it — the reader opened
  * over each payload's bytes, and the sentinel frame that ends the answer.
  *
  * <p>
  * The fold is what makes a streamed answer the same answer a blocking call returns: it sums the
- * fragments the way {@link ChatCompletionsReader} reads them, so a turn that arrived as twenty
+ * fragments the way {@link CompletionsReader} reads them, so a turn that arrived as twenty
  * chunks ends up as the one message, and the one tool call, a single response would have carried.
  *
  * <p>
- * One instance per exchange, built by {@link OpenAiChatClient} while the response is open; closing
+ * One instance per exchange, built by {@link OpenAiCompletionsChatClient} while the response is open; closing
  * it — or running out of events — releases the connection behind it.
  */
-class ChatCompletionsStream extends DefaultChatStream {
+class CompletionsStream extends DefaultChatStream {
 
     /**
      * The member that says which entry of a chunk's {@code tool_calls} array a fragment belongs to.
@@ -67,9 +67,9 @@ class ChatCompletionsStream extends DefaultChatStream {
      * @param config        the endpoint's conventions, for the members whose name varies between
      *                          endpoints
      */
-    ChatCompletionsStream(JsonCodec codec, SseEventStream sse, Consumer<ChatStreamEvent> eventPipeline,
+    CompletionsStream(JsonCodec codec, SseEventStream sse, Consumer<ChatStreamEvent> eventPipeline,
             AutoCloseable closeAction, OpenAiConfig config) {
-        super(events(codec, sse, new ChatCompletionsReader(config)), eventPipeline, ChatCompletionsStream::aggregate,
+        super(events(codec, sse, new CompletionsReader(config)), eventPipeline, CompletionsStream::aggregate,
                 closeAction);
     }
 
@@ -88,7 +88,7 @@ class ChatCompletionsStream extends DefaultChatStream {
      * @return the events; never {@code null}
      */
     private static Iterator<ChatStreamEvent> events(JsonCodec codec, SseEventStream sse,
-            ChatCompletionsReader eventReader) {
+            CompletionsReader eventReader) {
         return new Iterator<ChatStreamEvent>() {
 
             private @Nullable ChatStreamEvent pending;
@@ -130,7 +130,7 @@ class ChatCompletionsStream extends DefaultChatStream {
     }
 
     /** Maps one frame to its event. */
-    private static ChatStreamEvent toEvent(JsonCodec codec, SseEvent frame, ChatCompletionsReader eventReader) {
+    private static ChatStreamEvent toEvent(JsonCodec codec, SseEvent frame, CompletionsReader eventReader) {
         if (OpenAiEventTypes.DONE.equals(frame.getData())) {
             ChatStreamEvent done = new ChatStreamEvent();
             done.setEventType(OpenAiEventTypes.DONE);

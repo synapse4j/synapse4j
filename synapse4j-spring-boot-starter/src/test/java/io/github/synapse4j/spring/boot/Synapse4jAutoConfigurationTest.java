@@ -21,7 +21,7 @@ import io.github.synapse4j.http.restclient.RestClientHttpClient;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
-import io.github.synapse4j.openai.OpenAiChatClient;
+import io.github.synapse4j.openai.OpenAiCompletionsChatClient;
 import io.github.synapse4j.openai.OpenAiConfig;
 
 class Synapse4jAutoConfigurationTest {
@@ -36,7 +36,7 @@ class Synapse4jAutoConfigurationTest {
     void wiresTheWholeStackWithNoProperties() {
         runner.run(context -> {
             assertThat(context).hasSingleBean(ChatClient.class);
-            assertThat(context.getBean(ChatClient.class)).isInstanceOf(OpenAiChatClient.class);
+            assertThat(context.getBean(ChatClient.class)).isInstanceOf(OpenAiCompletionsChatClient.class);
             assertThat(context).hasSingleBean(JsonCodec.class);
             assertThat(context.getBean(JsonCodec.class)).isInstanceOf(JacksonJsonCodec.class);
             assertThat(context).hasSingleBean(HttpClient.class);
@@ -105,7 +105,7 @@ class Synapse4jAutoConfigurationTest {
     void applicationBeansWinOverEveryDefault() {
         JsonCodec codec = new JacksonJsonCodec();
         HttpClient http = new RestClientHttpClient();
-        ChatClient client = new OpenAiChatClient(http, codec, new OpenAiConfig());
+        ChatClient client = new OpenAiCompletionsChatClient(http, codec, new OpenAiConfig());
         runner.withBean(JsonCodec.class, () -> codec)
                 .withBean(HttpClient.class, () -> http)
                 .withBean(ChatClient.class, () -> client)

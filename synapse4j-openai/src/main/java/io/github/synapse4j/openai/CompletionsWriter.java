@@ -59,7 +59,7 @@ import lombok.RequiredArgsConstructor;
  * document and nothing about the exchange that carries it.
  */
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-class ChatCompletionsWriter {
+class CompletionsWriter {
 
     /** The type prefix of the media this module renders; the protocol's image shape takes nothing else. */
     private static final String IMAGE_TYPE_PREFIX = "image/";

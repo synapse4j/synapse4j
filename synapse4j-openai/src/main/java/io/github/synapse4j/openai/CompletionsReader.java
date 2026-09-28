@@ -41,7 +41,7 @@ import lombok.RequiredArgsConstructor;
  * when something went wrong — so it stays an argument of each call.
  */
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-class ChatCompletionsReader {
+class CompletionsReader {
 
     /**
      * The endpoint's conventions, as they were when this exchange began; never {@code null}, which is
@@ -445,35 +445,10 @@ class ChatCompletionsReader {
     }
 
     /**
-     * Reads the provider's error document into the detail a failure message carries — the part
-     * after its own prefix: {@code ": message [type] (code)}, each member the error object has, in
-     * that order, and nothing where it has none. A document that carries no error object answers
-     * {@code null}: what to say then belongs to the caller, as does everything about how the body
-     * reached a reader in the first place.
-     *
-     * @param reader the reader, before its first token; the caller owns it
-     * @return the detail after the caller's own prefix, or {@code null} when there is none to read
-     */
-    static @Nullable String readError(JsonReader reader) {
-        if (reader.nextToken() != JsonReader.Token.START_OBJECT) {
-            return null;
-        }
-        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = name(reader);
-            reader.nextToken();
-            if ("error".equals(field)) {
-                // A scalar where the conventional object belongs says less than the raw body does.
-                return reader.token() == JsonReader.Token.START_OBJECT ? errorSuffix(reader) : null;
-            }
-            reader.skipValue();
-        }
-        return null;
-    }
-
-    /**
      * The exception for a failure the provider reports inside the stream, where no HTTP status is
      * involved: the response was accepted, and the refusal arrives as a frame of its own. The
-     * message keeps the provider's own detail, type and code, the way a refused call's does.
+     * message keeps the provider's own detail, type and code, the way a refused call's does —
+     * spelled by the same helper both endpoints render that document with.
      *
      * @param reader the reader, positioned on the error value the frame carries
      * @return the exception to raise
@@ -481,7 +456,7 @@ class ChatCompletionsReader {
     private static SynapseException streamError(JsonReader reader) {
         StringBuilder message = new StringBuilder("OpenAI stream failed");
         if (reader.token() == JsonReader.Token.START_OBJECT) {
-            message.append(errorSuffix(reader));
+            message.append(AbstractOpenAiChatClient.errorSuffix(reader));
         } else {
             Object value = reader.captureValue();
             if (value != null) {
@@ -489,49 +464,6 @@ class ChatCompletionsReader {
             }
         }
         return new SynapseException(message.toString());
-    }
-
-    /**
-     * The detail an error object spells out — {@code ": message [type] (code)}, only the members it
-     * has — with the reader positioned on the object's start.
-     */
-    private static String errorSuffix(JsonReader reader) {
-        String message = null;
-        String type = null;
-        String code = null;
-        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = name(reader);
-            reader.nextToken();
-            switch (field) {
-                case "message" -> message = errorText(reader);
-                case "type" -> type = errorText(reader);
-                case "code" -> code = errorText(reader);
-                default -> reader.skipValue();
-            }
-        }
-        StringBuilder detail = new StringBuilder();
-        if (message != null) {
-            detail.append(": ").append(message);
-        }
-        if (type != null) {
-            detail.append(" [").append(type).append(']');
-        }
-        if (code != null) {
-            detail.append(" (").append(code).append(')');
-        }
-        return detail.toString();
-    }
-
-    /** A member's text as the message spells it, or {@code null} where it carries no text. */
-    private static @Nullable String errorText(JsonReader reader) {
-        JsonReader.Token token = reader.token();
-        if (token == JsonReader.Token.START_OBJECT || token == JsonReader.Token.START_ARRAY) {
-            // A structured member has no place in the message, and leaving it unread would lose
-            // the walk: skip it the way any unmodelled value is passed over.
-            reader.skipValue();
-            return null;
-        }
-        return reader.string();
     }
 
     /**
