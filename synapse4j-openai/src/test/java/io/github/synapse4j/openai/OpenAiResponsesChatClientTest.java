@@ -142,6 +142,34 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
+    void foldingAnAnswerInNamesItAsTheChainAnchor() {
+        ChatRequest request = requestWithModel();
+        ChatResponse answer = new ChatResponse();
+        answer.setId("resp_next");
+
+        client.continueWith(request, answer);
+
+        // The answer's turn joins the history — the chain holds it already — and its id becomes
+        // the response the next call names.
+        assertEquals(1, request.getHistoryMessages().size());
+        assertEquals("resp_next",
+                request.getOptions().getExtras().get(ResponsesWriter.PREVIOUS_RESPONSE_ID));
+    }
+
+    @Test
+    void anAnswerWithNoIdLeavesTheChainUnanchored() {
+        ChatRequest request = requestWithModel();
+        request.getOptions().getExtras().put(ResponsesWriter.PREVIOUS_RESPONSE_ID, "resp_old");
+        ChatResponse answer = new ChatResponse();
+
+        client.continueWith(request, answer);
+
+        // No id means nowhere to chain from: keeping the old name would fork the next call from a
+        // point the server has moved past, dropping everything sent since. It re-sends instead.
+        assertFalse(request.getOptions().getExtras().contains(ResponsesWriter.PREVIOUS_RESPONSE_ID));
+    }
+
+    @Test
     void theReasoningLevelGoesOutNestedUnderReasoning() {
         stubCompletion();
 

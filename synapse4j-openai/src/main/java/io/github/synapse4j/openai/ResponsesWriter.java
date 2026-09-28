@@ -70,8 +70,13 @@ class ResponsesWriter {
     /** The type prefix of the media this module renders; the protocol's image shape takes nothing else. */
     private static final String IMAGE_TYPE_PREFIX = "image/";
 
-    /** The option-bag name of the response the server already holds, when a call chains onto it. */
-    private static final String PREVIOUS_RESPONSE_ID = "previous_response_id";
+    /**
+     * The option-bag name of the response the server already holds, when a call chains onto it.
+     * The client writes it from an answer in {@code continueWith}; this class reads it back to
+     * decide how much of the conversation still has to go out, so it lives here under one name
+     * rather than being spelled twice.
+     */
+    static final String PREVIOUS_RESPONSE_ID = "previous_response_id";
 
     private final JsonCodec codec;
 

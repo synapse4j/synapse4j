@@ -40,6 +40,32 @@ public class OpenAiResponsesChatClient extends AbstractOpenAiChatClient {
         super(http, codec, config);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>
+     * This protocol continues a conversation by naming the response the server last produced, so
+     * folding an answer in means recording its id as that name: the writer sends it as
+     * {@code previous_response_id}, and while it is there sends only the pending messages — the
+     * history the chain already holds must not go out a second time.
+     *
+     * <p>
+     * An answer without an id cannot be chained from. Keeping the name of an earlier response
+     * would make the next call fork the chain from a point the server has already moved past,
+     * dropping everything sent since; the name comes off instead, and the next call re-sends the
+     * conversation rather than lose a turn of it.
+     */
+    @Override
+    public void continueWith(ChatRequest request, ChatResponse answer) {
+        super.continueWith(request, answer);
+        String id = answer.getId();
+        if (id != null) {
+            request.getOptions().getExtras().put(ResponsesWriter.PREVIOUS_RESPONSE_ID, id);
+        } else {
+            request.getOptions().getExtras().remove(ResponsesWriter.PREVIOUS_RESPONSE_ID);
+        }
+    }
+
     @Override
     protected String endpoint() {
         return "/responses";
