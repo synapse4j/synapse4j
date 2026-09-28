@@ -7,8 +7,8 @@ package io.github.synapse4j.spring.boot;
  * <p>
  * A closed type is right here in a way it would not be in the library itself: the set is exactly
  * what this configuration can construct — nothing extends it, and an application that wants
- * another client says so by declaring a {@code ChatClient} bean, which both beans back off from.
- * Closed also buys what a free string cannot: the binder refuses an unknown value at startup,
+ * another client says so by declaring a {@code ChatClient} bean, which every bean here backs off
+ * from. Closed also buys what a free string cannot: the binder refuses an unknown value at startup,
  * naming the property, instead of leaving a container that quietly has no client to inject.
  */
 public enum ChatClientType {
@@ -17,6 +17,9 @@ public enum ChatClientType {
     COMPLETIONS,
 
     /** The Responses protocol, where a call can continue from a response the server kept. */
-    RESPONSES
+    RESPONSES,
+
+    /** The Anthropic Messages protocol. */
+    ANTHROPIC
 
 }

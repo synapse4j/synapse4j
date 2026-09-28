@@ -4,6 +4,7 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
+import io.github.synapse4j.anthropic.AnthropicConfig;
 import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.openai.OpenAiConfig;
 
@@ -11,17 +12,17 @@ import io.github.synapse4j.openai.OpenAiConfig;
  * The {@code synapse4j.*} settings this starter binds.
  *
  * <p>
- * The two groups are the library's own configuration types held in place rather than restated:
- * {@code synapse4j.openai.*} lands on an {@link OpenAiConfig}, {@code synapse4j.http.*} on
- * {@link HttpOptions}. Spring's binder calls a setter only for a key the environment actually
+ * The groups are the library's own configuration types held in place rather than restated:
+ * {@code synapse4j.openai.*} lands on an {@link OpenAiConfig}, {@code synapse4j.anthropic.*} on
+ * an {@link AnthropicConfig}, {@code synapse4j.http.*} on {@link HttpOptions}. Spring's binder
+ * calls a setter only for a key the environment actually
  * carries, so every property a user does not set keeps the default the library's own instance
  * carries — and there is no second copy of these fields here that could drift from them.
  *
  * <p>
  * Settings that belong to Spring Boot's transport — read and connect timeouts, SSL bundles — are
- * deliberately not restated either. They live under {@code spring.http.client.*} and reach this
- * stack through the auto-configured {@code RestClient} like any other Boot application's HTTP
- * calls.
+ * deliberately not restated either. They live under {@code spring.http.client.*} and reach a
+ * {@code RestClient}-backed transport like any other Boot application's HTTP calls.
  */
 @Data
 @ConfigurationProperties(prefix = "synapse4j")
@@ -39,7 +40,7 @@ public class Synapse4jProperties {
 
     /**
      * Which chat client the auto-configuration builds: {@link ChatClientType#COMPLETIONS} (the
-     * default) or {@link ChatClientType#RESPONSES}.
+     * default), {@link ChatClientType#RESPONSES}, or {@link ChatClientType#ANTHROPIC}.
      *
      * <p>
      * Read as a Spring condition rather than from this instance — a condition evaluates before any
@@ -50,12 +51,29 @@ public class Synapse4jProperties {
      */
     private ChatClientType chatClient = ChatClientType.COMPLETIONS;
 
+    /**
+     * Which HTTP transport the auto-configuration builds: {@link HttpClientType#RESTCLIENT} (the
+     * default) or {@link HttpClientType#APACHE}.
+     *
+     * <p>
+     * Read as a Spring condition rather than from this instance, for the same reason as
+     * {@link #chatClient} — and the binding refuses what the conditions would answer by building
+     * nothing.
+     */
+    private HttpClientType httpClient = HttpClientType.RESTCLIENT;
+
     /** OpenAI family configuration: where the API lives and how the call authenticates. */
     // The marker earns its place: without it the metadata processor stops at the field, because a
     // nested type that comes from a jar is not recursed into on its own — every synapse4j.openai.*
     // key would silently vanish from the configuration metadata.
     @NestedConfigurationProperty
     private final OpenAiConfig openai = new OpenAiConfig();
+
+    /** Anthropic family configuration: where the Messages API lives and how the call authenticates. */
+    // Same reason for the marker as on openai: without it every synapse4j.anthropic.* key would
+    // silently vanish from the configuration metadata.
+    @NestedConfigurationProperty
+    private final AnthropicConfig anthropic = new AnthropicConfig();
 
     /**
      * The transport's fallback options, for what a call does not state itself.

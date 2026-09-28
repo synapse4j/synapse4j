@@ -1,5 +1,6 @@
 package io.github.synapse4j.spring.boot;
 
+import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -8,8 +9,11 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.RestClient;
 
+import io.github.synapse4j.anthropic.AnthropicChatClient;
+import io.github.synapse4j.anthropic.AnthropicConfig;
 import io.github.synapse4j.chat.ChatClient;
 import io.github.synapse4j.http.HttpClient;
+import io.github.synapse4j.http.apache.ApacheHttpClient;
 import io.github.synapse4j.http.restclient.RestClientHttpClient;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.json.JsonCodec;
@@ -20,14 +24,15 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Wires a complete synapse4j stack into a Spring Boot application: the Jackson codec, the
- * {@code RestClient} transport, the OpenAI family config and the chat client that joins them —
- * whichever of the two OpenAI protocol clients {@code synapse4j.chat-client} names.
+ * transport and the chat client that join them — {@code synapse4j.http-client} picks between
+ * the Spring and Apache transports, {@code synapse4j.chat-client} between the two OpenAI
+ * protocols and Anthropic's — with each family's config bound from its own properties.
  *
  * <p>
  * Every bean here backs off the moment the application declares one of the same type — this
  * configuration is the default answer, never the only one, which is the library's own rule about
- * replaceable implementations expressed the way Spring says it. The transport is built on the
- * auto-configured {@link RestClient.Builder} when Boot publishes one, so interceptors,
+ * replaceable implementations expressed the way Spring says it. The default transport is built on
+ * the auto-configured {@link RestClient.Builder} when Boot publishes one, so interceptors,
  * observations, SSL bundles and {@code spring.http.client.*} settings configured for the rest of
  * the application apply to LLM calls too; with no such bean a plain builder is used instead, so
  * excluding Boot's restclient support degrades the wiring rather than failing it. The codec takes
@@ -36,10 +41,10 @@ import tools.jackson.databind.json.JsonMapper;
  * schemas sent to the model describe and what tool arguments are bound with.
  *
  * <p>
- * Nothing here reaches for a secret or invents a default the library would not make itself: the
- * API key is whatever {@code synapse4j.openai.api-key} says (typically a placeholder for an
- * environment variable), and a call made without one fails exactly as it fails without Spring —
- * when it is made, with the library's own message.
+ * Nothing here reaches for a secret or invents a default the library would not make itself: an
+ * API key is whatever {@code synapse4j.openai.api-key} or {@code synapse4j.anthropic.api-key}
+ * says (typically a placeholder for an environment variable), and a call made without one fails
+ * exactly as it fails without Spring — when it is made, with the library's own message.
  */
 @AutoConfiguration
 @ConditionalOnProperty(prefix = "synapse4j", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -69,15 +74,37 @@ public class Synapse4jAutoConfiguration {
     }
 
     /**
-     * The transport, on Boot's auto-configured {@code RestClient.Builder} when one is published
-     * and a plain one otherwise. The bound {@code synapse4j.http.*} options become the fallback
-     * every call inherits from when it states nothing itself.
+     * The Spring transport — the default, taken when {@code synapse4j.http-client} names no value
+     * or names this one — on Boot's auto-configured {@code RestClient.Builder} when one is
+     * published and a plain one otherwise. The bound {@code synapse4j.http.*} options become the
+     * fallback every call inherits from when it states nothing itself.
      */
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "synapse4j", name = "http-client", havingValue = "restclient", matchIfMissing = true)
     public HttpClient httpClient(ObjectProvider<RestClient.Builder> builders, Synapse4jProperties properties) {
         RestClient.Builder builder = builders.getIfAvailable(RestClient::builder);
         return new RestClientHttpClient(builder.build(), properties.getHttp());
+    }
+
+    /**
+     * The Apache transport, the other half of {@code synapse4j.http-client}: the property names
+     * one of the two and exactly one of them exists, both backing off before a transport the
+     * application declares itself. The stock Apache client stands in as the delegate — its
+     * execution chain, pool and all, is HttpClient 5's own — while the bound
+     * {@code synapse4j.http.*} options reach it exactly as they reach the Spring transport.
+     *
+     * <p>
+     * The starter keeps Apache HttpClient 5 itself off the application's classpath (the module is
+     * a dependency; the library is not — another HTTP stack is the application's choice to make).
+     * An application that selects this transport declares httpclient5 itself; without it, only
+     * this bean fails, at startup, naming the missing class — the default wiring never loads it.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "synapse4j", name = "http-client", havingValue = "apache")
+    public HttpClient apacheHttpClient(Synapse4jProperties properties) {
+        return new ApacheHttpClient(HttpClients.createDefault(), properties.getHttp());
     }
 
     /**
@@ -91,6 +118,18 @@ public class Synapse4jAutoConfiguration {
     @ConditionalOnMissingBean
     public OpenAiConfig openAiConfig(Synapse4jProperties properties) {
         return properties.getOpenai();
+    }
+
+    /**
+     * The Anthropic family configuration, bound from {@code synapse4j.anthropic.*} — the same
+     * arrangement as {@link #openAiConfig}: the properties object and this bean are the same
+     * instance, and an application sourcing it elsewhere declares an {@link AnthropicConfig} bean
+     * and wins.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public AnthropicConfig anthropicConfig(Synapse4jProperties properties) {
+        return properties.getAnthropic();
     }
 
     /**
@@ -109,9 +148,9 @@ public class Synapse4jAutoConfiguration {
     }
 
     /**
-     * The Responses client, the other half of {@code synapse4j.chat-client}: the property names
-     * one of the two protocols and exactly one of these beans exists, both watching the interface
-     * the same way, so an application's own {@link ChatClient} wins over either.
+     * The Responses client, the other OpenAI protocol {@code synapse4j.chat-client} can name:
+     * the property names one protocol, exactly one of the three beans exists, and all watch the
+     * interface the same way, so an application's own {@link ChatClient} wins over any of them.
      */
     @Bean
     @ConditionalOnMissingBean(ChatClient.class)
@@ -119,6 +158,20 @@ public class Synapse4jAutoConfiguration {
     public OpenAiResponsesChatClient openAiResponsesChatClient(HttpClient http, JsonCodec codec,
             OpenAiConfig config) {
         return new OpenAiResponsesChatClient(http, codec, config);
+    }
+
+    /**
+     * The Anthropic Messages client, the third value {@code synapse4j.chat-client} takes — a
+     * second provider over the same {@link ChatClient} interface, under its own config bound from
+     * {@code synapse4j.anthropic.*}. The same missing-bean condition as the OpenAI pair: an
+     * application's own client is the whole answer and this one never comes into being.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ChatClient.class)
+    @ConditionalOnProperty(prefix = "synapse4j", name = "chat-client", havingValue = "anthropic")
+    public AnthropicChatClient anthropicChatClient(HttpClient http, JsonCodec codec,
+            AnthropicConfig config) {
+        return new AnthropicChatClient(http, codec, config);
     }
 
 }

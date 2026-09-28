@@ -12,10 +12,12 @@
 
   <artifactId>synapse4j-spring-boot-starter</artifactId>
 
-  <!-- The Spring Boot integration: it wires the Jackson codec, the RestClient transport and the
-       OpenAI chat client into the context, bound to synapse4j.* properties, and every bean backs
-       off as soon as the application declares one of its own. Versions of all Spring dependencies
-       come from the Boot BOM the parent imports — none are pinned here. -->
+  <!-- The Spring Boot integration: it wires the Jackson codec, a transport and a chat client into
+       the context, bound to synapse4j.* properties — synapse4j.http-client picks between the
+       Spring and Apache transports, synapse4j.chat-client between the OpenAI protocols and
+       Anthropic's — and every bean backs off as soon as the application declares one of its own.
+       Versions of all Spring dependencies come from the Boot BOM the parent imports — none are
+       pinned here. -->
   <dependencies>
     <dependency>
       <groupId>io.github.synapse4j</groupId>
@@ -27,9 +29,37 @@
       <artifactId>synapse4j-http-restclient</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- The transport module only: Apache HttpClient 5 is excluded here and re-declared optional
+         below, so this starter never carries the Apache library into an application. The Spring
+         transport is the default, and putting another HTTP stack on the application's classpath
+         behind its back is the application's decision to make, not ours. -->
+    <dependency>
+      <groupId>io.github.synapse4j</groupId>
+      <artifactId>synapse4j-http-apache</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.httpcomponents.client5</groupId>
+          <artifactId>httpclient5</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- Compile and test only — optional is what keeps it off the application's classpath. An
+         application that selects synapse4j.http-client=apache declares httpclient5 itself, and
+         without it that selection fails at startup with the missing class named. -->
+    <dependency>
+      <groupId>org.apache.httpcomponents.client5</groupId>
+      <artifactId>httpclient5</artifactId>
+      <optional>true</optional>
+    </dependency>
     <dependency>
       <groupId>io.github.synapse4j</groupId>
       <artifactId>synapse4j-openai</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.synapse4j</groupId>
+      <artifactId>synapse4j-anthropic</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

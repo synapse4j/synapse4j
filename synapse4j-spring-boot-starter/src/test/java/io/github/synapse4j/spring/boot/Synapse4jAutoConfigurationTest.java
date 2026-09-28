@@ -14,9 +14,12 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import io.github.synapse4j.anthropic.AnthropicChatClient;
+import io.github.synapse4j.anthropic.AnthropicConfig;
 import io.github.synapse4j.chat.ChatClient;
 import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpOptions;
+import io.github.synapse4j.http.apache.ApacheHttpClient;
 import io.github.synapse4j.http.restclient.RestClientHttpClient;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.json.JsonCodec;
@@ -70,6 +73,27 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
+    void selectsTheAnthropicClientFromItsProperty() {
+        // The value is part of the same contract as the key: a rename silently falls every
+        // application that asked for Anthropic back to the default client.
+        runner.withPropertyValues("synapse4j.chat-client=anthropic").run(context -> {
+            assertThat(context).hasSingleBean(ChatClient.class);
+            assertThat(context.getBean(ChatClient.class)).isInstanceOf(AnthropicChatClient.class);
+        });
+    }
+
+    @Test
+    void selectsTheApacheTransportFromItsProperty() {
+        // The transport key and its values are the starter's public contract for the same
+        // reason the chat-client ones are: a rename reverts every application to the Spring
+        // transport without a word.
+        runner.withPropertyValues("synapse4j.http-client=apache").run(context -> {
+            assertThat(context).hasSingleBean(HttpClient.class);
+            assertThat(context.getBean(HttpClient.class)).isInstanceOf(ApacheHttpClient.class);
+        });
+    }
+
+    @Test
     void bindsOpenAiPropertiesOntoTheConfig() {
         runner.withPropertyValues(
                 "synapse4j.openai.api-key=sk-test",
@@ -85,6 +109,22 @@ class Synapse4jAutoConfigurationTest {
                     assertThat(config.getBaseUrl()).isEqualTo("https://example.test/v1");
                     assertThat(config.getOrganization()).isEqualTo("org-1");
                     assertThat(config.getProject()).isEqualTo("proj-1");
+                });
+    }
+
+    @Test
+    void bindsAnthropicPropertiesOntoTheConfig() {
+        runner.withPropertyValues(
+                "synapse4j.anthropic.api-key=sk-ant-test",
+                "synapse4j.anthropic.base-url=https://example.test/v1",
+                "synapse4j.anthropic.anthropic-version=2023-06-01-custom")
+                .run(context -> {
+                    // Same contract as the OpenAI binding test above: the property names are
+                    // what applications configure against.
+                    AnthropicConfig config = context.getBean(AnthropicConfig.class);
+                    assertThat(config.getApiKey()).isEqualTo("sk-ant-test");
+                    assertThat(config.getBaseUrl()).isEqualTo("https://example.test/v1");
+                    assertThat(config.getAnthropicVersion()).isEqualTo("2023-06-01-custom");
                 });
     }
 
