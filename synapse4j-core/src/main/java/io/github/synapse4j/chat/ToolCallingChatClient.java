@@ -38,11 +38,16 @@ import lombok.NonNull;
  * its batch there and opens the next round before the next event arrives.
  *
  * <p>
- * The request grows in place: each turn appends the assistant's answer — the tool calls
- * included — and one message carrying the results, so the caller holds the whole transcript
- * on the request it passed in. The context rides along on the request, attached when this
- * decorator had to create one, and carries the turn: 1 when the round starts, one up per trip
- * around — which is what an executor's turn cap reads.
+ * The request fills in place, across its two lists: the inner client archives what each round
+ * sends, so the rounds already out join {@code historyMessages}; the loop folds each answer it
+ * consumes into that history through {@link ChatClient#continueWith} and puts the batch's results
+ * into {@code pendingMessages}, where the next round picks them up. After the round the request
+ * carries the transcript split across the two lists: the sent rounds and the answers the loop
+ * consumed are in the history, and the last answer is not — folding that one in is the caller's
+ * {@link ChatClient#continueWith} call, the same obligation it had before this method existed.
+ * The context rides along on the request, attached when this decorator had to create one, and
+ * carries the turn: 1 when the round starts, one up per trip around — which is what an executor's
+ * turn cap reads.
  *
  * <p>
  * One consequence of that growth is worth stating: same-named tools settle the same way
@@ -111,6 +116,19 @@ public class ToolCallingChatClient extends AbstractChatClient {
      * {@inheritDoc}
      *
      * <p>
+     * Handed straight to the inner client: what an answer means for the conversation next is the
+     * protocol's business, and every round of the loop went there too, so answering here would
+     * leave the decorator's own continuation a step behind the rounds'.
+     */
+    @Override
+    public void continueWith(ChatRequest request, ChatResponse answer) {
+        inner.continueWith(request, answer);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>
      * This is the loop itself: the first trip out, then — while the answer carries tool calls
      * — execute, append, count the turn up, and go again. An executor answering {@code null}
      * ends the round where it stands.
@@ -126,8 +144,8 @@ public class ToolCallingChatClient extends AbstractChatClient {
             if (results == null) {
                 return response;
             }
-            request.getMessages().add(response.getMessage());
-            request.getMessages().add(toolResults(results));
+            inner.continueWith(request, response);
+            request.getPendingMessages().add(toolResults(results));
             context.setTurn(context.getTurn() + 1);
             response = inner.chat(request);
             calls = toolCalls(response);
@@ -319,8 +337,8 @@ public class ToolCallingChatClient extends AbstractChatClient {
                         // no further round starts.
                         throw new IllegalStateException("this stream is closed");
                     }
-                    request.getMessages().add(round.getMessage());
-                    request.getMessages().add(toolResults(results));
+                    inner.continueWith(request, round);
+                    request.getPendingMessages().add(toolResults(results));
                     ChatContext context = contextOf(request);
                     context.setTurn(context.getTurn() + 1);
                     ChatStream next = inner.stream(request);

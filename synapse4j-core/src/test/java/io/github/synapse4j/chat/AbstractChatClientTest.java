@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.data.ChatContext;
+import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
@@ -157,6 +158,60 @@ class AbstractChatClientTest {
         ChatResponse response = client.chat(request);
 
         assertSame(context, response.getContext());
+    }
+
+    @Test
+    void continuingFoldsTheAnswerIntoTheHistoryAndTakesTheContextItCameBackOn() {
+        ChatContext context = new ChatContext();
+        context.setSessionId("session-1");
+        ChatResponse answer = new ChatResponse();
+        answer.setMessage(ChatMessage.assistant("hello"));
+        answer.setContext(context);
+        StubChatClient client = new StubChatClient();
+        ChatRequest request = new ChatRequest();
+        request.addPendingMessage(ChatMessage.user("hi"));
+
+        client.continueWith(request, answer);
+
+        // The answer's turn joins the history; what was sent stays pending until the exchange
+        // that carried it succeeds and the client archives it.
+        assertEquals(1, request.getHistoryMessages().size());
+        assertSame(answer.getMessage(), request.getHistoryMessages().get(0));
+        assertEquals(1, request.getPendingMessages().size());
+        // The exchange's own context is the one the conversation goes on with, since that is where
+        // an adopted session id and the turn live.
+        assertSame(context, request.getContext());
+    }
+
+    @Test
+    void whatTheCallSentJoinsTheHistoryWhenTheExchangeSucceeds() {
+        StubChatClient client = new StubChatClient();
+        ChatRequest request = new ChatRequest();
+        ChatMessage sent = ChatMessage.user("hi");
+        request.addPendingMessage(sent);
+
+        client.chat(request);
+
+        assertTrue(request.getPendingMessages().isEmpty());
+        assertEquals(1, request.getHistoryMessages().size());
+        assertSame(sent, request.getHistoryMessages().get(0));
+    }
+
+    @Test
+    void aFailedSendLeavesThePendingMessagesWhereARetryCanSendThem() {
+        StubChatClient client = new StubChatClient() {
+            @Override
+            protected ChatResponse doChat(ChatRequest request) {
+                throw new IllegalStateException("send failed");
+            }
+        };
+        ChatRequest request = new ChatRequest();
+        request.addPendingMessage(ChatMessage.user("hi"));
+
+        assertThrows(IllegalStateException.class, () -> client.chat(request));
+
+        assertEquals(1, request.getPendingMessages().size());
+        assertTrue(request.getHistoryMessages().isEmpty());
     }
 
     @Test
@@ -754,10 +809,10 @@ class AbstractChatClientTest {
         int defaultsApplied;
 
         @Override
-        protected ChatRequest applyDefaults(ChatRequest request) {
+        protected void applyDefaults(ChatRequest request) {
             defaultsApplied++;
             request.getOptions().setModel("inherited");
-            return super.applyDefaults(request);
+            super.applyDefaults(request);
         }
     }
 

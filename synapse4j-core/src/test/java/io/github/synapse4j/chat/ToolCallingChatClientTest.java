@@ -56,8 +56,8 @@ class ToolCallingChatClientTest {
         assertEquals("done", text(response));
         assertTrue(ran.get());
         assertEquals(2, inner.trips.get());
-        assertEquals(3, request.getMessages().size());
-        ChatMessage results = request.getMessages().get(2);
+        assertEquals(3, request.getHistoryMessages().size());
+        ChatMessage results = request.getHistoryMessages().get(2);
         assertEquals(ChatRole.TOOL, results.getRole());
         ToolResultPart result = (ToolResultPart) results.getParts().get(0);
         assertEquals("c1", result.getCallId());
@@ -120,7 +120,7 @@ class ToolCallingChatClientTest {
         ChatResponse response = client.chat(request);
 
         assertEquals(1, inner.trips.get());
-        assertEquals(1, request.getMessages().size());
+        assertEquals(1, request.getHistoryMessages().size());
         assertTrue(toolCalls(response) == 1);
     }
 
@@ -237,8 +237,8 @@ class ToolCallingChatClientTest {
         assertEquals(List.of(1, 2), inner.streamTurns);
         assertTrue(ran.get());
         assertEquals("done", text(stream.aggregatedResponse()));
-        assertEquals(3, request.getMessages().size());
-        ChatMessage results = request.getMessages().get(2);
+        assertEquals(3, request.getHistoryMessages().size());
+        ChatMessage results = request.getHistoryMessages().get(2);
         assertEquals(ChatRole.TOOL, results.getRole());
         assertEquals("A", text((ToolResultPart) results.getParts().get(0)));
     }
@@ -286,7 +286,7 @@ class ToolCallingChatClientTest {
         }
 
         assertEquals(1, inner.streamTrips.get());
-        assertEquals(1, request.getMessages().size());
+        assertEquals(1, request.getHistoryMessages().size());
         assertEquals(1, toolCalls(stream.aggregatedResponse()));
     }
 
@@ -308,8 +308,10 @@ class ToolCallingChatClientTest {
         assertThrows(IllegalStateException.class, events::hasNext);
 
         assertEquals(1, inner.streamTrips.get());
-        // Aborted before the append: the request carries only what it went out with.
-        assertEquals(0, request.getMessages().size());
+        // Aborted before the append: neither list gained anything — the request carries only
+        // what it went out with, which is nothing.
+        assertEquals(0, request.getHistoryMessages().size());
+        assertEquals(0, request.getPendingMessages().size());
     }
 
     @Test

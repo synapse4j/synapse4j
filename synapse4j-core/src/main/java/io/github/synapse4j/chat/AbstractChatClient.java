@@ -23,6 +23,10 @@ import lombok.NonNull;
  * A {@link ChatClient} that runs its customizers around the exchange: a request customizer before
  * the subclass sees the request, a response customizer before the caller sees the answer, and —
  * inside the streams it builds — the event customizers between their source and their folding.
+ * An exchange that runs to its successful end also records itself on the request: what the call
+ * sent moves from the pending messages into the history, so the request carries the conversation
+ * as it now stands. A failed exchange records nothing — a retry still has the pending messages to
+ * send.
  *
  * <p>
  * A subclass implements {@link #doChat(ChatRequest)} and {@link #doStream(ChatRequest)} with the
@@ -118,10 +122,6 @@ public abstract class AbstractChatClient implements ChatClient {
      */
     protected Consumer<ChatStreamEvent> eventPipeline() {
         List<ChatStreamEventCustomizer> snapshot = List.copyOf(eventCustomizers);
-        if (snapshot.isEmpty()) {
-            return event -> {
-            };
-        }
         return event -> runCustomizers(snapshot, event);
     }
 
@@ -205,19 +205,24 @@ public abstract class AbstractChatClient implements ChatClient {
      * {@inheritDoc}
      *
      * <p>
-     * The request goes through {@link #prepare(ChatRequest)} first; the subclass sees the result in
-     * {@link #doChat(ChatRequest)}. A context is resolved for the exchange — the prepared request's
-     * own when it carries one, a fresh call-scoped one otherwise, never attached back to the
-     * request — and it records the request as sent and the response as received before the answer
-     * is handed back on it. The response customizers run last, on the exchange's own answer, and it
-     * is that instance the caller receives.
+     * The request goes through {@link #prepare(ChatRequest)} first — in place, on the very
+     * instance the caller passed, so there is no second request to keep track of — and the
+     * subclass then sees it in {@link #doChat(ChatRequest)}. A context is resolved for the
+     * exchange — the request's own when it carries one, a fresh call-scoped one otherwise, never
+     * attached back to the request — and it records the request as sent and the response as
+     * received before the answer is handed back on it. Only once {@link #doChat(ChatRequest)}
+     * returns does the call archive what it sent: the pending messages move into the history, so
+     * an exchange that failed leaves them pending and a retry sends them again. The response
+     * customizers run last, on the exchange's own answer, and it is that instance the caller
+     * receives.
      */
     @Override
     public ChatResponse chat(ChatRequest request) {
-        ChatRequest prepared = prepare(request);
-        ChatContext context = resolveContext(prepared);
-        ChatResponse response = doChat(prepared);
+        prepare(request);
+        ChatContext context = resolveContext(request);
+        ChatResponse response = doChat(request);
         carryContext(context, response);
+        archiveSent(request);
         runCustomizers(responseCustomizers, response);
         return response;
     }
@@ -226,27 +231,45 @@ public abstract class AbstractChatClient implements ChatClient {
      * {@inheritDoc}
      *
      * <p>
-     * The request goes through {@link #prepare(ChatRequest)} first; the subclass sees the result in
-     * {@link #doStream(ChatRequest)}. The context is resolved, the request recorded, and the
-     * answer handed back the same way a blocking call does; the response customizers run once,
-     * when the stream runs to its end, on a list snapshotted when the stream opens — one
-     * registered mid-flight joins neither this stream nor its pass.
+     * The request goes through {@link #prepare(ChatRequest)} first — in place, as for
+     * {@link #chat(ChatRequest)} — and the subclass then sees it in {@link #doStream(ChatRequest)}.
+     * The context is resolved, the request recorded, and the answer handed back the same way a
+     * blocking call does. What the exchange sent and the response customizers' pass both wait for
+     * the stream to run to its end, on the wrapper every stream is handed back in — the customizer
+     * list is snapshotted when the stream opens, so one registered mid-flight joins neither this
+     * stream nor its pass. A stream closed before its last event runs neither: a partial exchange
+     * archives nothing, and what it sent stays pending.
      */
     @Override
     public ChatStream stream(ChatRequest request) {
-        ChatRequest prepared = prepare(request);
-        ChatContext context = resolveContext(prepared);
-        ChatStream stream = doStream(prepared);
+        prepare(request);
+        ChatContext context = resolveContext(request);
+        ChatStream stream = doStream(request);
         carryContext(context, stream.aggregatedResponse());
-        if (responseCustomizers.isEmpty()) {
-            return stream;
-        }
         // The list is already in execution order; the copy is the snapshot across the stream's life.
-        return new CustomizedStream(stream, List.copyOf(responseCustomizers), context);
+        return new RecordingStream(stream, request, List.copyOf(responseCustomizers), context);
     }
 
     /**
-     * The context this exchange runs on: the prepared request's own when it carries one — the
+     * Moves what the exchange sent — the pending messages, all of them written to the wire — into
+     * the conversation as it stands, so the request carries what happened and the next call sends
+     * only what is new.
+     *
+     * <p>
+     * It runs only once the exchange succeeded. A call that failed sent nothing worth keeping, and
+     * a retry has to send the pending messages again: archiving them on the way out of a failure
+     * would move them into the history of an exchange that never happened, and the retry would send
+     * an empty call.
+     *
+     * @param request the request the exchange ran on; never {@code null}
+     */
+    private static void archiveSent(ChatRequest request) {
+        request.getHistoryMessages().addAll(request.getPendingMessages());
+        request.getPendingMessages().clear();
+    }
+
+    /**
+     * The context this exchange runs on: the request's own when it carries one — the
      * application's, carrying its attributes — and otherwise a fresh call-scoped one. Either
      * way the request is recorded on it as it went out.
      *
@@ -295,20 +318,18 @@ public abstract class AbstractChatClient implements ChatClient {
      * {@link ToolProvider} answers for this call, and the request's own tools — a later source
      * wins by name at the slot the name first took, a new name appends. A subclass with defaults
      * of its own overrides this and must call {@code super.applyDefaults(request)} to keep that
-     * merge.
+     * merge. The request is changed where it stands: there is no other instance to change.
      *
      * @param request the request as the caller built it
-     * @return the request to continue with, which may be the one that was given; never
-     *         {@code null}
      */
-    protected ChatRequest applyDefaults(ChatRequest request) {
+    protected void applyDefaults(ChatRequest request) {
         // One get each, held in a local: a second read could land after a registration and
         // straddle two versions — each container is whole on its own, but this call should
         // see one of each.
         LinkedHashMap<String, Tool> defaults = defaultTools.get();
         LinkedHashSet<ToolProvider> providers = toolProviders.get();
         if (defaults.isEmpty() && providers.isEmpty()) {
-            return request;
+            return;
         }
         // A map keyed by name is the merge rule: a put answers the slot a name first took
         // with the later source, and a new name lands at the end.
@@ -323,7 +344,7 @@ public abstract class AbstractChatClient implements ChatClient {
         }
         if (merged.isEmpty()) {
             // Nothing to lend: the request keeps exactly the tools it brought.
-            return request;
+            return;
         }
         List<Tool> tools = request.getTools();
         for (Tool tool : tools) {
@@ -331,27 +352,24 @@ public abstract class AbstractChatClient implements ChatClient {
         }
         tools.clear();
         tools.addAll(merged.values());
-        return request;
     }
 
     /**
      * Applies this client's own defaults, then walks every request customizer in the order it was
-     * registered.
+     * registered. The request goes out as the instance the caller passed: both steps change it in
+     * place rather than answer a replacement, so there is no result to hand back.
      *
      * @param request the request as the caller built it
-     * @return the request to send; never {@code null}
-     * @throws NullPointerException {@link #applyDefaults} answered {@code null}
      */
-    protected ChatRequest prepare(ChatRequest request) {
-        request = Objects.requireNonNull(applyDefaults(request), "applyDefaults answered null");
+    protected void prepare(ChatRequest request) {
+        applyDefaults(request);
         runCustomizers(requestCustomizers, request);
-        return request;
     }
 
     /**
      * Sends one chat request that has already been through {@link #prepare(ChatRequest)}.
      *
-     * @param request the prepared request; never {@code null}
+     * @param request the request to send, prepared in place; never {@code null}
      * @return the provider's complete answer
      */
     protected abstract ChatResponse doChat(ChatRequest request);
@@ -359,19 +377,26 @@ public abstract class AbstractChatClient implements ChatClient {
     /**
      * Answers one chat request that has already been through {@link #prepare(ChatRequest)}.
      *
-     * @param request the prepared request; never {@code null}
+     * @param request the request to answer, prepared in place; never {@code null}
      * @return the streaming answer; never {@code null}
      */
     protected abstract ChatStream doStream(ChatRequest request);
 
     /**
-     * A stream that hands the aggregated answer to the response customizers once it runs to its
-     * end. A loop that breaks out early leaves them unrun: what it holds is a partial answer, and
-     * so is a stream that fails or is closed before its last event.
+     * A stream that records the exchange once it runs to its end: what the call sent joins the
+     * conversation's history, the aggregated answer is stamped with the exchange's context, and
+     * the response customizers take their pass over it — in that order, exactly once. The pass
+     * runs even with no customizer registered, because the recording is this wrapper's own job
+     * now. A loop that breaks out early leaves it unrun: what it holds is a partial answer, and
+     * so is a stream that fails or is closed before its last event — an exchange that never
+     * completed sent nothing to record.
      */
-    private final class CustomizedStream implements ChatStream {
+    private final class RecordingStream implements ChatStream {
 
         private final ChatStream delegate;
+
+        /** The request the exchange ran on; its messages are what the drain archives. */
+        private final ChatRequest request;
 
         private final List<ChatResponseCustomizer> customizers;
 
@@ -380,9 +405,10 @@ public abstract class AbstractChatClient implements ChatClient {
 
         private boolean applied;
 
-        private CustomizedStream(ChatStream delegate, List<ChatResponseCustomizer> customizers,
-                ChatContext context) {
+        private RecordingStream(ChatStream delegate, ChatRequest request,
+                List<ChatResponseCustomizer> customizers, ChatContext context) {
             this.delegate = delegate;
+            this.request = request;
             this.customizers = customizers;
             this.context = context;
         }
@@ -405,7 +431,7 @@ public abstract class AbstractChatClient implements ChatClient {
                     try {
                         return events.next();
                     } catch (NoSuchElementException drained) {
-                        // Drained by pulling past the end: the customizers still owe their pass.
+                        // Drained by pulling past the end: the recording still owes its pass.
                         apply();
                         throw drained;
                     }
@@ -428,9 +454,9 @@ public abstract class AbstractChatClient implements ChatClient {
                 return;
             }
             applied = true;
+            archiveSent(request);
             ChatResponse aggregated = delegate.aggregatedResponse();
-            aggregated.setContext(context);
-            context.setResponse(aggregated);
+            carryContext(context, aggregated);
             runCustomizers(customizers, aggregated);
         }
 

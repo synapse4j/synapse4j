@@ -11,11 +11,19 @@ import lombok.NonNull;
 import lombok.Setter;
 
 /**
- * One call: the conversation so far, what the model may call, the shape the answer should take, and
- * how to run it.
+ * One call: the conversation this call carries, what the model may call, the shape the answer
+ * should take, and how to run it.
  *
  * <p>
- * The collections start empty, the configured members are never null, and the context is absent
+ * The conversation is carried in two lists plus one slot. {@code historyMessages} is the
+ * conversation as it stands — everything an exchange has already covered; {@code pendingMessages}
+ * is what this call will send and has not sent yet. Together they are the whole conversation:
+ * neither list is ever trimmed here, so trimming is the application's deliberate act. The system
+ * message sits outside the turn sequence as the framing the model answers under — one slot that
+ * replaces rather than accumulates, and may hold none.
+ *
+ * <p>
+ * The lists start empty, the configured members are never null, and the context is absent
  * until one is attached, so a caller fills in what it needs. An empty list means "none of these"; a
  * {@link ChatOptions} with nothing set means "no opinion", and the defaults the client was built
  * with stand.
@@ -29,8 +37,17 @@ import lombok.Setter;
 @Setter
 public class ChatRequest {
 
-    /** The conversation so far, oldest first. Never {@code null}; empty means no messages yet. */
-    private final List<ChatMessage> messages = new ArrayList<>();
+    /**
+     * The instructions the model answers under, or {@code null} when this call carries none. Set, never accumulated:
+     * the same slot is overwritten, so changing it changes the next call.
+     */
+    private @Nullable ChatMessage systemMessage;
+
+    /** The conversation as it stands — everything an exchange has already covered, oldest first. Never {@code null}. */
+    private final List<ChatMessage> historyMessages = new ArrayList<>();
+
+    /** What this call will send and has not sent yet, oldest first. Never {@code null}. */
+    private final List<ChatMessage> pendingMessages = new ArrayList<>();
 
     /**
      * Tools the model may call. Never {@code null}; empty means none. Carries the whole
@@ -53,13 +70,25 @@ public class ChatRequest {
     private @Nullable ChatContext context;
 
     /**
-     * Adds a message to the conversation.
+     * Adds a message to what this call will send.
      *
      * @param message the message to add, oldest first
      * @return this call
      */
-    public ChatRequest addMessage(@NonNull ChatMessage message) {
-        messages.add(message);
+    public ChatRequest addPendingMessage(@NonNull ChatMessage message) {
+        pendingMessages.add(message);
+        return this;
+    }
+
+    /**
+     * Adds a message to the conversation as it stands — something an earlier exchange already
+     * covered.
+     *
+     * @param message the message to add, oldest first
+     * @return this call
+     */
+    public ChatRequest addHistoryMessage(@NonNull ChatMessage message) {
+        historyMessages.add(message);
         return this;
     }
 
@@ -75,59 +104,41 @@ public class ChatRequest {
     }
 
     /**
-     * Adds a message from the system saying the given text — the instructions a conversation usually
-     * opens with.
+     * Sets the instructions the model answers under, as a system message saying the given text —
+     * the framing a conversation usually opens with. The same slot is overwritten: a second call
+     * replaces the framing rather than adding to it.
      *
      * @param text what the message says
      * @return this call
      */
-    public ChatRequest addSystemMessage(@NonNull String text) {
-        return addMessage(ChatMessage.system(text));
+    public ChatRequest systemMessage(@NonNull String text) {
+        this.systemMessage = ChatMessage.system(text);
+        return this;
     }
 
     /**
-     * Adds a message from the user saying the given text — the shape most of a conversation is built
-     * from.
+     * Adds a message from the user saying the given text to what this call will send — the shape
+     * most of a conversation is built from.
      *
      * @param text what the message says
      * @return this call
      */
     public ChatRequest addUserMessage(@NonNull String text) {
-        return addMessage(ChatMessage.user(text));
+        return addPendingMessage(ChatMessage.user(text));
     }
 
     /**
-     * Continues this call from an answer: the answer's turn joins the conversation, and the context
-     * the answer rode back on becomes this call's.
-     *
-     * <p>
-     * The context is the one the exchange ran on — it holds the request as it went out, the answer,
-     * the turn, and whatever session id was adopted — so taking it is what keeps the next call part
-     * of the same conversation when the caller builds a fresh request rather than growing this one.
-     * An answer carrying no context leaves whatever this call already has; in the ordinary case the
-     * two are the same instance and there is nothing to take.
-     *
-     * @param answer the answer whose turn continues the conversation
-     * @return this call
-     */
-    public ChatRequest continueWith(@NonNull ChatResponse answer) {
-        messages.add(answer.getMessage());
-        if (answer.getContext() != null) {
-            context = answer.getContext();
-        }
-        return this;
-    }
-
-    /**
-     * The messages and tools are counted rather than printed: they grow with the conversation, and a
-     * printout that carried them would grow just as long.
+     * The messages are counted rather than printed: they grow with the conversation, and a
+     * printout that carried them would grow just as long. The system message is reported by
+     * presence alone, for the same reason.
      *
      * @return this call, in brief
      */
     @Override
     public String toString() {
-        return "ChatRequest(messages=" + messages.size() + ", tools=" + tools.size() + ", responseFormat="
-                + responseFormat + ", options=" + options + ')';
+        return "ChatRequest(systemMessage=" + (systemMessage != null) + ", historyMessages="
+                + historyMessages.size() + ", pendingMessages=" + pendingMessages.size() + ", tools="
+                + tools.size() + ", responseFormat=" + responseFormat + ", options=" + options + ')';
     }
 
 }

@@ -95,7 +95,7 @@ class ChatCompletionsWriter {
     private Map<String, Object> document(ChatRequest request, boolean stream) {
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("model", request.getOptions().getModel());
-        document.put("messages", messages(request.getMessages()));
+        document.put("messages", messages(request));
         if (!request.getTools().isEmpty()) {
             document.put("tools", tools(request.getTools()));
         }
@@ -123,6 +123,23 @@ class ChatCompletionsWriter {
         // sides is the caller's value that goes out.
         request.getOptions().getExtras().mergeInto(document);
         return document;
+    }
+
+    /**
+     * The whole conversation as the array of messages: the system message that frames it first —
+     * only when this call carries one — then the history as it stands, then what this call is
+     * about to send. In that order a system message keeps the place it had when the conversation
+     * was a single list.
+     */
+    private List<Map<String, Object>> messages(ChatRequest request) {
+        List<Map<String, Object>> written = new ArrayList<>();
+        ChatMessage system = request.getSystemMessage();
+        if (system != null) {
+            written.addAll(entries(system));
+        }
+        written.addAll(messages(request.getHistoryMessages()));
+        written.addAll(messages(request.getPendingMessages()));
+        return written;
     }
 
     /**

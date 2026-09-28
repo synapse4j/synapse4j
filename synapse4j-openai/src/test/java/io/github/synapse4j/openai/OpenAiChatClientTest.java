@@ -117,7 +117,7 @@ class OpenAiChatClientTest {
                 + "\"prompt_tokens_details\":{\"cached_tokens\":3}}}").getBytes(UTF_8)));
 
         ChatRequest request = requestWithModel();
-        request.addSystemMessage("You are helpful.");
+        request.systemMessage("You are helpful.");
         request.addUserMessage("Hello");
         request.getOptions().setTemperature(0.5);
         request.getOptions().setMaxOutputTokens(64);
@@ -399,7 +399,7 @@ class OpenAiChatClientTest {
         ChatMessage replay = new ChatMessage(ChatRole.ASSISTANT);
         replay.addPart(new TextPart("Earlier text"));
         replay.addPart(new ToolCallPart("call_9", "get_weather", "{\"city\":\"Rome\"}"));
-        request.addMessage(replay);
+        request.addPendingMessage(replay);
 
         client.chat(request);
 
@@ -428,7 +428,7 @@ class OpenAiChatClientTest {
         ChatRequest request = requestWithModel();
         ChatMessage message = new ChatMessage(ChatRole.USER);
         message.addPart(new MediaPart("image/png", null, InputStreamSupplier.of(bytes), null));
-        request.addMessage(message);
+        request.addPendingMessage(message);
 
         client.chat(request);
 
@@ -454,7 +454,7 @@ class OpenAiChatClientTest {
         ChatRequest request = requestWithModel();
         ChatMessage message = new ChatMessage(ChatRole.USER);
         message.addPart(new MediaPart("image/png", "https://example.test/cat.png", null, null));
-        request.addMessage(message);
+        request.addPendingMessage(message);
 
         client.chat(request);
 
@@ -476,7 +476,7 @@ class OpenAiChatClientTest {
         ChatMessage message = new ChatMessage(ChatRole.USER);
         message.addPart(new TextPart("what is this?"));
         message.addPart(new MediaPart("image/png", null, InputStreamSupplier.of(bytes), null));
-        request.addMessage(message);
+        request.addPendingMessage(message);
 
         client.chat(request);
 
@@ -498,7 +498,7 @@ class OpenAiChatClientTest {
         ChatRequest request = requestWithModel();
         ChatMessage message = new ChatMessage(ChatRole.USER);
         message.addPart(new MediaPart("audio/wav", null, InputStreamSupplier.of(new byte[] { 1 }), null));
-        request.addMessage(message);
+        request.addPendingMessage(message);
 
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
         assertTrue(thrown.getMessage().contains("audio/wav"), thrown.getMessage());
@@ -514,7 +514,7 @@ class OpenAiChatClientTest {
         ChatRequest request = requestWithModel();
         ChatMessage message = new ChatMessage(ChatRole.USER);
         message.addPart(new MediaPart("image/png", null, null, null));
-        request.addMessage(message);
+        request.addPendingMessage(message);
 
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
         assertTrue(thrown.getMessage().contains("neither uri nor source"), thrown.getMessage());
@@ -530,7 +530,7 @@ class OpenAiChatClientTest {
         ChatRequest request = requestWithModel();
         ChatMessage message = new ChatMessage(ChatRole.USER);
         message.addPart(new MediaPart(null, null, InputStreamSupplier.of(new byte[] { 1 }), null));
-        request.addMessage(message);
+        request.addPendingMessage(message);
 
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
         assertTrue(thrown.getMessage().contains("mediaType"), thrown.getMessage());
@@ -546,7 +546,7 @@ class OpenAiChatClientTest {
         ChatRequest request = requestWithModel();
         ChatMessage result = new ChatMessage(ChatRole.TOOL);
         result.addPart(new ToolResultPart("call_9", "get_weather", false).addText("sunny"));
-        request.addMessage(result);
+        request.addPendingMessage(result);
 
         client.chat(request);
 
@@ -676,7 +676,7 @@ class OpenAiChatClientTest {
         ChatMessage user = ChatMessage.user("Hello");
         user.setExtras(new ProviderExtras().put("name", "roger"));
         user.getParts().get(0).setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
-        request.addMessage(user);
+        request.addPendingMessage(user);
 
         client.chat(request);
 
@@ -826,7 +826,7 @@ class OpenAiChatClientTest {
         ToolCallPart call = new ToolCallPart("call_1", "get_weather", "{}");
         call.setExtras(new ProviderExtras().put(List.of("function", "provider_field"), "x"));
         replay.addPart(call);
-        request.addMessage(replay);
+        request.addPendingMessage(replay);
 
         client.chat(request);
 
@@ -851,7 +851,7 @@ class OpenAiChatClientTest {
         MediaPart image = new MediaPart("image/png", "https://example.com/a.png", null, null);
         image.setExtras(new ProviderExtras().put(List.of("image_url", "detail"), "high"));
         user.addPart(image);
-        request.addMessage(user);
+        request.addPendingMessage(user);
 
         client.chat(request);
 
@@ -985,7 +985,7 @@ class OpenAiChatClientTest {
         ToolResultPart part = new ToolResultPart("call_1", "get_weather", false).addText("sunny");
         part.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
         result.addPart(part);
-        request.addMessage(result);
+        request.addPendingMessage(result);
 
         client.chat(request);
 
@@ -1008,7 +1008,7 @@ class OpenAiChatClientTest {
         results.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
         results.addPart(new ToolResultPart("call_1", "get_weather", false).addText("sunny"));
         results.addPart(new ToolResultPart("call_2", "get_time", false).addText("noon"));
-        request.addMessage(results);
+        request.addPendingMessage(results);
 
         client.chat(request);
 
@@ -1073,7 +1073,7 @@ class OpenAiChatClientTest {
         TextPart part = new TextPart("");
         part.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
         user.addPart(part);
-        request.addMessage(user);
+        request.addPendingMessage(user);
 
         client.chat(request);
 
@@ -1095,7 +1095,7 @@ class OpenAiChatClientTest {
         TextPart text = new TextPart("sunny");
         text.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
         result.addPart(new ToolResultPart("call_1", "get_weather", false).addPart(text));
-        request.addMessage(result);
+        request.addPendingMessage(result);
 
         // The tool message's content is a plain string, so a part carrying extras would have them
         // dropped on the way out without a word.
@@ -1108,7 +1108,7 @@ class OpenAiChatClientTest {
         ChatRequest request = requestWithModel();
         ChatMessage message = new ChatMessage(ChatRole.USER);
         message.addPart(new UnmodelledPart());
-        request.addMessage(message);
+        request.addPendingMessage(message);
 
         assertThrows(SynapseException.class, () -> client.chat(request));
     }
@@ -1184,7 +1184,7 @@ class OpenAiChatClientTest {
         reasoning.setText("weighing it up");
         assistant.addPart(reasoning);
         assistant.addPart(new TextPart("42"));
-        request.addMessage(assistant);
+        request.addPendingMessage(assistant);
 
         // The default name, which is the one the providers that require their reasoning back use.
         stubCompletion();
@@ -1378,7 +1378,7 @@ class OpenAiChatClientTest {
         ToolCallPart call = new ToolCallPart("call_1", "get_weather", "{\"city\":\"Paris\"}");
         call.getOrCreateExtras().put("index", 0);
         assistant.addPart(call);
-        request.addMessage(assistant);
+        request.addPendingMessage(assistant);
 
         client.chat(request);
 

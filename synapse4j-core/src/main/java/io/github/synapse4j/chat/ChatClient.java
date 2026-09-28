@@ -42,8 +42,8 @@ public interface ChatClient {
     /**
      * Sends one chat request and blocks until the complete response arrives.
      *
-     * @param request the whole call: messages so far, tools, the shape the answer should take, and
-     *                    how to run it; never {@code null}
+     * @param request the whole call: the conversation this call carries, tools, the shape the
+     *                    answer should take, and how to run it; never {@code null}
      * @return the provider's complete answer
      * @throws SynapseException the call failed — the request was
      *                              refused, or no answer could be obtained
@@ -64,6 +64,32 @@ public interface ChatClient {
      * @throws SynapseException the request was refused before the stream could open
      */
     ChatStream stream(ChatRequest request);
+
+    /**
+     * Folds one answer into the request, called exactly once per answer received: the caller owes
+     * one call per answer — the tool-calling loop calls it for the answers it consumes, the caller
+     * for the last one.
+     *
+     * <p>
+     * This is not the bookkeeping that moves what was sent into the history — that is
+     * {@link #chat(ChatRequest)}'s, and it runs when the exchange succeeds. What this method
+     * records is the answer's own turn.
+     *
+     * <p>
+     * The default folds the answer's turn into the request's history and adopts the answer's
+     * context onto a request that carries none of its own, so a request rebuilt from storage —
+     * with a conversation but no context — picks up the session id the answer rode back on. A
+     * protocol client overrides this to also record what its own continuation needs.
+     *
+     * @param request the request the conversation goes on with; never {@code null}
+     * @param answer  the answer whose turn joins the conversation; never {@code null}
+     */
+    default void continueWith(ChatRequest request, ChatResponse answer) {
+        if (request.getContext() == null && answer.getContext() != null) {
+            request.setContext(answer.getContext());
+        }
+        request.addHistoryMessage(answer.getMessage());
+    }
 
     /**
      * Adds a customizer that prepares every request before this client validates and sends it.
