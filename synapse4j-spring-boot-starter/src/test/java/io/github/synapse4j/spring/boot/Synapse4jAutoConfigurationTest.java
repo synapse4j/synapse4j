@@ -23,6 +23,7 @@ import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.openai.OpenAiCompletionsChatClient;
 import io.github.synapse4j.openai.OpenAiConfig;
+import io.github.synapse4j.openai.OpenAiResponsesChatClient;
 
 class Synapse4jAutoConfigurationTest {
 
@@ -46,6 +47,26 @@ class Synapse4jAutoConfigurationTest {
             assertThat(context.getBean(OpenAiConfig.class).getBaseUrl())
                     .isEqualTo(new OpenAiConfig().getBaseUrl());
         });
+    }
+
+    @Test
+    void selectsTheResponsesClientFromItsProperty() {
+        // The key and its values are the starter's public contract, like every other key bound
+        // here: a rename silently reverts every application that asked for Responses back to
+        // the default client, and no other test would notice.
+        runner.withPropertyValues("synapse4j.chat-client=responses").run(context -> {
+            assertThat(context).hasSingleBean(ChatClient.class);
+            assertThat(context.getBean(ChatClient.class)).isInstanceOf(OpenAiResponsesChatClient.class);
+        });
+    }
+
+    @Test
+    void anUnknownChatClientValueFailsTheContext() {
+        // The conditions alone would answer an unknown value by building no client at all — a
+        // missing-bean error far away from the typo. The binding is what refuses it here, at
+        // startup, with the property named.
+        runner.withPropertyValues("synapse4j.chat-client=bogus")
+                .run(context -> assertThat(context).hasFailed());
     }
 
     @Test

@@ -37,6 +37,19 @@ public class Synapse4jProperties {
      */
     private boolean enabled = true;
 
+    /**
+     * Which chat client the auto-configuration builds: {@link ChatClientType#COMPLETIONS} (the
+     * default) or {@link ChatClientType#RESPONSES}.
+     *
+     * <p>
+     * Read as a Spring condition rather than from this instance — a condition evaluates before any
+     * bean of this type exists — and declared here so the selector appears in the generated
+     * configuration metadata where an IDE can surface it. The binding still matters: it is what
+     * refuses a value this starter does not wire, naming the property at startup, where the
+     * conditions alone would answer an unknown value by building nothing.
+     */
+    private ChatClientType chatClient = ChatClientType.COMPLETIONS;
+
     /** OpenAI family configuration: where the API lives and how the call authenticates. */
     // The marker earns its place: without it the metadata processor stops at the field, because a
     // nested type that comes from a jar is not recursed into on its own — every synapse4j.openai.*

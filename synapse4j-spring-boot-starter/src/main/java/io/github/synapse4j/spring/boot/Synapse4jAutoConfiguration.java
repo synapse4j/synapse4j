@@ -15,11 +15,13 @@ import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.openai.OpenAiCompletionsChatClient;
 import io.github.synapse4j.openai.OpenAiConfig;
+import io.github.synapse4j.openai.OpenAiResponsesChatClient;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Wires a complete synapse4j stack into a Spring Boot application: the Jackson codec, the
- * {@code RestClient} transport, the OpenAI family config and the chat client that joins them.
+ * {@code RestClient} transport, the OpenAI family config and the chat client that joins them —
+ * whichever of the two OpenAI protocol clients {@code synapse4j.chat-client} names.
  *
  * <p>
  * Every bean here backs off the moment the application declares one of the same type — this
@@ -92,16 +94,31 @@ public class Synapse4jAutoConfiguration {
     }
 
     /**
-     * The chat client the application injects as {@link ChatClient}. Declared as its concrete type
-     * so a caller may reach the OpenAI-specific surface, but the missing-bean condition watches
-     * the interface: a client of the application's own — another provider, a decorator — is the
-     * whole answer and this one never comes into being.
+     * The chat completions client — the default, taken when {@code synapse4j.chat-client} names
+     * no value or names this one. Declared as its concrete type so a caller may reach the
+     * OpenAI-specific surface, but the missing-bean condition watches the interface: a client of
+     * the application's own — another provider, a decorator — is the whole answer and this one
+     * never comes into being.
      */
     @Bean
     @ConditionalOnMissingBean(ChatClient.class)
+    @ConditionalOnProperty(prefix = "synapse4j", name = "chat-client", havingValue = "completions", matchIfMissing = true)
     public OpenAiCompletionsChatClient openAiCompletionsChatClient(HttpClient http, JsonCodec codec,
             OpenAiConfig config) {
         return new OpenAiCompletionsChatClient(http, codec, config);
+    }
+
+    /**
+     * The Responses client, the other half of {@code synapse4j.chat-client}: the property names
+     * one of the two protocols and exactly one of these beans exists, both watching the interface
+     * the same way, so an application's own {@link ChatClient} wins over either.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ChatClient.class)
+    @ConditionalOnProperty(prefix = "synapse4j", name = "chat-client", havingValue = "responses")
+    public OpenAiResponsesChatClient openAiResponsesChatClient(HttpClient http, JsonCodec codec,
+            OpenAiConfig config) {
+        return new OpenAiResponsesChatClient(http, codec, config);
     }
 
 }
