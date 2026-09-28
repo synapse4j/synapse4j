@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.github.synapse4j</groupId>
+    <artifactId>synapse4j-parent</artifactId>
+    <version>${revision}</version>
+    <relativePath>../synapse4j-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>synapse4j-http-apache</artifactId>
+
+  <!-- The HTTP transport built on Apache HttpClient 5, for callers whose stack already configures
+       one: connection pools, TLS, proxy and instrumentation configured on the client ride along,
+       while everything the transport itself must do — body streaming, SSE, timeouts — follows the
+       library's own HttpClient contract. -->
+  <dependencies>
+    <dependency>
+      <groupId>io.github.synapse4j</groupId>
+      <artifactId>synapse4j-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Version comes from the spring-boot-dependencies BOM the parent imports; nothing here pins
+         a second version of it — one authority per artifact. -->
+    <dependency>
+      <groupId>org.apache.httpcomponents.client5</groupId>
+      <artifactId>httpclient5</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+</project>

@@ -27,6 +27,7 @@
     <module>synapse4j-jackson</module>
     <module>synapse4j-http-jdk</module>
     <module>synapse4j-http-restclient</module>
+    <module>synapse4j-http-apache</module>
     <module>synapse4j-openai</module>
     <module>synapse4j-spring-boot-starter</module>
   </modules>
