@@ -9,7 +9,6 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.function.UnaryOperator;
 
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ChatRequest;
@@ -17,7 +16,6 @@ import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolProvider;
-import org.jspecify.annotations.Nullable;
 
 import lombok.NonNull;
 
@@ -114,14 +112,15 @@ public abstract class AbstractChatClient implements ChatClient {
      *
      * <p>
      * The chain runs on the thread pulling the events, once per event, between the source and
-     * the fold, and its answers are both folded and handed out.
+     * the fold, each customizer changing the event in place.
      *
      * @return the chain; never {@code null}
      */
-    protected UnaryOperator<ChatStreamEvent> eventPipeline() {
+    protected Consumer<ChatStreamEvent> eventPipeline() {
         List<ChatStreamEventCustomizer> snapshot = List.copyOf(eventCustomizers);
         if (snapshot.isEmpty()) {
-            return UnaryOperator.identity();
+            return event -> {
+            };
         }
         return event -> runCustomizers(snapshot, event);
     }
@@ -210,7 +209,8 @@ public abstract class AbstractChatClient implements ChatClient {
      * {@link #doChat(ChatRequest)}. A context is resolved for the exchange — the prepared request's
      * own when it carries one, a fresh call-scoped one otherwise, never attached back to the
      * request — and it records the request as sent and the response as received before the answer
-     * is handed back on it. The response customizers run last, before the caller.
+     * is handed back on it. The response customizers run last, on the exchange's own answer, and it
+     * is that instance the caller receives.
      */
     @Override
     public ChatResponse chat(ChatRequest request) {
@@ -218,12 +218,8 @@ public abstract class AbstractChatClient implements ChatClient {
         ChatContext context = resolveContext(prepared);
         ChatResponse response = doChat(prepared);
         carryContext(context, response);
-        // Each answer is stamped with the context as the pass goes, so the caller's answer and
-        // context.getResponse() end up as the same instance even when a customizer answered a copy.
-        return runCustomizers(responseCustomizers, response, stamped -> {
-            stamped.setContext(context);
-            context.setResponse(stamped);
-        });
+        runCustomizers(responseCustomizers, response);
+        return response;
     }
 
     /**
@@ -280,31 +276,15 @@ public abstract class AbstractChatClient implements ChatClient {
     }
 
     /**
-     * Runs the chain in registration order: each customizer's answer is the next one's input, and
-     * the answer that comes out is the caller's; an answer of {@code null} fails loudly. The hook,
-     * when given, runs after each step — where bookkeeping has to follow the answer along, as the
-     * context does on a response.
+     * Runs the chain in registration order, each customizer changing the given value in place.
      *
      * @param registrations the chain, in the order it was added
-     * @param initial       what the first customizer is given
-     * @param afterEach     runs after each answer, or {@code null} for nothing
-     * @return the last answer; never {@code null}
+     * @param value         what every customizer is handed
      */
-    private <T> T runCustomizers(List<? extends ChatCustomizer<T>> registrations, T initial,
-            @Nullable Consumer<T> afterEach) {
-        T answer = initial;
+    private <T> void runCustomizers(List<? extends ChatCustomizer<T>> registrations, T value) {
         for (ChatCustomizer<T> customizer : registrations) {
-            answer = Objects.requireNonNull(customizer.customize(this, answer), "customizer answered null");
-            if (afterEach != null) {
-                afterEach.accept(answer);
-            }
+            customizer.customize(this, value);
         }
-        return answer;
-    }
-
-    /** The same, with nothing to do after each step. */
-    private <T> T runCustomizers(List<? extends ChatCustomizer<T>> registrations, T initial) {
-        return runCustomizers(registrations, initial, null);
     }
 
     /**
@@ -359,13 +339,13 @@ public abstract class AbstractChatClient implements ChatClient {
      * registered.
      *
      * @param request the request as the caller built it
-     * @return the request to send, which is the one that was given when no customizer answered
-     *         another; never {@code null}
-     * @throws NullPointerException a customizer or {@link #applyDefaults} answered {@code null}
+     * @return the request to send; never {@code null}
+     * @throws NullPointerException {@link #applyDefaults} answered {@code null}
      */
     protected ChatRequest prepare(ChatRequest request) {
         request = Objects.requireNonNull(applyDefaults(request), "applyDefaults answered null");
-        return runCustomizers(requestCustomizers, request);
+        runCustomizers(requestCustomizers, request);
+        return request;
     }
 
     /**
@@ -399,8 +379,6 @@ public abstract class AbstractChatClient implements ChatClient {
         private final ChatContext context;
 
         private boolean applied;
-
-        private @Nullable ChatResponse result;
 
         private CustomizedStream(ChatStream delegate, List<ChatResponseCustomizer> customizers,
                 ChatContext context) {
@@ -437,7 +415,7 @@ public abstract class AbstractChatClient implements ChatClient {
 
         @Override
         public ChatResponse aggregatedResponse() {
-            return result != null ? result : delegate.aggregatedResponse();
+            return delegate.aggregatedResponse();
         }
 
         @Override
@@ -450,10 +428,10 @@ public abstract class AbstractChatClient implements ChatClient {
                 return;
             }
             applied = true;
-            result = runCustomizers(customizers, delegate.aggregatedResponse(), stamped -> {
-                stamped.setContext(context);
-                context.setResponse(stamped);
-            });
+            ChatResponse aggregated = delegate.aggregatedResponse();
+            aggregated.setContext(context);
+            context.setResponse(aggregated);
+            runCustomizers(customizers, aggregated);
         }
 
     }

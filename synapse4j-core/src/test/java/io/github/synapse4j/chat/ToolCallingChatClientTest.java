@@ -405,7 +405,6 @@ class ToolCallingChatClientTest {
         client.addChatResponseCustomizer((runner, response) -> {
             passes.incrementAndGet();
             response.setMessage(ChatMessage.assistant("custom"));
-            return response;
         });
         ChatRequest request = new ChatRequest();
         request.addTool(tool("alpha", arguments -> "A"));
@@ -493,7 +492,6 @@ class ToolCallingChatClientTest {
         client.addChatStreamEventCustomizer((it, event) -> {
             runners.add(it);
             event.setEventType("fixed");
-            return event;
         });
         ChatRequest request = new ChatRequest();
         request.addTool(tool("alpha", arguments -> "A"));

@@ -185,7 +185,6 @@ class DefaultChatStreamTest {
         List<String> seen = new ArrayList<>();
         try (ChatStream stream = new DefaultChatStream(arrived.iterator(), event -> {
             event.setEventType(event.getEventType() + "-fixed");
-            return event;
         }, (response, event) -> folded.add(event.getEventType()), () -> {
         })) {
             for (ChatStreamEvent event : stream) {

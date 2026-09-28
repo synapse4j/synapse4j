@@ -6,7 +6,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.function.UnaryOperator;
+import java.util.function.Consumer;
 
 import io.github.synapse4j.chat.DefaultChatStream;
 import io.github.synapse4j.data.ChatMessage;
@@ -67,7 +67,7 @@ class ChatCompletionsStream extends DefaultChatStream {
      * @param config        the endpoint's conventions, for the members whose name varies between
      *                          endpoints
      */
-    ChatCompletionsStream(JsonCodec codec, SseEventStream sse, UnaryOperator<ChatStreamEvent> eventPipeline,
+    ChatCompletionsStream(JsonCodec codec, SseEventStream sse, Consumer<ChatStreamEvent> eventPipeline,
             AutoCloseable closeAction, OpenAiConfig config) {
         super(events(codec, sse, new ChatCompletionsReader(config)), eventPipeline, ChatCompletionsStream::aggregate,
                 closeAction);

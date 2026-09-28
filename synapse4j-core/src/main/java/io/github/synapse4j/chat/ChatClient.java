@@ -93,7 +93,7 @@ public interface ChatClient {
      *
      * <p>
      * Customizers run in the order they were added, on the calling thread, after the client's own
-     * steps, and the last one's answer is what the caller receives. For a streamed answer they run
+     * steps, and what they change in place is what the caller receives. For a streamed answer they run
      * once, when the stream runs to its end; an answer that failed runs none. The same customizer
      * may be added more than once, and then runs once per addition. A client shared across threads
      * hands each call a consistent list, so a customizer must itself be safe to run concurrently.
@@ -117,8 +117,8 @@ public interface ChatClient {
      *
      * <p>
      * Customizers run in the order they were added, on the thread pulling the events, and the
-     * fold and the caller both see their answers: what is folded and what is handed out is the
-     * same event. The chain is snapshotted when a stream opens; one registered mid-flight joins
+     * fold and the caller both see the same event, a customizer's change included. The chain is
+     * snapshotted when a stream opens; one registered mid-flight joins
      * neither that stream nor its fold. A blocking call has no events, so a registration here
      * runs only on streams. The same customizer may be added more than once, and then runs once
      * per addition. A client shared across threads hands each call a consistent list, so a

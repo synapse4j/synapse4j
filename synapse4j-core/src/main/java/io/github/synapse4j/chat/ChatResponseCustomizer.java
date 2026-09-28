@@ -16,7 +16,7 @@ import io.github.synapse4j.data.ChatResponse;
  *
  * <p>
  * Customizers belong to a {@link ChatClient} and run on the calling thread after the client's own
- * steps, and the last one's answer is what the caller receives. The sequence among them is the
+ * steps, and what they change in place is what the caller receives. The sequence among them is the
  * order they were registered in — not a property of this interface: a customizer says what to do,
  * the client decides when. For a streamed answer they run once, when the stream runs to its end; a stream that fails,
  * is closed
@@ -25,12 +25,10 @@ import io.github.synapse4j.data.ChatResponse;
  * should make each change once.
  *
  * <p>
- * The response handed in is the client's own, so a customizer may change it in place and answer
- * it, or leave it alone and answer another one. Either way the answer is stamped with the
- * exchange's {@link ChatContext} before the next customizer sees it: the caller's answer and
- * {@code getResponse()} are always the same instance, and the context rides on
- * whatever comes back — a copy included. What a customizer adjusts is the context's contents;
- * the instance itself belongs to the exchange.
+ * The response handed in is the client's own and already carries the exchange's {@link ChatContext}
+ * before the first customizer sees it, so the caller's answer, {@code getResponse()} and the
+ * instance the customizers change are always the same one. What a customizer adjusts is that
+ * instance's contents; the instance itself belongs to the exchange.
  *
  * <p>
  * The client passed in is the one applying the customizer, carrying the same meaning as in

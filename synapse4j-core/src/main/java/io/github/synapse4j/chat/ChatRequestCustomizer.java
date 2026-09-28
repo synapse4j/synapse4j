@@ -20,8 +20,8 @@ import io.github.synapse4j.data.ChatRequest;
  * applies its own defaults before any of them runs, so every customizer sees them applied.
  *
  * <p>
- * The request handed in is the caller's own, so a customizer may change it in place and answer it,
- * or leave it alone and answer another one. A customizer that changes what it was given should make
+ * The request handed in is the caller's own — the same instance the tool loop grows and the
+ * exchange records — so a customizer changes it in place. A customizer that changes it should make
  * that change once: the caller may reuse the request, and a request that is written again after a
  * failed attempt passes through here again.
  *

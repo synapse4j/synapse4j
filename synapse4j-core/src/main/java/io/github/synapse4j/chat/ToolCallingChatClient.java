@@ -45,12 +45,9 @@ import lombok.NonNull;
  * around — which is what an executor's turn cap reads.
  *
  * <p>
- * Two consequences of that growth are worth stating. The loop grows the request it holds, so
- * an inner request customizer that answers another request must answer one derived from the
- * one it was given — a replacement that drops the grown transcript sends the next round
- * without it. Same-named tools settle the same way outward: the decorator's defaults are on
- * the request before the inner client merges its own, and the request has the last word there
- * too, so an outer default stands in the inner one's slot.
+ * One consequence of that growth is worth stating: same-named tools settle the same way
+ * outward — the decorator's defaults are on the request before the inner client merges its own,
+ * and the request has the last word there too, so an outer default stands in the inner one's slot.
  *
  * <p>
  * A decline ends the round with the response that asked for the calls, them unanswered; a

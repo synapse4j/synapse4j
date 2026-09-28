@@ -16,10 +16,9 @@ import io.github.synapse4j.data.ChatStreamEvent;
  *
  * <p>
  * The chain runs between a stream's source and its folding, and what the caller is handed is the
- * very event that was folded — each customizer answers the event the next one, and then the
- * fold, receives. Changing the given event in place and answering it, or answering a copy of its
- * own, both work: the answer is what carries on. An adaptation meant only for the caller's own
- * dispatch belongs in the consuming loop instead, where it sits outside the fold by construction.
+ * very event that was folded: a customizer changes the event in place, and the next one, then the
+ * fold, see the same instance. An adaptation meant only for the caller's own dispatch belongs in
+ * the consuming loop instead, where it sits outside the fold by construction.
  *
  * <p>
  * Customizers belong to a {@link ChatClient} and run on the thread pulling the events, in the
@@ -29,8 +28,7 @@ import io.github.synapse4j.data.ChatStreamEvent;
  * one named here. A blocking call has no events — a registration there never runs.
  *
  * <p>
- * The event handed in is the stream's own, so a customizer may change it in place and answer it,
- * or leave it alone and answer another one.
+ * The event handed in is the stream's own, so a customizer changes it in place.
  */
 @FunctionalInterface
 public interface ChatStreamEventCustomizer extends ChatCustomizer<ChatStreamEvent> {
