@@ -8,8 +8,8 @@ Core capabilities for interacting with LLMs: JSON Schema generation, serializati
 deserialization between Java objects and JSON that conforms to that schema; a thin HTTP layer
 beneath a provider-neutral chat model, with blocking and streaming as equal citizens; and tool
 calling end to end — declarations paired with the code behind them, an execution policy for a
-batch of calls, and an optional decorator that runs the model's tool-call rounds. Provider
-modules ship separately (OpenAI chat completions so far).
+batch of calls, and an optional decorator that runs the model's tool-call rounds. Provider modules
+ship separately.
 
 It is aimed at developers who want to assemble their own stack (pick the JSON library, pick the
 HTTP client, pick the provider) rather than be locked into a framework.

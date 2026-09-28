@@ -10,9 +10,11 @@ import lombok.ToString;
  * Configuration of the OpenAI family: where the API lives and how the caller authenticates.
  *
  * <p>
- * This is family-level configuration, shared by the chat-completions adapter implemented now and the
- * Responses adapter to come: both speak to the same API with the same credentials, so neither owns
- * a config of its own.
+ * This is family-level configuration, shared by the chat-completions adapter and the Responses
+ * adapter: both speak to the same API with the same credentials, so neither owns a config of its
+ * own. {@link #maxTokensField} and {@link #reasoningField} are the chat-completions adapter's
+ * conventions: the Responses protocol fixes the name of its token limit and carries reasoning in a
+ * structure of its own, so that adapter reads neither.
  */
 @Data
 public class OpenAiConfig {
