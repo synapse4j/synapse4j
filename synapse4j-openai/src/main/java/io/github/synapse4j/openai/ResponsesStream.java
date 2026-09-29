@@ -17,6 +17,7 @@ import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
+import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.SseEvent;
 import io.github.synapse4j.http.SseEventStream;
 import io.github.synapse4j.json.JsonCodec;
@@ -67,9 +68,10 @@ class ResponsesStream extends DefaultChatStream {
      *
      * <p>
      * Pulling is what reads the body: this iterator asks the frames for their next event only when
-     * one is asked of it, so a caller that stops pulling stops the provider. The body ending is the
-     * answer ending — this protocol marks it with the frame that carries the whole response rather
-     * than with a sentinel of its own.
+     * one is asked of it, so a caller that stops pulling stops the provider. The answer ends with
+     * the terminal frame this protocol marks it with, not with the body: a connection that drops
+     * before that frame is an answer cut short, and this iterator fails rather than handing back
+     * what is left of one.
      *
      * @param codec       the codec, for opening a reader over each frame's payload
      * @param sse         the frames, in arrival order; the response behind them is released by the
@@ -90,11 +92,22 @@ class ResponsesStream extends DefaultChatStream {
                 if (pending != null) {
                     return true;
                 }
-                if (ended || !sse.hasNext()) {
-                    ended = true;
+                if (ended) {
                     return false;
                 }
+                if (!sse.hasNext()) {
+                    // This protocol ends every answer with the frame that carries the finished
+                    // response: a body that just stops is an answer cut short, not an answer.
+                    // What was consumed before the cut stays folded into the aggregated response
+                    // the caller already holds.
+                    throw new SynapseException("OpenAI Responses stream ended without "
+                            + OpenAiResponsesEventTypes.COMPLETED + ": the answer was cut short");
+                }
                 pending = toEvent(codec, sse.next(), eventReader);
+                // The frame that finishes the answer is the last one there is: a provider that
+                // sent something after it would be contradicting itself, and nothing here waits
+                // for it. A failure frame never reaches here — the reader raises it.
+                ended = finishesAnswer(pending.getEventType());
                 return true;
             }
 
@@ -141,9 +154,11 @@ class ResponsesStream extends DefaultChatStream {
         if (delta == null) {
             return;
         }
-        if (isWholeResponse(event.getEventType())) {
+        if (finishesAnswer(event.getEventType())) {
             // The event carries the complete turn, so it takes the place of what the fragments built
-            // rather than being appended to it.
+            // rather than being appended to it. The frames that open the answer also carry the whole
+            // response, but an empty one — appending those is harmless, replacing with them would
+            // wipe what the fragments already built.
             response.setMessage(delta);
             return;
         }
@@ -171,13 +186,12 @@ class ResponsesStream extends DefaultChatStream {
     }
 
     /**
-     * Whether an event carries the whole response rather than a fragment of it. Those frames are the
-     * boundary of the answer, and their delta is the complete turn.
+     * Whether an event closes the answer: the frames that carry the finished response. Such a
+     * frame's delta is the complete turn, so it replaces what the fragments built — and the body
+     * ending before one of them is an answer cut short rather than an answer.
      */
-    private static boolean isWholeResponse(@Nullable String eventType) {
-        return OpenAiResponsesEventTypes.CREATED.equals(eventType)
-                || OpenAiResponsesEventTypes.IN_PROGRESS.equals(eventType)
-                || OpenAiResponsesEventTypes.COMPLETED.equals(eventType)
+    private static boolean finishesAnswer(@Nullable String eventType) {
+        return OpenAiResponsesEventTypes.COMPLETED.equals(eventType)
                 || OpenAiResponsesEventTypes.INCOMPLETE.equals(eventType);
     }
 

@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -487,6 +488,59 @@ class OpenAiResponsesChatClientTest {
         assertEquals(blocking.getExtras().rawMap(), aggregated.getExtras().rawMap());
     }
 
+    @Test
+    void aBodyThatStopsWithoutClosingTheAnswerFailsAsTruncated() {
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                namedFrame(OpenAiResponsesEventTypes.CREATED,
+                        "{\"response\":{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"in_progress\","
+                                + "\"output\":[]}}"),
+                namedFrame(OpenAiResponsesEventTypes.OUTPUT_TEXT_DELTA,
+                        "{\"item_id\":\"msg_1\",\"output_index\":0,\"delta\":\"Hi\"}"))
+                .getBytes(UTF_8)));
+
+        ChatStream stream = client.stream(requestWithModel());
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        assertEquals(OpenAiResponsesEventTypes.CREATED, events.next().getEventType());
+        assertEquals("Hi", textOf(events.next()));
+
+        // A body that ends before the frame that closes the answer is a connection dropped
+        // mid-answer, not an answer — the same line the completions stream draws at [DONE].
+        SynapseException thrown = assertThrows(SynapseException.class, events::hasNext);
+        assertTrue(thrown.getMessage().contains("cut short"), thrown.getMessage());
+        // What arrived before the cut is still the caller's: the failure reports the answer,
+        // it does not discard it.
+        assertEquals("Hi",
+                assertInstanceOf(TextPart.class, stream.aggregatedResponse().getMessage().getParts().get(0))
+                        .getText());
+    }
+
+    @Test
+    void anOpeningFrameArrivingAfterFragmentsKeepsWhatTheyBuilt() {
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                namedFrame(OpenAiResponsesEventTypes.OUTPUT_TEXT_DELTA,
+                        "{\"item_id\":\"msg_1\",\"output_index\":0,\"delta\":\"Hi\"}"),
+                // The whole response this frame carries has no output yet: replacing the turn
+                // with it would wipe the fragment above — an opening frame announces the answer,
+                // it does not speak for it.
+                namedFrame(OpenAiResponsesEventTypes.IN_PROGRESS,
+                        "{\"response\":{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"in_progress\","
+                                + "\"output\":[]}}"))
+                .getBytes(UTF_8)));
+
+        ChatStream stream = client.stream(requestWithModel());
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        assertEquals("Hi", textOf(events.next()));
+        events.next();
+
+        assertEquals("Hi",
+                assertInstanceOf(TextPart.class, stream.aggregatedResponse().getMessage().getParts().get(0))
+                        .getText());
+    }
+
     /** A canned completed response, for the tests that only care about the request. */
     private void stubCompletion() {
         stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":[]}");
@@ -528,6 +582,14 @@ class OpenAiResponsesChatClientTest {
     /** One named frame: its {@code event:} line and the {@code data:} line that follows it. */
     private static String namedFrame(String event, String data) {
         return "event: " + event + "\ndata: " + data;
+    }
+
+    /** The text one event contributes, or {@code null} when it contributes none. */
+    private static String textOf(ChatStreamEvent event) {
+        if (event.getDelta() == null || event.getDelta().getParts().isEmpty()) {
+            return null;
+        }
+        return ((TextPart) event.getDelta().getParts().get(0)).getText();
     }
 
     /** A request with a model set, which is all the request-writing tests here need. */
