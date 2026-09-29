@@ -1,6 +1,7 @@
 package io.github.synapse4j.spring.boot;
 
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -99,12 +100,30 @@ public class Synapse4jAutoConfiguration {
      * a dependency; the library is not — another HTTP stack is the application's choice to make).
      * An application that selects this transport declares httpclient5 itself; without it, only
      * this bean fails, at startup, naming the missing class — the default wiring never loads it.
+     *
+     * <p>
+     * The delegate is a bean of its own, with the context's close for its own: the connection pool
+     * it holds outlives any one request, and {@link ApacheHttpClient} never closes what it was
+     * handed — so without this, the pool would outlive the context that created it. An application
+     * declaring a {@link CloseableHttpClient} of its own supplies the transport instead, pool
+     * configuration and all, and owns its disposal as it always did.
+     */
+    @Bean(destroyMethod = "close")
+    @ConditionalOnMissingBean(CloseableHttpClient.class)
+    @ConditionalOnProperty(prefix = "synapse4j", name = "http-client", havingValue = "apache")
+    public CloseableHttpClient apacheTransport() {
+        return HttpClients.createDefault();
+    }
+
+    /**
+     * The Apache transport, wired to the delegate above — or to the application's own
+     * {@link CloseableHttpClient}, when it declares one.
      */
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "synapse4j", name = "http-client", havingValue = "apache")
-    public HttpClient apacheHttpClient(Synapse4jProperties properties) {
-        return new ApacheHttpClient(HttpClients.createDefault(), properties.getHttp());
+    public HttpClient apacheHttpClient(CloseableHttpClient transport, Synapse4jProperties properties) {
+        return new ApacheHttpClient(transport, properties.getHttp());
     }
 
     /**

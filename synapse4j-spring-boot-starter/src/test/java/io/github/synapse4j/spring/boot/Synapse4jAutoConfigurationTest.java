@@ -1,14 +1,20 @@
 package io.github.synapse4j.spring.boot;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.message.BasicClassicHttpRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
@@ -91,6 +97,20 @@ class Synapse4jAutoConfigurationTest {
             assertThat(context).hasSingleBean(HttpClient.class);
             assertThat(context.getBean(HttpClient.class)).isInstanceOf(ApacheHttpClient.class);
         });
+    }
+
+    @Test
+    void theApacheTransportClosesItsPoolWithTheContext() {
+        AtomicReference<CloseableHttpClient> transport = new AtomicReference<>();
+        runner.withPropertyValues("synapse4j.http-client=apache")
+                .run(context -> transport.set(context.getBean(CloseableHttpClient.class)));
+
+        // The pool outlives any one request, and the library's transport never closes the delegate
+        // it was handed — so the context's close is the only close it gets. A pool still open here
+        // would leave its reactor threads outliving the application that spawned them.
+        ClassicHttpRequest request = new BasicClassicHttpRequest("GET", URI.create("http://localhost/"));
+        assertThatThrownBy(() -> transport.get().execute(request)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("shut down");
     }
 
     @Test
