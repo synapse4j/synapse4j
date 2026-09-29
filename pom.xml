@@ -52,6 +52,7 @@
          place. -->
     <flatten-maven-plugin.version>1.7.3</flatten-maven-plugin.version>
     <spotless-maven-plugin.version>3.10.2</spotless-maven-plugin.version>
+    <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
   </properties>
 
   <modules>
@@ -69,6 +70,34 @@
 
   <build>
     <plugins>
+      <!-- Checked before anything compiles: maven.compiler.release fails deep inside javac on an
+           old JDK, after Spotless and flatten have already run, and the scm append-path flags
+           below need a Maven new enough to honour them. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>${maven-enforcer-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>enforce-build-environment</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[21,)</version>
+                  <message>This build compiles for Java 21 — run it on a JDK 21 or newer.</message>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.6.3,)</version>
+                  <message>This build relies on Maven behaviour introduced in 3.6.3.</message>
+                </requireMavenVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <!-- Declared here with no configuration of its own so that a direct `spotless:apply` invocation
            from the root runs for every module in the reactor instead of failing on the ones without
            the plugin. The build parent carries the real configuration the leaf modules format with. -->

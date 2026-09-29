@@ -178,6 +178,8 @@ one would block extension by users and providers.
 
 ## Build and test
 
+- The build enforces its own floor first: JDK 21+ and Maven 3.6.3+ (maven-enforcer-plugin), so
+  an old toolchain fails with a message instead of deep inside javac.
 - Compile: `mvn -q -DskipTests package`
 - Full check — compiles, enforces formatting, runs tests: `mvn verify`
 - The build also enforces the nullness contracts: NullAway runs inside the compiler (as an Error
