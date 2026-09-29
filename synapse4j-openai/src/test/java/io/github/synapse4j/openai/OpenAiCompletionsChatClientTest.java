@@ -42,6 +42,8 @@ import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseHttpException;
 import io.github.synapse4j.http.DefaultHttpResponse;
 import io.github.synapse4j.http.HttpClient;
+import io.github.synapse4j.http.HttpOptions;
+import io.github.synapse4j.http.HttpRequest;
 import io.github.synapse4j.http.HttpResponse;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.json.JsonSchema;
@@ -55,12 +57,12 @@ class OpenAiCompletionsChatClientTest {
     /** Captures the outgoing request and replays a canned response. */
     static class StubHttpClient implements HttpClient {
 
-        io.github.synapse4j.http.HttpRequest captured;
+        HttpRequest captured;
         DefaultHttpResponse canned = new DefaultHttpResponse();
-        io.github.synapse4j.http.HttpOptions options = io.github.synapse4j.http.HttpOptions.defaults();
+        HttpOptions options = HttpOptions.defaults();
 
         @Override
-        public HttpResponse send(io.github.synapse4j.http.HttpRequest request) {
+        public HttpResponse send(HttpRequest request) {
             this.captured = request;
             // A transport asks for the body before it answers, so this one does too: a request the
             // module cannot spell fails here, the way it would fail on the way out.
@@ -72,7 +74,7 @@ class OpenAiCompletionsChatClientTest {
             // A transport is where a request's options meet its own, so the response it hands back
             // carries the result: whatever the exchange was configured with is what frames its
             // event stream.
-            canned.setOptions(io.github.synapse4j.http.HttpOptions.effective(request.getOptions(), options));
+            canned.setOptions(HttpOptions.effective(request.getOptions(), options));
             return canned;
         }
     }
@@ -156,6 +158,16 @@ class OpenAiCompletionsChatClientTest {
         assertEquals(Integer.valueOf(11), response.getUsage().getInputTokens());
         assertEquals(Integer.valueOf(7), response.getUsage().getOutputTokens());
         assertEquals(Integer.valueOf(3), response.getUsage().getCachedInputTokens());
+    }
+
+    @Test
+    void aBaseUrlWithATrailingSlashDoesNotDoubleThePath() {
+        stubCompletion();
+        config.setBaseUrl("https://example.test/v1/");
+
+        client.chat(requestWithModel());
+
+        assertEquals("https://example.test/v1/chat/completions", stub.captured.getUrl());
     }
 
     @Test
@@ -1503,7 +1515,7 @@ class OpenAiCompletionsChatClientTest {
         // A budget of zero is one the event stream refuses to read under, so the failure lands
         // between the response arriving and the stream taking ownership of it — where nothing else
         // holds the connection, and nobody but this path can release it.
-        io.github.synapse4j.http.HttpOptions http = new io.github.synapse4j.http.HttpOptions();
+        HttpOptions http = new HttpOptions();
         http.setMaxFrameBytes(0);
         request.getOptions().setHttpOptions(http);
 
@@ -1612,7 +1624,7 @@ class OpenAiCompletionsChatClientTest {
         stub.canned.setBody(new ByteArrayInputStream(sse(bigChunk(), "[DONE]").getBytes(UTF_8)));
 
         ChatRequest request = requestWithModel();
-        io.github.synapse4j.http.HttpOptions http = new io.github.synapse4j.http.HttpOptions();
+        HttpOptions http = new HttpOptions();
         http.setMaxFrameBytes(64);
         request.getOptions().setHttpOptions(http);
 

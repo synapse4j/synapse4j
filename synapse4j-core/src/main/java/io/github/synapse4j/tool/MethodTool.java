@@ -3,6 +3,7 @@ package io.github.synapse4j.tool;
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
+import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
 import org.jspecify.annotations.Nullable;
@@ -86,7 +87,15 @@ public class MethodTool implements StagedTool {
             Objects.requireNonNull(target, "target must not be null: " + method + " is an instance method");
         }
         this.target = target;
-        method.setAccessible(true);
+        try {
+            method.setAccessible(true);
+        } catch (RuntimeException failure) {
+            // A module path refuses this for a package that was not opened: the caller has to open
+            // it, so the message names the method and the package it lives in.
+            throw new SynapseException("cannot reach " + method + ": open package "
+                    + method.getDeclaringClass().getPackageName()
+                    + " to this library, for example with --add-opens", failure);
+        }
         this.parameters = method.getParameters();
         this.returnsVoid = method.getReturnType() == void.class;
         this.names = new String[parameters.length];

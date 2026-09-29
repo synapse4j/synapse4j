@@ -14,7 +14,10 @@ import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseHttpException;
+import io.github.synapse4j.http.HttpBody;
 import io.github.synapse4j.http.HttpClient;
+import io.github.synapse4j.http.HttpRequest;
+import io.github.synapse4j.http.HttpResponse;
 import io.github.synapse4j.http.SseEventStream;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
@@ -138,7 +141,7 @@ public class AnthropicChatClient extends AbstractChatClient {
         AnthropicConfig config = this.config.get();
         requireCallable(config, request);
 
-        io.github.synapse4j.http.HttpRequest httpRequest = httpRequest(config, request, out -> {
+        HttpRequest httpRequest = httpRequest(config, request, out -> {
             // The body is written when the transport asks for it, and written again on every retry
             // or redirect: the document goes into whatever sink the implementation hands over, so it
             // never exists as bytes here.
@@ -147,7 +150,7 @@ public class AnthropicChatClient extends AbstractChatClient {
             }
         });
 
-        try (io.github.synapse4j.http.HttpResponse httpResponse = http.send(httpRequest)) {
+        try (HttpResponse httpResponse = http.send(httpRequest)) {
             // The body is a stream and can be read once, so the status decides how it is read
             // before anything is consumed.
             int status = httpResponse.getStatusCode();
@@ -170,13 +173,13 @@ public class AnthropicChatClient extends AbstractChatClient {
         AnthropicConfig config = this.config.get();
         requireCallable(config, request);
 
-        io.github.synapse4j.http.HttpRequest httpRequest = httpRequest(config, request, out -> {
+        HttpRequest httpRequest = httpRequest(config, request, out -> {
             try (JsonWriter writer = codec.writer(out)) {
                 new MessagesWriter(codec).writeStreaming(request, writer);
             }
         });
 
-        io.github.synapse4j.http.HttpResponse httpResponse = http.send(httpRequest);
+        HttpResponse httpResponse = http.send(httpRequest);
         int status = httpResponse.getStatusCode();
         if (status >= 200 && status < 300) {
             try {
@@ -199,7 +202,7 @@ public class AnthropicChatClient extends AbstractChatClient {
                 // Between the response arriving and the stream taking ownership of it, nothing else
                 // holds the connection: whatever broke here would leave it held by a response no one
                 // has, so release it before the failure leaves.
-                try (io.github.synapse4j.http.HttpResponse closing = httpResponse) {
+                try (HttpResponse closing = httpResponse) {
                     // The close is what this path owes; the comment is what it is owed for.
                 } catch (IOException closeFailure) {
                     failure.addSuppressed(closeFailure);
@@ -211,15 +214,30 @@ public class AnthropicChatClient extends AbstractChatClient {
     }
 
     /**
+     * The base URL as an endpoint path is appended to it: a trailing slash is dropped, so a
+     * configured {@code https://host/} does not put a doubled slash in the path.
+     *
+     * @param baseUrl the configured base URL; never {@code null}
+     * @return the base URL without a trailing slash
+     */
+    private static String withoutTrailingSlash(String baseUrl) {
+        int end = baseUrl.length();
+        while (end > 0 && baseUrl.charAt(end - 1) == '/') {
+            end--;
+        }
+        return baseUrl.substring(0, end);
+    }
+
+    /**
      * The HTTP request both ways of asking share: one endpoint, one set of headers, the caller's
      * applied last. Only the body differs between them, so it is the one thing handed in beside the
      * path.
      */
-    private io.github.synapse4j.http.HttpRequest httpRequest(AnthropicConfig config,
-            ChatRequest request, io.github.synapse4j.http.HttpBody body) {
-        io.github.synapse4j.http.HttpRequest httpRequest = new io.github.synapse4j.http.HttpRequest(
-                config.getBaseUrl() + "/v1/messages");
-        httpRequest.setMethod(io.github.synapse4j.http.HttpRequest.POST);
+    private HttpRequest httpRequest(AnthropicConfig config,
+            ChatRequest request, HttpBody body) {
+        HttpRequest httpRequest = new HttpRequest(
+                withoutTrailingSlash(config.getBaseUrl()) + "/v1/messages");
+        httpRequest.setMethod(HttpRequest.POST);
         httpRequest.getHeaders().put("Content-Type", List.of("application/json"));
         httpRequest.getHeaders().put("x-api-key", List.of(config.getApiKey()));
         // The protocol version this call declares; the endpoint answers only to versions it knows.
@@ -239,8 +257,8 @@ public class AnthropicChatClient extends AbstractChatClient {
      * not opened, so there is nothing to hand it to. The exception is the same one a refused
      * blocking call gets, since the provider's refusal is the same document either way.
      */
-    private SynapseException refusal(io.github.synapse4j.http.HttpResponse httpResponse, int status) {
-        try (io.github.synapse4j.http.HttpResponse refused = httpResponse) {
+    private SynapseException refusal(HttpResponse httpResponse, int status) {
+        try (HttpResponse refused = httpResponse) {
             return failure(status, readBody(refused));
         } catch (IOException e) {
             throw new SynapseException(FAILED + ": response could not be read", e);
@@ -254,7 +272,7 @@ public class AnthropicChatClient extends AbstractChatClient {
                 "options.model is required");
     }
 
-    private static byte[] readBody(io.github.synapse4j.http.HttpResponse httpResponse) throws IOException {
+    private static byte[] readBody(HttpResponse httpResponse) throws IOException {
         // Bounded: a refusal needs enough of the body to parse the error document or show a
         // snippet of it, and no hostile or broken gateway gets paid for more. What lies past the
         // limit is never read — the caller's try-with-resources closes the response, connection

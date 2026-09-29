@@ -36,6 +36,8 @@ import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.DefaultHttpResponse;
 import io.github.synapse4j.http.HttpClient;
+import io.github.synapse4j.http.HttpOptions;
+import io.github.synapse4j.http.HttpRequest;
 import io.github.synapse4j.http.HttpResponse;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.tool.ManualTool;
@@ -47,16 +49,16 @@ class OpenAiResponsesChatClientTest {
     /** Captures the outgoing request and replays a canned response. */
     static class StubHttpClient implements HttpClient {
 
-        io.github.synapse4j.http.HttpRequest captured;
+        HttpRequest captured;
 
         /** The body as it went out; asserted instead of a re-write of a request that has moved on. */
         ByteArrayOutputStream sent = new ByteArrayOutputStream();
 
         DefaultHttpResponse canned = new DefaultHttpResponse();
-        io.github.synapse4j.http.HttpOptions options = io.github.synapse4j.http.HttpOptions.defaults();
+        HttpOptions options = HttpOptions.defaults();
 
         @Override
-        public HttpResponse send(io.github.synapse4j.http.HttpRequest request) {
+        public HttpResponse send(HttpRequest request) {
             this.captured = request;
             // A transport asks for the body before it answers, so this one does too: a request the
             // module cannot spell fails here, the way it would fail on the way out. What it wrote
@@ -68,7 +70,7 @@ class OpenAiResponsesChatClientTest {
             } catch (IOException e) {
                 throw new SynapseException("the request body could not be written", e);
             }
-            canned.setOptions(io.github.synapse4j.http.HttpOptions.effective(request.getOptions(), options));
+            canned.setOptions(HttpOptions.effective(request.getOptions(), options));
             return canned;
         }
     }

@@ -565,13 +565,18 @@ class MessagesReader {
     }
 
     private static String describe(JsonReader.@Nullable Token token) {
-        if (token == JsonReader.Token.NUMBER) {
-            return "Number";
+        if (token == null) {
+            return "nothing";
         }
-        if (token == JsonReader.Token.TRUE || token == JsonReader.Token.FALSE) {
-            return "Boolean";
-        }
-        return "unexpected";
+        return switch (token) {
+            case START_OBJECT -> "an object";
+            case START_ARRAY -> "an array";
+            case STRING -> "a string";
+            case NUMBER -> "a number";
+            case TRUE, FALSE -> "a boolean";
+            case NULL -> "null";
+            default -> token.toString();
+        };
     }
 
     /**

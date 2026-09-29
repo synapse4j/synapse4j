@@ -225,7 +225,7 @@ public class JdkHttpClient implements HttpClient {
         public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
             subscriber.onSubscribe(new Flow.Subscription() {
 
-                private boolean sent;
+                private volatile boolean sent;
 
                 @Override
                 public void request(long n) {

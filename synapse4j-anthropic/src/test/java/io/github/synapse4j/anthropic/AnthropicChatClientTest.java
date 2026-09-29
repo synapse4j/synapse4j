@@ -41,6 +41,8 @@ import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseHttpException;
 import io.github.synapse4j.http.DefaultHttpResponse;
 import io.github.synapse4j.http.HttpClient;
+import io.github.synapse4j.http.HttpOptions;
+import io.github.synapse4j.http.HttpRequest;
 import io.github.synapse4j.http.HttpResponse;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.tool.ManualTool;
@@ -53,12 +55,12 @@ class AnthropicChatClientTest {
     /** Captures the outgoing request and replays a canned response. */
     static class StubHttpClient implements HttpClient {
 
-        io.github.synapse4j.http.HttpRequest captured;
+        HttpRequest captured;
         DefaultHttpResponse canned = new DefaultHttpResponse();
-        io.github.synapse4j.http.HttpOptions options = io.github.synapse4j.http.HttpOptions.defaults();
+        HttpOptions options = HttpOptions.defaults();
 
         @Override
-        public HttpResponse send(io.github.synapse4j.http.HttpRequest request) {
+        public HttpResponse send(HttpRequest request) {
             this.captured = request;
             // A transport asks for the body before it answers, so this one does too: a request the
             // module cannot spell fails here, the way it would fail on the way out.
@@ -70,7 +72,7 @@ class AnthropicChatClientTest {
             // A transport is where a request's options meet its own, so the response it hands back
             // carries the result: whatever the exchange was configured with is what frames its
             // event stream.
-            canned.setOptions(io.github.synapse4j.http.HttpOptions.effective(request.getOptions(), options));
+            canned.setOptions(HttpOptions.effective(request.getOptions(), options));
             return canned;
         }
     }
@@ -149,6 +151,16 @@ class AnthropicChatClientTest {
         assertEquals("claude-test", response.getModel());
         assertEquals(Integer.valueOf(11), response.getUsage().getInputTokens());
         assertEquals(Integer.valueOf(7), response.getUsage().getOutputTokens());
+    }
+
+    @Test
+    void aBaseUrlWithATrailingSlashDoesNotDoubleThePath() {
+        stubCompletion();
+        config.setBaseUrl("https://example.test/");
+
+        client.chat(requestWithModel());
+
+        assertEquals("https://example.test/v1/messages", stub.captured.getUrl());
     }
 
     @Test
@@ -952,7 +964,7 @@ class AnthropicChatClientTest {
         // A budget of zero is one the event stream refuses to read under, so the failure lands
         // between the response arriving and the stream taking ownership of it — where nothing else
         // holds the connection, and nobody but this path can release it.
-        io.github.synapse4j.http.HttpOptions http = new io.github.synapse4j.http.HttpOptions();
+        HttpOptions http = new HttpOptions();
         http.setMaxFrameBytes(0);
         request.getOptions().setHttpOptions(http);
 

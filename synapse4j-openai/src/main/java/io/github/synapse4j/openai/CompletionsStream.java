@@ -159,10 +159,7 @@ class CompletionsStream extends DefaultChatStream {
         // The event's own unmodelled fields belong to the answer the way they belong to a
         // blocking response — folded in as they arrive, the last frame winning, which for the
         // fields that stay constant across a stream is the value the single response carries.
-        ProviderExtras eventExtras = event.getExtras();
-        if (eventExtras != null) {
-            response.getExtras().putAll(eventExtras);
-        }
+        response.getExtras().putAll(event.getExtras());
         ChatMessage delta = event.getDelta();
         if (delta == null) {
             return;

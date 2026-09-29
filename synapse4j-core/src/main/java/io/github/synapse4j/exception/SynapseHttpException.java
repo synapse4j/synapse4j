@@ -2,6 +2,8 @@ package io.github.synapse4j.exception;
 
 import org.jspecify.annotations.Nullable;
 
+import lombok.Getter;
+
 /**
  * A call the provider answered with a non-2xx status.
  *
@@ -15,8 +17,10 @@ import org.jspecify.annotations.Nullable;
  * One class holds every status rather than a subclass per code: the set is large, closed by the HTTP
  * specification, and read as an integer far more often than it is caught as a type.
  */
+@Getter
 public class SynapseHttpException extends SynapseException {
 
+    /** The HTTP status the answer carried. */
     private final int statusCode;
 
     /**
@@ -26,13 +30,6 @@ public class SynapseHttpException extends SynapseException {
     public SynapseHttpException(@Nullable String message, int statusCode) {
         super(message);
         this.statusCode = statusCode;
-    }
-
-    /**
-     * @return the HTTP status the answer carried
-     */
-    public int getStatusCode() {
-        return statusCode;
     }
 
 }
