@@ -942,6 +942,27 @@ class AnthropicChatClientTest {
     }
 
     @Test
+    void aStreamTheReaderRefusesStillReleasesTheResponse() {
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        RecordedInputStream body = new RecordedInputStream("data: {}\n\n".getBytes(UTF_8));
+        stub.canned.setBody(body);
+
+        ChatRequest request = requestWithModel();
+        // A budget of zero is one the event stream refuses to read under, so the failure lands
+        // between the response arriving and the stream taking ownership of it — where nothing else
+        // holds the connection, and nobody but this path can release it.
+        io.github.synapse4j.http.HttpOptions http = new io.github.synapse4j.http.HttpOptions();
+        http.setMaxFrameBytes(0);
+        request.getOptions().setHttpOptions(http);
+
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+                () -> client.stream(request));
+        assertTrue(thrown.getMessage().contains("maxFrameBytes"), thrown::toString);
+        assertTrue(body.closed, "the response the stream never took must still be released");
+    }
+
+    @Test
     void anErrorEventFailsWhileIterating() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));

@@ -174,25 +174,33 @@ public abstract class AbstractOpenAiChatClient extends AbstractChatClient {
         io.github.synapse4j.http.HttpResponse httpResponse = http.send(httpRequest);
         int status = httpResponse.getStatusCode();
         if (status >= 200 && status < 300) {
-            // The response decides whether it carries an event stream, and frames it with the budget
-            // the call asked for: the transport merged the options, so nothing here merges again.
-            SseEventStream events = httpResponse.sseEventStream();
-            if (events == null) {
-                try (io.github.synapse4j.http.HttpResponse notAnEventStream = httpResponse) {
+            try {
+                // The response decides whether it carries an event stream, and frames it with the budget
+                // the call asked for: the transport merged the options, so nothing here merges again.
+                SseEventStream events = httpResponse.sseEventStream();
+                if (events == null) {
                     throw new SynapseException("OpenAI answered " + status
                             + " to a streamed request, but not with a text/event-stream");
-                } catch (IOException e) {
-                    throw new SynapseException("OpenAI " + protocol() + " failed: response could not be read", e);
                 }
+                // The response is deliberately left open on success: the stream owns it from here,
+                // and closing the stream is what cancels an answer that is still in flight.
+                ChatStream stream = openStream(events, httpResponse::close, config);
+                // The headers arrive with the response, before any frame does, so they go onto the
+                // answer now: aggregatedResponse() carries them the moment the stream exists, the
+                // same way the answer of a blocking call does.
+                copyHeaders(stream.aggregatedResponse(), httpResponse.getHeaders());
+                return stream;
+            } catch (RuntimeException failure) {
+                // Between the response arriving and the stream taking ownership of it, nothing else
+                // holds the connection: whatever broke here would leave it held by a response no one
+                // has, so release it before the failure leaves.
+                try (io.github.synapse4j.http.HttpResponse closing = httpResponse) {
+                    // The close is what this path owes; the comment is what it is owed for.
+                } catch (IOException closeFailure) {
+                    failure.addSuppressed(closeFailure);
+                }
+                throw failure;
             }
-            // The response is deliberately left open: the stream owns it from here, and closing
-            // the stream is what cancels an answer that is still in flight.
-            ChatStream stream = openStream(events, httpResponse::close, config);
-            // The headers arrive with the response, before any frame does, so they go onto the
-            // answer now: aggregatedResponse() carries them the moment the stream exists, the
-            // same way the answer of a blocking call does.
-            copyHeaders(stream.aggregatedResponse(), httpResponse.getHeaders());
-            return stream;
         }
         throw refusal(httpResponse, status);
     }
