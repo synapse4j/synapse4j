@@ -4,8 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -47,13 +45,13 @@ import org.jspecify.annotations.Nullable;
  * brackets every block with a start and a stop frame, and the fold uses that grammar rather than
  * guessing: the frame that opens a block births the block's part outright and registers it under
  * the block's index, and every delta joins the part its own index names — so one block is one part,
- * however many frames it took, and two adjacent blocks never merge into one, a rule that holds even
- * when the block between them drew no part of its own. Tool input arrives as fragments of JSON text
+ * however many frames it took, and two adjacent blocks never merge into one. Tool input arrives as
+ * fragments of JSON text
  * and is concatenated as it comes, which is why a call's arguments are whole by the time the block
  * closes; a call whose input never streamed means the empty object, the same answer a blocking call
  * gives it. The input of a block the shared model has no part for — a server tool's call — is
- * parsed back into the extras entry that block arrived in, so the answer carries it where a blocking
- * walk kept it. The counts are merged member by member rather than replaced, because this protocol
+ * parsed into the block itself when it closes, so both ways of asking read the same document. The
+ * counts are merged member by member rather than replaced, because this protocol
  * reports the input side when the answer opens and the output side as it finishes — replacing would
  * lose the first half. The block bracket's {@code index} stays on the event that carried it and is
  * left off the answer, whose document has no such member.
@@ -183,13 +181,13 @@ class MessagesStream extends DefaultChatStream {
             foldExtras(response.getExtras(), event.getExtras());
             String eventType = event.getEventType();
             if (AnthropicEventTypes.CONTENT_BLOCK_STOP.equals(eventType)) {
-                closeBlock(response, event);
+                closeBlock(event);
             }
             if (AnthropicEventTypes.MESSAGE_STOP.equals(eventType)) {
                 // Every block has closed by now — or should have: any input whose stop frame never
                 // arrived still lands in its block rather than being dropped, and a call whose input
                 // never streamed means the empty object, the same answer a blocking call gives it.
-                writeUnmodeledInputs(response);
+                writeUnmodeledInputs();
                 normalizeEmptyInputs(response.getMessage());
             }
             ChatMessage delta = event.getDelta();
@@ -220,30 +218,32 @@ class MessagesStream extends DefaultChatStream {
                         openBlocks.put(index, part);
                     }
                 } else {
-                    mergeFragment(response, message, part, index);
+                    mergeFragment(message, part, index);
                 }
             }
         }
 
         /** Joins one fragment to the block its index names, or places it if that block is unknown. */
-        private void mergeFragment(ChatResponse response, ChatMessage message, ContentPart fragment,
-                @Nullable Integer index) {
+        private void mergeFragment(ChatMessage message, ContentPart fragment, @Nullable Integer index) {
             ContentPart target = index == null ? null : openBlocks.get(index);
+            if (target instanceof RawContentBlock) {
+                // The block keeps itself whole; only its input still streams, as fragments of JSON
+                // text that are parsed into the block when it closes — where a blocking walk
+                // captured the input whole with the block itself.
+                if (index != null && fragment instanceof ToolCallPart call
+                        && call.getArgumentsJson() != null) {
+                    unmodeledInput.computeIfAbsent(index, ignored -> new StringBuilder())
+                            .append(call.getArgumentsJson());
+                }
+                return;
+            }
             if (target != null) {
                 mergeInto(target, fragment, message);
                 return;
             }
-            if (fragment instanceof ToolCallPart call) {
-                if (call.getCallId() == null && index != null) {
-                    // Input fragments carry no id of their own: they belong to the block their index
-                    // names. That block may be one this module has no part for — a server tool's call,
-                    // whose block sits in extras — so the text accumulates here and is parsed into
-                    // that block when it closes, rather than being read as a call the model can see.
-                    unmodeledInput.computeIfAbsent(index, ignored -> new StringBuilder())
-                            .append(call.getArgumentsJson());
-                }
-                // A fragment with no block to belong to has nowhere trustworthy to go, and inventing a
-                // part from it would hand the model a call that was never made.
+            if (fragment instanceof ToolCallPart) {
+                // A fragment with no block to belong to has nowhere trustworthy to go, and inventing
+                // a part from it would hand the model a call that was never made.
                 return;
             }
             // No opening frame was seen for this index — the fragment opens its own part, and the
@@ -255,45 +255,41 @@ class MessagesStream extends DefaultChatStream {
         }
 
         /** Closes the block its index names: the part is done, and the input it spelled is written. */
-        private void closeBlock(ChatResponse response, ChatStreamEvent event) {
+        private void closeBlock(ChatStreamEvent event) {
             Integer index = indexOf(event);
             if (index == null) {
                 return;
             }
-            openBlocks.remove(index);
+            ContentPart target = openBlocks.remove(index);
             StringBuilder input = unmodeledInput.remove(index);
-            if (input != null) {
-                writeUnmodeledInput(response, index, input);
+            if (input != null && target instanceof RawContentBlock block) {
+                writeInput(block, input);
             }
         }
 
         /** Writes every input still held — for a block whose stop frame never arrived. */
-        private void writeUnmodeledInputs(ChatResponse response) {
-            unmodeledInput.forEach((index, input) -> writeUnmodeledInput(response, index, input));
+        private void writeUnmodeledInputs() {
+            unmodeledInput.forEach((index, input) -> {
+                ContentPart target = openBlocks.get(index);
+                if (target instanceof RawContentBlock block) {
+                    writeInput(block, input);
+                }
+            });
             unmodeledInput.clear();
         }
 
         /**
-         * Parses the input an unmodeled block spelled and sets it into that block, kept under its
-         * position in the answer's extras — where a blocking walk captured the same block whole.
+         * Parses the input an unmodeled block spelled and sets it into the block itself, where a
+         * blocking walk captured the same input whole.
          */
-        private void writeUnmodeledInput(ChatResponse response, int index, StringBuilder input) {
+        private void writeInput(RawContentBlock block, StringBuilder input) {
             if (input.isEmpty()) {
                 return;
             }
-            Object held = response.getExtras().get("content", String.valueOf(index));
-            if (!(held instanceof Map<?, ?> members)) {
-                // The opening frame never arrived, so there is no block to complete.
-                return;
-            }
             Object parsed = codec.decode(input.toString(), Object.class);
-            if (parsed == null) {
-                return;
+            if (parsed != null) {
+                block.getMembers().put("input", parsed);
             }
-            Map<String, Object> completed = new LinkedHashMap<>();
-            members.forEach((key, value) -> completed.put(String.valueOf(key), value));
-            completed.put("input", parsed);
-            response.getExtras().put(List.of("content", String.valueOf(index)), completed);
         }
 
         /** The bracket a frame carries for the block it speaks for, or {@code null} when it names none. */

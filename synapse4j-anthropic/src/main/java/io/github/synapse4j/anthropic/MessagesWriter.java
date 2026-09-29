@@ -274,6 +274,10 @@ class MessagesWriter {
                 blocks.add(toolResult(toolResult));
             } else if (part instanceof ReasoningPart reasoning) {
                 blocks.add(thinking(reasoning));
+            } else if (part instanceof RawContentBlock raw) {
+                // The block goes back out as it arrived: its members were read whole off the wire,
+                // so the protocol spells them again untouched, in the place this part holds.
+                blocks.add(raw.getMembers());
             } else {
                 throw unsupportedPart(part);
             }

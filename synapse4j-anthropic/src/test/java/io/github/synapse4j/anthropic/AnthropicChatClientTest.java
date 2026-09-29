@@ -544,15 +544,41 @@ class AnthropicChatClientTest {
 
         ChatResponse response = client.chat(request);
 
-        // The shared model has no part for the block, so it keeps its place in the content array
-        // rather than stopping the walk: the words still arrive, under the path they came from.
-        assertEquals(1, response.getMessage().getParts().size());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> kept = (Map<String, Object>) response.getExtras().get("content", "1");
-        assertEquals("server_tool_use", kept.get("type"));
-        assertEquals(Map.of("query", "weather"), kept.get("input"));
+        // The shared model has no part for the block, so it rides as itself: it keeps its place in
+        // the turn — after the text, where it sat in the content array — and goes back out whole.
+        assertEquals(2, response.getMessage().getParts().size());
+        RawContentBlock kept = assertInstanceOf(RawContentBlock.class,
+                response.getMessage().getParts().get(1));
+        assertEquals("server_tool_use", kept.getMembers().get("type"));
+        assertEquals(Map.of("query", "weather"), kept.getMembers().get("input"));
         // The fields after it were still read, so the walk stayed in step.
         assertEquals(Integer.valueOf(7), response.getUsage().getInputTokens());
+    }
+
+    @Test
+    void aServerToolsBlockComesBackOnTheNextTurnAsItArrived() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(message("\"msg_5\"",
+                "[{\"type\":\"text\",\"text\":\"hi\"},"
+                        + "{\"type\":\"server_tool_use\",\"id\":\"srvtoolu_1\",\"name\":\"web_search\","
+                        + "\"input\":{\"query\":\"weather\"}}]",
+                "end_turn", "\"usage\":{\"input_tokens\":7,\"output_tokens\":2}").getBytes(UTF_8)));
+
+        ChatResponse response = client.chat(requestWithModel());
+
+        // The turn continues the way an ongoing conversation continues: the answer's message joins
+        // the history, and the next request sends it back — the block read whole must arrive on the
+        // wire whole, in the place it held, or the provider is told a turn that never happened.
+        stubCompletion();
+        ChatRequest next = requestWithModel();
+        client.continueWith(next, response);
+        client.chat(next);
+
+        List<Map<String, Object>> content = contentOf(parseCaptured());
+        assertEquals(2, content.size());
+        assertEquals(Map.of("type", "text", "text", "hi"), content.get(0));
+        assertEquals(Map.of("type", "server_tool_use", "id", "srvtoolu_1", "name", "web_search",
+                "input", Map.of("query", "weather")), content.get(1));
     }
 
     @Test
@@ -767,15 +793,16 @@ class AnthropicChatClientTest {
         // The client's call keeps its own input whole: the server tool's fragments were routed by
         // the bracket index, never appended to the part that happened to open last.
         ChatResponse aggregated = stream.aggregatedResponse();
-        assertEquals(1, aggregated.getMessage().getParts().size());
+        assertEquals(2, aggregated.getMessage().getParts().size());
         ToolCallPart call = assertInstanceOf(ToolCallPart.class, aggregated.getMessage().getParts().get(0));
         assertEquals("toolu_1", call.getCallId());
         assertEquals("{\"city\":\"Paris\"}", call.getArgumentsJson());
-        // The server tool's block arrives with its input, the answer a blocking walk gives it.
-        @SuppressWarnings("unchecked")
-        Map<String, Object> kept = (Map<String, Object>) aggregated.getExtras().get("content", "1");
-        assertEquals("server_tool_use", kept.get("type"));
-        assertEquals(Map.of("query", "weather"), kept.get("input"));
+        // The server tool's block arrives as itself, carrying the input its fragments spelled —
+        // the answer a blocking walk gives it.
+        RawContentBlock kept = assertInstanceOf(RawContentBlock.class,
+                aggregated.getMessage().getParts().get(1));
+        assertEquals("server_tool_use", kept.getMembers().get("type"));
+        assertEquals(Map.of("query", "weather"), kept.getMembers().get("input"));
     }
 
     @Test

@@ -1,6 +1,5 @@
 package io.github.synapse4j.anthropic;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -197,28 +196,20 @@ class MessagesReader {
             throw new SynapseException(
                     "unsupported content shape in Anthropic Messages response: " + describe(token));
         }
-        int position = 0;
         while (reader.nextToken() != JsonReader.Token.END_ARRAY) {
             if (reader.token() != JsonReader.Token.START_OBJECT) {
                 reader.skipValue();
-                position++;
                 continue;
             }
             Object value = reader.captureValue();
             if (value instanceof Map<?, ?> block) {
+                // A block this module does not model — a server tool's call, a search result —
+                // rides as itself rather than being dropped or reinterpreted: kept whole as a
+                // part, it sits where it sat in the content array, so it travels with the turn
+                // when the conversation continues and goes back out exactly as it arrived.
                 ContentPart part = partOf(block);
-                if (part != null) {
-                    response.getMessage().getParts().add(part);
-                } else {
-                    // A block this module does not model — a server tool's call, a search result —
-                    // is kept whole under its position in the content array rather than dropped:
-                    // the shared model has no part for it, but its words still have to arrive. It
-                    // stays on the response, because the message's extras are what a request
-                    // replays, and this block is not a member of a message.
-                    response.getExtras().put(List.of("content", String.valueOf(position)), block);
-                }
+                response.getMessage().getParts().add(part != null ? part : new RawContentBlock(block));
             }
-            position++;
         }
     }
 
@@ -326,14 +317,11 @@ class MessagesReader {
             event.setDelta(delta(call));
         } else if (part != null) {
             event.setDelta(delta(part));
-        } else if (blockValue != null) {
-            // A block type with no part of its own keeps the position it has in the answer's
-            // content array, under the path the blocking walk reads it to — the two ways of
-            // asking stay the same document.
-            Object position = event.getExtras().get("index");
-            if (position != null) {
-                event.getExtras().put(List.of("content", String.valueOf(position)), blockValue);
-            }
+        } else if (blockValue instanceof Map<?, ?> block) {
+            // A block type with no part of its own is born the same way the blocking walk keeps
+            // it: whole, as itself, in the place it holds in the turn — so both ways of asking
+            // read the same document, and the input the deltas spell joins it when it closes.
+            event.setDelta(delta(new RawContentBlock(block)));
         }
         carryRest(event, payload, "content_block");
     }
