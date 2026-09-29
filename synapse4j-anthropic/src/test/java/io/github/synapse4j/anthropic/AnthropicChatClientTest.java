@@ -717,8 +717,7 @@ class AnthropicChatClientTest {
         List<Map<String, Object>> messages = (List<Map<String, Object>>) wire.get("messages");
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> content = (List<Map<String, Object>>) messages.get(0).get("content");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> block = (Map<String, Object>) content.get(0);
+        Map<String, Object> block = content.get(0);
         assertEquals("tool_use", block.get("type"));
         assertEquals(Map.of("city", "Paris"), block.get("input"));
     }
@@ -769,8 +768,7 @@ class AnthropicChatClientTest {
         List<Map<String, Object>> messages = (List<Map<String, Object>>) wire.get("messages");
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> content = (List<Map<String, Object>>) messages.get(0).get("content");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> block = (Map<String, Object>) content.get(0);
+        Map<String, Object> block = content.get(0);
         assertEquals(Map.of(), block.get("input"));
     }
 
