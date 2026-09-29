@@ -12,6 +12,11 @@
 
   <artifactId>synapse4j-jackson</artifactId>
 
+  <!-- name is never inherited, so it is stated in every module; url and scm arrive
+       unchanged from the root — its append-path flags are switched off. -->
+  <name>synapse4j Jackson</name>
+  <description>JSON support for synapse4j built on Jackson: serialization and JSON Schema generation.</description>
+
   <!-- The JSON codec that binds this library to Jackson and victools. Every dependency here is
        declared as what it is — a direct one — rather than optional: a user who pulls this module in
        is asking for Jackson, so nothing is hidden behind an opt-in that would leave the classes it

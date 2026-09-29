@@ -5,9 +5,8 @@
 
   <!-- What consumers import: the versions of this library's own modules, nothing else. The parent
        is the bare aggregator rather than the build parent, so no third-party dependency
-       management is inherited that flatten would have to fight. Flatten runs here standalone
-       because the plugin management that versions it lives in the build parent this pom
-       deliberately does not use. -->
+       management is inherited that flatten would have to fight. Flatten itself comes from the
+       aggregator; only the override below is declared here. -->
   <parent>
     <groupId>io.github.synapse4j</groupId>
     <artifactId>synapse4j-aggregator</artifactId>
@@ -17,15 +16,17 @@
   <artifactId>synapse4j-bom</artifactId>
   <packaging>pom</packaging>
 
+  <!-- name is never inherited, so it is stated in every module; url and scm arrive
+       unchanged from the root — its append-path flags are switched off. -->
+  <name>synapse4j BOM</name>
+  <description>Bill of Materials for synapse4j: the module versions a consumer imports.</description>
+
   <build>
     <plugins>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>flatten-maven-plugin</artifactId>
-        <version>${flatten-maven-plugin.version}</version>
         <configuration>
-          <updatePomFile>true</updatePomFile>
-          <flattenMode>oss</flattenMode>
           <pomElements>
             <!-- The oss mode drops dependencyManagement, which for every other module is internal
                  bookkeeping and for this one is the artifact itself. Only this module's own entries
@@ -33,22 +34,6 @@
             <dependencyManagement>resolve</dependencyManagement>
           </pomElements>
         </configuration>
-        <executions>
-          <execution>
-            <id>flatten</id>
-            <phase>process-resources</phase>
-            <goals>
-              <goal>flatten</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>flatten-clean</id>
-            <phase>clean</phase>
-            <goals>
-              <goal>clean</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>

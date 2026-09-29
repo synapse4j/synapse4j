@@ -12,6 +12,11 @@
 
   <artifactId>synapse4j-core</artifactId>
 
+  <!-- name is never inherited, so it is stated in every module; url and scm arrive
+       unchanged from the root — its append-path flags are switched off. -->
+  <name>synapse4j Core</name>
+  <description>The provider-neutral core of synapse4j: the chat model, tools, and the JSON and HTTP extension points.</description>
+
   <dependencies>
     <dependency>
       <groupId>org.projectlombok</groupId>

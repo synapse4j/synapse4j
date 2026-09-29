@@ -12,6 +12,11 @@
 
   <artifactId>synapse4j-openai</artifactId>
 
+  <!-- name is never inherited, so it is stated in every module; url and scm arrive
+       unchanged from the root — its append-path flags are switched off. -->
+  <name>synapse4j OpenAI</name>
+  <description>An OpenAI protocol client for synapse4j: Chat Completions and the Responses API.</description>
+
   <!-- The OpenAI provider module. Protocol documents are plain Map/List structures bound by the
        application's own JsonCodec — the module depends on no JSON library of its own. The codec
        implementation is only needed by the tests. -->

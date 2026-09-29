@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+  child.project.url.inherit.append.path="false">
   <modelVersion>4.0.0</modelVersion>
+
+  <!-- The project-level append-path flag above (and the scm flags further down) keep a child's
+       inherited url and scm exactly as written here instead of growing the module's path. -->
 
   <!-- The aggregator only: it lists what this build contains and carries the CI-friendly version.
        synapse4j-parent holds how the leaf modules are built; synapse4j-bom is what consumers
@@ -11,11 +15,41 @@
   <version>${revision}</version>
   <packaging>pom</packaging>
 
+  <!-- The metadata every published pom carries: Central validates name, description, url,
+       licenses, developers and scm on each artifact, and flatten inlines these inherited
+       values into the pom each module is deployed with. -->
+  <name>synapse4j</name>
+  <description>A lightweight Java library for talking to LLM providers, decoupled from any particular framework.</description>
+  <url>https://github.com/synapse4j/synapse4j</url>
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <name>synapse4j</name>
+      <url>https://github.com/synapse4j</url>
+    </developer>
+  </developers>
+  <!-- The append-path flags stop Maven from tacking each module's directory onto these
+       strings as they inherit; without them every child's connection ends in /module/path. -->
+  <scm child.scm.connection.inherit.append.path="false"
+       child.scm.developerConnection.inherit.append.path="false"
+       child.scm.url.inherit.append.path="false">
+    <connection>scm:git:https://github.com/synapse4j/synapse4j.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/synapse4j/synapse4j.git</developerConnection>
+    <url>https://github.com/synapse4j/synapse4j</url>
+  </scm>
+
   <properties>
     <revision>0.0.1-SNAPSHOT</revision>
 
-    <!-- The versions of the build's own plugins, kept here so the poms that declare those plugins
-         a second time — the BOM's flatten, this file's spotless — reference one place. -->
+    <!-- The versions of the build's own plugins, kept here so every pom that declares one of
+         them — this file's spotless and flatten, the BOM's flatten override — references one
+         place. -->
     <flatten-maven-plugin.version>1.7.3</flatten-maven-plugin.version>
     <spotless-maven-plugin.version>3.10.2</spotless-maven-plugin.version>
   </properties>
@@ -43,7 +77,115 @@
         <artifactId>spotless-maven-plugin</artifactId>
         <version>${spotless-maven-plugin.version}</version>
       </plugin>
+      <!-- Declared at the aggregator so every module flattens the same way — the deployed pom is
+           this file's own raw pom for the root, and for everything below a self-contained oss pom
+           carrying the coordinates, metadata and dependencies above, with no parent to fetch. The
+           BOM adds only its dependencyManagement override. -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>flatten-maven-plugin</artifactId>
+        <version>${flatten-maven-plugin.version}</version>
+        <configuration>
+          <updatePomFile>true</updatePomFile>
+          <flattenMode>oss</flattenMode>
+        </configuration>
+        <executions>
+          <execution>
+            <id>flatten</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>flatten</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>flatten-clean</id>
+            <phase>clean</phase>
+            <goals>
+              <goal>clean</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!-- Everything a Maven Central release needs, off by default so a normal build never signs,
+         never jars sources and never talks to a repository. Activated by -Prelease, which the
+         release workflow does after the tag's CI has already gone green. -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>3.3.1</version>
+            <configuration>
+              <!-- A pom module has no sources: attach nothing there rather than an empty jar. -->
+              <skipIfEmpty>true</skipIfEmpty>
+            </configuration>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.11.2</version>
+            <configuration>
+              <!-- Errors for malformed markup and broken links, silence for the missing-tag
+                   noise: the prose carries the contract here, and a missing @param on a
+                   one-line accessor must not hold a release hostage. -->
+              <doclint>all,-missing</doclint>
+            </configuration>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.8</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <!-- Replaces maven-deploy-plugin where it loads: uploads the whole reactor as one
+               Central Portal deployment and waits until it is actually published. -->
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.9.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <deploymentName>synapse4j-${project.version}</deploymentName>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>true</autoPublish>
+              <waitUntil>published</waitUntil>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 
 </project>

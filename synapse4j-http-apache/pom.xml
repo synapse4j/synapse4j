@@ -12,6 +12,11 @@
 
   <artifactId>synapse4j-http-apache</artifactId>
 
+  <!-- name is never inherited, so it is stated in every module; url and scm arrive
+       unchanged from the root — its append-path flags are switched off. -->
+  <name>synapse4j HTTP Apache</name>
+  <description>An HTTP transport for synapse4j built on Apache HttpClient 5.</description>
+
   <!-- The HTTP transport built on Apache HttpClient 5, for callers whose stack already configures
        one: connection pools, TLS, proxy and instrumentation configured on the client ride along,
        while everything the transport itself must do — body streaming, SSE, timeouts — follows the

@@ -14,6 +14,11 @@
   <artifactId>synapse4j-parent</artifactId>
   <packaging>pom</packaging>
 
+  <!-- name is never inherited, so it is stated in every module; url and scm arrive
+       unchanged from the root — its append-path flags are switched off. -->
+  <name>synapse4j Build Parent</name>
+  <description>How the synapse4j modules are built: dependency management, plugin versions and formatting rules.</description>
+
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
 
@@ -155,11 +160,6 @@
           <artifactId>maven-deploy-plugin</artifactId>
           <version>3.2.0</version>
         </plugin>
-        <plugin>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>flatten-maven-plugin</artifactId>
-          <version>${flatten-maven-plugin.version}</version>
-        </plugin>
       </plugins>
     </pluginManagement>
     <plugins>
@@ -189,38 +189,6 @@
             <phase>verify</phase>
             <goals>
               <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>flatten-maven-plugin</artifactId>
-        <configuration>
-          <updatePomFile>true</updatePomFile>
-          <flattenMode>oss</flattenMode>
-          <pomElements>
-            <description>remove</description>
-            <developers>remove</developers>
-            <organization>remove</organization>
-            <scm>remove</scm>
-            <url>remove</url>
-            <repositories>remove</repositories>
-          </pomElements>
-        </configuration>
-        <executions>
-          <execution>
-            <id>flatten</id>
-            <phase>process-resources</phase>
-            <goals>
-              <goal>flatten</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>flatten-clean</id>
-            <phase>clean</phase>
-            <goals>
-              <goal>clean</goal>
             </goals>
           </execution>
         </executions>

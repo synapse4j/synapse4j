@@ -12,6 +12,11 @@
 
   <artifactId>synapse4j-http-jdk</artifactId>
 
+  <!-- name is never inherited, so it is stated in every module; url and scm arrive
+       unchanged from the root — its append-path flags are switched off. -->
+  <name>synapse4j HTTP JDK</name>
+  <description>An HTTP transport for synapse4j built on the JDK's HttpClient.</description>
+
   <!-- The HTTP transport built on the JDK's java.net.http.HttpClient, so that this module needs no
        dependencies at all: a caller who does not want to pick an HTTP library gets one that ships
        with the JDK. Socket-level configuration (connect timeout, executor, SSL, proxy) stays in

@@ -12,6 +12,11 @@
 
   <artifactId>synapse4j-http-restclient</artifactId>
 
+  <!-- name is never inherited, so it is stated in every module; url and scm arrive
+       unchanged from the root — its append-path flags are switched off. -->
+  <name>synapse4j HTTP RestClient</name>
+  <description>An HTTP transport for synapse4j built on the Spring Framework's RestClient abstraction.</description>
+
   <!-- The HTTP transport built on Spring's RestClient, for callers whose stack already configures
        one: interceptors, Observation instrumentation, authentication and retries ride along, while
        everything underneath the RestClient — request factory, redirects, socket configuration —

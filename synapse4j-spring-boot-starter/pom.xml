@@ -12,6 +12,11 @@
 
   <artifactId>synapse4j-spring-boot-starter</artifactId>
 
+  <!-- name is never inherited, so it is stated in every module; url and scm arrive
+       unchanged from the root — its append-path flags are switched off. -->
+  <name>synapse4j Spring Boot Starter</name>
+  <description>Spring Boot auto-configuration for synapse4j's clients, transports and JSON support.</description>
+
   <!-- The Spring Boot integration: it wires the Jackson codec, a transport and a chat client into
        the context, bound to synapse4j.* properties — synapse4j.http-client picks between the
        Spring and Apache transports, synapse4j.chat-client between the OpenAI protocols and

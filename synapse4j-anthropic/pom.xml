@@ -12,6 +12,11 @@
 
   <artifactId>synapse4j-anthropic</artifactId>
 
+  <!-- name is never inherited, so it is stated in every module; url and scm arrive
+       unchanged from the root — its append-path flags are switched off. -->
+  <name>synapse4j Anthropic</name>
+  <description>An Anthropic Messages protocol client for synapse4j.</description>
+
   <!-- The Anthropic provider module. Protocol documents are plain Map/List structures bound by the
        application's own JsonCodec — the module depends on no JSON library of its own. The codec
        implementation is only needed by the tests. -->
