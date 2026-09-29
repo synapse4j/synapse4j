@@ -44,8 +44,9 @@ public class DefaultSseEventStream implements SseEventStream {
 
     /**
      * Bytes read ahead from the body, so a line is assembled from a fill rather than a read per
-     * byte. Owned by the reading thread — {@link #close()} reaches only {@link #source}, which is
-     * what unblocks a reader parked on a silent provider.
+     * byte. Owned by the reading thread — {@link #close()} marks the stream finished and reaches
+     * only {@link #source}, never the buffer, which is what unblocks a reader parked on a silent
+     * provider.
      */
     private final byte[] buffer = new byte[8192];
 
@@ -59,9 +60,15 @@ public class DefaultSseEventStream implements SseEventStream {
     /** The line being assembled, decoded once its terminator arrives. */
     private final ByteArrayOutputStream line = new ByteArrayOutputStream();
 
-    private @Nullable SseEvent pending;
+    /** Read by the consuming thread, written there and by {@link #close()}: hence volatile. */
+    private volatile @Nullable SseEvent pending;
 
-    private boolean finished;
+    /**
+     * Whether the stream is over — the body ended, or {@link #close()} was called. Volatile
+     * because the close may come from another thread: the reader has to see it rather than
+     * meet the closed source with a read.
+     */
+    private volatile boolean finished;
 
     /**
      * Reads the given body as UTF-8, the encoding every mainstream provider streams. The body is
@@ -104,12 +111,15 @@ public class DefaultSseEventStream implements SseEventStream {
     /**
      * Closes the body this stream was given — directly, through no reader, so a thread parked on
      * a silent provider is unblocked by the close rather than left holding a lock the reader
-     * wants. Idempotent, and the reason a streaming response ends early when a caller closes it.
-     * A failure of the close is the transport's own, so it travels as an {@link IOException}
-     * rather than being wrapped.
+     * wants. Idempotent, and the reason a streaming response ends early when a caller closes it:
+     * the close is the stream's terminal state, so whatever is asked of it afterwards answers that
+     * the stream is over rather than meeting a closed source with a read. A failure of the close
+     * is the transport's own, so it travels as an {@link IOException} rather than being wrapped.
      */
     @Override
     public void close() throws IOException {
+        pending = null;
+        finished = true;
         source.close();
     }
 

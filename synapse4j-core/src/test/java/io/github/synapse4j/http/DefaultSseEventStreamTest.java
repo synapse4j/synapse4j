@@ -141,6 +141,22 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
+    void closingLeavesTheStreamOverRatherThanFailed() throws IOException {
+        TrackingStream body = new TrackingStream("data: one\n\n");
+        DefaultSseEventStream reader = new DefaultSseEventStream(body, HttpOptions.defaults().getMaxFrameBytes());
+        assertTrue(reader.hasNext());
+
+        reader.close();
+
+        // The close is the terminal state, from whatever thread it came: what is asked of the
+        // stream afterwards is answered by that state — over — rather than by a read off the
+        // closed source, which would fail an iterator that has simply been ended early.
+        assertFalse(reader.hasNext());
+        reader.close();
+        assertTrue(body.closed);
+    }
+
+    @Test
     void aFailingSourceIsReportedAsTheLibraryOwns() throws IOException {
         InputStream body = new InputStream() {
 

@@ -150,6 +150,34 @@ class DefaultChatStreamTest {
     }
 
     @Test
+    void aSourceFailingAfterPromisingAnEventReleasesTheConnection() {
+        AtomicInteger closed = new AtomicInteger();
+        Iterator<ChatStreamEvent> failing = new Iterator<ChatStreamEvent>() {
+            @Override
+            public boolean hasNext() {
+                return true;
+            }
+
+            @Override
+            public ChatStreamEvent next() {
+                throw new SynapseException("the source failed");
+            }
+        };
+        ChatStream stream = new DefaultChatStream(failing, (response, event) -> {
+        }, closed::incrementAndGet);
+        Iterator<ChatStreamEvent> iterator = stream.iterator();
+
+        // hasNext saying yes and the read that follows failing is the same ending as hasNext
+        // failing: the answer is over, and nothing will read the connection again.
+        SynapseException thrown = assertThrows(SynapseException.class, iterator::next);
+
+        assertEquals("the source failed", thrown.getMessage());
+        assertEquals(1, closed.get(), "a failed source leaves nothing to read — release it");
+        stream.close();
+        assertEquals(1, closed.get(), "closing after the failure must not release a second time");
+    }
+
+    @Test
     void aCloseFailureIsReportedAsTheLibraryOwns() {
         ChatStream stream = new DefaultChatStream(events("one").iterator(), (response, event) -> {
         }, () -> {

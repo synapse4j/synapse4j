@@ -156,10 +156,25 @@ public class DefaultChatStream implements ChatStream {
             if (!hasNext()) {
                 throw new NoSuchElementException("the stream is exhausted");
             }
-            ChatStreamEvent event = source.next();
-            eventPipeline.accept(event);
-            aggregation.accept(aggregated, event);
-            return event;
+            try {
+                ChatStreamEvent event = source.next();
+                eventPipeline.accept(event);
+                aggregation.accept(aggregated, event);
+                return event;
+            } catch (RuntimeException failure) {
+                // A source that promised an event and then failed has ended the answer just as one
+                // that fails hasNext: nothing will read the connection again, so release it here,
+                // keeping any close failure beside the original rather than in its place. The
+                // pipeline and the fold run inside the same guard for the same reason — whatever
+                // broke has left the stream unusable, and a caller unwinding from the failure is
+                // not going to come back for the next event.
+                try {
+                    release();
+                } catch (RuntimeException closeFailure) {
+                    failure.addSuppressed(closeFailure);
+                }
+                throw failure;
+            }
         }
 
     }
