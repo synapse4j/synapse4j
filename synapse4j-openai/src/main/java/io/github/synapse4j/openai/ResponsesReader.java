@@ -389,18 +389,21 @@ class ResponsesReader {
     }
 
     private static void textDelta(ChatStreamEvent event, ProviderExtras payload) {
+        // The whole frame rides on the event — where in the stream it sat, the fragment it
+        // carried — for an application reading the stream. The answer keeps none of it: a
+        // blocking response has no frames, and the fold is what makes the two answers equal.
+        event.getExtras().putAll(payload);
         String fragment = stringOf(payload.get("delta"));
-        if (fragment == null) {
-            event.getExtras().putAll(payload);
-            return;
+        if (fragment != null) {
+            event.setDelta(delta(new TextPart(fragment)));
         }
-        event.setDelta(delta(new TextPart(fragment)));
     }
 
     private static void argumentsDelta(ChatStreamEvent event, ProviderExtras payload) {
+        // The frame belongs to the event; see textDelta.
+        event.getExtras().putAll(payload);
         String fragment = stringOf(payload.get("delta"));
         if (fragment == null) {
-            event.getExtras().putAll(payload);
             return;
         }
         ToolCallPart call = new ToolCallPart();
@@ -410,9 +413,10 @@ class ResponsesReader {
     }
 
     private static void reasoningDelta(ChatStreamEvent event, ProviderExtras payload) {
+        // The frame belongs to the event; see textDelta.
+        event.getExtras().putAll(payload);
         String fragment = stringOf(payload.get("delta"));
         if (fragment == null) {
-            event.getExtras().putAll(payload);
             return;
         }
         ReasoningPart reasoning = new ReasoningPart();
@@ -427,15 +431,15 @@ class ResponsesReader {
      * the two together, since this module has no field for it.
      */
     private static void addedItem(ChatStreamEvent event, ProviderExtras payload) {
-        if (!(payload.get("item") instanceof Map<?, ?> item) || !"function_call".equals(item.get("type"))) {
-            event.getExtras().putAll(payload);
-            return;
+        // The frame belongs to the event; see textDelta.
+        event.getExtras().putAll(payload);
+        if (payload.get("item") instanceof Map<?, ?> item && "function_call".equals(item.get("type"))) {
+            ToolCallPart call = new ToolCallPart();
+            call.setName(stringOf(item.get("name")));
+            call.setCallId(stringOf(item.get("call_id")));
+            streamPosition(payload, call);
+            event.setDelta(delta(call));
         }
-        ToolCallPart call = new ToolCallPart();
-        call.setName(stringOf(item.get("name")));
-        call.setCallId(stringOf(item.get("call_id")));
-        streamPosition(payload, call);
-        event.setDelta(delta(call));
     }
 
     /** Keeps the position a fragment came with on the part it produced, where the fold reads it back. */

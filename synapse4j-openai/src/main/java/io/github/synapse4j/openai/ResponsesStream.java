@@ -148,8 +148,14 @@ class ResponsesStream extends DefaultChatStream {
         }
         // The event's own unmodelled fields belong to the answer the way they belong to a blocking
         // response — folded in as they arrive, the last frame winning, which for the fields that
-        // stay constant across a stream is the value the single response carries.
-        response.getExtras().putAll(event.getExtras());
+        // stay constant across a stream is the value the single response carries. The frames that
+        // carry a fragment of a part are the exception: their payload is the stream's own bookkeeping
+        // — position in the stream, the fragment text — and a blocking response has no frames to
+        // carry it. What such a frame says about the answer itself arrives on the frame that closes
+        // it, which carries the whole response.
+        if (!isFragment(event.getEventType())) {
+            response.getExtras().putAll(event.getExtras());
+        }
         ChatMessage delta = event.getDelta();
         if (delta == null) {
             return;
@@ -193,6 +199,19 @@ class ResponsesStream extends DefaultChatStream {
     private static boolean finishesAnswer(@Nullable String eventType) {
         return OpenAiResponsesEventTypes.COMPLETED.equals(eventType)
                 || OpenAiResponsesEventTypes.INCOMPLETE.equals(eventType);
+    }
+
+    /**
+     * Whether an event carries a fragment — a piece of a part, or the announcement of an item —
+     * rather than a response of its own. Such a frame's payload is the stream's bookkeeping, kept
+     * on the event for the application and folded out of the answer, which a blocking call spells
+     * without ever seeing a frame.
+     */
+    private static boolean isFragment(@Nullable String eventType) {
+        return OpenAiResponsesEventTypes.OUTPUT_TEXT_DELTA.equals(eventType)
+                || OpenAiResponsesEventTypes.OUTPUT_ITEM_ADDED.equals(eventType)
+                || OpenAiResponsesEventTypes.FUNCTION_CALL_ARGUMENTS_DELTA.equals(eventType)
+                || OpenAiResponsesEventTypes.REASONING_SUMMARY_TEXT_DELTA.equals(eventType);
     }
 
     /** Appends a fragment to the turn's text, which is one part however many frames it took. */

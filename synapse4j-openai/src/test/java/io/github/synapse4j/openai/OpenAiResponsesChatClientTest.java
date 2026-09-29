@@ -466,6 +466,10 @@ class OpenAiResponsesChatClientTest {
         assertEquals(OpenAiResponsesEventTypes.OUTPUT_TEXT_DELTA, events.get(1).getEventType());
         // The second text frame named no event, so its payload's own type names the event.
         assertEquals(OpenAiResponsesEventTypes.OUTPUT_TEXT_DELTA, events.get(2).getEventType());
+        // The frame arrives whole on the event — its position in the stream included — even
+        // though the answer keeps none of it, a blocking response having no frames to carry it.
+        assertEquals("msg_1", events.get(1).getExtras().get("item_id"));
+        assertEquals(0, events.get(1).getExtras().get("output_index"));
 
         ChatResponse aggregated = stream.aggregatedResponse();
         assertEquals(ChatRole.ASSISTANT, aggregated.getMessage().getRole());
