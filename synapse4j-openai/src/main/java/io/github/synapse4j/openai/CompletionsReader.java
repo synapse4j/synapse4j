@@ -213,6 +213,13 @@ class CompletionsReader {
             return;
         }
         if (!"text".equals(type)) {
+            if ("refusal".equals(type)) {
+                // A refusal the provider spelled inside the content is kept as the member this
+                // protocol's message-level refusal already travels under, so an application reads
+                // one member however the provider chose to deliver the words.
+                message.getOrCreateExtras().put("refusal", collected.get("refusal"));
+                return;
+            }
             throw new SynapseException("unsupported content part in OpenAI response: " + type);
         }
         TextPart part = new TextPart(text);

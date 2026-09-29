@@ -345,6 +345,26 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
+    void aRefusalInTheContentIsKeptAsTheMessageMember() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
+                + "\"message\":{\"role\":\"assistant\",\"content\":["
+                + "{\"type\":\"refusal\",\"refusal\":\"I cannot help with that\"},"
+                + "{\"type\":\"text\",\"text\":\"visible\"}]}}]}").getBytes(UTF_8)));
+
+        ChatRequest request = requestWithModel();
+
+        ChatResponse response = client.chat(request);
+
+        // The refusal is kept as the member this protocol's message-level refusal already travels
+        // under, and the walk goes on to the parts beside it rather than failing on it.
+        assertEquals("I cannot help with that", response.getMessage().getExtras().get("refusal"));
+        assertEquals(1, response.getMessage().getParts().size());
+        assertEquals("visible",
+                assertInstanceOf(TextPart.class, response.getMessage().getParts().get(0)).getText());
+    }
+
+    @Test
     void toolDefinitionsGoOutAndToolCallsComeBack() throws Exception {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,"

@@ -262,6 +262,14 @@ class ResponsesReader {
             if (type == null) {
                 continue;
             }
+            if ("refusal".equals(type)) {
+                // The refusal this protocol spells inside the content is kept as the member its
+                // message-level cousins travel under, so an application reads one member however
+                // the protocol chose to deliver the words — and the walk goes on to the parts
+                // beside it instead of failing on it.
+                message.getOrCreateExtras().put("refusal", members.get("refusal"));
+                continue;
+            }
             if (!"output_text".equals(type)) {
                 throw new SynapseException("unsupported content part in OpenAI Responses response: " + type);
             }

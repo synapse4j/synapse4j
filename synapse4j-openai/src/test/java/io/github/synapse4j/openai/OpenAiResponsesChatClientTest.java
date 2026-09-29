@@ -438,6 +438,24 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
+    void aRefusalInTheContentIsKeptAsTheMessageMember() {
+        stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\","
+                + "\"output\":[{\"type\":\"message\",\"id\":\"msg_9\",\"status\":\"completed\","
+                + "\"content\":[{\"type\":\"refusal\",\"refusal\":\"I cannot help with that\"},"
+                + "{\"type\":\"output_text\",\"text\":\"visible\"}]}],"
+                + "\"usage\":{\"input_tokens\":7,\"output_tokens\":2}}");
+
+        ChatResponse response = client.chat(requestWithModel());
+
+        // The refusal is kept as the member its message-level cousins travel under, and the walk
+        // goes on to the parts beside it rather than failing on a payload the protocol sends.
+        assertEquals("I cannot help with that", response.getMessage().getExtras().get("refusal"));
+        assertEquals(1, response.getMessage().getParts().size());
+        assertEquals("visible",
+                assertInstanceOf(TextPart.class, response.getMessage().getParts().get(0)).getText());
+    }
+
+    @Test
     void aStreamedAnswerFoldsIntoTheSameAnswerABlockingCallReturns() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
