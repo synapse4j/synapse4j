@@ -54,10 +54,11 @@ public class OpenAiConfig {
 
     /**
      * The member the model's reasoning travels under, read and written alike. Endpoints disagree
-     * about its name — {@code reasoning_content} is the one the providers that require it back use,
-     * {@code reasoning} the one the newer servers settled on — and a name is one thing, not two: a
-     * conversation that reads one spelling and writes another renames a member the endpoint never
-     * sent. Blank means reasoning is neither read nor sent.
+     * about its name — {@code reasoning} is the one the newer servers settled on and the one this
+     * module's default endpoint speaks, {@code reasoning_content} the one the providers that
+     * require the reasoning back use — and a name is one thing, not two: a conversation that reads
+     * one spelling and writes another renames a member the endpoint never sent. Blank means
+     * reasoning is neither read nor sent.
      *
      * <p>
      * A response that carries reasoning under some other name is not a failure: that member stays in
@@ -65,7 +66,7 @@ public class OpenAiConfig {
      * setting.
      */
     @NonNull
-    private String reasoningField = "reasoning_content";
+    private String reasoningField = "reasoning";
 
     /**
      * Whether the endpoint keeps the answer this call produces, sent as the Responses protocol's
