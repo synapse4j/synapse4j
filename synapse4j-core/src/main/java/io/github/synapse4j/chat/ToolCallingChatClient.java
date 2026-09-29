@@ -29,10 +29,10 @@ import lombok.NonNull;
  * tools, or the executor declines the batch.
  *
  * <p>
- * Everything else passes through: the rounds all go to the inner client, so its customizers
- * and defaults run per turn, while this class's own run at the round's start and once on the
- * final answer. Event customizers registered on this decorator are handed to the inner client
- * as they are registered — its streams fold the events, and that is where the chain has to run.
+ * Everything else passes through: the rounds all go to the inner client, so its defaults run
+ * per turn while this class's own apply at the round's start. A customizer registered on this
+ * decorator is handed to the inner client whole: every round runs it, and its streams are where
+ * the events fold, so that is where the chain has to run.
  * {@link #stream} loops too: the rounds' streams are spliced into one sequence of events, and
  * the loop advances inside the pull — a round that runs out with calls outstanding executes
  * its batch there and opens the next round before the next event arrives.
@@ -93,12 +93,15 @@ public class ToolCallingChatClient extends AbstractChatClient {
      * {@inheritDoc}
      *
      * <p>
-     * Handed straight to the inner client — its streams are where the events are folded, and
-     * the chain has to run there.
+     * Handed straight to the inner client whole: which hooks a composite overrides is not this
+     * class's to ask, the loop's streams draw their events from the inner client, and the rounds
+     * went there too — so it joins the inner client's chains and every round runs it: the request
+     * hook on each round's request as that round prepares it, the response hook on each round's
+     * answer, the stream hook on each event of each round's stream.
      */
     @Override
-    public void addChatStreamEventCustomizer(ChatStreamEventCustomizer customizer) {
-        inner.addChatStreamEventCustomizer(customizer);
+    public void addChatCustomizer(ChatCustomizer customizer) {
+        inner.addChatCustomizer(customizer);
     }
 
     /**
@@ -108,8 +111,8 @@ public class ToolCallingChatClient extends AbstractChatClient {
      * The registration was handed to the inner client, and it comes off there.
      */
     @Override
-    public boolean removeChatStreamEventCustomizer(ChatStreamEventCustomizer customizer) {
-        return inner.removeChatStreamEventCustomizer(customizer);
+    public boolean removeChatCustomizer(ChatCustomizer customizer) {
+        return inner.removeChatCustomizer(customizer);
     }
 
     /**

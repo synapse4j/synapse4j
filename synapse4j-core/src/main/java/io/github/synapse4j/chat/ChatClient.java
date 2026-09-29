@@ -22,12 +22,11 @@ import io.github.synapse4j.tool.ToolProvider;
  * same {@link ChatResponse} as it goes. Implementations must provide both.
  *
  * <p>
- * A client may also carry {@link ChatRequestCustomizer}s, which prepare every request before it is
- * validated and sent — where an application corrects a shared field whose mapping does not fit the
- * endpoint — {@link ChatResponseCustomizer}s, which adjust an answer on its way back,
- * {@link ChatStreamEventCustomizer}s, which adapt a stream's events before they are folded, and a
- * set of default tools merged into every request's own, and tool providers whose tools are
- * fetched on every call instead. {@link AbstractChatClient} implements these
+ * A client may also carry {@link ChatCustomizer}s: hooks that prepare every request before it is
+ * validated and sent — where an application corrects a shared field whose mapping does not fit
+ * the endpoint — adjust an answer on its way back, adapt a stream's events before they are
+ * folded, and a set of default tools merged into every request's own, and tool providers whose
+ * tools are fetched on every call instead. {@link AbstractChatClient} implements these
  * parts for an implementation; a client that implements this interface directly carries the same
  * obligation.
  *
@@ -96,76 +95,24 @@ public interface ChatClient {
     }
 
     /**
-     * Adds a customizer that prepares every request before this client validates and sends it.
-     *
-     * <p>
-     * Customizers run in the order they were added, on the calling thread — the client applies
-     * its own defaults first, so every customizer sees them applied and has the last word on what
-     * goes out. The same customizer may be added more than once, and then runs once per addition.
-     * A client shared across threads hands each call a consistent list, so a customizer must
-     * itself be safe to run concurrently.
+     * Adds a customizer: its request hook runs before each send this client makes, its response
+     * hook on each answer, its stream hook on each event of each stream — whichever it
+     * overrides, the rest stand idle. Customizers run in the order they were added; a client
+     * shared across threads hands each call a consistent list, so a customizer must itself be
+     * safe to run concurrently.
      *
      * @param customizer the customizer to add; never {@code null}
      */
-    void addChatRequestCustomizer(ChatRequestCustomizer customizer);
+    void addChatCustomizer(ChatCustomizer customizer);
 
     /**
-     * Removes every registration of the given customizer. Since a lambda equals only itself, the
-     * caller has to keep the reference it added.
+     * Removes every registration of the given customizer. An instance removes only itself, so
+     * the caller has to keep the reference it added.
      *
      * @param customizer the customizer to remove; never {@code null}
      * @return whether any was removed
      */
-    boolean removeChatRequestCustomizer(ChatRequestCustomizer customizer);
-
-    /**
-     * Adds a customizer that adjusts every answer after this client has finished with it.
-     *
-     * <p>
-     * Customizers run in the order they were added, on the calling thread, after the client's own
-     * steps, and what they change in place is what the caller receives. For a streamed answer they run
-     * once, when the stream runs to its end; an answer that failed runs none. The same customizer
-     * may be added more than once, and then runs once per addition. A client shared across threads
-     * hands each call a consistent list, so a customizer must itself be safe to run concurrently.
-     *
-     * @param customizer the customizer to add; never {@code null}
-     */
-    void addChatResponseCustomizer(ChatResponseCustomizer customizer);
-
-    /**
-     * Removes every registration of the given customizer. Since a lambda equals only itself, the
-     * caller has to keep the reference it added.
-     *
-     * @param customizer the customizer to remove; never {@code null}
-     * @return whether any was removed
-     */
-    boolean removeChatResponseCustomizer(ChatResponseCustomizer customizer);
-
-    /**
-     * Adds a customizer that adapts every event of every stream this client opens, between the
-     * stream's source and its folding.
-     *
-     * <p>
-     * Customizers run in the order they were added, on the thread pulling the events, and the
-     * fold and the caller both see the same event, a customizer's change included. The chain is
-     * snapshotted when a stream opens; one registered mid-flight joins
-     * neither that stream nor its fold. A blocking call has no events, so a registration here
-     * runs only on streams. The same customizer may be added more than once, and then runs once
-     * per addition. A client shared across threads hands each call a consistent list, so a
-     * customizer must itself be safe to run concurrently.
-     *
-     * @param customizer the customizer to add; never {@code null}
-     */
-    void addChatStreamEventCustomizer(ChatStreamEventCustomizer customizer);
-
-    /**
-     * Removes every registration of the given customizer. Since a lambda equals only itself, the
-     * caller has to keep the reference it added.
-     *
-     * @param customizer the customizer to remove; never {@code null}
-     * @return whether any was removed
-     */
-    boolean removeChatStreamEventCustomizer(ChatStreamEventCustomizer customizer);
+    boolean removeChatCustomizer(ChatCustomizer customizer);
 
     /**
      * Registers a tool this client merges into every request it sends, beside the ones the request

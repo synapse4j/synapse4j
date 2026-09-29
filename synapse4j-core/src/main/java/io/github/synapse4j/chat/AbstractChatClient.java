@@ -46,15 +46,12 @@ public abstract class AbstractChatClient implements ChatClient {
 
     /**
      * Copy-on-write, so a call in flight walks a list no other thread can change under it, and
-     * adding a customizer costs a copy only when one is added. All three chains keep the order
-     * they were registered in — the list itself is the execution order, so a call in flight walks
-     * it as it stands, with no pass to re-sort it.
+     * adding a customizer costs a copy only when one is added. The list keeps the order
+     * customizers were registered in — the list itself is the execution order, so a call in
+     * flight walks it as it stands, with no pass to re-sort it. Every pass reads the same list:
+     * a hook a customizer does not override costs its pass nothing.
      */
-    private final List<ChatRequestCustomizer> requestCustomizers = new CopyOnWriteArrayList<>();
-
-    private final List<ChatResponseCustomizer> responseCustomizers = new CopyOnWriteArrayList<>();
-
-    private final List<ChatStreamEventCustomizer> eventCustomizers = new CopyOnWriteArrayList<>();
+    private final List<ChatCustomizer> customizers = new CopyOnWriteArrayList<>();
 
     /**
      * The standing tool set, keyed by name in registration order: a repeated name keeps the
@@ -79,33 +76,13 @@ public abstract class AbstractChatClient implements ChatClient {
             new LinkedHashSet<>());
 
     @Override
-    public void addChatRequestCustomizer(@NonNull ChatRequestCustomizer customizer) {
-        requestCustomizers.add(customizer);
+    public void addChatCustomizer(@NonNull ChatCustomizer customizer) {
+        customizers.add(customizer);
     }
 
     @Override
-    public boolean removeChatRequestCustomizer(@NonNull ChatRequestCustomizer customizer) {
-        return requestCustomizers.removeIf(customizer::equals);
-    }
-
-    @Override
-    public void addChatResponseCustomizer(@NonNull ChatResponseCustomizer customizer) {
-        responseCustomizers.add(customizer);
-    }
-
-    @Override
-    public boolean removeChatResponseCustomizer(@NonNull ChatResponseCustomizer customizer) {
-        return responseCustomizers.removeIf(customizer::equals);
-    }
-
-    @Override
-    public void addChatStreamEventCustomizer(@NonNull ChatStreamEventCustomizer customizer) {
-        eventCustomizers.add(customizer);
-    }
-
-    @Override
-    public boolean removeChatStreamEventCustomizer(@NonNull ChatStreamEventCustomizer customizer) {
-        return eventCustomizers.removeIf(customizer::equals);
+    public boolean removeChatCustomizer(@NonNull ChatCustomizer customizer) {
+        return customizers.removeIf(customizer::equals);
     }
 
     /**
@@ -121,8 +98,12 @@ public abstract class AbstractChatClient implements ChatClient {
      * @return the chain; never {@code null}
      */
     protected Consumer<ChatStreamEvent> eventPipeline() {
-        List<ChatStreamEventCustomizer> snapshot = List.copyOf(eventCustomizers);
-        return event -> runCustomizers(snapshot, event);
+        List<ChatCustomizer> snapshot = List.copyOf(customizers);
+        return event -> {
+            for (ChatCustomizer customizer : snapshot) {
+                customizer.customizeStreamEvent(this, event);
+            }
+        };
     }
 
     /**
@@ -223,7 +204,9 @@ public abstract class AbstractChatClient implements ChatClient {
         ChatContext context = resolveContext(request);
         ChatResponse response = doChat(request);
         carryContext(context, response);
-        runCustomizers(responseCustomizers, response);
+        for (ChatCustomizer customizer : customizers) {
+            customizer.customizeResponse(this, response);
+        }
         return response;
     }
 
@@ -249,7 +232,7 @@ public abstract class AbstractChatClient implements ChatClient {
         ChatStream stream = doStream(request);
         carryContext(context, stream.aggregatedResponse());
         // The list is already in execution order; the copy is the snapshot across the stream's life.
-        return new RecordingStream(stream, List.copyOf(responseCustomizers), context);
+        return new RecordingStream(stream, List.copyOf(customizers), context);
     }
 
     /**
@@ -280,18 +263,6 @@ public abstract class AbstractChatClient implements ChatClient {
         }
         context.setResponse(response);
         response.setContext(context);
-    }
-
-    /**
-     * Runs the chain in registration order, each customizer changing the given value in place.
-     *
-     * @param registrations the chain, in the order it was added
-     * @param value         what every customizer is handed
-     */
-    private <T> void runCustomizers(List<? extends ChatCustomizer<T>> registrations, T value) {
-        for (ChatCustomizer<T> customizer : registrations) {
-            customizer.customize(this, value);
-        }
     }
 
     /**
@@ -347,7 +318,9 @@ public abstract class AbstractChatClient implements ChatClient {
      */
     protected void prepare(ChatRequest request) {
         applyDefaults(request);
-        runCustomizers(requestCustomizers, request);
+        for (ChatCustomizer customizer : customizers) {
+            customizer.customizeRequest(this, request);
+        }
     }
 
     /**
@@ -379,14 +352,14 @@ public abstract class AbstractChatClient implements ChatClient {
 
         private final ChatStream delegate;
 
-        private final List<ChatResponseCustomizer> customizers;
+        private final List<ChatCustomizer> customizers;
 
         /** The exchange's context; stamped on every answer the pass hands on. */
         private final ChatContext context;
 
         private boolean applied;
 
-        private RecordingStream(ChatStream delegate, List<ChatResponseCustomizer> customizers,
+        private RecordingStream(ChatStream delegate, List<ChatCustomizer> customizers,
                 ChatContext context) {
             this.delegate = delegate;
             this.customizers = customizers;
@@ -436,7 +409,9 @@ public abstract class AbstractChatClient implements ChatClient {
             applied = true;
             ChatResponse aggregated = delegate.aggregatedResponse();
             carryContext(context, aggregated);
-            runCustomizers(customizers, aggregated);
+            for (ChatCustomizer customizer : customizers) {
+                customizer.customizeResponse(AbstractChatClient.this, aggregated);
+            }
         }
 
     }

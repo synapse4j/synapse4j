@@ -372,8 +372,11 @@ class ToolCallingChatClientTest {
     void aFailureWhilePullingAnEventEndsTheStreamAndReleasesIt() {
         inner.streamScript.add(new StreamRound(textResponse("done"), "r1"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner);
-        client.addChatStreamEventCustomizer((it, event) -> {
-            throw new IllegalStateException("boom");
+        client.addChatCustomizer(new ChatCustomizer() {
+            @Override
+            public void customizeStreamEvent(ChatClient it, ChatStreamEvent event) {
+                throw new IllegalStateException("boom");
+            }
         });
         ChatRequest request = new ChatRequest();
 
@@ -409,14 +412,16 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void theDecoratorPassRunsOnceOnTheDrainedAnswer() {
+    void theResponseHookRunsOnEveryRoundsDrainedAnswer() {
         inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
         inner.streamScript.add(new StreamRound(textResponse("done"), "r2"));
         AtomicInteger passes = new AtomicInteger();
         ToolCallingChatClient client = new ToolCallingChatClient(inner);
-        client.addChatResponseCustomizer((runner, response) -> {
-            passes.incrementAndGet();
-            response.setMessage(ChatMessage.assistant("custom"));
+        client.addChatCustomizer(new ChatCustomizer() {
+            @Override
+            public void customizeResponse(ChatClient runner, ChatResponse response) {
+                passes.incrementAndGet();
+            }
         });
         ChatRequest request = new ChatRequest();
         request.addTool(tool("alpha", arguments -> "A"));
@@ -427,8 +432,9 @@ class ToolCallingChatClientTest {
             events.next();
         }
 
-        assertEquals(1, passes.get());
-        assertEquals("custom", text(stream.aggregatedResponse()));
+        // Handed to the inner client whole: each round's drained answer takes the pass.
+        assertEquals(2, passes.get());
+        assertEquals("done", text(stream.aggregatedResponse()));
         assertSame(stream.aggregatedResponse(), request.getContext().getResponse());
     }
 
@@ -501,9 +507,12 @@ class ToolCallingChatClientTest {
         inner.streamScript.add(new StreamRound(textResponse("done"), "r2"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner);
         List<ChatClient> runners = new ArrayList<>();
-        client.addChatStreamEventCustomizer((it, event) -> {
-            runners.add(it);
-            event.setEventType("fixed");
+        client.addChatCustomizer(new ChatCustomizer() {
+            @Override
+            public void customizeStreamEvent(ChatClient it, ChatStreamEvent event) {
+                runners.add(it);
+                event.setEventType("fixed");
+            }
         });
         ChatRequest request = new ChatRequest();
         request.addTool(tool("alpha", arguments -> "A"));
