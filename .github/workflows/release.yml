@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# One release at a time, and never cancel one mid-flight: a publish interrupted
+# halfway is harder to recover than one that waits for the previous job.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # creating the GitHub Release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+          server-id: central # written into settings.xml, must match publishingServerId
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: Check the tag names this version
+        run: |
+          version="$(mvn -q -N help:evaluate -Dexpression=revision -DforceStdout | tail -n1)"
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$version" != "$tag" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match revision $version in the pom"
+            exit 1
+          fi
+
+      # A version on Central is immutable: a rerun must not try to publish it again.
+      # The portal publishes atomically, so this one marker artifact standing means
+      # the whole deployment is live.
+      - name: Check whether this version is already published
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          marker="https://repo1.maven.org/maven2/io/github/synapse4j/synapse4j-core/${ver}/synapse4j-core-${ver}.pom"
+          if curl -sf -o /dev/null "$marker"; then
+            echo "already on Maven Central — skipping the publish"
+            echo "SKIP_PUBLISH=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Publish to Maven Central
+        if: env.SKIP_PUBLISH != 'true'
+        run: mvn -B -Prelease deploy
+        env:
+          MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      # The body is this version's section of the changelog; a missing section falls
+      # back to generated notes so a forgotten edit never blocks what Central already
+      # hosts, and an existing release makes the step a no-op on rerun.
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          awk -v ver="$ver" 'index($0, "## [" ver "]") == 1 { found=1; next } found && /^## \[/ { exit } found { print }' CHANGELOG.md > notes.md
+          if [ -s notes.md ]; then
+            notes=(--notes-file notes.md)
+          else
+            echo "::warning::no changelog section for $ver; generating notes from the commits"
+            notes=(--generate-notes)
+          fi
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" "${notes[@]}"
