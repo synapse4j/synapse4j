@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Flow;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
@@ -87,6 +89,56 @@ class BodyPublisherTest {
         assertEquals(1, subscriber.errors.size());
         assertInstanceOf(IllegalArgumentException.class, subscriber.errors.get(0));
         assertTrue(cancelled.await(5, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void aSecondRunWaitsForTheFirstToLeaveTheBody() throws Exception {
+        // The premise of the lock: a retry or a redirect subscribes again while the run before it
+        // may still be inside the body, and HttpBody promises its calls are sequential.
+        CountDownLatch firstInside = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        CountDownLatch secondInside = new CountDownLatch(1);
+        AtomicInteger concurrent = new AtomicInteger();
+        AtomicInteger maxConcurrent = new AtomicInteger();
+        AtomicBoolean firstRun = new AtomicBoolean(true);
+        HttpBody body = sink -> {
+            int now = concurrent.incrementAndGet();
+            maxConcurrent.accumulateAndGet(now, Math::max);
+            try {
+                if (firstRun.getAndSet(false)) {
+                    firstInside.countDown();
+                    if (!releaseFirst.await(5, TimeUnit.SECONDS)) {
+                        throw new IOException("the test never released the first write");
+                    }
+                } else {
+                    secondInside.countDown();
+                }
+                sink.write(now);
+            } catch (InterruptedException stopped) {
+                Thread.currentThread().interrupt();
+                throw new IOException(stopped);
+            } finally {
+                concurrent.decrementAndGet();
+            }
+        };
+        JdkHttpClient.StreamingBodyPublisher publisher = new JdkHttpClient.StreamingBodyPublisher(body);
+        RecordingSubscriber first = new RecordingSubscriber();
+        RecordingSubscriber second = new RecordingSubscriber();
+
+        publisher.subscribe(first);
+        first.subscription.request(1);
+        assertTrue(firstInside.await(5, TimeUnit.SECONDS));
+        publisher.subscribe(second);
+        second.subscription.request(1);
+
+        // The second run may not set foot in the body while the first is inside it: entering
+        // together is two interleaved writes of one body's bytes.
+        assertFalse(secondInside.await(250, TimeUnit.MILLISECONDS));
+        releaseFirst.countDown();
+        assertTrue(secondInside.await(5, TimeUnit.SECONDS));
+        assertEquals(1, maxConcurrent.get());
+        assertEquals(1, first.received.size());
+        assertEquals(1, second.received.size());
     }
 
     /** A subscriber that records every signal and drains what it is handed, as the JDK does. */

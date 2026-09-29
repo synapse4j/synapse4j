@@ -14,6 +14,7 @@ import java.util.Objects;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.locks.ReentrantLock;
 
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.DefaultHttpResponse;
@@ -263,11 +264,19 @@ public class JdkHttpClient implements HttpClient {
      *
      * <p>
      * Each subscription gets its own run, since a request may be sent again: {@link HttpBody} promises
-     * that a second write produces the same bytes, and a run is one write.
+     * that a second write produces the same bytes, and a run is one write. The runs take turns, though:
+     * this publisher's lock is held for the whole of one run's write, so a run started for a retry or a
+     * redirect waits for the run before it to leave the body — {@link HttpBody} promises its calls are
+     * sequential, and two runs inside it at once would be two interleaved writes. The premise is the
+     * Flow contract's own: the run being replaced is cancelled before the next exchange begins, and a
+     * cancelled run leaves the body at its next chunk, releasing the lock with it.
      */
     static final class StreamingBodyPublisher implements Flow.Publisher<ByteBuffer> {
 
         private final HttpBody body;
+
+        /** Held across one run's whole write, so the runs of this body never overlap. */
+        private final ReentrantLock writeLock = new ReentrantLock();
 
         StreamingBodyPublisher(HttpBody body) {
             this.body = body;
@@ -275,13 +284,15 @@ public class JdkHttpClient implements HttpClient {
 
         @Override
         public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
-            new BodyRun(body, subscriber).start();
+            new BodyRun(body, writeLock, subscriber).start();
         }
 
         /** One subscription's worth of state: a body written once, one chunk at a time, on request. */
         private static final class BodyRun implements Flow.Subscription {
 
             private final HttpBody body;
+
+            private final ReentrantLock writeLock;
 
             private final Flow.Subscriber<? super ByteBuffer> subscriber;
 
@@ -308,8 +319,9 @@ public class JdkHttpClient implements HttpClient {
 
             private volatile boolean cancelled;
 
-            BodyRun(HttpBody body, Flow.Subscriber<? super ByteBuffer> subscriber) {
+            BodyRun(HttpBody body, ReentrantLock writeLock, Flow.Subscriber<? super ByteBuffer> subscriber) {
                 this.body = body;
+                this.writeLock = writeLock;
                 this.subscriber = subscriber;
             }
 
@@ -344,6 +356,11 @@ public class JdkHttpClient implements HttpClient {
                 // Set before the first wait, so a request that arrives while this thread is starting
                 // still finds someone to wake: unparking a thread that has not parked yet is remembered.
                 producer = Thread.currentThread();
+                // The whole write runs under the publisher's lock, so a second run — a retry, a
+                // redirect — waits here for the run before it to leave the body rather than entering
+                // it at the same time. A cancelled run leaves at its next chunk and releases the lock
+                // on the way out.
+                writeLock.lock();
                 try {
                     body.writeTo(chunkSink);
                     subscriber.onComplete();
@@ -354,6 +371,8 @@ public class JdkHttpClient implements HttpClient {
                     if (!cancelled) {
                         subscriber.onError(failure);
                     }
+                } finally {
+                    writeLock.unlock();
                 }
             }
 
