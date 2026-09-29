@@ -115,10 +115,12 @@ one would block extension by users and providers.
 - Both are first-class.
 - They share one public request model; their results are modeled separately.
 
-### 9. No reactive libraries
+### 9. Blocking, not reactive
 
-- Asynchrony relies on JDK facilities (Java 21 virtual threads). Do not bind the library to Reactor,
-  RxJava or similar.
+- The API is deliberately blocking, so the threading model stays simple: asynchrony relies on JDK
+  facilities (Java 21 virtual threads). Do not bind the library to Reactor, RxJava or similar.
+- Thread safety is declared, never assumed: a method is safe to call from any thread only where its
+  javadoc says so, and everything else supports no concurrent access or modification.
 
 ## Non-goals
 
