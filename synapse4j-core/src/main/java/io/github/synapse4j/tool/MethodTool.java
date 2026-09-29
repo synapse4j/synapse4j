@@ -67,8 +67,8 @@ public class MethodTool implements StagedTool {
     /** Whether the method returns void — asked once for the result stage. */
     private final boolean returnsVoid;
 
-    /** The declaration; set exactly once by {@link #define}. */
-    private @Nullable ToolDefinition definition;
+    /** The declaration; set exactly once by {@link #define}, visible to whoever the tool is shared with. */
+    private volatile @Nullable ToolDefinition definition;
 
     /**
      * Reads the signature and holds everything the stages need; builds nothing yet. An instance
@@ -335,7 +335,7 @@ public class MethodTool implements StagedTool {
         if (types[i].isInstance(raw)) {
             return raw;
         }
-        return codec.decode(codec.encode(raw), genericTypes[i]);
+        return codec.convert(raw, genericTypes[i]);
     }
 
 }

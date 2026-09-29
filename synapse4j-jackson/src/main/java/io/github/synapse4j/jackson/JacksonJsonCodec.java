@@ -144,6 +144,13 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
         return jsonMapper.readValue(json, jsonMapper.getTypeFactory().constructType(type));
     }
 
+    @Override
+    public <T> @Nullable T convert(Object value, Type type) {
+        // One pass over the decoded value — no text written out and read back for a type the
+        // mapper can reach directly, which is what makes this the hot path's conversion.
+        return jsonMapper.convertValue(value, jsonMapper.getTypeFactory().constructType(type));
+    }
+
     private JsonSchema schema(SchemaGenerator schemaGenerator, Type type) {
         ObjectNode schemaNode = generateSchema(schemaGenerator, type);
         JavaType mapType = jsonMapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class);

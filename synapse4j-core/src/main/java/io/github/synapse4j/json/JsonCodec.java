@@ -93,6 +93,24 @@ public interface JsonCodec {
     <T> @Nullable T decode(String json, Type type);
 
     /**
+     * Reads a value that is already decoded — the maps, lists and scalars {@link #decode} or a
+     * reader's {@code captureValue} produce — as a value of the given type.
+     *
+     * <p>
+     * The default spells the value out as JSON text and reads it back, which every codec can do.
+     * An implementation whose library converts a decoded value directly should say so here
+     * instead: one pass over the value, with no text in between.
+     *
+     * @param <T>   the type of the value
+     * @param value the decoded value to read as the given type; must not be {@code null}
+     * @param type  the type to read it as, type arguments included; must not be {@code null}
+     * @return the value; may be {@code null}
+     */
+    default <T> @Nullable T convert(Object value, Type type) {
+        return decode(encode(value), type);
+    }
+
+    /**
      * Opens a writer that puts one JSON document into the given sink.
      *
      * <p>
