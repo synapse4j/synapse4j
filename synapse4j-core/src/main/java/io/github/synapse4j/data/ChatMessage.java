@@ -32,6 +32,12 @@ public class ChatMessage {
     /** Who contributes this message: a {@link ChatRole} constant, or any other value. */
     private @Nullable String role;
 
+    /**
+     * An identifier for this message, owned by the application — whatever value its persistence
+     * needs to tell one message from another across calls; {@code null} until someone sets one.
+     */
+    private @Nullable String id;
+
     /** What the message contributes. Never {@code null}; empty is allowed. */
     private final List<ContentPart> parts = new ArrayList<>();
 
