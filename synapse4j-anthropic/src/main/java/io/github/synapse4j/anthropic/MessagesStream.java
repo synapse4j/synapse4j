@@ -2,11 +2,14 @@ package io.github.synapse4j.anthropic;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import io.github.synapse4j.chat.DefaultChatStream;
@@ -42,15 +45,18 @@ import org.jspecify.annotations.Nullable;
  * <p>
  * The fold is what makes a streamed answer the same answer a blocking call returns. This protocol
  * brackets every block with a start and a stop frame, and the fold uses that grammar rather than
- * guessing: the frame that opens a block births the block's part outright, and every delta joins
- * the one block that is open — so one block is one part, however many frames it took, and two
- * adjacent blocks never merge into one. Tool input arrives as fragments of JSON text and is
- * concatenated as it comes, which is why a call's arguments are whole by the time the block closes;
- * a call whose input never streamed means the empty object, the same answer a blocking call gives
- * it. The counts are merged member by member rather than replaced, because this protocol reports
- * the input side when the answer opens and the output side as it finishes — replacing would lose
- * the first half. The block bracket's {@code index} stays on the event that carried it and is left
- * off the answer, whose document has no such member.
+ * guessing: the frame that opens a block births the block's part outright and registers it under
+ * the block's index, and every delta joins the part its own index names — so one block is one part,
+ * however many frames it took, and two adjacent blocks never merge into one, a rule that holds even
+ * when the block between them drew no part of its own. Tool input arrives as fragments of JSON text
+ * and is concatenated as it comes, which is why a call's arguments are whole by the time the block
+ * closes; a call whose input never streamed means the empty object, the same answer a blocking call
+ * gives it. The input of a block the shared model has no part for — a server tool's call — is
+ * parsed back into the extras entry that block arrived in, so the answer carries it where a blocking
+ * walk kept it. The counts are merged member by member rather than replaced, because this protocol
+ * reports the input side when the answer opens and the output side as it finishes — replacing would
+ * lose the first half. The block bracket's {@code index} stays on the event that carried it and is
+ * left off the answer, whose document has no such member.
  *
  * <p>
  * One instance per exchange, built by {@link AnthropicChatClient} while the response is open;
@@ -70,7 +76,7 @@ class MessagesStream extends DefaultChatStream {
      */
     MessagesStream(JsonCodec codec, SseEventStream sse, Consumer<ChatStreamEvent> eventPipeline,
             AutoCloseable closeAction) {
-        super(events(codec, sse, new MessagesReader(codec)), eventPipeline, MessagesStream::aggregate,
+        super(events(codec, sse, new MessagesReader(codec)), eventPipeline, new Fold(codec),
                 closeAction);
     }
 
@@ -139,58 +145,188 @@ class MessagesStream extends DefaultChatStream {
         }
     }
 
-    /** Folds one event into the answer being assembled. */
-    private static void aggregate(ChatResponse response, ChatStreamEvent event) {
-        if (event.getId() != null) {
-            response.setId(event.getId());
+    /**
+     * The fold: one instance per stream, assembling the answer as events are consumed. It tracks
+     * which part each block's bracket index named, because a delta belongs to the block its index
+     * says — never to whichever part happened to be added last, which is how one block's input used
+     * to leak into its neighbour's. The state lives exactly as long as the stream that owns it and
+     * is read and written on the thread consuming the iterator.
+     */
+    private static final class Fold implements BiConsumer<ChatResponse, ChatStreamEvent> {
+
+        private final JsonCodec codec;
+
+        /** The part each open block opened, by the block's bracket index. */
+        private final Map<Integer, ContentPart> openBlocks = new HashMap<>();
+
+        /** The input spelled so far for a block that has no part of its own, by its index. */
+        private final Map<Integer, StringBuilder> unmodeledInput = new HashMap<>();
+
+        private Fold(JsonCodec codec) {
+            this.codec = codec;
         }
-        if (event.getModel() != null) {
-            response.setModel(event.getModel());
+
+        @Override
+        public void accept(ChatResponse response, ChatStreamEvent event) {
+            if (event.getId() != null) {
+                response.setId(event.getId());
+            }
+            if (event.getModel() != null) {
+                response.setModel(event.getModel());
+            }
+            if (event.getFinishReason() != null) {
+                response.setFinishReason(event.getFinishReason());
+            }
+            if (event.getUsage() != null) {
+                mergeUsage(response, event.getUsage());
+            }
+            foldExtras(response.getExtras(), event.getExtras());
+            String eventType = event.getEventType();
+            if (AnthropicEventTypes.CONTENT_BLOCK_STOP.equals(eventType)) {
+                closeBlock(response, event);
+            }
+            if (AnthropicEventTypes.MESSAGE_STOP.equals(eventType)) {
+                // Every block has closed by now — or should have: any input whose stop frame never
+                // arrived still lands in its block rather than being dropped, and a call whose input
+                // never streamed means the empty object, the same answer a blocking call gives it.
+                writeUnmodeledInputs(response);
+                normalizeEmptyInputs(response.getMessage());
+            }
+            ChatMessage delta = event.getDelta();
+            if (delta == null) {
+                return;
+            }
+            ChatMessage message = response.getMessage();
+            if (message.getRole() == null && delta.getRole() != null) {
+                // The role is named once, on the frame that opens the turn; the rest of the answer has
+                // nothing to say about it.
+                message.setRole(delta.getRole());
+            }
+            // A field the provider put on a fragment is a field of the answer's message, so it travels
+            // with it rather than staying behind on the frame that happened to carry it.
+            ProviderExtras deltaExtras = delta.getExtras();
+            if (deltaExtras != null) {
+                message.getOrCreateExtras().putAll(deltaExtras);
+            }
+            Integer index = indexOf(event);
+            boolean opensBlock = AnthropicEventTypes.CONTENT_BLOCK_START.equals(eventType);
+            for (ContentPart part : delta.getParts()) {
+                if (opensBlock) {
+                    // The frame that opens a block is where the block becomes a part: one block is one
+                    // part, however many deltas follow, and a later block never merges into an
+                    // earlier one even when the two are of the same kind.
+                    message.getParts().add(part);
+                    if (index != null) {
+                        openBlocks.put(index, part);
+                    }
+                } else {
+                    mergeFragment(response, message, part, index);
+                }
+            }
         }
-        if (event.getFinishReason() != null) {
-            response.setFinishReason(event.getFinishReason());
+
+        /** Joins one fragment to the block its index names, or places it if that block is unknown. */
+        private void mergeFragment(ChatResponse response, ChatMessage message, ContentPart fragment,
+                @Nullable Integer index) {
+            ContentPart target = index == null ? null : openBlocks.get(index);
+            if (target != null) {
+                mergeInto(target, fragment, message);
+                return;
+            }
+            if (fragment instanceof ToolCallPart call) {
+                if (call.getCallId() == null && index != null) {
+                    // Input fragments carry no id of their own: they belong to the block their index
+                    // names. That block may be one this module has no part for — a server tool's call,
+                    // whose block sits in extras — so the text accumulates here and is parsed into
+                    // that block when it closes, rather than being read as a call the model can see.
+                    unmodeledInput.computeIfAbsent(index, ignored -> new StringBuilder())
+                            .append(call.getArgumentsJson());
+                }
+                // A fragment with no block to belong to has nowhere trustworthy to go, and inventing a
+                // part from it would hand the model a call that was never made.
+                return;
+            }
+            // No opening frame was seen for this index — the fragment opens its own part, and the
+            // frames that follow find it here.
+            message.getParts().add(fragment);
+            if (index != null) {
+                openBlocks.put(index, fragment);
+            }
         }
-        if (event.getUsage() != null) {
-            mergeUsage(response, event.getUsage());
+
+        /** Closes the block its index names: the part is done, and the input it spelled is written. */
+        private void closeBlock(ChatResponse response, ChatStreamEvent event) {
+            Integer index = indexOf(event);
+            if (index == null) {
+                return;
+            }
+            openBlocks.remove(index);
+            StringBuilder input = unmodeledInput.remove(index);
+            if (input != null) {
+                writeUnmodeledInput(response, index, input);
+            }
         }
-        foldExtras(response.getExtras(), event.getExtras());
-        if (AnthropicEventTypes.MESSAGE_STOP.equals(event.getEventType())) {
-            // Every block has closed by now, so a call whose input never streamed — a tool taking
-            // no arguments spells nothing — is the empty object, the same answer a blocking call
-            // gives it, and the same thing a replay can send back.
-            normalizeEmptyInputs(response.getMessage());
+
+        /** Writes every input still held — for a block whose stop frame never arrived. */
+        private void writeUnmodeledInputs(ChatResponse response) {
+            unmodeledInput.forEach((index, input) -> writeUnmodeledInput(response, index, input));
+            unmodeledInput.clear();
         }
-        ChatMessage delta = event.getDelta();
-        if (delta == null) {
-            return;
+
+        /**
+         * Parses the input an unmodeled block spelled and sets it into that block, kept under its
+         * position in the answer's extras — where a blocking walk captured the same block whole.
+         */
+        private void writeUnmodeledInput(ChatResponse response, int index, StringBuilder input) {
+            if (input.isEmpty()) {
+                return;
+            }
+            Object held = response.getExtras().get("content", String.valueOf(index));
+            if (!(held instanceof Map<?, ?> members)) {
+                // The opening frame never arrived, so there is no block to complete.
+                return;
+            }
+            Object parsed = codec.decode(input.toString(), Object.class);
+            if (parsed == null) {
+                return;
+            }
+            Map<String, Object> completed = new LinkedHashMap<>();
+            members.forEach((key, value) -> completed.put(String.valueOf(key), value));
+            completed.put("input", parsed);
+            response.getExtras().put(List.of("content", String.valueOf(index)), completed);
         }
-        ChatMessage message = response.getMessage();
-        if (message.getRole() == null && delta.getRole() != null) {
-            // The role is named once, on the frame that opens the turn; the rest of the answer has
-            // nothing to say about it.
-            message.setRole(delta.getRole());
+
+        /** The bracket a frame carries for the block it speaks for, or {@code null} when it names none. */
+        private static @Nullable Integer indexOf(ChatStreamEvent event) {
+            Object index = event.getExtras().get("index");
+            return index instanceof Integer block ? block : null;
         }
-        // A field the provider put on a fragment is a field of the answer's message, so it travels
-        // with it rather than staying behind on the frame that happened to carry it.
-        ProviderExtras deltaExtras = delta.getExtras();
-        if (deltaExtras != null) {
-            message.getOrCreateExtras().putAll(deltaExtras);
-        }
-        boolean opensBlock = AnthropicEventTypes.CONTENT_BLOCK_START.equals(event.getEventType());
-        for (ContentPart part : delta.getParts()) {
-            if (opensBlock) {
-                // The frame that opens a block is where the block becomes a part: one block is one
-                // part, however many deltas follow, and a later block never merges into an
-                // earlier one even when the two are of the same kind.
-                message.getParts().add(part);
-            } else if (part instanceof TextPart text) {
-                appendText(message, text);
-            } else if (part instanceof ToolCallPart call) {
-                mergeToolCall(message, call);
-            } else if (part instanceof ReasoningPart reasoning) {
-                appendReasoning(message, reasoning);
+
+        /**
+         * Merges a fragment into the part its block opened. The kinds are the block's own — a delta
+         * never changes what its block is — and a fragment whose kind disagrees with the part it
+         * names is kept as a part of its own rather than forced into a shape it does not fit.
+         */
+        private static void mergeInto(ContentPart target, ContentPart fragment, ChatMessage message) {
+            if (target instanceof TextPart text && fragment instanceof TextPart piece) {
+                text.setText(join(text.getText(), piece.getText()));
+            } else if (target instanceof ToolCallPart call && fragment instanceof ToolCallPart piece) {
+                if (call.getName() == null) {
+                    call.setName(piece.getName());
+                }
+                call.setArgumentsJson(join(call.getArgumentsJson(), piece.getArgumentsJson()));
+                ProviderExtras fragmentExtras = piece.getExtras();
+                if (fragmentExtras != null) {
+                    call.getOrCreateExtras().putAll(fragmentExtras);
+                }
+            } else if (target instanceof ReasoningPart reasoning && fragment instanceof ReasoningPart piece) {
+                reasoning.setText(join(reasoning.getText(), piece.getText()));
+                ProviderExtras fragmentExtras = piece.getExtras();
+                if (fragmentExtras != null) {
+                    reasoning.getOrCreateExtras().putAll(fragmentExtras);
+                }
             } else {
-                message.getParts().add(part);
+                message.getParts().add(fragment);
             }
         }
     }
@@ -240,74 +376,6 @@ class MessagesStream extends DefaultChatStream {
                 call.setArgumentsJson("{}");
             }
         }
-    }
-
-    /** Appends a fragment to the turn's text, which is one part however many frames it took. */
-    private static void appendText(ChatMessage message, TextPart fragment) {
-        List<ContentPart> parts = message.getParts();
-        if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof TextPart text) {
-            text.setText(join(text.getText(), fragment.getText()));
-            return;
-        }
-        parts.add(fragment);
-    }
-
-    /**
-     * Appends a fragment to the turn's reasoning, which is one block however many frames it took.
-     * The fold is what makes a streamed answer carry the same reasoning a blocking call returns as
-     * one part — signature included, the delta that carried it having kept it in its extras.
-     */
-    private static void appendReasoning(ChatMessage message, ReasoningPart fragment) {
-        List<ContentPart> parts = message.getParts();
-        if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof ReasoningPart reasoning) {
-            reasoning.setText(join(reasoning.getText(), fragment.getText()));
-            ProviderExtras fragmentExtras = fragment.getExtras();
-            if (fragmentExtras != null) {
-                reasoning.getOrCreateExtras().putAll(fragmentExtras);
-            }
-            return;
-        }
-        parts.add(fragment);
-    }
-
-    /**
-     * Merges a fragment into the call it belongs to. A call is announced by the frame that opens
-     * its block, naming it, and its input is then spelled by as many deltas as it takes — the
-     * arguments are pieces of JSON text, so they are concatenated as they come.
-     */
-    private static void mergeToolCall(ChatMessage message, ToolCallPart fragment) {
-        ToolCallPart call = toolCallFor(message, fragment);
-        if (call == null) {
-            message.getParts().add(fragment);
-            return;
-        }
-        if (call.getName() == null) {
-            call.setName(fragment.getName());
-        }
-        call.setArgumentsJson(join(call.getArgumentsJson(), fragment.getArgumentsJson()));
-        ProviderExtras fragmentExtras = fragment.getExtras();
-        if (fragmentExtras != null) {
-            call.getOrCreateExtras().putAll(fragmentExtras);
-        }
-    }
-
-    /** The call a fragment continues, or {@code null} when it opens a new one. */
-    private static @Nullable ToolCallPart toolCallFor(ChatMessage message, ToolCallPart fragment) {
-        List<ContentPart> parts = message.getParts();
-        if (fragment.getCallId() != null) {
-            for (ContentPart part : parts) {
-                if (part instanceof ToolCallPart call && fragment.getCallId().equals(call.getCallId())) {
-                    return call;
-                }
-            }
-            return null;
-        }
-        // An input fragment carries no id — the protocol names the call once, on the frame that
-        // opens its block — so it continues the call that is open, which is the one added last.
-        if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof ToolCallPart open) {
-            return open;
-        }
-        return null;
     }
 
     /** The arguments as they arrive: a fragment is a piece of the JSON text, not a value. */

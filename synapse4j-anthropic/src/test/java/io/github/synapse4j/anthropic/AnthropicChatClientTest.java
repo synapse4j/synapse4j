@@ -723,6 +723,110 @@ class AnthropicChatClientTest {
     }
 
     @Test
+    void serverToolInputDoesNotLeakIntoTheCallBeforeIt() {
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                "message_start",
+                "{\"type\":\"message_start\",\"message\":{\"id\":\"msg_7\",\"type\":\"message\","
+                        + "\"role\":\"assistant\",\"content\":[],\"model\":\"claude-test\","
+                        + "\"stop_reason\":null,\"stop_sequence\":null,"
+                        + "\"usage\":{\"input_tokens\":10,\"output_tokens\":1}}}",
+                "content_block_start",
+                "{\"type\":\"content_block_start\",\"index\":0,\"content_block\":"
+                        + "{\"type\":\"tool_use\",\"id\":\"toolu_1\",\"name\":\"get_weather\","
+                        + "\"input\":{}}}",
+                "content_block_delta",
+                "{\"type\":\"content_block_delta\",\"index\":0,\"delta\":"
+                        + "{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"city\\\":\\\"Paris\\\"}\"}}",
+                "content_block_stop",
+                "{\"type\":\"content_block_stop\",\"index\":0}",
+                // A server tool's call: the shared model has no part for it, but its input still
+                // streams as fragments — which must land in its own block, not in the call above.
+                "content_block_start",
+                "{\"type\":\"content_block_start\",\"index\":1,\"content_block\":"
+                        + "{\"type\":\"server_tool_use\",\"id\":\"srvtoolu_1\",\"name\":\"web_search\","
+                        + "\"input\":{}}}",
+                "content_block_delta",
+                "{\"type\":\"content_block_delta\",\"index\":1,\"delta\":"
+                        + "{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"query\\\":\\\"weather\\\"}\"}}",
+                "content_block_stop",
+                "{\"type\":\"content_block_stop\",\"index\":1}",
+                "message_delta",
+                "{\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\","
+                        + "\"stop_sequence\":null},\"usage\":{\"output_tokens\":5}}",
+                "message_stop",
+                "{\"type\":\"message_stop\"}").getBytes(UTF_8)));
+
+        ChatStream stream = client.stream(requestWithModel());
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        while (events.hasNext()) {
+            events.next();
+        }
+
+        // The client's call keeps its own input whole: the server tool's fragments were routed by
+        // the bracket index, never appended to the part that happened to open last.
+        ChatResponse aggregated = stream.aggregatedResponse();
+        assertEquals(1, aggregated.getMessage().getParts().size());
+        ToolCallPart call = assertInstanceOf(ToolCallPart.class, aggregated.getMessage().getParts().get(0));
+        assertEquals("toolu_1", call.getCallId());
+        assertEquals("{\"city\":\"Paris\"}", call.getArgumentsJson());
+        // The server tool's block arrives with its input, the answer a blocking walk gives it.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> kept = (Map<String, Object>) aggregated.getExtras().get("content", "1");
+        assertEquals("server_tool_use", kept.get("type"));
+        assertEquals(Map.of("query", "weather"), kept.get("input"));
+    }
+
+    @Test
+    void twoAdjacentTextBlocksStayTwoParts() {
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                "message_start",
+                "{\"type\":\"message_start\",\"message\":{\"id\":\"msg_8\",\"type\":\"message\","
+                        + "\"role\":\"assistant\",\"content\":[],\"model\":\"claude-test\","
+                        + "\"stop_reason\":null,\"stop_sequence\":null,"
+                        + "\"usage\":{\"input_tokens\":10,\"output_tokens\":1}}}",
+                "content_block_start",
+                "{\"type\":\"content_block_start\",\"index\":0,\"content_block\":"
+                        + "{\"type\":\"text\",\"text\":\"\"}}",
+                "content_block_delta",
+                "{\"type\":\"content_block_delta\",\"index\":0,\"delta\":"
+                        + "{\"type\":\"text_delta\",\"text\":\"Hello\"}}",
+                "content_block_stop",
+                "{\"type\":\"content_block_stop\",\"index\":0}",
+                "content_block_start",
+                "{\"type\":\"content_block_start\",\"index\":1,\"content_block\":"
+                        + "{\"type\":\"text\",\"text\":\"\"}}",
+                "content_block_delta",
+                "{\"type\":\"content_block_delta\",\"index\":1,\"delta\":"
+                        + "{\"type\":\"text_delta\",\"text\":\" world\"}}",
+                "content_block_stop",
+                "{\"type\":\"content_block_stop\",\"index\":1}",
+                "message_delta",
+                "{\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\","
+                        + "\"stop_sequence\":null},\"usage\":{\"output_tokens\":5}}",
+                "message_stop",
+                "{\"type\":\"message_stop\"}").getBytes(UTF_8)));
+
+        ChatStream stream = client.stream(requestWithModel());
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        while (events.hasNext()) {
+            events.next();
+        }
+
+        // Two blocks of the same kind are two parts: each delta joins the block its index names,
+        // so nothing merges across the bracket between them.
+        ChatResponse aggregated = stream.aggregatedResponse();
+        assertEquals(2, aggregated.getMessage().getParts().size());
+        assertEquals("Hello",
+                assertInstanceOf(TextPart.class, aggregated.getMessage().getParts().get(0)).getText());
+        assertEquals(" world",
+                assertInstanceOf(TextPart.class, aggregated.getMessage().getParts().get(1)).getText());
+    }
+
+    @Test
     void aToolCallWhoseInputNeverStreamedIsTheEmptyObjectOnTheWire() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
