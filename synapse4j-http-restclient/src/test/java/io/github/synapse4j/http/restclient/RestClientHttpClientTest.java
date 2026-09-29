@@ -90,7 +90,8 @@ class RestClientHttpClientTest {
 
         try (HttpResponse response = client.send(request)) {
             assertEquals(200, response.getStatusCode());
-            assertEquals(List.of("yes"), headerValues(response.getHeaders(), "X-Echoed"));
+            // Response names arrive lower-cased, whichever transport handed the response over.
+            assertEquals(List.of("yes"), response.getHeaders().get("x-echoed"));
             assertEquals("hello back", new String(response.getBody().readAllBytes(), UTF_8));
         }
 
@@ -130,7 +131,7 @@ class RestClientHttpClientTest {
 
         try (HttpResponse response = client.send(request)) {
             assertEquals(200, response.getStatusCode());
-            assertEquals(List.of("first", "second"), headerValues(response.getHeaders(), "X-Multi"));
+            assertEquals(List.of("first", "second"), response.getHeaders().get("x-multi"));
         }
     }
 
@@ -248,6 +249,31 @@ class RestClientHttpClientTest {
         // The mode is wrong whatever the body is, so a request without one is refused the same way.
         request.setBody(null);
         assertThrows(IllegalArgumentException.class, () -> client.send(request));
+    }
+
+    @Test
+    void aBodyCarryingItsOwnFramingIsRefusedBeforeTheCallGoesOut() throws IOException {
+        int freePort;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            freePort = socket.getLocalPort();
+        }
+
+        HttpRequest request = new HttpRequest("http://127.0.0.1:" + freePort + "/nowhere");
+        request.setMethod(HttpRequest.POST);
+        request.getHeaders().put("Content-Length", List.of("999"));
+        request.setBody(HttpBody.of("ping"));
+
+        // Nothing listens on that port: an IllegalArgumentException reaching the caller means the
+        // refusal happened before any connection was attempted, not after one failed — and the
+        // caller's framing was never silently replaced by the length this body would send.
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+                () -> client.send(request));
+        assertTrue(thrown.getMessage().contains("Content-Length"), thrown::toString);
+
+        // The framing is only in the way when there is a body to frame: without one, the header
+        // stands as the caller wrote it, and the request fails the way any unreachable one does.
+        request.setBody(null);
+        assertThrows(SynapseException.class, () -> client.send(request));
     }
 
     @Test
@@ -544,7 +570,7 @@ class RestClientHttpClientTest {
         }
     }
 
-    /** The value list of one header, whichever spelling of the name the transport preserved. */
+    /** The value list of one captured request header, whichever spelling the server-side recorded. */
     private static List<String> headerValues(Map<String, List<String>> headers, String name) {
         for (Map.Entry<String, List<String>> header : headers.entrySet()) {
             if (header.getKey().equalsIgnoreCase(name)) {

@@ -20,6 +20,12 @@ import io.github.synapse4j.exception.SynapseException;
  * timeout — are thrown as {@code SynapseException}.
  *
  * <p>
+ * A body's framing — {@code Content-Length}, {@code Transfer-Encoding} — is the transport's to
+ * set from the body it is about to send. A request that carries its own framing alongside a
+ * body is refused rather than reconciled: each implementation answers the conflict the way the
+ * HTTP library under it does, and none silently replaces what the caller wrote.
+ *
+ * <p>
  * Callers must close the returned response, typically via try-with-resources. Closing releases the
  * connection and cancels an in-flight body; it must be safe to call from any thread.
  *

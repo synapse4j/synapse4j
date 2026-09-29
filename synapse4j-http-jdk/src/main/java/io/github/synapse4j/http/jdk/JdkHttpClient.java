@@ -9,6 +9,7 @@ import java.net.http.HttpRequest.BodyPublisher;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.Flow;
@@ -117,9 +118,12 @@ public class JdkHttpClient implements HttpClient {
                     BodyHandlers.ofInputStream());
             DefaultHttpResponse response = new DefaultHttpResponse();
             response.setStatusCode(jdkResponse.statusCode());
-            // The JDK's own header map is already mutable and case-normalized, but it is this
-            // implementation's type — copy it into the response's own map, which is never replaced.
-            response.getHeaders().putAll(jdkResponse.headers().map());
+            // The JDK's header names are already lower-cased — the spelling this library's contract
+            // promises — but its lists are its own: copy name by name so the map and every value
+            // list belong to the response and no caller mutation reaches the JDK's response.
+            jdkResponse.headers()
+                    .map()
+                    .forEach((name, values) -> response.getHeaders().put(name, new ArrayList<>(values)));
             response.setBody(jdkResponse.body());
             // The options the exchange ran under travel with the response, so the event stream it
             // hands out is framed with the budget this call asked for — and no caller has to merge

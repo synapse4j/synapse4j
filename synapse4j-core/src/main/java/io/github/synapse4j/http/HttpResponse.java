@@ -31,7 +31,18 @@ public interface HttpResponse extends AutoCloseable {
     /** The HTTP status code, exactly as received. */
     int getStatusCode();
 
-    /** The response header lines, multiple values per name. Never {@code null}. */
+    /**
+     * The response header lines, multiple values per name. Never {@code null}.
+     *
+     * <p>
+     * Names arrive lower-cased, whichever transport handed the response over: HTTP names are
+     * case-insensitive, and one normalized spelling is what a caller can rely on — look a name up
+     * as written here ({@code "content-type"}), not in whatever case the wire carried. Values are
+     * the lines in the order they arrived, and the map and its lists belong to this response: the
+     * transport reuses neither.
+     *
+     * @return the headers, keyed by lower-cased name
+     */
     Map<String, List<String>> getHeaders();
 
     /** The body stream. Read on the caller's thread; closed by {@link #close()}. */

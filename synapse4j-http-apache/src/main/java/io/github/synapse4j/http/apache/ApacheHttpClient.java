@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.apache.hc.client5.http.config.Configurable;
@@ -279,21 +280,14 @@ public class ApacheHttpClient implements HttpClient {
     }
 
     /**
-     * The response header lines, grouped by name as the wire's case-insensitive names demand: two
-     * spellings of one name are one entry, held under whichever arrived first, with the values in
-     * the order they arrived.
+     * The response header lines, keyed by lower-cased name — the spelling {@link HttpResponse}
+     * promises, whichever case the wire carried. Two spellings of one name are one entry, with the
+     * values in the order they arrived.
      */
     private static void copyHeaders(CloseableHttpResponse hcResponse, Map<String, List<String>> headers) {
         for (Header header : hcResponse.getHeaders()) {
-            String name = header.getName();
-            String key = name;
-            for (String existing : headers.keySet()) {
-                if (existing.equalsIgnoreCase(name)) {
-                    key = existing;
-                    break;
-                }
-            }
-            headers.computeIfAbsent(key, ignored -> new ArrayList<>()).add(header.getValue());
+            headers.computeIfAbsent(header.getName().toLowerCase(Locale.ROOT), ignored -> new ArrayList<>())
+                    .add(header.getValue());
         }
     }
 

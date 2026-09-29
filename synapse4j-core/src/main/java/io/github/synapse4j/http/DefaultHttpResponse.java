@@ -87,9 +87,9 @@ public class DefaultHttpResponse implements HttpResponse {
 
     /**
      * Whether this response carries a {@code text/event-stream}. Header names are compared without
-     * regard to case, since only some transports normalize them, and only the media type counts: the
-     * parameters after it are the server's business — {@code text/event-stream; charset=utf-8} is
-     * the shape providers send.
+     * regard to case — the map is the response's own and a caller may have written a name in any
+     * spelling — and only the media type counts: the parameters after it are the server's business —
+     * {@code text/event-stream; charset=utf-8} is the shape providers send.
      */
     private boolean isEventStream() {
         for (Map.Entry<String, List<String>> header : headers.entrySet()) {

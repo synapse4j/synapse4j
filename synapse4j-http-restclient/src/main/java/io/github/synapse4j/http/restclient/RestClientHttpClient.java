@@ -4,6 +4,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import lombok.NonNull;
@@ -126,6 +128,7 @@ public class RestClientHttpClient implements HttpClient {
     public HttpResponse send(HttpRequest request) {
         HttpOptions effective = HttpOptions.effective(request.getOptions(), this.options);
         requireKnown(effective.getBodyWriteMode());
+        requireNoOwnFraming(request);
         if (effective.getResponseTimeout() != null && responseTimeoutWarned.compareAndSet(false, true)) {
             // Ignoring a setting that cannot be honoured is one thing; saying it again on every call
             // would be another — the setting is named once, and the fix is named with it.
@@ -145,9 +148,11 @@ public class RestClientHttpClient implements HttpClient {
                 try {
                     response.setStatusCode(clientResponse.getStatusCode().value());
                     // Spring 7's HttpHeaders is no longer a map, so the lines are copied one name
-                    // at a time — into this response's own map, which is never replaced.
+                    // at a time — lower-cased, the spelling the contract promises, and into fresh
+                    // lists so the response owns its values rather than borrowing Spring's.
                     clientResponse.getHeaders()
-                            .forEach((name, values) -> response.getHeaders().put(name, values));
+                            .forEach((name, values) -> response.getHeaders()
+                                    .put(name.toLowerCase(Locale.ROOT), new ArrayList<>(values)));
                     response.setBody(clientResponse.getBody());
                 } catch (IOException e) {
                     // The caller never sees this response, so nothing else will release the connection
@@ -224,6 +229,25 @@ public class RestClientHttpClient implements HttpClient {
         if (!HttpOptions.STREAMED.equals(mode) && !HttpOptions.BUFFERED.equals(mode)) {
             throw new IllegalArgumentException("unsupported bodyWriteMode '" + mode + "': this implementation "
                     + "supports " + HttpOptions.STREAMED + " and " + HttpOptions.BUFFERED);
+        }
+    }
+
+    /**
+     * Refuses a body-bearing request that carries its own framing, the way the other transports
+     * do: {@code Content-Length} and {@code Transfer-Encoding} are this library's to set from the
+     * body it is about to send — the JDK's client rejects the header outright and HttpClient 5's
+     * protocol layer refuses the pair — so silently overwriting what the caller wrote would leave
+     * this implementation the only one that disagrees with its own library.
+     */
+    private static void requireNoOwnFraming(HttpRequest request) {
+        if (request.getBody() == null) {
+            return;
+        }
+        for (String name : request.getHeaders().keySet()) {
+            if ("content-length".equalsIgnoreCase(name) || "transfer-encoding".equalsIgnoreCase(name)) {
+                throw new IllegalArgumentException(
+                        "a body's framing belongs to the transport: drop the request's own " + name);
+            }
         }
     }
 

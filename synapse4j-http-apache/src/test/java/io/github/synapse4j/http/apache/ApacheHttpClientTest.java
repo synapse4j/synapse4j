@@ -89,7 +89,8 @@ class ApacheHttpClientTest {
 
         try (HttpResponse response = client.send(request)) {
             assertEquals(200, response.getStatusCode());
-            assertEquals(List.of("yes"), headerValues(response.getHeaders(), "X-Echoed"));
+            // Response names arrive lower-cased, whichever transport handed the response over.
+            assertEquals(List.of("yes"), response.getHeaders().get("x-echoed"));
             assertEquals("hello back", new String(response.getBody().readAllBytes(), UTF_8));
         }
 
@@ -112,7 +113,7 @@ class ApacheHttpClientTest {
 
         try (HttpResponse response = client.send(request)) {
             assertEquals(200, response.getStatusCode());
-            assertEquals(List.of("first", "second"), headerValues(response.getHeaders(), "X-Multi"));
+            assertEquals(List.of("first", "second"), response.getHeaders().get("x-multi"));
         }
     }
 
@@ -534,7 +535,7 @@ class ApacheHttpClientTest {
         }
     }
 
-    /** The value list of one header, whichever spelling of the name the transport preserved. */
+    /** The value list of one captured request header, whichever spelling the server-side recorded. */
     private static List<String> headerValues(Map<String, List<String>> headers, String name) {
         for (Map.Entry<String, List<String>> header : headers.entrySet()) {
             if (header.getKey().equalsIgnoreCase(name)) {
