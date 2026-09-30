@@ -60,13 +60,14 @@ public class DefaultSseEventStream implements SseEventStream {
     /** The line being assembled, decoded once its terminator arrives. */
     private final ByteArrayOutputStream line = new ByteArrayOutputStream();
 
-    /** Read by the consuming thread, written there and by {@link #close()}: hence volatile. */
-    private volatile @Nullable SseEvent pending;
+    /** Written and read on the consuming thread alone: {@link #close()} never touches it. */
+    private @Nullable SseEvent pending;
 
     /**
-     * Whether the stream is over — the body ended, or {@link #close()} was called. Volatile
-     * because the close may come from another thread: the reader has to see it rather than
-     * meet the closed source with a read.
+     * Whether the stream is over — the body ended, or {@link #close()} was called. Volatile because
+     * the close may come from another thread, and a read that starts after it has to answer "over"
+     * rather than touch the closed body. It cannot call back a read already under way: that one is
+     * unblocked by {@link #close()} closing the body, and surfaces as a failed read.
      */
     private volatile boolean finished;
 
