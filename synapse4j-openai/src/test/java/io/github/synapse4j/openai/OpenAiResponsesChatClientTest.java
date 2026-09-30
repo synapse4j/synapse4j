@@ -458,6 +458,31 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
+    void aRefusalOnlyTurnReplaysAsAContentEntry() {
+        stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\","
+                + "\"output\":[{\"type\":\"message\",\"id\":\"msg_9\",\"status\":\"completed\","
+                + "\"content\":[{\"type\":\"refusal\",\"refusal\":\"I cannot help with that\"}]}]}");
+
+        ChatResponse answer = client.chat(requestWithModel());
+        assertEquals("I cannot help with that", answer.getMessage().getExtras().get("refusal"));
+        assertTrue(answer.getMessage().getParts().isEmpty());
+
+        ChatRequest replay = requestWithModel();
+        replay.addPendingMessage(answer.getMessage());
+        stubCompletion();
+        client.chat(replay);
+
+        // The turn survives as an item — a refusal is the only thing it carries — and the refusal
+        // goes back where this protocol spells it, inside the content, never as a member of the item.
+        List<Map<String, Object>> input = inputOf(parseCaptured());
+        assertEquals(1, input.size());
+        assertEquals("assistant", input.get(0).get("role"));
+        assertEquals(List.of(Map.of("type", "refusal", "refusal", "I cannot help with that")),
+                input.get(0).get("content"));
+        assertFalse(input.get(0).containsKey("refusal"));
+    }
+
+    @Test
     void aStreamedAnswerFoldsIntoTheSameAnswerABlockingCallReturns() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));

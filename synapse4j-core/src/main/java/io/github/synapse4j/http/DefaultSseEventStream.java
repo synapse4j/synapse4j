@@ -112,13 +112,13 @@ public class DefaultSseEventStream implements SseEventStream {
      * Closes the body this stream was given — directly, through no reader, so a thread parked on
      * a silent provider is unblocked by the close rather than left holding a lock the reader
      * wants. Idempotent, and the reason a streaming response ends early when a caller closes it:
-     * the close is the stream's terminal state, so whatever is asked of it afterwards answers that
-     * the stream is over rather than meeting a closed source with a read. A failure of the close
-     * is the transport's own, so it travels as an {@link IOException} rather than being wrapped.
+     * nothing further is read once this returns, though a frame already read is still handed out —
+     * a {@code hasNext()} that answered true is a promise {@code next()} keeps. A failure of the
+     * close is the transport's own, so it travels as an {@link IOException} rather than being
+     * wrapped.
      */
     @Override
     public void close() throws IOException {
-        pending = null;
         finished = true;
         source.close();
     }

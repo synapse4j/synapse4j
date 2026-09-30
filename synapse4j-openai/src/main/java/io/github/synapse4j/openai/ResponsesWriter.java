@@ -217,12 +217,15 @@ class ResponsesWriter {
                 content.add(part);
             }
         }
+        // A refusal this protocol spells inside content: it is what makes a message that carries
+        // nothing else still an item, so it is weighed here as well as where the content is built.
+        boolean carriesRefusal = refusalOf(message) != null;
         // A field set on the message belongs to the item the message becomes. A message that becomes
         // no item of its own — one that carries nothing but the parts this protocol hoists out of it,
         // which is what a turn of tool results is — has nowhere else for them to go, so the items it
         // does become carry them instead.
-        ProviderExtras messageExtras = content.isEmpty() ? message.getExtras() : null;
-        if (!content.isEmpty()) {
+        ProviderExtras messageExtras = content.isEmpty() && !carriesRefusal ? message.getExtras() : null;
+        if (!content.isEmpty() || carriesRefusal) {
             input.add(messageItem(message, content));
         }
         for (ContentPart part : message.getParts()) {
@@ -240,13 +243,14 @@ class ResponsesWriter {
 
     /**
      * What a message says as the item it becomes. A message that is text alone takes the plain-string
-     * content form; anything else — an image, a part carrying a field this module does not model —
-     * takes the array form, which is the only one that can hold it.
+     * content form; anything else — an image, a refusal, a part carrying a field this module does not
+     * model — takes the array form, which is the only one that can hold it.
      */
     private static Map<String, Object> messageItem(ChatMessage message, List<ContentPart> content) {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("role", message.getRole());
-        if (arrayContent(content)) {
+        Object refusal = refusalOf(message);
+        if (arrayContent(content) || refusal != null) {
             // What the assistant said is this protocol's own kind of content entry, and what anyone
             // else says is the input kind: an assistant turn replayed as an item has to look like the
             // item it was, or the endpoint reads it as something the model did not say.
@@ -261,6 +265,14 @@ class ResponsesWriter {
                 } else {
                     entries.add(mediaEntry((MediaPart) part));
                 }
+            }
+            if (refusal != null) {
+                // This protocol spells a refusal as a content entry, not as a member of the message:
+                // it goes here, where the read side put it back under the same key.
+                Map<String, Object> refusalEntry = new LinkedHashMap<>();
+                refusalEntry.put("type", "refusal");
+                refusalEntry.put("refusal", refusal);
+                entries.add(refusalEntry);
             }
             entry.put("content", entries);
         } else {
@@ -278,8 +290,17 @@ class ResponsesWriter {
         ProviderExtras messageExtras = message.getExtras();
         if (messageExtras != null) {
             messageExtras.mergeInto(entry);
+            // The refusal is content here, not a member of the item: it was written into the content
+            // above, so it must not also ride out as a top-level member the endpoint would reject.
+            entry.remove("refusal");
         }
         return entry;
+    }
+
+    /** The refusal a message carries, under the key the read side stores it, or {@code null}. */
+    private static @Nullable Object refusalOf(ChatMessage message) {
+        ProviderExtras extras = message.getExtras();
+        return extras == null ? null : extras.get("refusal");
     }
 
     /**
