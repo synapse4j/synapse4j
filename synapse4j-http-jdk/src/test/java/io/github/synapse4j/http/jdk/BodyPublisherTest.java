@@ -98,6 +98,7 @@ class BodyPublisherTest {
         CountDownLatch firstInside = new CountDownLatch(1);
         CountDownLatch releaseFirst = new CountDownLatch(1);
         CountDownLatch secondInside = new CountDownLatch(1);
+        CountDownLatch secondWrote = new CountDownLatch(1);
         AtomicInteger concurrent = new AtomicInteger();
         AtomicInteger maxConcurrent = new AtomicInteger();
         AtomicBoolean firstRun = new AtomicBoolean(true);
@@ -105,7 +106,8 @@ class BodyPublisherTest {
             int now = concurrent.incrementAndGet();
             maxConcurrent.accumulateAndGet(now, Math::max);
             try {
-                if (firstRun.getAndSet(false)) {
+                boolean isFirst = firstRun.getAndSet(false);
+                if (isFirst) {
                     firstInside.countDown();
                     if (!releaseFirst.await(5, TimeUnit.SECONDS)) {
                         throw new IOException("the test never released the first write");
@@ -114,6 +116,11 @@ class BodyPublisherTest {
                     secondInside.countDown();
                 }
                 sink.write(now);
+                if (!isFirst) {
+                    // The chunk is delivered once the write returns, so the signal has to follow it:
+                    // awaiting the second run's entry into the body would read the receipt too soon.
+                    secondWrote.countDown();
+                }
             } catch (InterruptedException stopped) {
                 Thread.currentThread().interrupt();
                 throw new IOException(stopped);
@@ -135,7 +142,7 @@ class BodyPublisherTest {
         // together is two interleaved writes of one body's bytes.
         assertFalse(secondInside.await(250, TimeUnit.MILLISECONDS));
         releaseFirst.countDown();
-        assertTrue(secondInside.await(5, TimeUnit.SECONDS));
+        assertTrue(secondWrote.await(5, TimeUnit.SECONDS));
         assertEquals(1, maxConcurrent.get());
         assertEquals(1, first.received.size());
         assertEquals(1, second.received.size());
