@@ -149,14 +149,14 @@ class ResponsesStream extends DefaultChatStream {
             // and the answer must not be the same object under it.
             response.setUsage(copyOf(event.getUsage()));
         }
-        // The event's own unmodelled fields belong to the answer the way they belong to a blocking
-        // response — folded in as they arrive, the last frame winning, which for the fields that
-        // stay constant across a stream is the value the single response carries. The frames that
-        // carry a fragment of a part are the exception: their payload is the stream's own bookkeeping
-        // — position in the stream, the fragment text — and a blocking response has no frames to
-        // carry it. What such a frame says about the answer itself arrives on the frame that closes
-        // it, which carries the whole response.
-        if (!isFragment(event.getEventType())) {
+        // The frames that carry the whole response are the only ones whose extras are the answer's:
+        // those hold the response's own unmodelled members, which is what a blocking call keeps. Any
+        // other frame's payload is the stream's own bookkeeping — where in the stream it sat, the
+        // item it spoke for, the fragment's text — and a blocking response has no frames to carry
+        // it, so folding it would make the answer depend on how it was asked for. Naming the whole
+        // response frames is also what keeps a kind of frame this module has never heard of from
+        // leaking its payload into the answer.
+        if (carriesWholeResponse(event.getEventType())) {
             response.getExtras().putAll(event.getExtras());
         }
         ChatMessage delta = event.getDelta();
@@ -207,16 +207,15 @@ class ResponsesStream extends DefaultChatStream {
     }
 
     /**
-     * Whether an event carries a fragment — a piece of a part, or the announcement of an item —
-     * rather than a response of its own. Such a frame's payload is the stream's bookkeeping, kept
-     * on the event for the application and folded out of the answer, which a blocking call spells
-     * without ever seeing a frame.
+     * Whether an event carries the whole response, and so the answer's own unmodelled members.
+     * Everything else a frame carries is bookkeeping for the stream — a position, an item it speaks
+     * for, a fragment — and stays on the event, where a blocking call's answer has no counterpart
+     * to fold it into.
      */
-    private static boolean isFragment(@Nullable String eventType) {
-        return OpenAiResponsesEventTypes.OUTPUT_TEXT_DELTA.equals(eventType)
-                || OpenAiResponsesEventTypes.OUTPUT_ITEM_ADDED.equals(eventType)
-                || OpenAiResponsesEventTypes.FUNCTION_CALL_ARGUMENTS_DELTA.equals(eventType)
-                || OpenAiResponsesEventTypes.REASONING_SUMMARY_TEXT_DELTA.equals(eventType);
+    private static boolean carriesWholeResponse(@Nullable String eventType) {
+        return OpenAiResponsesEventTypes.CREATED.equals(eventType)
+                || OpenAiResponsesEventTypes.IN_PROGRESS.equals(eventType)
+                || finishesAnswer(eventType);
     }
 
     /** Appends a fragment to the turn's text, which is one part however many frames it took. */

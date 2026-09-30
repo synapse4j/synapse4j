@@ -348,7 +348,11 @@ class OpenAiResponsesChatClientTest {
 
         ChatRequest request = requestWithModel();
         ChatMessage results = new ChatMessage(ChatRole.TOOL);
-        results.addPart(new ToolResultPart("call_1", "get_weather", false).addText("sunny"));
+        // Marked as a failure, deliberately: this protocol has no member for it, so the flag is
+        // left unsent and the item is exactly what a successful result would produce. Anthropic has
+        // is_error for it; this protocol does not, and nothing else would notice the decision being
+        // flipped.
+        results.addPart(new ToolResultPart("call_1", "get_weather", true).addText("sunny"));
         request.addPendingMessage(results);
 
         client.chat(request);
@@ -496,6 +500,13 @@ class OpenAiResponsesChatClientTest {
                 // This one carries no event name, so its type member is the only thing that says.
                 "data: {\"type\":\"response.output_text.delta\",\"item_id\":\"msg_1\","
                         + "\"output_index\":0,\"delta\":\" there\"}",
+                // A frame this module has no shape for: the protocol's own end-of-item frame. It
+                // arrives whole on its event and must stay out of the answer — a blocking response
+                // has no such frame, so folding its payload would make the answer depend on how it
+                // was asked for.
+                namedFrame("response.output_text.done",
+                        "{\"item_id\":\"msg_1\",\"output_index\":0,\"text\":\"Hi there\","
+                                + "\"sequence_number\":4}"),
                 namedFrame(OpenAiResponsesEventTypes.COMPLETED,
                         "{\"type\":\"response.completed\",\"response\":" + COMPLETED_RESPONSE + "}"))
                 .getBytes(UTF_8)));
@@ -506,15 +517,17 @@ class OpenAiResponsesChatClientTest {
             events.add(event);
         }
 
-        assertEquals(4, events.size());
+        assertEquals(5, events.size());
         assertEquals(OpenAiResponsesEventTypes.CREATED, events.get(0).getEventType());
         assertEquals(OpenAiResponsesEventTypes.OUTPUT_TEXT_DELTA, events.get(1).getEventType());
         // The second text frame named no event, so its payload's own type names the event.
         assertEquals(OpenAiResponsesEventTypes.OUTPUT_TEXT_DELTA, events.get(2).getEventType());
+        assertEquals("response.output_text.done", events.get(3).getEventType());
         // The frame arrives whole on the event — its position in the stream included — even
         // though the answer keeps none of it, a blocking response having no frames to carry it.
         assertEquals("msg_1", events.get(1).getExtras().get("item_id"));
         assertEquals(0, events.get(1).getExtras().get("output_index"));
+        assertEquals("Hi there", events.get(3).getExtras().get("text"));
         // The events are snapshots: the answer is assembled from copies, so a delta event an
         // application kept still carries only the fragment it delivered.
         assertEquals("Hi", textOf(events.get(1)));

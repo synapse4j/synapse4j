@@ -357,7 +357,7 @@ class MessagesStream extends DefaultChatStream {
                     reasoning.getOrCreateExtras().putAll(fragmentExtras);
                 }
             } else {
-                message.getParts().add(fragment);
+                message.getParts().add(copyOf(fragment));
             }
         }
     }

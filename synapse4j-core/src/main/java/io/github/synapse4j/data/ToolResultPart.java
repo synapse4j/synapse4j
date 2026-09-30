@@ -35,7 +35,11 @@ public class ToolResultPart extends ContentPart {
     /** The result itself. Never {@code null}; empty is allowed. */
     private final List<ContentPart> parts = new ArrayList<>();
 
-    /** Whether the tool failed. Some protocols report it out of band rather than in the result. */
+    /**
+     * Whether the tool failed. A protocol with a member for it — Anthropic's {@code is_error} —
+     * carries the failure there; a protocol without one leaves it unsent, and the result reaches the
+     * model as an ordinary result.
+     */
     private boolean error;
 
     /**

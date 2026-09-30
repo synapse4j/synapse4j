@@ -1016,6 +1016,29 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
+    void aFailedToolResultCarriesNoErrorMarker() {
+        // Neither OpenAI protocol has a member for a tool failure, so it is left unsent and the
+        // result goes out as an ordinary one. Pinned because Anthropic's is_error has a test and
+        // these two would otherwise notice the decision being flipped by nothing at all.
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        ChatMessage results = new ChatMessage(ChatRole.TOOL);
+        results.addPart(new ToolResultPart("call_1", "get_weather", true).addText("boom"));
+        request.addPendingMessage(results);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) wire.get("messages");
+        assertEquals("tool", messages.get(0).get("role"));
+        assertEquals("boom", messages.get(0).get("content"));
+        assertFalse(messages.get(0).containsKey("is_error"));
+        assertFalse(messages.get(0).containsKey("error"));
+    }
+
+    @Test
     void aToolResultCarriesItsOwnExtras() {
         stubCompletion();
 

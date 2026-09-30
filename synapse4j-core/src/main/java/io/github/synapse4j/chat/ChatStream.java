@@ -60,6 +60,11 @@ public interface ChatStream extends Iterable<ChatStreamEvent>, AutoCloseable {
      * {@link ChatClient#chat} would have returned. This method never blocks and never drives
      * consumption — it reports what the iterator has already folded.
      *
+     * <p>
+     * The fold runs on the thread consuming the iterator, so this is read from that thread too:
+     * calling it from another thread while the stream is being consumed races with the fold. Of the
+     * methods here, only {@link #close()} is safe to call from any thread.
+     *
      * @return the aggregated response; never {@code null}
      */
     ChatResponse aggregatedResponse();
