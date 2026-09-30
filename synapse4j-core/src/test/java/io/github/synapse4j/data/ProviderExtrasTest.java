@@ -382,6 +382,18 @@ class ProviderExtrasTest {
     }
 
     @Test
+    void getRawReadsTheAssembledKeySpace() {
+        // The counterpart of putRaw, so it addresses the keys rawMap spells rather than the path
+        // segments get takes: a path and a key that spells the same text are two different entries.
+        ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1).putRaw("a\\.b", 2);
+
+        assertEquals(1, extras.getRaw("a.b"));
+        assertEquals(2, extras.getRaw("a\\.b"));
+        assertEquals(1, extras.get("a", "b"));
+        assertNull(extras.getRaw("a"));
+    }
+
+    @Test
     void aBagRoundTripsThroughItsRawMap() {
         ProviderExtras extras = new ProviderExtras().put(List.of("metadata", "trace_id"), "abc").put("temperature",
                 0.5);

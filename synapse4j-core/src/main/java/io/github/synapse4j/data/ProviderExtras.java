@@ -168,8 +168,8 @@ public class ProviderExtras {
      *
      * <p>
      * This is the writing counterpart of {@link #rawMap()}: an entry set here is read back from that
-     * view, not through {@link #get(String...)}, which addresses path segments and so spells the
-     * same tree differently.
+     * view, or through {@link #getRaw(String)}, not through {@link #get(String...)}, which addresses
+     * path segments and so spells the same tree differently.
      *
      * @param key   the assembled key; must not be {@code null}
      * @param value the value; stored as-is, may be {@code null}
@@ -179,6 +179,18 @@ public class ProviderExtras {
         clearAround(key);
         values.put(key, value);
         return this;
+    }
+
+    /**
+     * Returns the value set under a key the caller has already assembled — the reading counterpart of
+     * {@link #putRaw(String, Object)}, addressing the keys {@link #rawMap()} hands out rather than
+     * the path segments {@link #get(String...)} takes.
+     *
+     * @param key the assembled key; must not be {@code null}
+     * @return the value, or {@code null} if nothing is set under that key
+     */
+    public @Nullable Object getRaw(@NonNull String key) {
+        return values.get(key);
     }
 
     /**
