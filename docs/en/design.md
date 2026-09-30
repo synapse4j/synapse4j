@@ -39,9 +39,12 @@ it in four ways:
    enough. The field has to matter across providers *and* the providers' values have to map onto
    one common meaning.
 
-3. **A shared field is either translated or refused, never ignored.** If you set a field that a
-   provider's protocol cannot express, the call fails. A setting that quietly does nothing is the
-   worst kind of wrong, because the model's behaviour looks like it ignored your instructions.
+3. **A shared field a protocol cannot express is left off the wire, and the call goes on.** A
+   provider that has no member for what you set simply does not send it; refusing would break the
+   same code the moment you switch provider, which is the thing this library exists to prevent. The
+   one exception is a requirement on the shape of the answer: a protocol that cannot honour it
+   fails the call, because an answer that violates what was asked for but looks like success is the
+   most expensive kind of wrong.
 
 4. **A provider's spelling of a shared field is configuration on that module.** Endpoints disagree
    about names — one wants `max_completion_tokens`, another `max_tokens`; one carries reasoning as

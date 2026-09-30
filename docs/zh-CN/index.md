@@ -54,19 +54,7 @@ API 本身的参考以 Javadoc 为准。
 
 ## 模块
 
-按需选择模块；BOM 负责对齐它们的版本。
-
-| 模块 | 是什么 |
-|---|---|
-| `synapse4j-core` | 请求/响应模型、JSON 与 HTTP 接口、工具调用 |
-| `synapse4j-jackson` | 基于 Jackson 与 victools 的 `JsonCodec` |
-| `synapse4j-http-jdk` | 基于 JDK `java.net.http` 的 `HttpClient` |
-| `synapse4j-http-apache` | 基于 Apache HttpClient 5 的 `HttpClient` |
-| `synapse4j-http-restclient` | 基于 Spring `RestClient` 的 `HttpClient` |
-| `synapse4j-openai` | OpenAI Chat Completions 与 Responses 协议 |
-| `synapse4j-anthropic` | Anthropic Messages 协议 |
-| `synapse4j-spring-boot-starter` | Spring Boot 自动配置 |
-| `synapse4j-bom` | 用于对齐版本的 BOM |
+按需选择模块；BOM 负责对齐它们的版本。模块清单见 [README](../../README.zh-CN.md#模块)。
 
 ## 环境要求
 

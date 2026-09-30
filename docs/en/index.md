@@ -60,19 +60,8 @@ The Javadoc is the reference for the API itself.
 
 ## Modules
 
-Pick the modules you need; the BOM aligns their versions.
-
-| Module | What it is |
-|---|---|
-| `synapse4j-core` | The request/response model, the JSON and HTTP interfaces, tool calling |
-| `synapse4j-jackson` | `JsonCodec` on Jackson and victools |
-| `synapse4j-http-jdk` | `HttpClient` on the JDK's `java.net.http` |
-| `synapse4j-http-apache` | `HttpClient` on Apache HttpClient 5 |
-| `synapse4j-http-restclient` | `HttpClient` on Spring's `RestClient` |
-| `synapse4j-openai` | OpenAI Chat Completions and Responses protocols |
-| `synapse4j-anthropic` | Anthropic Messages protocol |
-| `synapse4j-spring-boot-starter` | Auto-configuration for Spring Boot |
-| `synapse4j-bom` | Bill of materials for version alignment |
+Pick the modules you need; the BOM aligns their versions. [The README](../../README.md#modules)
+lists them.
 
 ## Requirements
 

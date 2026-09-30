@@ -12,16 +12,16 @@
 | 对话记忆 | 无；由你持有 | 内置（`ChatMemory`，窗口、淘汰、持久化） | 内置（`ChatMemory` 加 advisor） | 无 |
 | 提供商抽象 | 一套模型 + 提供商模块 | 一套模型 + 各提供商模块 | `ChatModel` 加 `ChatClient` | 仅一家提供商 |
 | 框架耦合 | 无 | 无（一个工具集） | Spring，与 Boot 配合最佳 | 无 |
-| JSON 库 | 由你选，藏在接口后 | Jackson | Jackson | 自带，生成的 |
-| HTTP 客户端 | 由你选，藏在接口后 | 自带客户端 | Spring 的 HTTP | 自带（OkHttp） |
+| JSON 库 | 由你选，接口背后的实现可换 | Jackson | Jackson | 自带，生成的 |
+| HTTP 客户端 | 由你选，接口背后的实现可换 | 自带客户端 | Spring 的 HTTP | 自带（OkHttp） |
 | API 风格 | 阻塞；流是拉取的 | 阻塞 + 流式回调 | 阻塞 + 流式（Flux） | 阻塞 + 流式 |
 | 声明式接口 | 无 | 有（`AiService`） | 无 | 无 |
 | 工具调用 | `Tool` 加执行器与循环 | `@Tool` 注解 | `@Tool` 加 `ChatClient` | 原始调用 |
-| 扩展模型 | 开放结构，外加透传袋子 | 自己的类型 | 自己的类型 | 生成的类型 |
+| 扩展模型 | 开放结构，外加可透传的附加字段 | 自己的类型 | 自己的类型 | 生成的类型 |
 
 ## LangChain4j
 
-一个工具集：它为整个应用提供零件——聊天模型、嵌入、RAG、agent、记忆——并且不绑定框架。
+一个工具集：它为整个应用备齐各个组件——聊天模型、嵌入、RAG、agent、记忆——并且不绑定框架。
 
 它的核心是声明式的 **`AiService`**：你写一个普通接口，加上注解，库生成实现。
 
@@ -39,8 +39,8 @@ interface Assistant {
 
 ## Spring AI
 
-Spring 原生。`ChatModel` 抽象一家提供商；`ChatClient` 是链式门面，`ChatMemory` 加 advisor 提供
-记忆和其他横切行为。
+Spring 原生。`ChatModel` 抽象一家提供商；`ChatClient` 是链式调用的入口，`ChatMemory` 加 advisor
+提供记忆和其他横切行为。
 
 记忆通过 advisor 接线——`MessageChatMemoryAdvisor` 从 `ChatMemory` 取出历史、把回答写回——因此它
 是按客户端可选加入的，而把它限定到正确的对话是你的工作。
@@ -59,7 +59,7 @@ Spring 原生。`ChatModel` 抽象一家提供商；`ChatClient` 是链式门面
 ## synapse4j 处在什么位置
 
 synapse4j 是四者中最小的。它保留中立模型和工具调用，略去其他库捆绑的东西：没有对话记忆、没有框架，
-也不固定 JSON 库或 HTTP 客户端。历史由你保存，零件由你挑选。
+也不固定 JSON 库或 HTTP 客户端。历史由你保存，组件由你挑选。
 
 这有代价，直说：保存对话的循环由你写，库是阻塞式而非响应式，覆盖的提供商也比其他库少。换来的是一个
 属于你的技术栈——更换 JSON 库、HTTP 客户端或提供商都不触碰任何核心抽象，依赖树也保持很小。

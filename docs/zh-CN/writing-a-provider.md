@@ -8,10 +8,10 @@
 
 一个模块里有两部分：
 
-- 一个**线上模型**——协议自己的 JSON，按 token 写出、按 token 读入；
-- 一个**适配器**——把共享的 `ChatRequest` 与 `ChatResponse` 映射到那个线上模型、再映射回来的客户端。
+- 一个**协议模型**——协议自己的 JSON，按 token 写出、按 token 读入；
+- 一个**适配器**——把共享的 `ChatRequest` 与 `ChatResponse` 映射到那个协议模型、再映射回来的客户端。
 
-线上模型从不渗入 core：它住在提供商的包里，只有共享类型跨过边界。
+协议模型从不漏进 core：它住在提供商的包里，只有共享类型跨过边界。
 
 ## 客户端
 
@@ -33,22 +33,24 @@
 `HttpOptions`，交给 `HttpClient`：
 
 ```java
-HttpRequest httpRequest = new HttpRequest(baseUrl + endpoint);
-httpRequest.setMethod(HttpRequest.POST);
-httpRequest.getHeaders().put("Content-Type", List.of("application/json"));
-httpRequest.setBody(out -> {
-    try (JsonWriter writer = codec.writer(out)) {
-        write(request, writer);
-    }
-});
+void send(ChatRequest request) throws IOException {
+    HttpRequest httpRequest = new HttpRequest(baseUrl + endpoint);
+    httpRequest.setMethod(HttpRequest.POST);
+    httpRequest.getHeaders().put("Content-Type", List.of("application/json"));
+    httpRequest.setBody(out -> {
+        try (JsonWriter writer = codec.writer(out)) {
+            write(request, writer);
+        }
+    });
 
-try (HttpResponse response = http.send(httpRequest)) {
-    // 在碰正文之前先读状态
+    try (HttpResponse response = http.send(httpRequest)) {
+        // 在碰正文之前先读状态
+    }
 }
 ```
 
-正文是一个 `HttpBody`：一个在传输层索要时才写出的 lambda，因此文档直接写到线上，而不是先建树。第二
-次写出会产生同样的字节，因为传输层可能在重试或重定向时再写一次。
+正文是一个 `HttpBody`：一个在传输层索要时才写出的 lambda，因此文档边写边发，而不是先建树。第二次写出
+会产生同样的字节，因为传输层可能在重试或重定向时再写一次。
 
 先读状态再碰正文——正文是流，只能读一次。非 2xx 的答案是拒绝：读出它的细节，抛一个
 `SynapseHttpException`。
@@ -62,8 +64,10 @@ try (HttpResponse response = http.send(httpRequest)) {
 
 ```java
 Map<String, Object> members = new LinkedHashMap<>();
-members.put("model", options.getModel());
-// ... 这个协议建模的成员 ...
+if (options.getModel() != null) {
+    members.put("model", options.getModel());
+}
+// ... 这个协议建模的成员，每个只在它的值已设置时才写出 ...
 options.getExtras().mergeInto(members);
 ```
 
@@ -80,10 +84,12 @@ options.getExtras().mergeInto(members);
 
 没有归一化内容的事件把 `delta` 留作 null，负载留在 `extras` 里。
 
-## 响亮地失败
+## 失败要显眼
 
-协议无法表达的东西就失败，而不是半表达地发出去。协议没有成员的某种模式、它无法满足的某个旋钮——抛
-异常，点名协议和字段。一个悄悄不起作用的字段，从上面看像一个无视了指令的模型。
+只有一种情况会让调用失败：协议无法兑现的、对答案形状的要求。一个违反要求却看起来像成功的答案，在调用者
+看来就是模型无视了指令——这是代价最高的错误——所以模块宁可拒绝调用，也不让它通过。协议没有对应成员的
+其他东西——一个开关、一个字段、一种模式——都不发出去，调用带着协议能承载的部分继续进行。若因此拒绝，
+换一家提供商的瞬间同一段应用代码就会坏掉，而这正是共享模型要避免的事。
 
 ## 把提供商的拼写作为配置
 

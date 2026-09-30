@@ -38,17 +38,19 @@ Build a `HttpRequest` (the library's own, not the JDK's), set its method, header
 per-call `HttpOptions`, and hand it to the `HttpClient`:
 
 ```java
-HttpRequest httpRequest = new HttpRequest(baseUrl + endpoint);
-httpRequest.setMethod(HttpRequest.POST);
-httpRequest.getHeaders().put("Content-Type", List.of("application/json"));
-httpRequest.setBody(out -> {
-    try (JsonWriter writer = codec.writer(out)) {
-        write(request, writer);
-    }
-});
+void send(ChatRequest request) throws IOException {
+    HttpRequest httpRequest = new HttpRequest(baseUrl + endpoint);
+    httpRequest.setMethod(HttpRequest.POST);
+    httpRequest.getHeaders().put("Content-Type", List.of("application/json"));
+    httpRequest.setBody(out -> {
+        try (JsonWriter writer = codec.writer(out)) {
+            write(request, writer);
+        }
+    });
 
-try (HttpResponse response = http.send(httpRequest)) {
-    // read the status before the body
+    try (HttpResponse response = http.send(httpRequest)) {
+        // read the status before the body
+    }
 }
 ```
 
@@ -69,8 +71,10 @@ Write the protocol's own members with `JsonWriter`, token by token. Two rules:
 
 ```java
 Map<String, Object> members = new LinkedHashMap<>();
-members.put("model", options.getModel());
-// ... the members this protocol models ...
+if (options.getModel() != null) {
+    members.put("model", options.getModel());
+}
+// ... the members this protocol models, each one only when its value is set ...
 options.getExtras().mergeInto(members);
 ```
 
@@ -91,9 +95,13 @@ An event with no normalized content leaves `delta` null and keeps its payload in
 
 ## Failing loudly
 
-What the protocol cannot express fails, rather than going out half expressed. A mode the protocol
-has no member for, a knob it cannot honour — throw, naming the protocol and the field. A field that
-quietly does nothing reads from above as a model that ignored its instructions.
+Only one thing fails the call: a requirement on the shape of the answer that the protocol cannot
+honour. An answer that violates what was asked for but looks like success reads to the caller as a
+model that ignored its instructions — the most expensive kind of wrong — so the module refuses the
+call instead of letting it through. Everything else the protocol has no member for — a knob, a
+field, a mode — is left unsent, and the call goes on with what the protocol can carry. Refusing
+those would break the same application code the moment a provider is swapped, which is what the
+shared model exists to prevent.
 
 ## Provider spellings as configuration
 

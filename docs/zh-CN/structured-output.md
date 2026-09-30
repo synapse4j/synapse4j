@@ -40,7 +40,7 @@ ChatOptions options = new ChatOptions();
 options.setResponseFormat(format);
 ```
 
-三种模式是 `TYPE_TEXT`（散文）、`TYPE_JSON`（任意合法 JSON）和 `TYPE_JSON_SCHEMA`（符合 schema 的
+三种模式是 `TYPE_TEXT`（普通文本）、`TYPE_JSON`（任意合法 JSON）和 `TYPE_JSON_SCHEMA`（符合 schema 的
 JSON）。`strict` 要求提供商强制执行 schema，而不只是朝它努力。
 
 因为 schema 是文本，这里没有任何东西绑定 JSON 库：你选的编解码器产出它，模型被约束到那个编解码器
@@ -62,6 +62,7 @@ Person person = codec.decode(text(response), Person.class);
 | `synapse4j-openai`（Responses） | `text.format` |
 | `synapse4j-anthropic` | `output_config.format` |
 
-协议无法表达某种模式时，会响亮地失败，而不是以散文作答——一个看上去像成功的答案是最昂贵的错误方式。
-例如 Anthropic 协议不携带 schema 的名字或描述，并且对给它的任何 schema 都强制执行，因此在那里设置
-`name`、`description`，或把 `strict` 设为 `false` 都会被拒绝。
+协议无法表达所要求的答案形状时，调用会失败，而不是以普通文本作答——一个看上去像成功的答案是最昂贵的
+错误方式。例如 Anthropic 协议没有承载 schema 名字或描述的成员，也无法关掉对 schema 的强制，因此
+`name`、`description` 和 `strict` 在那里根本不会发出，调用带着它能兑现的那份 schema 继续进行。换作
+它不支持的 `type`，则会被拒绝。

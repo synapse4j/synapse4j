@@ -13,8 +13,8 @@ reads back. It can also carry `strict`, and provider-specific fields.
 
 ## A tool
 
-The `Tool` interface is two methods: `definition()` and `execute(arguments, context)`. Most tools
-are built from one of three classes.
+The `Tool` interface is `definition()` and `execute(arguments, context)`, plus `name()`, which
+defaults to the name on the declaration. Most tools are built from one of three classes.
 
 **`FunctionTool`** — a typed lambda. The model's arguments decode into your type, the lambda runs,
 and its result is rendered back:

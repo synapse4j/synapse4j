@@ -35,6 +35,8 @@ English docs: [docs/en](docs/en/index.md).
 
 - Java 21 或更新版本
 - Maven 3.6.3 或更新版本（没有 Maven Wrapper，直接运行 `mvn`）
+- 使用 starter 需要 Spring Boot 4.0 或更新版本（它建立在 `spring-boot-restclient` 与
+  `spring-boot-jackson` 之上，这两个模块自 Boot 4.0 才有，另外还依赖 Jackson 3）
 
 ## 构建
 

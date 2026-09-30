@@ -16,7 +16,7 @@
 
 答案是一个 `ChatResponse`。它的 `message` 是助手的这一轮，类型是 `ChatMessage`——和构建请求用的是
 同一个类型，因此可以原样追加到下一个请求。旁边还有 `finishReason`、`usage`、回答的 `model`、提供商
-给这次响应的 `id`、响应 `headers`，以及一个承载提供商特有字段的袋子。
+给这次响应的 `id`、响应 `headers`，以及一个承载提供商特有字段的映射。
 
 ## 消息
 
@@ -60,17 +60,17 @@ ChatMessage.user("你好").addText("，世界");
 | `maxOutputTokens` | 生成 token 的上限 |
 | `reasoningEffort` | 模型应该推理多少 |
 | `toolChoice`、`toolChoiceName` | 模型是否可以、以及可以调用哪个工具 |
-| `responseFormat` | 散文、JSON，或符合 schema 的 JSON |
+| `responseFormat` | 普通文本、JSON，或符合 schema 的 JSON |
 | `httpOptions`、`headers` | 本次调用的传输层设置 |
 | `extras` | 提供商特有的字段 |
 
-每个字段都是可选的：`null` 表示「没有意见」，客户端的默认值会补上。只有至少两家提供商都认同的旋钮
-才放在这里；某一家独有的字段放进 extras 袋子。
+每个字段都是可选的：`null` 表示「没有意见」，客户端的默认值会补上。只有至少两家提供商都认同的设置
+才放在这里；某一家独有的字段放进 extras 映射。
 
 ## 提供商特有的字段
 
 库没有建模的东西不会丢。每个节点——消息、内容部分、工具、选项——都能携带一个 `ProviderExtras`
-袋子：一个从点分路径到值的映射，会原样合并进要发出的 JSON：
+映射：从点分路径到值，会原样合并进要发出的 JSON：
 
 ```java
 message.getOrCreateExtras().putRaw("thinking.budget_tokens", 2048);

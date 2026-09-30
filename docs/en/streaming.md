@@ -2,8 +2,9 @@
 
 **English** | [中文](../zh-CN/streaming.md)
 
-A streaming call and a blocking call share the same request. Only the result differs: `chat`
-returns the whole answer, `stream` returns a `ChatStream` you pull event by event.
+An answer can be consumed as it arrives or waited for whole. The request is the same either way;
+what differs is what comes back — the complete answer, or its events one at a time, in the order
+the provider sends them.
 
 ```java
 try (ChatStream stream = client.stream(request)) {
@@ -54,7 +55,7 @@ never drives consumption — it reports what the iterator has already folded.
 Iteration is lazy and blocking: `hasNext()` waits for the next event, which is also what
 backpressures the provider. The thread that iterates is the thread events arrive on.
 
-A stream is one pass. `iterator()` answers the same iterator on every call, and a second call
+A stream is one pass: the first call to `iterator()` hands back the iterator, and a second call
 throws. Closing releases the connection behind the stream, cancelling a response still in flight;
 it is idempotent and safe to call from any thread. A stream that runs to its end releases the same
 connection by itself, so consuming an answer completely needs no close — a loop that breaks out

@@ -15,9 +15,12 @@ codec, a transport, and a chat client — with everything bound from `synapse4j.
 </dependency>
 ```
 
+The starter needs Spring Boot 4.0 or newer. It builds on `spring-boot-restclient` and
+`spring-boot-jackson`, both introduced in Boot 4.0, and on Jackson 3.
+
 ## What it wires
 
-Three beans, each backing off if you declare your own:
+The default wiring is three beans, each backing off if you declare your own:
 
 - **`JsonCodec`** — a `JacksonJsonCodec`. It uses Boot's auto-configured `JsonMapper` when one
   exists, so `spring.jackson.*` and every `JsonMapperBuilderCustomizer` apply to the schemas sent
@@ -25,6 +28,9 @@ Three beans, each backing off if you declare your own:
 - **`HttpClient`** — the transport `synapse4j.http-client` names.
 - **`ChatClient`** — the protocol `synapse4j.chat-client` names, wrapped in `ToolCallingChatClient`
   unless `synapse4j.auto-tool-calling` is off.
+
+Selecting the Apache transport adds a fourth bean, the `CloseableHttpClient` holding the connection
+pool. It steps aside when you declare a `CloseableHttpClient` or an `HttpClient` of your own.
 
 ## Configuration
 
@@ -42,18 +48,16 @@ synapse4j:
     temperature: 0.2
 ```
 
-| Group | What it binds |
-|---|---|
-| `synapse4j.openai.*` | `OpenAiConfig`: `base-url`, `api-key`, `organization`, `project`, `max-tokens-field`, `reasoning-field`, `store-responses` |
-| `synapse4j.anthropic.*` | `AnthropicConfig`: `base-url`, `api-key`, `anthropic-version` |
-| `synapse4j.chat-options.*` | the default `ChatOptions`: `model`, `temperature`, `max-output-tokens`, `top-p`, `reasoning-effort`, `tool-choice`, `tool-choice-name`, `response-format.*`, `headers.*`, `extras.*` |
-| `synapse4j.http-options.*` | `HttpOptions`: `body-write-mode`, `response-timeout`, `max-frame-bytes` |
+The `synapse4j.*` keys group by what they configure: `synapse4j.openai.*` binds `OpenAiConfig`,
+`synapse4j.anthropic.*` binds `AnthropicConfig`, `synapse4j.chat-options.*` binds the default
+`ChatOptions`, and `synapse4j.http-options.*` binds `HttpOptions`. Each key is a field on the type
+it binds, documented there. `chat-options.extras` binds raw keys: a key is the provider's own wire
+name, and a dotted key addresses a nested member. A non-string value needs YAML — a `.properties`
+file yields a string for every value.
 
-`chat-options.extras` binds raw keys: a key is the provider's own wire name, and a dotted key
-addresses a nested member. A non-string value needs YAML — a `.properties` file yields a string for
-every value.
-
-Every `synapse4j.*` key has configuration metadata, so your IDE completes them.
+Every `synapse4j.*` key has configuration metadata, so your IDE completes them. The selectors you
+set most often are `synapse4j.chat-client`, `synapse4j.http-client`, `synapse4j.auto-tool-calling`,
+and `synapse4j.enabled`, which turns the whole auto-configuration off.
 
 ## Using it
 
@@ -79,8 +83,8 @@ Two kinds of bean shape the auto-configured client:
 
 - **`ChatCustomizer`** beans join its per-call hooks, so they run on every call.
 - **`ChatClientCustomizer`** beans run after the `synapse4j.chat-options.*` defaults and have the
-  last word: they can replace the default options, register tools or tool providers, or add a
-  `ChatCustomizer`.
+  last word on the client's options and tools: they can replace the default options, register tools
+  or tool providers, or add a `ChatCustomizer`.
 
 ```java
 @Bean
@@ -96,11 +100,38 @@ ChatClientCustomizer tenantHeader(String tenant) {
 
 Both kinds are applied in `@Order` order.
 
+A customizer cannot change provider configuration — the base URL, the API key, the protocol's field
+spellings. `setConfig` is not on the `ChatClient` interface, and with `auto-tool-calling` on (the
+default) the customizer receives the `ToolCallingChatClient` wrapper, which exposes no delegate to
+reach through. Change the bound configuration instead. The starter hands each provider client the
+`OpenAiConfig` or `AnthropicConfig` instance held by the `Synapse4jProperties` bean, and a client
+reads its configuration afresh on every exchange, so changing that instance takes effect on the
+next call:
+
+```java
+@Component
+class GatewaySettings {
+
+    GatewaySettings(Synapse4jProperties properties) {
+        properties.getOpenai().setBaseUrl("https://gateway.internal/v1");
+    }
+}
+```
+
 ## Declaring your own bean
 
 Every bean the starter defines backs off when you declare one of the same type. Declare your own
-`ChatClient` bean to wire the client by hand; the starter's default then steps aside entirely. The
-same holds for `JsonCodec` and `HttpClient`.
+`ChatClient` bean to wire the client by hand; the starter's default then steps aside entirely, and
+you hold the concrete client and its own surface, `setConfig` among them. The same holds for
+`JsonCodec` and `HttpClient`.
+
+## Where the API key comes from
+
+The starter never reads a secret itself. An API key reaches it the way any other property does:
+`synapse4j.openai.api-key` or `synapse4j.anthropic.api-key` is bound from whatever the application's
+Spring configuration supplies — a placeholder for an environment variable, a `spring.config.import`
+of a vault or a config server, or any other property source. Keeping the key out of the application's
+own files is the same problem it is for every other credential the application holds.
 
 ## Transports
 
@@ -110,5 +141,8 @@ settings configured for the rest of the application apply to LLM calls too.
 `synapse4j.http-options.response-timeout` binds but has no effect on this transport, because
 `RestClient` has no per-request timeout; use `spring.http.client.read-timeout` instead.
 
-Selecting `apache` uses Apache HttpClient 5, which the starter does not put on your classpath.
-Declare `httpclient5` yourself; without it, only that one bean fails, at startup.
+Selecting `apache` uses Apache HttpClient 5, which the starter does not put on your classpath —
+another HTTP stack is your application's choice to make. Declare `httpclient5` yourself. The Apache
+beans sit behind a class condition, so the default wiring never touches them; selecting `apache`
+without the library fails the context with a message telling you to add
+`org.apache.httpcomponents.client5:httpclient5`.

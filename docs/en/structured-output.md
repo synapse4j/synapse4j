@@ -62,7 +62,8 @@ Every provider module translates the requirement to its own protocol:
 | `synapse4j-openai` (Responses) | `text.format` |
 | `synapse4j-anthropic` | `output_config.format` |
 
-A protocol that cannot express a mode fails loudly rather than answering in prose — an answer that
-looks like success is the most expensive way to be wrong. The Anthropic protocol, for example,
-carries no schema name or description and enforces any schema it is given, so setting `name`,
-`description`, or `strict` to `false` there is refused.
+A protocol that cannot express the shape the caller asked the answer to take fails the call rather
+than answering in prose — an answer that looks like success is the most expensive way to be wrong.
+The Anthropic protocol, for example, has no member for a schema name or description and cannot
+switch its schema enforcement off, so `name`, `description` and `strict` are simply not sent there
+and the call goes on with the schema it can honour. An unsupported `type`, by contrast, is refused.

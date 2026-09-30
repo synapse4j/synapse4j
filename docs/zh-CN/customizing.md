@@ -26,7 +26,7 @@ defaults.setModel("gpt-4o-mini");
 client.setDefaultOptions(defaults);
 ```
 
-默认值补上调用没有声明的东西：调用留作 `null` 的字段取默认值，两个 extras 袋子合并，调用的条目按键
+默认值补上调用没有声明的东西：调用留作 `null` 的字段取默认值，两个 extras 映射合并，调用的条目按键
 胜出。设置属于配置，应在客户端被共享之前完成。
 
 工具也可以常驻客户端——注册的工具，以及每次调用都会问的 `ToolProvider`：
@@ -67,12 +67,12 @@ options.setHttpOptions(http);
 options.getHeaders().put("X-Request-Id", id);
 ```
 
-`HttpOptions` 有三个旋钮：
+`HttpOptions` 有三个设置项：
 
 | 字段 | 设置什么 |
 |---|---|
 | `responseTimeout` | 等待响应头多久；它不限制读取正文 |
-| `bodyWriteMode` | `STREAMED`（默认）或 `BUFFERED`——写出的正文如何到达一个无法边写边收的传输层 |
+| `bodyWriteMode` | 写出的正文如何到达一个无法边写边收的传输层——字符串 `"streamed"`（默认）或 `"buffered"`，对应常量 `HttpOptions.STREAMED` 与 `HttpOptions.BUFFERED` |
 | `maxFrameBytes` | 一个 server-sent event 帧最多可累积多少字节 |
 
 请求的设置与实现自身的设置合并，方式和调用选项一样。

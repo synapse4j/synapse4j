@@ -77,7 +77,7 @@ options.getHeaders().put("X-Request-Id", id);
 | Field | What it sets |
 |---|---|
 | `responseTimeout` | how long to wait for the response headers; it does not bound reading the body |
-| `bodyWriteMode` | `STREAMED` (default) or `BUFFERED` — how a written body reaches a transport that cannot take one as it comes |
+| `bodyWriteMode` | how a written body reaches a transport that cannot take one as it comes — the string `"streamed"` (the default) or `"buffered"`, named by the constants `HttpOptions.STREAMED` and `HttpOptions.BUFFERED` |
 | `maxFrameBytes` | the most one server-sent event frame may accumulate |
 
 A request's settings merge with the implementation's own the same way the call options do.

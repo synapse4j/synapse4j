@@ -36,6 +36,8 @@ blocking and streaming, and tool calling end to end. Provider modules ship separ
 
 - Java 21 or newer
 - Maven 3.6.3 or newer (no wrapper; run `mvn` directly)
+- Spring Boot 4.0 or newer to use the starter (it builds on `spring-boot-restclient` and
+  `spring-boot-jackson`, both introduced in Boot 4.0, and on Jackson 3)
 
 ## Building
 

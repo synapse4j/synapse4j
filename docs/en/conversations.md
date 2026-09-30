@@ -48,8 +48,9 @@ This changes what the client sends, not how you write the code: you still call `
 what its next call needs — the previous response id — and to decide which list the answer belongs
 in.
 
-Whether the server stores the answer is a per-call decision. On the OpenAI Responses client it is
-the `storeResponses` option on `OpenAiConfig`; left unset, the endpoint's own default stands.
+Whether the server stores the answer is a decision for each call. The OpenAI Responses client reads
+it from the `storeResponses` option on `OpenAiConfig`, and a call can also set the `store` member
+itself through its options extras; left unset either way, the endpoint's own default stands.
 
 ## Persisting a conversation
 

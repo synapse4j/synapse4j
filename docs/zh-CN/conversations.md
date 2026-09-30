@@ -43,8 +43,9 @@ ChatResponse second = client.chat(request);
 协议有状态的客户端会重写 `continueWith`，记录它下一次调用需要的东西——上一次的响应 id——并决定答案
 该进哪个列表。
 
-服务端是否保存答案，是每次调用的决定。在 OpenAI Responses 客户端上，它是 `OpenAiConfig` 上的
-`storeResponses` 选项；不设置就沿用端点自己的默认值。
+服务端是否保存答案，是每次调用的决定。OpenAI Responses 客户端从 `OpenAiConfig` 上的
+`storeResponses` 选项读取它，调用也可以通过自己的选项 extras 设置 `store` 成员；两者都不设置时，
+沿用端点自己的默认值。
 
 ## 自己持久化对话
 
@@ -72,5 +73,5 @@ client.addChatCustomizer(new ChatCustomizer() {
 ## 在提供商之间迁移
 
 一段对话可以用另一个客户端继续——另一个模型，或另一家提供商。两边用的消息是同样的类型。extras
-袋子里的提供商特有字段按读到的原样携带；新提供商是否理解它们由你判断，把它们过滤掉也是你的事。见
+映射里的提供商特有字段按读到的原样携带；新提供商是否理解它们由你判断，把它们过滤掉也是你的事。见
 [设计与取舍](design.md)。
