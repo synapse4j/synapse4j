@@ -3,6 +3,7 @@ package io.github.synapse4j.data;
 import org.jspecify.annotations.Nullable;
 
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.Setter;
 import lombok.ToString;
 
@@ -62,5 +63,29 @@ public class ChatResponseFormat {
 
     /** Provider-specific fields of this requirement. */
     private final ProviderExtras extras = new ProviderExtras();
+
+    /**
+     * The response format in effect for one call: what the call itself states, and the default for
+     * every part it leaves unstated — merged field by field like the options around it, so a call
+     * that changes only the schema keeps the default's mode, and the bag merges with the call's
+     * entries winning by key.
+     *
+     * @param format   the format the call carries; never {@code null}
+     * @param defaults the default format; never {@code null}
+     * @return a new instance holding the call's format with its gaps filled in from the default —
+     *         never {@code defaults} itself, so changing the answer touches neither
+     */
+    public static ChatResponseFormat effective(@NonNull ChatResponseFormat format,
+            @NonNull ChatResponseFormat defaults) {
+        ChatResponseFormat effective = new ChatResponseFormat();
+        effective.type = format.type != null ? format.type : defaults.type;
+        effective.name = format.name != null ? format.name : defaults.name;
+        effective.description = format.description != null ? format.description : defaults.description;
+        effective.schema = format.schema != null ? format.schema : defaults.schema;
+        effective.strict = format.strict != null ? format.strict : defaults.strict;
+        effective.extras.putAll(defaults.extras);
+        effective.extras.putAll(format.extras);
+        return effective;
+    }
 
 }

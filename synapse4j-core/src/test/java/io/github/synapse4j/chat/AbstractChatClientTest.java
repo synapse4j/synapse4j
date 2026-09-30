@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ChatMessage;
+import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
@@ -652,6 +653,23 @@ class AbstractChatClientTest {
 
         assertEquals(1, client.defaultsApplied);
         assertEquals("inherited", client.seen.getOptions().getModel());
+    }
+
+    @Test
+    void defaultOptionsFillWhatTheRequestLeavesUnstated() {
+        StubChatClient client = new StubChatClient();
+        ChatOptions defaults = new ChatOptions();
+        defaults.setModel("gpt-4o");
+        client.setDefaultOptions(defaults);
+        ChatRequest request = new ChatRequest();
+        request.getOptions().setTemperature(0.9);
+
+        client.chat(request);
+
+        assertEquals("gpt-4o", client.seen.getOptions().getModel());
+        assertEquals(Double.valueOf(0.9), client.seen.getOptions().getTemperature());
+        // The merge answers a new instance: the default keeps only what it was given.
+        assertNull(defaults.getTemperature());
     }
 
     /** A request customizer that records a name instead of touching the request. */

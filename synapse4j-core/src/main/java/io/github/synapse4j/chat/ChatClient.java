@@ -1,5 +1,6 @@
 package io.github.synapse4j.chat;
 
+import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.tool.Tool;
@@ -25,10 +26,10 @@ import io.github.synapse4j.tool.ToolProvider;
  * A client may also carry {@link ChatCustomizer}s: hooks that prepare every request before it is
  * validated and sent — where an application corrects a shared field whose mapping does not fit
  * the endpoint — adjust an answer on its way back, adapt a stream's events before they are
- * folded, and a set of default tools merged into every request's own, and tool providers whose
- * tools are fetched on every call instead. {@link AbstractChatClient} implements these
- * parts for an implementation; a client that implements this interface directly carries the same
- * obligation.
+ * folded; a set of default tools merged into every request's own, and tool providers whose
+ * tools are fetched on every call instead; and default {@link ChatOptions} that fill in what a
+ * request leaves unstated. {@link AbstractChatClient} implements these parts for an
+ * implementation; a client that implements this interface directly carries the same obligation.
  *
  * <p>
  * The calls carry nothing between calls: every input arrives on the request, and there is no
@@ -113,6 +114,22 @@ public interface ChatClient {
      * @return whether any was removed
      */
     boolean removeChatCustomizer(ChatCustomizer customizer);
+
+    /**
+     * Sets the options every call this client sends inherits from, so a standing model, temperature
+     * or response format need not be repeated on each request. The defaults fill in what the call
+     * leaves unstated: a field the call leaves {@code null} takes the default's value, and the two
+     * bags merge with the call's entries winning by key. They are applied before any customizer
+     * runs, so a customizer sees the merged options and still has the last word on what goes out.
+     *
+     * <p>
+     * Setting is configuration, meant for the time before the client is shared: to change it while
+     * shared, hand in a new instance rather than mutating the one already set, which a call in
+     * flight may be reading.
+     *
+     * @param options the options to inherit from; never {@code null}
+     */
+    void setDefaultOptions(ChatOptions options);
 
     /**
      * Registers a tool this client merges into every request it sends, beside the ones the request

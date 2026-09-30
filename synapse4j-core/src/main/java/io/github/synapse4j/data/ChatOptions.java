@@ -21,8 +21,8 @@ import lombok.ToString;
  * provider apply its own default — there is nothing to copy and nothing to send.
  *
  * <p>
- * A caller fills in only what this call should differ in; combining it with the client's defaults is
- * the client's business. The two bags are the exception to the per-field story: they are never
+ * A caller fills in only what this call should differ in; {@link #effective} is where it is combined
+ * with the client's defaults. The two bags are the exception to the per-field story: they are never
  * replaced, only filled.
  *
  * <p>
@@ -121,5 +121,42 @@ public class ChatOptions {
 
     /** Provider-specific fields to merge into this call's payload. */
     private final ProviderExtras extras = new ProviderExtras();
+
+    /**
+     * The options in effect for one call: what the call itself states, and the client's defaults
+     * for everything it does not. A field the call leaves {@code null} takes the default's value,
+     * the two bags merge with the call's entries winning by key, and the nested response format and
+     * HTTP options merge through their own {@code effective} the same way.
+     *
+     * @param options  the options the call carries; never {@code null}
+     * @param defaults the client's own options; never {@code null}
+     * @return a new instance holding the call's options with their gaps filled in from the
+     *         defaults — never {@code defaults} itself, so changing the answer touches neither
+     */
+    public static ChatOptions effective(@NonNull ChatOptions options, @NonNull ChatOptions defaults) {
+        ChatOptions effective = new ChatOptions();
+        effective.model = options.model != null ? options.model : defaults.model;
+        effective.temperature = options.temperature != null ? options.temperature : defaults.temperature;
+        effective.maxOutputTokens = options.maxOutputTokens != null ? options.maxOutputTokens
+                : defaults.maxOutputTokens;
+        effective.topP = options.topP != null ? options.topP : defaults.topP;
+        effective.reasoningEffort = options.reasoningEffort != null ? options.reasoningEffort
+                : defaults.reasoningEffort;
+        effective.toolChoice = options.toolChoice != null ? options.toolChoice : defaults.toolChoice;
+        effective.toolChoiceName = options.toolChoiceName != null ? options.toolChoiceName
+                : defaults.toolChoiceName;
+        effective.responseFormat = ChatResponseFormat.effective(options.responseFormat, defaults.responseFormat);
+        HttpOptions defaultHttpOptions = defaults.httpOptions;
+        if (defaultHttpOptions == null) {
+            effective.httpOptions = options.httpOptions;
+        } else {
+            effective.httpOptions = HttpOptions.effective(options.httpOptions, defaultHttpOptions);
+        }
+        effective.headers.putAll(defaults.headers);
+        effective.headers.putAll(options.headers);
+        effective.extras.putAll(defaults.extras);
+        effective.extras.putAll(options.extras);
+        return effective;
+    }
 
 }

@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import io.github.synapse4j.data.ChatContext;
+import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
@@ -74,6 +75,19 @@ public abstract class AbstractChatClient implements ChatClient {
      */
     private final AtomicReference<LinkedHashSet<ToolProvider>> toolProviders = new AtomicReference<>(
             new LinkedHashSet<>());
+
+    /**
+     * The options every call inherits from, or {@code null} when none were set — the common case,
+     * which keeps the merge off every call's path. Same pattern as the containers above: a rare
+     * writer publishes a whole instance through the reference in one step, and every call reads it
+     * once into a local, so a call never sees two versions.
+     */
+    private final AtomicReference<ChatOptions> defaultOptions = new AtomicReference<>();
+
+    @Override
+    public void setDefaultOptions(@NonNull ChatOptions options) {
+        defaultOptions.set(options);
+    }
 
     @Override
     public void addChatCustomizer(@NonNull ChatCustomizer customizer) {
@@ -268,16 +282,32 @@ public abstract class AbstractChatClient implements ChatClient {
     /**
      * Applies this client's own defaults to the request — first, before any customizer runs, so
      * every customizer sees them applied and has the last word on what goes out. Runs exactly once
-     * per call. The base assembles the request's tool set from three sources in this order: the
-     * default tools registered through {@link #addDefaultTool(Tool)}, what each registered
-     * {@link ToolProvider} answers for this call, and the request's own tools — a later source
-     * wins by name at the slot the name first took, a new name appends. A subclass with defaults
-     * of its own overrides this and must call {@code super.applyDefaults(request)} to keep that
-     * merge. The request is changed where it stands: there is no other instance to change.
+     * per call. The base fills the request's options from the default options set through
+     * {@link #setDefaultOptions(ChatOptions)}, then assembles the request's tool set from three
+     * sources in this order: the default tools registered through {@link #addDefaultTool(Tool)},
+     * what each registered {@link ToolProvider} answers for this call, and the request's own tools
+     * — a later source wins by name at the slot the name first took, a new name appends. A subclass
+     * with defaults of its own overrides this and must call {@code super.applyDefaults(request)} to
+     * keep that work. The request is changed where it stands: there is no other instance to change.
      *
      * @param request the request as the caller built it
      */
     protected void applyDefaults(ChatRequest request) {
+        ChatOptions options = defaultOptions.get();
+        if (options != null) {
+            request.setOptions(ChatOptions.effective(request.getOptions(), options));
+        }
+        applyDefaultTools(request);
+    }
+
+    /**
+     * Merges the standing tool set into the request's own, in one fixed shape: the default tools in
+     * registration order, each provider's answer in registration order, then the request's own — a
+     * later source wins by name at the slot the name first took, a new name appends.
+     *
+     * @param request the request as the caller built it
+     */
+    private void applyDefaultTools(ChatRequest request) {
         // One get each, held in a local: a second read could land after a registration and
         // straddle two versions — each container is whole on its own, but this call should
         // see one of each.
