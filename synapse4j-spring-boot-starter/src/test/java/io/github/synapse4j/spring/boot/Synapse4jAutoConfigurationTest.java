@@ -3,6 +3,8 @@ package io.github.synapse4j.spring.boot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -23,8 +25,14 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import io.github.synapse4j.anthropic.AnthropicChatClient;
 import io.github.synapse4j.anthropic.AnthropicConfig;
 import io.github.synapse4j.chat.ChatClient;
+import io.github.synapse4j.data.ChatOptions;
+import io.github.synapse4j.data.ChatRequest;
+import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.http.DefaultHttpResponse;
 import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpOptions;
+import io.github.synapse4j.http.HttpRequest;
+import io.github.synapse4j.http.HttpResponse;
 import io.github.synapse4j.http.apache.ApacheHttpClient;
 import io.github.synapse4j.http.restclient.RestClientHttpClient;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
@@ -161,6 +169,48 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
+    void bindsChatOptionsProperties() {
+        runner.withPropertyValues(
+                "synapse4j.chat-options.model=gpt-4o",
+                "synapse4j.chat-options.temperature=0.3",
+                "synapse4j.chat-options.reasoning-effort=high",
+                "synapse4j.chat-options.response-format.type=json_schema",
+                "synapse4j.chat-options.response-format.schema={\"type\":\"object\"}",
+                "synapse4j.chat-options.headers.openai-beta=responses=v1",
+                "synapse4j.chat-options.extras.service_tier=flex")
+                .run(context -> {
+                    // The keys are the starter's public contract, like every other key bound here:
+                    // a renamed one silently drops the default an application configured.
+                    ChatOptions options = context.getBean(Synapse4jProperties.class)
+                            .getChatOptions().toChatOptions();
+                    assertThat(options.getModel()).isEqualTo("gpt-4o");
+                    assertThat(options.getTemperature()).isEqualTo(0.3);
+                    assertThat(options.getReasoningEffort()).isEqualTo("high");
+                    assertThat(options.getResponseFormat().getType()).isEqualTo("json_schema");
+                    assertThat(options.getResponseFormat().getSchema()).isEqualTo("{\"type\":\"object\"}");
+                    assertThat(options.getHeaders()).containsEntry("openai-beta", "responses=v1");
+                    assertThat(options.getExtras().get("service_tier")).isEqualTo("flex");
+                });
+    }
+
+    @Test
+    void theBoundChatOptionsReachTheWire() {
+        StubHttpClient transport = new StubHttpClient();
+        runner.withPropertyValues(
+                "synapse4j.openai.api-key=sk-test",
+                "synapse4j.chat-options.model=gpt-4o",
+                "synapse4j.chat-options.temperature=0.3")
+                .withBean(HttpClient.class, () -> transport)
+                .run(context -> {
+                    // The default supplies the model the request never states — without it the call
+                    // fails its own validation before reaching the transport at all.
+                    context.getBean(ChatClient.class).chat(new ChatRequest().addUserMessage("hi"));
+                    assertThat(transport.capturedBody).contains("\"model\":\"gpt-4o\"");
+                    assertThat(transport.capturedBody).contains("\"temperature\":0.3");
+                });
+    }
+
+    @Test
     void theApplicationsJacksonConfigurationReachesTheCodec() {
         // Goes through Boot's own Jackson auto-configuration rather than a mapper registered by
         // hand, because the dependency on spring-boot-jackson is what makes the mapper exist in a
@@ -226,6 +276,31 @@ class Synapse4jAutoConfigurationTest {
             }
         }
         assertThat(found).as("listed in " + IMPORTS).isTrue();
+    }
+
+    /** Captures the outgoing request body and replays a canned completion. */
+    static class StubHttpClient implements HttpClient {
+
+        String capturedBody;
+
+        @Override
+        public HttpResponse send(HttpRequest request) {
+            ByteArrayOutputStream body = new ByteArrayOutputStream();
+            try {
+                request.getBody().writeTo(body);
+            } catch (IOException e) {
+                throw new SynapseException("the request body could not be written", e);
+            }
+            capturedBody = body.toString(StandardCharsets.UTF_8);
+            DefaultHttpResponse canned = new DefaultHttpResponse();
+            canned.setStatusCode(200);
+            canned.setBody(new ByteArrayInputStream(
+                    ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":"
+                            + "{\"role\":\"assistant\",\"content\":\"hi\"}}]}")
+                            .getBytes(StandardCharsets.UTF_8)));
+            canned.setOptions(HttpOptions.effective(request.getOptions(), HttpOptions.defaults()));
+            return canned;
+        }
     }
 
 }

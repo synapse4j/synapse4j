@@ -5,6 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
 import io.github.synapse4j.anthropic.AnthropicConfig;
+import io.github.synapse4j.data.ChatOptions;
+import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.openai.OpenAiConfig;
 
@@ -18,6 +20,13 @@ import io.github.synapse4j.openai.OpenAiConfig;
  * calls a setter only for a key the environment actually
  * carries, so every property a user does not set keeps the default the library's own instance
  * carries — and there is no second copy of these fields here that could drift from them.
+ *
+ * <p>
+ * {@code synapse4j.chat-options.*} is the one exception, held as a {@link ChatOptionsProperties}
+ * rather than a {@link ChatOptions}: the library type cannot be bound, because its nested response
+ * format and HTTP options are types from another jar the metadata processor will not recurse into,
+ * and its {@link ProviderExtras} bag has no shape Spring can write into. The mirror restates only
+ * the bindable fields, and {@link ChatOptionsProperties#toChatOptions()} rebuilds the library type.
  *
  * <p>
  * Settings that belong to Spring Boot's transport — read and connect timeouts, SSL bundles — are
@@ -74,6 +83,13 @@ public class Synapse4jProperties {
     // silently vanish from the configuration metadata.
     @NestedConfigurationProperty
     private final AnthropicConfig anthropic = new AnthropicConfig();
+
+    /**
+     * The defaults every auto-configured call inherits from, filling in what each request leaves
+     * unstated.
+     */
+    @NestedConfigurationProperty
+    private final ChatOptionsProperties chatOptions = new ChatOptionsProperties();
 
     /**
      * The transport's fallback options, for what a call does not state itself.

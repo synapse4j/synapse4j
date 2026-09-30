@@ -27,7 +27,8 @@ import tools.jackson.databind.json.JsonMapper;
  * Wires a complete synapse4j stack into a Spring Boot application: the Jackson codec, the
  * transport and the chat client that join them — {@code synapse4j.http-client} picks between
  * the Spring and Apache transports, {@code synapse4j.chat-client} between the two OpenAI
- * protocols and Anthropic's — with each family's config bound from its own properties.
+ * protocols and Anthropic's — with each family's config bound from its own properties and every
+ * client's default options from {@code synapse4j.chat-options.*}.
  *
  * <p>
  * Every bean here backs off the moment the application declares one of the same type — this
@@ -162,8 +163,8 @@ public class Synapse4jAutoConfiguration {
     @ConditionalOnMissingBean(ChatClient.class)
     @ConditionalOnProperty(prefix = "synapse4j", name = "chat-client", havingValue = "completions", matchIfMissing = true)
     public OpenAiCompletionsChatClient openAiCompletionsChatClient(HttpClient http, JsonCodec codec,
-            OpenAiConfig config) {
-        return new OpenAiCompletionsChatClient(http, codec, config);
+            OpenAiConfig config, Synapse4jProperties properties) {
+        return withDefaultOptions(new OpenAiCompletionsChatClient(http, codec, config), properties);
     }
 
     /**
@@ -175,8 +176,8 @@ public class Synapse4jAutoConfiguration {
     @ConditionalOnMissingBean(ChatClient.class)
     @ConditionalOnProperty(prefix = "synapse4j", name = "chat-client", havingValue = "responses")
     public OpenAiResponsesChatClient openAiResponsesChatClient(HttpClient http, JsonCodec codec,
-            OpenAiConfig config) {
-        return new OpenAiResponsesChatClient(http, codec, config);
+            OpenAiConfig config, Synapse4jProperties properties) {
+        return withDefaultOptions(new OpenAiResponsesChatClient(http, codec, config), properties);
     }
 
     /**
@@ -189,8 +190,18 @@ public class Synapse4jAutoConfiguration {
     @ConditionalOnMissingBean(ChatClient.class)
     @ConditionalOnProperty(prefix = "synapse4j", name = "chat-client", havingValue = "anthropic")
     public AnthropicChatClient anthropicChatClient(HttpClient http, JsonCodec codec,
-            AnthropicConfig config) {
-        return new AnthropicChatClient(http, codec, config);
+            AnthropicConfig config, Synapse4jProperties properties) {
+        return withDefaultOptions(new AnthropicChatClient(http, codec, config), properties);
+    }
+
+    /**
+     * Applies the bound chat options to a freshly built client, so every call it makes inherits the
+     * standing model, temperature or response format. Applied here rather than through a constructor
+     * because the clients' own constructors are the library's API and take no options.
+     */
+    private static <T extends ChatClient> T withDefaultOptions(T client, Synapse4jProperties properties) {
+        client.setDefaultOptions(properties.getChatOptions().toChatOptions());
+        return client;
     }
 
 }
