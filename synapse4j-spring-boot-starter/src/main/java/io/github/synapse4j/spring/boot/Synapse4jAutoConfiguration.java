@@ -155,6 +155,11 @@ public class Synapse4jAutoConfiguration {
      * HttpClient 5 is not on the classpath. Without this the selection would fail as a missing
      * {@link HttpClient} bean — an error that names neither the property nor the library — so the
      * message here says exactly what to add.
+     *
+     * <p>
+     * It fires only when the starter would have to build the transport: an application that declares
+     * its own {@link HttpClient} has already wired one by hand, so the selector is inert for it and
+     * naming a library it deliberately does not use would be wrong.
      */
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnMissingClass("org.apache.hc.client5.http.impl.classic.CloseableHttpClient")
@@ -162,6 +167,7 @@ public class Synapse4jAutoConfiguration {
     static class ApacheTransportMissingConfiguration {
 
         @Bean
+        @ConditionalOnMissingBean(HttpClient.class)
         HttpClient apacheTransportMissing() {
             throw new IllegalStateException(
                     "synapse4j.http-client=apache needs Apache HttpClient 5 on the classpath: declare a "

@@ -8,7 +8,9 @@ on:
 # One release at a time, and never cancel one mid-flight: a publish interrupted
 # halfway is harder to recover than one that waits for the previous job. The group is a
 # constant, not the ref: keyed by ref, two tags pushed together landed in groups of their
-# own and published at once.
+# own and published at once. GitHub holds one running and one pending task per group, so
+# pushing a third tag while one runs and one waits cancels the waiting one — push release
+# tags one at a time.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -61,10 +63,16 @@ jobs:
         run: |
           ver="${GITHUB_REF_NAME#v}"
           token="$(printf '%s:%s' "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | base64 -w0)"
-          published="$(curl -sf -H "Authorization: Bearer $token" \
-            "https://central.sonatype.com/api/v1/publisher/published?namespace=io.github.synapse4j&name=synapse4j-core&version=${ver}" \
-            | jq -r '.published // false')"
-          if [ "$published" = "true" ]; then
+          url="https://central.sonatype.com/api/v1/publisher/published?namespace=io.github.synapse4j&name=synapse4j-core&version=${ver}"
+          code="$(curl -sS -o /tmp/published.json -w '%{http_code}' -H "Authorization: Bearer $token" "$url")"
+          # The status is what carries the signal: a rotated credential or a bad gateway would
+          # otherwise leave the body empty and read as "not published", which is the one answer
+          # that leads to a duplicate upload.
+          if [ "$code" != "200" ]; then
+            echo "::error::Central answered $code for $url — cannot tell whether the version is out"
+            exit 1
+          fi
+          if [ "$(jq -r '.published // false' /tmp/published.json)" = "true" ]; then
             echo "already on Maven Central — skipping the publish"
             echo "SKIP_PUBLISH=true" >> "$GITHUB_ENV"
           fi

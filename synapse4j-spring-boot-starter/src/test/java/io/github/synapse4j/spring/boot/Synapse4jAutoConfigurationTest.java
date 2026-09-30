@@ -163,6 +163,22 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
+    void selectingApacheWithoutItsLibraryStartsWhenTheApplicationWiresItsOwnClient() {
+        // The selector names a transport the starter would build. An application that declares its
+        // own HttpClient has already wired one by hand, so the selector is inert for it and naming a
+        // library it deliberately does not use would be wrong: the context has to start.
+        new ApplicationContextRunner()
+                .withClassLoader(new FilteredClassLoader(CloseableHttpClient.class))
+                .withConfiguration(AutoConfigurations.of(Synapse4jAutoConfiguration.class))
+                .withPropertyValues("synapse4j.http-client=apache")
+                .withBean(HttpClient.class, RestClientHttpClient::new)
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(HttpClient.class);
+                });
+    }
+
+    @Test
     void aRelaxedTransportSpellingStillSelects() {
         // The binder accepts the spellings Spring binds everywhere else, and the bean that has to
         // exist follows the same value the client reads. A raw string comparison accepted
