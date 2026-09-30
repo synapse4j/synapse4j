@@ -50,6 +50,10 @@ import org.jspecify.annotations.Nullable;
  * {@link IllegalArgumentException} when a request tries to set one. That is a caller bug —
  * the call never went out — and is deliberately left unwrapped rather than surfaced as a
  * {@code SynapseException}.</li>
+ * <li>A request that carries its own framing ({@code Content-Length} or {@code Transfer-Encoding})
+ * alongside a body is refused, as the other transports refuse it: the JDK takes
+ * {@code Transfer-Encoding} as an ordinary header and would add its own framing beside it, so
+ * leaving it alone would put two framings on one request.</li>
  * </ul>
  *
  * <p>
@@ -105,6 +109,18 @@ public class JdkHttpClient implements HttpClient {
     @Override
     public HttpResponse send(HttpRequest request) {
         HttpOptions effective = HttpOptions.effective(request.getOptions(), this.options);
+        // A body's framing belongs to the transport. The JDK refuses Content-Length as a restricted
+        // header but takes Transfer-Encoding as an ordinary one and then frames the body itself, so
+        // a request that set it would go out with both framings. Refused here, the way the other two
+        // transports refuse the pair.
+        if (request.getBody() != null) {
+            for (String name : request.getHeaders().keySet()) {
+                if ("content-length".equalsIgnoreCase(name) || "transfer-encoding".equalsIgnoreCase(name)) {
+                    throw new IllegalArgumentException(
+                            "a body's framing belongs to the transport: drop the request's own " + name);
+                }
+            }
+        }
         java.net.http.HttpRequest.Builder builder = java.net.http.HttpRequest.newBuilder()
                 .uri(URI.create(request.getUrl()));
         request.getHeaders()

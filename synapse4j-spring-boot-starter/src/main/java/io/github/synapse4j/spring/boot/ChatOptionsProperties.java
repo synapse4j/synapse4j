@@ -58,6 +58,12 @@ public class ChatOptionsProperties {
     /**
      * The shape the answer should take. The marker is what makes the metadata processor recurse
      * into the type from another jar; without it its keys would silently vanish from the metadata.
+     *
+     * <p>
+     * Only the five members modelled on {@link ChatResponseFormat} — {@code type}, {@code name},
+     * {@code description}, {@code schema} and {@code strict} — are bindable here. Its
+     * {@code extras} bag has a getter but no setter, so a {@code response-format.extras.*} key binds
+     * nowhere and does nothing: it is absent from the metadata, and the binder does not refuse it.
      */
     @NestedConfigurationProperty
     private final ChatResponseFormat responseFormat = new ChatResponseFormat();

@@ -286,7 +286,15 @@ class MessagesStream extends DefaultChatStream {
             if (input.isEmpty()) {
                 return;
             }
-            Object parsed = codec.decode(input.toString(), Object.class);
+            Object parsed;
+            try {
+                parsed = codec.decode(input.toString(), Object.class);
+            } catch (RuntimeException failure) {
+                // A block whose input never finished arriving leaves truncated JSON. The failure is
+                // the library's to report, not the codec's own exception type escaping from a fold:
+                // this module's pom carries no JSON library for a caller to catch it by.
+                throw new SynapseException("streamed block input is not valid JSON", failure);
+            }
             if (parsed != null) {
                 block.getMembers().put("input", parsed);
             }

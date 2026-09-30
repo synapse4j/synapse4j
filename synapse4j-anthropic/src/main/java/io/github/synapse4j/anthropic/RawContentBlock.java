@@ -1,5 +1,6 @@
 package io.github.synapse4j.anthropic;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import io.github.synapse4j.data.ContentPart;
@@ -34,9 +35,12 @@ public class RawContentBlock extends ContentPart {
      * @param block the captured block; never {@code null}, always a JSON object
      */
     public RawContentBlock(@NonNull Map<?, ?> block) {
-        @SuppressWarnings("unchecked")
-        Map<String, Object> members = (Map<String, Object>) block;
-        this.members = members;
+        // A copy, not the caller's map: a streamed block is completed later, member by member, and
+        // the map the reader handed over belongs to the reader — one built on an immutable tree
+        // would refuse the write, and the streamed path would then differ from the blocking one.
+        Map<String, Object> copy = new LinkedHashMap<>();
+        block.forEach((key, value) -> copy.put(String.valueOf(key), value));
+        this.members = copy;
     }
 
     /**

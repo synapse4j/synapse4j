@@ -62,6 +62,19 @@ class JdkHttpClientTest {
     }
 
     @Test
+    void aRequestCarryingItsOwnFramingIsRefused() {
+        // The JDK takes Transfer-Encoding as an ordinary header and frames the body itself, so a
+        // request that set it would go out with two framings. Refused here, as the other transports
+        // refuse the pair, before anything reaches the wire.
+        HttpRequest request = new HttpRequest(baseUrl + "/chat");
+        request.setMethod(HttpRequest.POST);
+        request.getHeaders().put("Transfer-Encoding", List.of("chunked"));
+        request.setBody(HttpBody.of("{}"));
+
+        assertThrows(IllegalArgumentException.class, () -> client.send(request));
+    }
+
+    @Test
     void postRoundTripsMethodPathHeadersBodyAndStatus() throws Exception {
         AtomicReference<String> seenMethod = new AtomicReference<>();
         AtomicReference<String> seenPath = new AtomicReference<>();
