@@ -42,7 +42,12 @@ public class ChatResponseFormat {
     /** Answer with JSON that conforms to the schema set on this format. */
     public static final String TYPE_JSON_SCHEMA = "json_schema";
 
-    /** One of the {@code TYPE_*} constants, or any other value a provider understands. */
+    /**
+     * One of the {@code TYPE_*} constants, or any other value a provider understands. The value is
+     * open because a protocol may add a shape this library has not heard of; a protocol that
+     * expresses only fixed shapes fails the call on one it cannot honour rather than sending a
+     * request that would come back as something else.
+     */
     private @Nullable String type;
 
     /** Name of the schema; the protocol that requires a name needs one. */
