@@ -15,5 +15,6 @@ version becomes the body of the GitHub Release created when that version's tag i
 - Protocol clients for OpenAI Chat Completions, the OpenAI Responses API, and Anthropic Messages
 - Spring Boot starter with auto-configuration, bound from synapse4j.*: provider and transport config, default chat options, customizer beans and the tool-calling loop on by default
 - Configuration metadata for every synapse4j.* key, so an IDE completes them
+- A bilingual user guide under `docs/`: the design, getting started, and a page per feature
 - A BOM for version alignment
 - Null-safety contracts declared with JSpecify and enforced at compile time by NullAway
