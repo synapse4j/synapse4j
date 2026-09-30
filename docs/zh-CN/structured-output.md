@@ -1,0 +1,67 @@
+# 结构化输出
+
+[English](../en/structured-output.md) | **中文**
+
+你可以要求模型以 JSON 作答，或者以符合某个 schema 的 JSON 作答。schema 由你的编解码器生成，因此
+模型被约束到你的编解码器恰好能读回的 JSON。
+
+## 生成 schema
+
+`JsonCodec` 能为任意类型推导出 schema，两个方向都有：
+
+- `generateEncodeSchema(type)` 描述 `encode` 写出什么；
+- `generateDecodeSchema(type)` 描述 `decode` 接受什么。
+
+两者可以不同，因为绑定器可能写出一个它读不回的属性。要向模型要一个值，你要的是 decode schema——
+你的编解码器会接受的那份 JSON：
+
+```java
+JsonSchema schema = codec.generateDecodeSchema(Person.class);
+String schemaText = codec.encode(schema);
+```
+
+类型是 `Type` 而不是 `Class`，因此泛型类型带着它的类型参数一起到达：`List<Order>` 描述的是一组
+order。
+
+## 提出要求
+
+答案应取的形状放在选项里的 `ChatResponseFormat` 上：
+
+```java
+record Person(String name, int age) {}
+
+ChatResponseFormat format = new ChatResponseFormat();
+format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
+format.setName("person");
+format.setSchema(codec.encode(codec.generateDecodeSchema(Person.class)));
+format.setStrict(true);
+
+ChatOptions options = new ChatOptions();
+options.setResponseFormat(format);
+```
+
+三种模式是 `TYPE_TEXT`（散文）、`TYPE_JSON`（任意合法 JSON）和 `TYPE_JSON_SCHEMA`（符合 schema 的
+JSON）。`strict` 要求提供商强制执行 schema，而不只是朝它努力。
+
+因为 schema 是文本，这里没有任何东西绑定 JSON 库：你选的编解码器产出它，模型被约束到那个编解码器
+读回的形状。
+
+## 把答案读回来
+
+```java
+Person person = codec.decode(text(response), Person.class);
+```
+
+## 各提供商的支持
+
+每个提供商模块都把这项要求翻译成自己的协议：
+
+| 模块 | 落在哪里 |
+|---|---|
+| `synapse4j-openai`（Completions） | `response_format` |
+| `synapse4j-openai`（Responses） | `text.format` |
+| `synapse4j-anthropic` | `output_config.format` |
+
+协议无法表达某种模式时，会响亮地失败，而不是以散文作答——一个看上去像成功的答案是最昂贵的错误方式。
+例如 Anthropic 协议不携带 schema 的名字或描述，并且对给它的任何 schema 都强制执行，因此在那里设置
+`name`、`description`，或把 `strict` 设为 `false` 都会被拒绝。

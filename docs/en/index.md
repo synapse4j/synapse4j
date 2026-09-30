@@ -47,8 +47,14 @@ history, sometimes a whole framework. synapse4j bundles none of them.
 2. [The call model](model.md) — the request, the response, messages, parts and options.
 3. [Conversations](conversations.md) — holding history yourself, and continuing across turns.
 4. [Tools](tools.md) — declaring tools and running the model's tool calls.
-5. [Design and trade-offs](design.md) — what the library does and does not do, and why.
-6. *Comparison with other Java libraries — planned.*
+5. [Streaming](streaming.md) — consuming an answer event by event.
+6. [Structured output](structured-output.md) — asking for JSON against a schema.
+7. [Customizing](customizing.md) — swapping components, hooks, defaults and per-call settings.
+8. [Spring Boot](spring-boot.md) — the auto-configuring starter.
+9. [Writing a provider](writing-a-provider.md) — the shape of a provider module.
+10. [Design and trade-offs](design.md) — what the library does and does not do, and why.
+11. [Comparison with other Java libraries](comparison.md) — how it differs from LangChain4j,
+    Spring AI and the vendor SDKs.
 
 The Javadoc is the reference for the API itself.
 
