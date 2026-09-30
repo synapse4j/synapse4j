@@ -21,6 +21,11 @@ import org.jspecify.annotations.Nullable;
  * <p>
  * The {@code eventType} is an open string, like every value in this library that can grow; the
  * well-known ones are declared as constants by the provider module that produces them.
+ *
+ * <p>
+ * An event's parts are its own: the fold copies the fragments it accumulates into the aggregated
+ * answer rather than sharing them, so an event an application keeps does not change as later frames
+ * arrive, and the answer does not change under one that reads it.
  */
 @Getter
 @Setter

@@ -515,6 +515,10 @@ class OpenAiResponsesChatClientTest {
         // though the answer keeps none of it, a blocking response having no frames to carry it.
         assertEquals("msg_1", events.get(1).getExtras().get("item_id"));
         assertEquals(0, events.get(1).getExtras().get("output_index"));
+        // The events are snapshots: the answer is assembled from copies, so a delta event an
+        // application kept still carries only the fragment it delivered.
+        assertEquals("Hi", textOf(events.get(1)));
+        assertEquals(" there", textOf(events.get(2)));
 
         ChatResponse aggregated = stream.aggregatedResponse();
         assertEquals(ChatRole.ASSISTANT, aggregated.getMessage().getRole());

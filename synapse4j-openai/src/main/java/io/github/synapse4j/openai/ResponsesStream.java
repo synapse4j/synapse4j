@@ -221,7 +221,7 @@ class ResponsesStream extends DefaultChatStream {
             text.setText(join(text.getText(), fragment.getText()));
             return;
         }
-        parts.add(fragment);
+        parts.add(copyOf(fragment));
     }
 
     /**
@@ -239,7 +239,7 @@ class ResponsesStream extends DefaultChatStream {
             }
             return;
         }
-        parts.add(fragment);
+        parts.add(copyOf(fragment));
     }
 
     /**
@@ -250,7 +250,7 @@ class ResponsesStream extends DefaultChatStream {
     private static void mergeToolCall(ChatMessage message, ToolCallPart fragment) {
         ToolCallPart call = toolCallFor(message, fragment);
         if (call == null) {
-            message.getParts().add(fragment);
+            message.getParts().add(copyOf(fragment));
             return;
         }
         if (call.getName() == null) {
@@ -261,6 +261,28 @@ class ResponsesStream extends DefaultChatStream {
         if (fragmentExtras != null) {
             call.getOrCreateExtras().putAll(fragmentExtras);
         }
+    }
+
+    /**
+     * A part the answer owns, so the fold never mutates a part an event handed out: the answer grows
+     * by merging later fragments into the part it took, and that part has to be the answer's own, or
+     * an application that kept the event would watch its text change under it.
+     */
+    private static ContentPart copyOf(ContentPart part) {
+        ContentPart copy;
+        if (part instanceof TextPart text) {
+            copy = new TextPart(text.getText());
+        } else if (part instanceof ReasoningPart reasoning) {
+            copy = new ReasoningPart(reasoning.getText());
+        } else if (part instanceof ToolCallPart call) {
+            copy = new ToolCallPart(call.getCallId(), call.getName(), call.getArgumentsJson());
+        } else {
+            return part;
+        }
+        if (part.getExtras() != null) {
+            copy.getOrCreateExtras().putAll(part.getExtras());
+        }
+        return copy;
     }
 
     /** The call a fragment continues, or {@code null} when it opens a new one. */

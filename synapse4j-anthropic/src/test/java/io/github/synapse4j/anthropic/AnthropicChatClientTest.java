@@ -680,6 +680,10 @@ class AnthropicChatClientTest {
         assertEquals(AnthropicEventTypes.PING, events.get(2).getEventType());
         assertEquals(AnthropicEventTypes.MESSAGE_STOP, events.get(7).getEventType());
         assertEquals(Boolean.TRUE, parseCaptured().get("stream"));
+        // The events are snapshots: the answer is assembled from copies, so a delta event an
+        // application kept still carries only the fragment it delivered.
+        assertEquals("Hi ", textOf(events.get(3)));
+        assertEquals("there", textOf(events.get(4)));
 
         ChatResponse aggregated = stream.aggregatedResponse();
         assertEquals(ChatRole.ASSISTANT, aggregated.getMessage().getRole());
