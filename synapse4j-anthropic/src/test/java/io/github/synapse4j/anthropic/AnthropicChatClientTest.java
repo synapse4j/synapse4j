@@ -231,14 +231,20 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aToolChoiceThisProtocolCannotSpellIsRefused() {
-        // A mode outside the set the protocol fixes.
+    void aToolChoiceModeThisProtocolCannotSpellIsLeftUnsent() {
+        stubCompletion();
+
+        // A mode outside the set the protocol fixes is left off the wire, not refused: the call
+        // goes on with the endpoint's own default.
         ChatRequest unknownMode = requestWithModel();
         unknownMode.getOptions().setToolChoice("sample");
-        SynapseException thrown = assertThrows(SynapseException.class,
-                () -> client.chat(unknownMode));
-        assertTrue(thrown.getMessage().contains("sample"), thrown.getMessage());
+        client.chat(unknownMode);
 
+        assertFalse(parseCaptured().containsKey("tool_choice"));
+    }
+
+    @Test
+    void aContradictoryToolChoiceIsRefused() {
         // A name beside a mode that names no tool is half a requirement.
         ChatRequest strayName = requestWithModel();
         strayName.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_AUTO);
@@ -399,14 +405,28 @@ class AnthropicChatClientTest {
         SynapseException thrown = assertThrows(SynapseException.class,
                 () -> client.chat(anyJson));
         assertTrue(thrown.getMessage().contains("json"), thrown.getMessage());
+    }
 
-        // A description would never reach the provider, and a request whose knobs quietly do
-        // nothing reads from above as a model that ignored them.
+    @Test
+    void aResponseFormatMemberTheProtocolLacksIsLeftUnsent() {
+        stubCompletion();
+
+        // The protocol's format carries no name, description or enforcement flag; those are left
+        // off the wire, and the schema the protocol can honour still goes out.
         ChatRequest described = requestWithModel();
-        described.getOptions().getResponseFormat().setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
-        described.getOptions().getResponseFormat().setSchema("{\"type\":\"object\"}");
-        described.getOptions().getResponseFormat().setDescription("The answer, as JSON");
-        assertThrows(SynapseException.class, () -> client.chat(described));
+        ChatResponseFormat format = described.getOptions().getResponseFormat();
+        format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
+        format.setSchema("{\"type\":\"object\"}");
+        format.setName("person");
+        format.setDescription("The answer, as JSON");
+        format.setStrict(false);
+        client.chat(described);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> outputConfig = (Map<String, Object>) parseCaptured().get("output_config");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> formatWire = (Map<String, Object>) outputConfig.get("format");
+        assertEquals(Map.of("type", "json_schema", "schema", Map.of("type", "object")), formatWire);
     }
 
     @Test

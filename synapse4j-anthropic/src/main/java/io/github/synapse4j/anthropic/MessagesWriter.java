@@ -453,14 +453,15 @@ class MessagesWriter {
     }
 
     /**
-     * The tool choice as the member it goes out as, or {@code null} when the call states none.
-     * This protocol always takes the object form, and its four shapes are the set the specification
-     * fixes: the shared vocabulary's {@code auto}, {@code none} and {@code tool} map onto them —
-     * {@code required}, which this protocol spells {@code any}, is the translation — and a value
-     * the provider itself understands but this library has no constant for passes as it stands. Any
-     * other mode is refused here rather than sent: a knob that quietly did nothing would read from
-     * above as a model that ignored its instructions. Provider fields of the object form ride in
-     * through the options bag — a {@code tool_choice.…} path merges over what is written here.
+     * The tool choice as the member it goes out as, or {@code null} when the call states none or a
+     * mode this protocol has no word for. This protocol always takes the object form, and its four
+     * shapes are the set the specification fixes: the shared vocabulary's {@code auto}, {@code none}
+     * and {@code tool} map onto them, and {@code required}, which this protocol spells {@code any},
+     * is the translation. A mode with no counterpart here is left unsent, so the call goes on with
+     * the endpoint's own default; a name beside a mode that names no tool, or a missing name for the
+     * mode that needs one, is the caller's own contradiction and is refused. Provider fields of the
+     * object form ride in through the options bag — a {@code tool_choice.…} path merges over what is
+     * written here.
      */
     private static @Nullable Object toolChoice(ChatOptions options) {
         String mode = options.getToolChoice();
@@ -493,8 +494,10 @@ class MessagesWriter {
                 named.put("name", name);
                 return named;
             default:
-                throw new SynapseException(
-                        "unsupported tool choice mode for Anthropic Messages: " + mode);
+                // A mode this protocol has no word for goes out as nothing, not as a refusal: the
+                // call proceeds on the endpoint's own default, which is all a protocol without the
+                // mode can offer.
+                return null;
         }
     }
 
@@ -522,26 +525,12 @@ class MessagesWriter {
      * This protocol expresses exactly one shape — a JSON Schema the endpoint then enforces — so a
      * schema-shaped request is translated, prose is what the endpoint answers with when no format
      * is asked for (its own members still go out as the caller spelled them), and any other stated
-     * shape is refused rather than dropped. The properties of the requirement this protocol has no
-     * member for are refused for the same reason: a schema name or description that never reaches
-     * the provider would read from above as a model that ignored the request. The enforcement flag
-     * needs no member — grammar-constrained output either happens or the format is not written —
-     * so {@code true} is honored by the format itself and {@code false}, which asks for an
-     * enforcement this protocol cannot switch off, is refused.
+     * shape is refused rather than dropped: prose where JSON was asked for would look like success.
+     * The requirement's properties this protocol has no member for — a schema name or description,
+     * and the enforcement flag, which this protocol cannot switch off — are left unsent, so the call
+     * goes on with the schema it can honour.
      */
     private Map<String, Object> responseFormat(ChatResponseFormat format) {
-        if (format.getName() != null) {
-            throw new SynapseException("unsupported response format for Anthropic Messages:"
-                    + " the protocol's format carries no name");
-        }
-        if (format.getDescription() != null) {
-            throw new SynapseException("unsupported response format for Anthropic Messages:"
-                    + " the protocol's format carries no description");
-        }
-        if (Boolean.FALSE.equals(format.getStrict())) {
-            throw new SynapseException("unsupported response format for Anthropic Messages:"
-                    + " a schema-shaped answer is enforced, and enforcement cannot be turned off");
-        }
         Map<String, Object> entry = new LinkedHashMap<>();
         String type = format.getType();
         if (ChatResponseFormat.TYPE_JSON_SCHEMA.equals(type)) {

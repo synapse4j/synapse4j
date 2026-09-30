@@ -483,15 +483,16 @@ class ResponsesWriter {
     }
 
     /**
-     * The tool choice as the member it goes out as, or {@code null} when the call states none. The
-     * modes that constrain nothing in particular are this protocol's bare strings; naming a tool
-     * takes the object form, which is the only shape that carries a name.
+     * The tool choice as the member it goes out as, or {@code null} when the call states none or a
+     * mode this protocol has no word for. The modes that constrain nothing in particular are this
+     * protocol's bare strings; naming a tool takes the object form, which is the only shape that
+     * carries a name.
      *
      * <p>
-     * Every mode the call states is translated or refused here, and the name with it: a knob that
-     * quietly did nothing would read from above as a model that ignored its instructions. Provider
-     * fields of the object form ride in through the options bag — a {@code tool_choice.…} path merges
-     * over what is written here.
+     * A mode with no counterpart here is left unsent, so the call goes on with the endpoint's own
+     * default; a name beside a mode that names no tool, or a missing name for the mode that needs
+     * one, is the caller's own contradiction and is refused. Provider fields of the object form ride
+     * in through the options bag — a {@code tool_choice.…} path merges over what is written here.
      */
     private static @Nullable Object toolChoice(ChatOptions options) {
         String mode = options.getToolChoice();
@@ -517,7 +518,8 @@ class ResponsesWriter {
                 entry.put("name", options.getToolChoiceName());
                 return entry;
             default:
-                throw new SynapseException("unsupported tool choice mode for OpenAI Responses: " + mode);
+                // A mode this protocol has no word for goes out as nothing, not as a refusal.
+                return null;
         }
     }
 

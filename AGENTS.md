@@ -87,11 +87,13 @@ framework; efficiency is why it would be better.
 - A concept is promoted from that bag into the shared model only when the application needs it to
   survive a provider switch *and* the providers' shapes map onto one neutral value space. Two
   providers carrying a similarly named field is not a reason.
-- A promoted concept is translated or refused, never dropped: a module whose protocol cannot express
-  it fails the call, because a knob that quietly does nothing reads from above as a model that
-  ignored its instructions. A value the protocol takes as it stands goes as it stands — the constants
-  name what means the same thing across providers, and a module invents no whitelist the protocol
-  never fixed.
+- A promoted concept a protocol cannot express is left unsent and the call goes on — refusing one
+  would break the same code the moment a provider is swapped, and most protocols simply lack the
+  word. The one exception is a requirement on the answer's shape: a module whose protocol cannot
+  honour it fails the call, because an answer that violates what was asked for but looks like success
+  is the most expensive kind of wrong. A value the protocol takes as it stands goes as it stands — the
+  constants name what means the same thing across providers, and a module invents no whitelist the
+  protocol never fixed.
 - A provider's spelling of a common field is a configuration field on that module's config, used for
   reading and writing alike, with a default that suits the provider that fails loudly when wrong. It
   is never inferred from what a response happened to contain.

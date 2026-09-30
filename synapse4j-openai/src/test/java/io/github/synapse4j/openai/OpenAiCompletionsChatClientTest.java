@@ -989,13 +989,20 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aToolChoiceThisProtocolCannotSpellIsRefused() {
-        // A mode the open vocabulary allows and this protocol has no member for.
+    void aToolChoiceModeThisProtocolCannotSpellIsLeftUnsent() {
+        stubCompletion();
+
+        // A mode the open vocabulary allows and this protocol has no member for is left off the
+        // wire, not refused: the call goes on with the endpoint's own default.
         ChatRequest unknownMode = requestWithModel();
         unknownMode.getOptions().setToolChoice("any");
-        SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(unknownMode));
-        assertTrue(thrown.getMessage().contains("any"), thrown.getMessage());
+        client.chat(unknownMode);
 
+        assertFalse(parseCaptured().containsKey("tool_choice"));
+    }
+
+    @Test
+    void aContradictoryToolChoiceIsRefused() {
         // A name beside a mode that names no tool is half a requirement.
         ChatRequest strayName = requestWithModel();
         strayName.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_REQUIRED);
