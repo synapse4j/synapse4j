@@ -54,6 +54,8 @@ dependencies {
 }
 ```
 
+上面写的 `0.0.1` 是本文档随附的版本；有更新的版本时，请从 Maven Central 取。
+
 ## 2. 构建一个客户端
 
 一个客户端由三部分协作而成：一个把值变成 JSON 的 JSON 编解码器，一个发送字节的 HTTP 客户端，以及一个
@@ -126,7 +128,7 @@ static String text(ChatResponse response) {
 
 ## 5. 继续对话
 
-库不保存历史。历史由你保存：持有那个 request，每收到一个答案就用 `continueWith` 折回去：
+库不保存历史。历史由你保存：持有那个请求，每收到一个答案就用 `continueWith` 折回去：
 
 ```java
 ChatRequest request = new ChatRequest()
@@ -143,7 +145,7 @@ ChatResponse second = client.chat(request);
 `continueWith` 把刚发出去的那一轮归档，并追加助手的回答，因此下一次 `chat` 会发出整段往来。这是唯一
 一处「服务端替你记住对话」时写法不同的地方；采用那种协议的客户端会重写它，而调用点不变。
 
-如果你想自己持久化对话，实现一个 `ChatCustomizer`，在它的钩子触发时把 request 和 response 写出去。
+如果你想自己持久化对话，实现一个 `ChatCustomizer`，在它的钩子触发时把请求与响应写出去。
 库永远不会去碰你的存储。
 
 ## 6. 流式接收答案
@@ -200,7 +202,7 @@ System.out.println(text(answer));
 ```
 
 `ToolCallingChatClient` 包装任意客户端：它跑完模型发起的各轮工具调用，直到模型不再要求调用，并在
-此过程中把调用与结果追加进 request。未包装的客户端不运行工具——它把调用交给你，由你驱动；当默认
+此过程中把调用与结果追加进请求。未包装的客户端不运行工具——它把调用交给你，由你驱动；当默认
 循环不是你想要的循环时，这就是合适的选择。
 
 ## 8. 要求结构化输出

@@ -80,7 +80,8 @@ options.getExtras().mergeInto(members);
 
 用协议自己的成员要求流式，然后读响应的 `SseEventStream`——每帧一个 `SseEvent`——把每一帧映射成携带
 协议 `eventType` 和归一化 `delta` 的 `ChatStreamEvent`。`DefaultChatStream` 把事件折叠成聚合答案；
-用你的迭代器和一个释放响应的关闭动作来构建它。
+用你的迭代器、把单个事件折叠进答案的 `BiConsumer<ChatResponse, ChatStreamEvent>`，以及一个释放响应的
+关闭动作来构建它。
 
 没有归一化内容的事件把 `delta` 留作 null，负载留在 `extras` 里。
 

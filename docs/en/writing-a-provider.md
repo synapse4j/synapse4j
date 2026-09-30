@@ -89,7 +89,8 @@ trip.
 Ask for a stream with the protocol's own member, then read the response's `SseEventStream` — one
 `SseEvent` per frame — and map each frame to a `ChatStreamEvent` carrying the protocol's `eventType`
 and a normalized `delta`. `DefaultChatStream` folds the events into the aggregated answer; build it
-with your iterator and a close action that releases the response.
+with your iterator, the `BiConsumer<ChatResponse, ChatStreamEvent>` that folds one event into the
+answer, and a close action that releases the response.
 
 An event with no normalized content leaves `delta` null and keeps its payload in `extras`.
 

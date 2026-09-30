@@ -49,8 +49,7 @@ ChatResponse second = client.chat(request);
 
 ## 自己持久化对话
 
-如果你自己保存对话——数据库、文件——实现一个 `ChatCustomizer`，在它的钩子触发时把 request 和
-response 写出去：
+如果你自己保存对话——数据库、文件——实现一个 `ChatCustomizer`，在它的钩子触发时把请求与响应写出去：
 
 ```java
 client.addChatCustomizer(new ChatCustomizer() {

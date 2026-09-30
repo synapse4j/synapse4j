@@ -12,8 +12,8 @@
 
 ## 一个工具
 
-`Tool` 接口有两个方法：`definition()` 和 `execute(arguments, context)`。多数工具由下面三个类之一
-构建。
+`Tool` 接口有 `definition()` 和 `execute(arguments, context)`，外加 `name()`，它默认取声明上的名字。
+多数工具由下面三个类之一构建。
 
 **`FunctionTool`**——一个带类型的 lambda。模型的参数被解码成你的类型，lambda 运行，返回值再被渲染
 回去：
@@ -49,7 +49,7 @@ ChatClient client = new ToolCallingChatClient(new OpenAiCompletionsChatClient(ht
 ```
 
 `ToolCallingChatClient` 跑完模型发起的各轮工具调用，直到模型不再要求调用，并在此过程中把调用与结果
-追加进 request。最后一个答案留给你去 `continueWith`。
+追加进请求。最后一个答案留给你去 `continueWith`。
 
 ## 执行策略
 
@@ -61,7 +61,13 @@ ToolExecutor executor = new DefaultToolExecutor();
 ChatClient client = new ToolCallingChatClient(inner, executor);
 ```
 
-它的构造函数还可以接收：
+除了无参构造器，还有接收 `ExecutorService` 与 `ErrorHandler` 的双参数构造器，以及再加上
+`maxTurns` 上限的三参数构造器：
+
+```java
+ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
+ToolExecutor executor = new DefaultToolExecutor(workers, ErrorHandlers.rethrow(), 5);
+```
 
 - 一个 `ExecutorService`——并发运行整批，而不是内联，结果仍按调用顺序组装；
 - 一个 `ErrorHandler`——失败的调用去哪里：作为模型可以据此重试的文本交回，还是抛给调用方。现成的有

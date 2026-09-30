@@ -39,7 +39,8 @@ ChatMessage.assistant("因为散射。");               // 手写的一轮模型
 - `ReasoningPart`——模型的推理，与答案分开保存，因为应用通常会隐藏它、单独计费，或者必须原样发回；
 - `ToolCallPart`——模型请求调用工具：调用 id、工具名，以及作为 JSON 文本的参数；
 - `ToolResultPart`——对一次工具调用的回答：调用 id、工具名、一个或多个部分，以及调用是否失败；
-- `MediaPart`——图像、音频、视频或文档。
+- `MediaPart`——一份媒体负载，种类由 `image/png` 这样的媒体类型字符串表示，携带 URI 或字节来源，以及
+  可选的文件名。
 
 `ContentPart` 不是 final：提供商或应用可以继承它，加入库没有建模的类别。
 
@@ -81,8 +82,8 @@ message.getOrCreateExtras().putRaw("thinking.budget_tokens", 2048);
 
 ## 上下文
 
-`ChatContext` 把一次调用与一段对话关联起来：一个会话 id、当前的轮次、进行中这次往来的 request 与
-response，以及一个库从不读取、也从不发送的属性映射。
+`ChatContext` 把一次调用与一段对话关联起来：一个会话 id、当前的轮次、进行中这次往来的请求与
+响应，以及一个库从不读取、也从不发送的属性映射。
 
 你很少需要碰它。除了属性，库会填好一切；需要这段对话的工具会把它作为参数收到。属性是你自己数据的
 进程内通道，里面的东西不会进入请求。

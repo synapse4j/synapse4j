@@ -55,6 +55,9 @@ dependencies {
 }
 ```
 
+The `0.0.1` above is the release these docs ship with; when a later one exists, take it from Maven
+Central.
+
 ## 2. Build a client
 
 A client is three pieces working together: a JSON codec that turns values into JSON, an HTTP client

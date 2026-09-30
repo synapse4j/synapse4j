@@ -49,9 +49,11 @@ synapse4j:
 ```
 
 `synapse4j.*` 的键按配置的内容分组：`synapse4j.openai.*` 绑定 `OpenAiConfig`，
-`synapse4j.anthropic.*` 绑定 `AnthropicConfig`，`synapse4j.chat-options.*` 绑定默认的 `ChatOptions`，
-`synapse4j.http-options.*` 绑定 `HttpOptions`。每个键都是它绑定的那个类型上的一个字段，含义在该类型
-上有文档。`chat-options.extras` 按原始键绑定：键写的就是协议里的字段名，点分键指向嵌套成员。非字符串
+`synapse4j.anthropic.*` 绑定 `AnthropicConfig`，`synapse4j.chat-options.*` 绑定
+`ChatOptionsProperties`，即 starter 里 `ChatOptions` 的镜像，由 `toChatOptions()` 转成库里的类型
+——库里的类型本身无法绑定——而 `synapse4j.http-options.*` 绑定 `HttpOptions`。每个键都是它绑定的那个
+类型上的一个字段，含义在该类型上有文档；chat-options 这个镜像只重述 Spring 能绑定的字段。
+`chat-options.extras` 按原始键绑定：键写的就是协议里的字段名，点分键指向嵌套成员。非字符串
 的值需要 YAML——`.properties` 文件会把每个值都变成字符串。
 
 每个 `synapse4j.*` 键都有配置元数据，因此 IDE 会补全它们。最常设置的选择项是

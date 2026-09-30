@@ -67,7 +67,13 @@ ToolExecutor executor = new DefaultToolExecutor();
 ChatClient client = new ToolCallingChatClient(inner, executor);
 ```
 
-Its constructors also take:
+Besides the no-argument constructor, a two-argument one takes the `ExecutorService` and the
+`ErrorHandler` together; a three-argument one adds the `maxTurns` cap:
+
+```java
+ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
+ToolExecutor executor = new DefaultToolExecutor(workers, ErrorHandlers.rethrow(), 5);
+```
 
 - an `ExecutorService` — run the batch concurrently instead of inline, still assembling the results
   in call order;

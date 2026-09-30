@@ -46,7 +46,8 @@ The content of a message is a list of parts, each one of:
   JSON text;
 - `ToolResultPart` — the answer to a tool call: the call id, the tool name, one or more parts, and
   whether the call failed;
-- `MediaPart` — an image, audio, video or document.
+- `MediaPart` — a media payload, its kind named by a media type string such as `image/png`, carried
+  with a URI or a byte source and an optional file name.
 
 `ContentPart` is not final: a provider or an application adds a kind the library does not model by
 subclassing it.

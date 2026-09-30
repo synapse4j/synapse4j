@@ -49,11 +49,13 @@ synapse4j:
 ```
 
 The `synapse4j.*` keys group by what they configure: `synapse4j.openai.*` binds `OpenAiConfig`,
-`synapse4j.anthropic.*` binds `AnthropicConfig`, `synapse4j.chat-options.*` binds the default
-`ChatOptions`, and `synapse4j.http-options.*` binds `HttpOptions`. Each key is a field on the type
-it binds, documented there. `chat-options.extras` binds raw keys: a key is the provider's own wire
-name, and a dotted key addresses a nested member. A non-string value needs YAML — a `.properties`
-file yields a string for every value.
+`synapse4j.anthropic.*` binds `AnthropicConfig`, `synapse4j.chat-options.*` binds
+`ChatOptionsProperties`, the starter's mirror of `ChatOptions` that `toChatOptions()` turns into the
+library type — the library type itself cannot be bound — and `synapse4j.http-options.*` binds
+`HttpOptions`. Each key is a field on the type it binds, documented there; the chat-options mirror
+restates only the fields Spring can bind. `chat-options.extras` binds raw keys: a key is the
+provider's own wire name, and a dotted key addresses a nested member. A non-string value needs YAML
+— a `.properties` file yields a string for every value.
 
 Every `synapse4j.*` key has configuration metadata, so your IDE completes them. The selectors you
 set most often are `synapse4j.chat-client`, `synapse4j.http-client`, `synapse4j.auto-tool-calling`,
