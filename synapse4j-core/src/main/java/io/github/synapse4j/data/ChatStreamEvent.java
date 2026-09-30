@@ -24,8 +24,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>
  * An event's parts and usage are its own: the fold never mutates what a frame handed out, so an
- * event an application keeps does not change as later frames arrive, and the answer does not change
- * under one that reads it.
+ * event an application keeps does not change as later frames arrive. The answer is assembled from
+ * its own copies and shares nothing with an event.
  */
 @Getter
 @Setter

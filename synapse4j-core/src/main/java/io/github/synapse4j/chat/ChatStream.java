@@ -30,8 +30,9 @@ import io.github.synapse4j.data.ChatStreamEvent;
  * holds when the stream ends is the same answer {@link ChatClient#chat} would have returned.
  *
  * <p>
- * One pass only. {@link #iterator()} answers the same iterator on every call and a second call
- * throws; iterating a stream that was closed throws as well. Closing releases the connection
+ * One pass only. {@link #iterator()} is called once — events are not buffered, so there is nothing
+ * to iterate a second time — and a further call throws; iterating a stream that was closed throws
+ * as well. Closing releases the connection
  * behind the stream, cancelling the response if it is still in flight; it is idempotent and safe
  * to call from any thread, and try-with-resources covers the common case. A stream that runs to
  * its end releases the same connection by itself — the moment its last event is handed out — so
