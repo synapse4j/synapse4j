@@ -42,6 +42,8 @@ options.setResponseFormat(format);
 
 The three modes are `TYPE_TEXT` (prose), `TYPE_JSON` (any valid JSON) and `TYPE_JSON_SCHEMA` (JSON
 against the schema). `strict` asks the provider to enforce the schema rather than merely aim at it.
+A protocol that cannot switch enforcement off enforces either way, so `strict = false` there still
+gets a schema-shaped answer — stricter than asked for, never looser.
 
 Because the schema is text, nothing here binds a JSON library: the codec you chose produces it, and
 the model is held to the same shape that codec reads.

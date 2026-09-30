@@ -62,7 +62,9 @@ public class ChatResponseFormat {
     /**
      * Whether the provider has to enforce the schema rather than merely aim at it; {@code null}
      * leaves the decision to the protocol's default. Only the protocols that carry the flag inside
-     * a schema-shaped answer send it, and only for {@link #TYPE_JSON_SCHEMA}.
+     * a schema-shaped answer send it, and only for {@link #TYPE_JSON_SCHEMA}. A protocol that cannot
+     * switch enforcement off enforces anyway, so {@code false} there still gets a schema-shaped
+     * answer — stricter than asked for, never looser.
      */
     private @Nullable Boolean strict;
 
