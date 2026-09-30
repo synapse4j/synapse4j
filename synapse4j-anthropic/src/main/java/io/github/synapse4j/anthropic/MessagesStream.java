@@ -48,9 +48,10 @@ import org.jspecify.annotations.Nullable;
  * however many frames it took, and two adjacent blocks never merge into one. Tool input arrives as
  * fragments of JSON text
  * and is concatenated as it comes, which is why a call's arguments are whole by the time the block
- * closes; a call whose input never streamed means the empty object, the same answer a blocking call
- * gives it. The input of a block the shared model has no part for — a server tool's call — is
- * parsed into the block itself when it closes, so both ways of asking read the same document. The
+ * closes; a call whose input never streamed means the empty object, which is what this protocol
+ * sends for a tool that takes no arguments. The input of a block the shared model has no part for —
+ * a server tool's call — is parsed into the block itself when it closes, as the object the protocol
+ * expects when that block is sent back. The
  * counts are merged member by member rather than replaced, because this protocol
  * reports the input side when the answer opens and the output side as it finishes — replacing would
  * lose the first half. The block bracket's {@code index} stays on the event that carried it and is
@@ -186,7 +187,8 @@ class MessagesStream extends DefaultChatStream {
             if (AnthropicEventTypes.MESSAGE_STOP.equals(eventType)) {
                 // Every block has closed by now — or should have: any input whose stop frame never
                 // arrived still lands in its block rather than being dropped, and a call whose input
-                // never streamed means the empty object, the same answer a blocking call gives it.
+                // never streamed means the empty object, which is what the protocol sends for a tool
+                // that takes no arguments.
                 writeUnmodeledInputs();
                 normalizeEmptyInputs(response.getMessage());
             }
@@ -306,8 +308,8 @@ class MessagesStream extends DefaultChatStream {
         }
 
         /**
-         * Parses the input an unmodeled block spelled and sets it into the block itself, where a
-         * blocking walk captured the same input whole.
+         * Parses the input an unmodeled block spelled and sets it into the block itself, as the
+         * object the protocol expects when the block is sent back.
          */
         private void writeInput(RawContentBlock block, StringBuilder input) {
             if (input.isEmpty()) {
@@ -364,10 +366,9 @@ class MessagesStream extends DefaultChatStream {
 
     /**
      * The event's own extras onto the answer, minus what belongs to the event alone: {@code index}
-     * says which block a frame arrived for, and {@code delta} is a frame's own fragment — a kind
-     * this module did not model, kept on the event for the application rather than promoted to a
-     * member of the answer a blocking call could never produce. The answer must not depend on which
-     * way it was asked for.
+     * says which block a frame arrived for, and {@code delta} is a frame's own fragment — stream
+     * bookkeeping rather than a field of the answer, kept on the event for the application instead
+     * of being promoted to a member no response carries.
      */
     private static void foldExtras(ProviderExtras responseExtras, ProviderExtras eventExtras) {
         for (Map.Entry<String, Object> member : eventExtras.rawMap().entrySet()) {

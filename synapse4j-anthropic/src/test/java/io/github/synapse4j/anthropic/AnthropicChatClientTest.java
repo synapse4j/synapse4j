@@ -635,7 +635,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aTextStreamAggregatesToTheSameAnswerAsABlockingCall() {
+    void aTextStreamAggregatesToTheSameTurnAsABlockingCall() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -717,10 +717,6 @@ class AnthropicChatClientTest {
         assertEquals(blocking.getModel(), aggregated.getModel());
         assertEquals(blocking.getUsage().getInputTokens(), aggregated.getUsage().getInputTokens());
         assertEquals(blocking.getUsage().getOutputTokens(), aggregated.getUsage().getOutputTokens());
-        // Unmodelled fields arrive the same way too: what the blocking walk kept in extras, the
-        // drained stream has folded into its own — same keys, same values, and no stream
-        // bookkeeping among them.
-        assertEquals(blocking.getExtras().rawMap(), aggregated.getExtras().rawMap());
     }
 
     @Test

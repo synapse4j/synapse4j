@@ -230,11 +230,11 @@ public abstract class AbstractChatClient implements ChatClient {
      * <p>
      * The request goes through {@link #prepare(ChatRequest)} first — in place, as for
      * {@link #chat(ChatRequest)} — and the subclass then sees it in {@link #doStream(ChatRequest)}.
-     * The context is resolved, the request recorded, and the answer handed back the same way a
-     * blocking call does. Stamping the aggregated answer with the exchange's context and the
-     * response customizers' pass both wait for the stream to run to its end, on the wrapper every
-     * stream is handed back in — the customizer list is snapshotted when the stream opens, so one
-     * registered mid-flight joins neither this stream nor its pass. A stream closed before its
+     * The context is resolved, the request recorded, and the aggregated answer stamped with that
+     * context — what {@link ChatClient#continueWith(ChatRequest, ChatResponse)} reads off an answer.
+     * That stamping and the response customizers' pass both wait for the stream to run to its end,
+     * on the wrapper every stream is handed back in — the customizer list is snapshotted when the
+     * stream opens, so one registered mid-flight joins neither this stream nor its pass. A stream closed before its
      * last event runs neither: it holds a partial answer, and nothing is recorded for it — the
      * conversation is recorded when the answer is folded in through
      * {@link ChatClient#continueWith(ChatRequest, ChatResponse)}.

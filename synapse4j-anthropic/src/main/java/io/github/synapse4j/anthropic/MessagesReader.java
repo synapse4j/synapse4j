@@ -98,7 +98,7 @@ class MessagesReader {
             reader.nextToken();
             if ("type".equals(field)) {
                 // The frame's discriminator, not a member of the answer: it becomes the event's own
-                // type and is never folded into the message document a blocking call reads.
+                // type and never reaches the assembled answer.
                 type = reader.string();
                 continue;
             }

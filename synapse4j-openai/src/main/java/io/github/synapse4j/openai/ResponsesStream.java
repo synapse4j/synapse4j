@@ -150,12 +150,10 @@ class ResponsesStream extends DefaultChatStream {
             response.setUsage(copyOf(event.getUsage()));
         }
         // The frames that carry the whole response are the only ones whose extras are the answer's:
-        // those hold the response's own unmodelled members, which is what a blocking call keeps. Any
-        // other frame's payload is the stream's own bookkeeping — where in the stream it sat, the
-        // item it spoke for, the fragment's text — and a blocking response has no frames to carry
-        // it, so folding it would make the answer depend on how it was asked for. Naming the whole
-        // response frames is also what keeps a kind of frame this module has never heard of from
-        // leaking its payload into the answer.
+        // those hold the response's own unmodelled members. Any other frame's payload is stream
+        // bookkeeping — where in the stream it sat, the item it spoke for, the fragment's text —
+        // which is not a field of any answer. Naming the whole-response frames is also what keeps a
+        // kind of frame this module has never heard of from leaking its payload into the answer.
         if (carriesWholeResponse(event.getEventType())) {
             response.getExtras().putAll(event.getExtras());
         }
@@ -229,9 +227,8 @@ class ResponsesStream extends DefaultChatStream {
     }
 
     /**
-     * Appends a fragment to the turn's reasoning, which is one part however many frames it took. The
-     * fold is what makes a streamed answer carry the same reasoning a blocking call returns as one
-     * member — and, before it, what stops a multi-frame answer from keeping only the last fragment.
+     * Appends a fragment to the turn's reasoning, which is one part however many frames it took —
+     * and, before that, what stops a multi-frame answer from keeping only the last fragment.
      */
     private static void appendReasoning(ChatMessage message, ReasoningPart fragment) {
         List<ContentPart> parts = message.getParts();

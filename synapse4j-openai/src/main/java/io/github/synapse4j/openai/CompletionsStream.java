@@ -159,9 +159,9 @@ class CompletionsStream extends DefaultChatStream {
             // and the answer must not be the same object under it.
             response.setUsage(copyOf(event.getUsage()));
         }
-        // The event's own unmodelled fields belong to the answer the way they belong to a
-        // blocking response — folded in as they arrive, the last frame winning, which for the
-        // fields that stay constant across a stream is the value the single response carries.
+        // The event's own unmodelled fields are the provider's own fields for the answer, folded in
+        // as they arrive, the last frame winning — which, for the fields that stay constant across a
+        // stream, is the value the answer ends up carrying.
         response.getExtras().putAll(event.getExtras());
         ChatMessage delta = event.getDelta();
         if (delta == null) {
@@ -191,10 +191,8 @@ class CompletionsStream extends DefaultChatStream {
     }
 
     /**
-     * Appends a fragment to the turn's reasoning, which is one part however many chunks it took.
-     * The fold is what makes a streamed answer carry the same reasoning a blocking call returns as
-     * one member — and, before it, what stops a multi-chunk answer from keeping only the last
-     * fragment of it.
+     * Appends a fragment to the turn's reasoning, which is one part however many chunks it took —
+     * and, before that, what stops a multi-chunk answer from keeping only the last fragment of it.
      */
     private static void appendReasoning(ChatMessage message, ReasoningPart fragment) {
         List<ContentPart> parts = message.getParts();

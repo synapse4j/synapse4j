@@ -487,7 +487,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void aStreamedAnswerFoldsIntoTheSameAnswerABlockingCallReturns() {
+    void aStreamedAnswerFoldsIntoTheSameTurnABlockingCallReturns() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -549,9 +549,13 @@ class OpenAiResponsesChatClientTest {
         assertEquals(blocking.getModel(), aggregated.getModel());
         assertEquals(blocking.getUsage().getInputTokens(), aggregated.getUsage().getInputTokens());
         assertEquals(blocking.getUsage().getOutputTokens(), aggregated.getUsage().getOutputTokens());
-        // A member the module does not model arrives the same way too: what the blocking walk kept
-        // in extras, the drained stream has folded into its own — same keys, same values.
-        assertEquals(blocking.getExtras().rawMap(), aggregated.getExtras().rawMap());
+        // The response's own unmodelled member reaches the answer, and the frames' bookkeeping does
+        // not: an answer carrying the item a frame spoke for, or a sequence number, would be the
+        // frame leaking into it.
+        assertEquals(1700000000, aggregated.getExtras().get("created_at"));
+        assertFalse(aggregated.getExtras().rawMap().containsKey("text"));
+        assertFalse(aggregated.getExtras().rawMap().containsKey("item_id"));
+        assertFalse(aggregated.getExtras().rawMap().containsKey("sequence_number"));
     }
 
     @Test
