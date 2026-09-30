@@ -60,7 +60,7 @@ API 本身的参考以 Javadoc 为准。
 
 - Java 21 或更新版本。
 - 若要构建项目本身，需要 Maven 3.6.3 或更新版本（没有 Maven Wrapper，直接运行 `mvn`）。
-- 使用 starter 需要 Spring Boot 4.0 或更新版本。
+- 使用 starter 需要 Spring Boot 4.1 或更新版本。
 
 ## 许可证
 

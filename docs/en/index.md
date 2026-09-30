@@ -67,7 +67,7 @@ lists them.
 
 - Java 21 or newer.
 - Maven 3.6.3 or newer if you build the project itself (there is no wrapper; run `mvn` directly).
-- Spring Boot 4.0 or newer to use the starter.
+- Spring Boot 4.1 or newer to use the starter.
 
 ## License
 

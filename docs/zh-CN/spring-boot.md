@@ -15,8 +15,8 @@
 </dependency>
 ```
 
-starter 需要 Spring Boot 4.0 或更新版本。它建立在 `spring-boot-restclient` 与
-`spring-boot-jackson` 之上，这两个模块自 Boot 4.0 才有，另外还依赖 Jackson 3。
+starter 需要 Spring Boot 4.1 或更新版本——这是它构建与测试所针对的版本线。Boot 4.0.x 不在构建覆盖范围
+内，能不能用不一定：JSON 模块需要 Jackson 3.1，而 Boot 4.0.4 是第一个管理它的版本。
 
 ## 它接了什么
 

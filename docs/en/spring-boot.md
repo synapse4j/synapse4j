@@ -15,8 +15,9 @@ codec, a transport, and a chat client — with everything bound from `synapse4j.
 </dependency>
 ```
 
-The starter needs Spring Boot 4.0 or newer. It builds on `spring-boot-restclient` and
-`spring-boot-jackson`, both introduced in Boot 4.0, and on Jackson 3.
+The starter needs Spring Boot 4.1 or newer — the line it is built and tested against. Boot 4.0.x is
+not covered by the build and may or may not work: the JSON module needs Jackson 3.1, which Boot 4.0.4
+was the first to manage.
 
 ## What it wires
 

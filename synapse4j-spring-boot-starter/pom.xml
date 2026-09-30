@@ -22,9 +22,10 @@
        Spring and Apache transports, synapse4j.chat-client between the OpenAI protocols and
        Anthropic's — and every bean backs off as soon as the application declares one of its own.
        Versions of all Spring dependencies come from the Boot BOM the parent imports — none are
-       pinned in this file. The floor is Spring Boot 4.0: spring-boot-restclient and
-       spring-boot-jackson are Boot 4 modules, and this codec binds Jackson 3, which Boot 4 manages.
-       That resolved version is what flatten inlines into the deployed pom, so an application on a
+       pinned in this file. The starter is built and tested against Spring Boot 4.1 — it needs
+       Jackson 3.1, which Boot 4.0.4 was the first to manage, and the Boot 4 modules
+       spring-boot-restclient and spring-boot-jackson. Boot 4.0.x is not covered by the build. That
+       resolved version is what flatten inlines into the deployed pom, so an application on a
        different Boot line should import spring-boot-dependencies itself, so its own BOM wins. -->
   <dependencies>
     <dependency>
