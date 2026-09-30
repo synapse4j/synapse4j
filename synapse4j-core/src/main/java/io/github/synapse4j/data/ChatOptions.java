@@ -7,11 +7,13 @@ import io.github.synapse4j.http.HttpOptions;
 import org.jspecify.annotations.Nullable;
 
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.Setter;
 import lombok.ToString;
 
 /**
- * The configuration of one call: which model, how to tune it, and the escape hatches.
+ * The configuration of one call: which model, how to tune it, the shape the answer should take, and
+ * the escape hatches.
  *
  * <p>
  * Every knob is optional and expressed by a wrapper type, so {@code null} means "no opinion". An
@@ -100,6 +102,12 @@ public class ChatOptions {
      * beside a mode that names no tool has nowhere to go.
      */
     private @Nullable String toolChoiceName;
+
+    /**
+     * The shape the answer should take. Never {@code null}; with nothing set, nothing is asked.
+     */
+    @NonNull
+    private ChatResponseFormat responseFormat = new ChatResponseFormat();
 
     /**
      * HTTP-level settings for this call's request, or {@code null} to leave every one of them to

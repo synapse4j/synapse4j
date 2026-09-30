@@ -599,7 +599,7 @@ class OpenAiCompletionsChatClientTest {
                         + "\"content\":\"{}\"}}]}").getBytes(UTF_8)));
 
         ChatRequest request = requestWithModel();
-        ChatResponseFormat format = request.getResponseFormat();
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setName("answer");
         format.setDescription("The answer, as JSON");
@@ -785,7 +785,7 @@ class OpenAiCompletionsChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ChatResponseFormat format = request.getResponseFormat();
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setSchema("{\"type\":\"object\"}");
         format.setStrict(true);
@@ -827,7 +827,7 @@ class OpenAiCompletionsChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ChatResponseFormat format = request.getResponseFormat();
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setSchema("{\"type\":\"object\"}");
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
@@ -900,7 +900,7 @@ class OpenAiCompletionsChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ChatResponseFormat format = request.getResponseFormat();
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setName("answer");
         format.setSchema("{\"type\":\"object\"}");
@@ -923,7 +923,7 @@ class OpenAiCompletionsChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ChatResponseFormat format = request.getResponseFormat();
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setName("answer");
         request.getOptions().getExtras().put(List.of("response_format", "json_schema", "strict"), true);

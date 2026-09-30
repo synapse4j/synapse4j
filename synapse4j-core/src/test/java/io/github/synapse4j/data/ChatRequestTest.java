@@ -8,10 +8,9 @@ import org.junit.jupiter.api.Test;
 class ChatRequestTest {
 
     @Test
-    void responseFormatAndOptionsCannotBeSetToNull() {
+    void optionsCannotBeSetToNull() {
         ChatRequest request = new ChatRequest();
 
-        assertThrows(NullPointerException.class, () -> request.setResponseFormat(null));
         assertThrows(NullPointerException.class, () -> request.setOptions(null));
     }
 

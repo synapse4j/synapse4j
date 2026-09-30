@@ -374,7 +374,7 @@ class AnthropicChatClientTest {
 
         ChatRequest request = requestWithModel();
         request.getOptions().setReasoningEffort("high");
-        ChatResponseFormat format = request.getResponseFormat();
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setSchema("{\"type\":\"object\"}");
 
@@ -395,7 +395,7 @@ class AnthropicChatClientTest {
         // Only a schema-shaped answer has a member here; prose is what the endpoint answers with
         // when no format is asked for, and "any JSON" would have to be invented to be written.
         ChatRequest anyJson = requestWithModel();
-        anyJson.getResponseFormat().setType(ChatResponseFormat.TYPE_JSON);
+        anyJson.getOptions().getResponseFormat().setType(ChatResponseFormat.TYPE_JSON);
         SynapseException thrown = assertThrows(SynapseException.class,
                 () -> client.chat(anyJson));
         assertTrue(thrown.getMessage().contains("json"), thrown.getMessage());
@@ -403,9 +403,9 @@ class AnthropicChatClientTest {
         // A description would never reach the provider, and a request whose knobs quietly do
         // nothing reads from above as a model that ignored them.
         ChatRequest described = requestWithModel();
-        described.getResponseFormat().setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
-        described.getResponseFormat().setSchema("{\"type\":\"object\"}");
-        described.getResponseFormat().setDescription("The answer, as JSON");
+        described.getOptions().getResponseFormat().setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
+        described.getOptions().getResponseFormat().setSchema("{\"type\":\"object\"}");
+        described.getOptions().getResponseFormat().setDescription("The answer, as JSON");
         assertThrows(SynapseException.class, () -> client.chat(described));
     }
 

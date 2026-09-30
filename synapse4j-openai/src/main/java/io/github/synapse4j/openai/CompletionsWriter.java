@@ -106,9 +106,9 @@ class CompletionsWriter {
         }
         putIfSet(document, "top_p", request.getOptions().getTopP());
         putIfSet(document, "reasoning_effort", request.getOptions().getReasoningEffort());
-        if (request.getResponseFormat().getType() != null
-                || !request.getResponseFormat().getExtras().isEmpty()) {
-            document.put("response_format", responseFormat(request.getResponseFormat()));
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
+        if (format.getType() != null || !format.getExtras().isEmpty()) {
+            document.put("response_format", responseFormat(format));
         }
         if (stream) {
             document.put("stream", true);

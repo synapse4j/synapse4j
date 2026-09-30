@@ -10,7 +10,7 @@ import lombok.ToString;
  * The shape the answer should take: prose, any JSON, or JSON that conforms to a given schema.
  *
  * <p>
- * The mode and the schema are one type rather than loose fields on the request, because they are one
+ * The mode and the schema are one type rather than loose fields in the options, because they are one
  * requirement: a request either asks for a shape or it does not.
  *
  * <p>

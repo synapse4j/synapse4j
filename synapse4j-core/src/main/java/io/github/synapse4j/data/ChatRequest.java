@@ -11,8 +11,8 @@ import lombok.NonNull;
 import lombok.Setter;
 
 /**
- * One call: the conversation this call carries, what the model may call, the shape the answer
- * should take, and how to run it.
+ * One call: the conversation this call carries, what the model may call, and how to run it. The
+ * shape the answer should take sits in the options.
  *
  * <p>
  * The conversation is carried in two lists plus one slot. {@code historyMessages} is the
@@ -55,10 +55,6 @@ public class ChatRequest {
      * {@link Tool}, not just its declaration, so what is sent and what can run are the same set.
      */
     private final List<Tool> tools = new ArrayList<>();
-
-    /** The shape the answer should take. Never {@code null}; with nothing set, nothing is asked. */
-    @NonNull
-    private ChatResponseFormat responseFormat = new ChatResponseFormat();
 
     /** How to run this call. Never {@code null}; with nothing set, the defaults stand. */
     @NonNull
@@ -139,7 +135,7 @@ public class ChatRequest {
     public String toString() {
         return "ChatRequest(systemMessage=" + (systemMessage != null) + ", historyMessages="
                 + historyMessages.size() + ", pendingMessages=" + pendingMessages.size() + ", tools="
-                + tools.size() + ", responseFormat=" + responseFormat + ", options=" + options + ')';
+                + tools.size() + ", options=" + options + ')';
     }
 
 }

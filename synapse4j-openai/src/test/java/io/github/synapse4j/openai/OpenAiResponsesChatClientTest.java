@@ -291,7 +291,7 @@ class OpenAiResponsesChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ChatResponseFormat format = request.getResponseFormat();
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setName("answer");
         format.setDescription("The answer, as JSON");

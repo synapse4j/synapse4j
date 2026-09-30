@@ -138,10 +138,10 @@ class ResponsesWriter {
             reasoning.put("effort", request.getOptions().getReasoningEffort());
             document.put("reasoning", reasoning);
         }
-        if (request.getResponseFormat().getType() != null
-                || !request.getResponseFormat().getExtras().isEmpty()) {
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
+        if (format.getType() != null || !format.getExtras().isEmpty()) {
             Map<String, Object> text = new LinkedHashMap<>();
-            text.put("format", responseFormat(request.getResponseFormat()));
+            text.put("format", responseFormat(format));
             document.put("text", text);
         }
         if (stream) {

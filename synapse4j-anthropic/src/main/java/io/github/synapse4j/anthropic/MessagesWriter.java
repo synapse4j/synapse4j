@@ -510,7 +510,7 @@ class MessagesWriter {
         if (options.getReasoningEffort() != null) {
             outputConfig.put("effort", options.getReasoningEffort());
         }
-        Map<String, Object> format = responseFormat(request.getResponseFormat());
+        Map<String, Object> format = responseFormat(options.getResponseFormat());
         if (!format.isEmpty()) {
             outputConfig.put("format", format);
         }
