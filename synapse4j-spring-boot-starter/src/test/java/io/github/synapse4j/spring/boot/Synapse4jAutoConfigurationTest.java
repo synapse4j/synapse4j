@@ -8,6 +8,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -22,6 +23,7 @@ import org.apache.hc.core5.http.message.BasicClassicHttpRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
+import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import io.github.synapse4j.anthropic.AnthropicChatClient;
@@ -127,6 +129,37 @@ class Synapse4jAutoConfigurationTest {
             assertThat(context).hasSingleBean(HttpClient.class);
             assertThat(context.getBean(HttpClient.class)).isInstanceOf(ApacheHttpClient.class);
         });
+    }
+
+    @Test
+    void noApacheTypeSitsOnTheConfigurationEveryApplicationLoads() {
+        // Spring introspects a configuration class's bean-method signatures before it evaluates any
+        // condition, so a bean method returning or taking an Apache type here fails every
+        // application that does not carry httpclient5 — during bean-factory post-processing, with
+        // an error that names neither the library nor the property. The Apache beans live in a
+        // nested configuration guarded by @ConditionalOnClass instead; this pins them there.
+        for (Method method : Synapse4jAutoConfiguration.class.getDeclaredMethods()) {
+            assertThat(method.getReturnType().getName()).doesNotStartWith("org.apache.hc");
+            for (Class<?> parameter : method.getParameterTypes()) {
+                assertThat(parameter.getName()).doesNotStartWith("org.apache.hc");
+            }
+        }
+    }
+
+    @Test
+    void selectingApacheWithoutItsLibraryFailsNamingTheLibrary() {
+        // The starter keeps httpclient5 off the application's classpath, so choosing this transport
+        // without declaring the library is a plain misconfiguration. It has to fail with the
+        // library named: the selection alone leaves no transport bean, and a bare missing-bean
+        // error points at HttpClient, not at what to add.
+        new ApplicationContextRunner()
+                .withClassLoader(new FilteredClassLoader(CloseableHttpClient.class))
+                .withConfiguration(AutoConfigurations.of(Synapse4jAutoConfiguration.class))
+                .withPropertyValues("synapse4j.http-client=apache")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure()).rootCause().hasMessageContaining("httpclient5");
+                });
     }
 
     @Test

@@ -4,7 +4,9 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -12,6 +14,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Condition;
 import org.springframework.context.annotation.ConditionContext;
 import org.springframework.context.annotation.Conditional;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.web.client.RestClient;
 
@@ -106,41 +109,64 @@ public class Synapse4jAutoConfiguration {
     }
 
     /**
-     * The Apache transport, the other half of {@code synapse4j.http-client}: the property names
-     * one of the two and exactly one of them exists, both backing off before a transport the
-     * application declares itself. The stock Apache client stands in as the delegate — its
-     * execution chain, pool and all, is HttpClient 5's own — while the bound
-     * {@code synapse4j.http-options.*} options reach it exactly as they reach the Spring transport.
+     * The Apache transport, the other half of {@code synapse4j.http-client}, in a configuration of
+     * its own so that its signatures are never introspected on a classpath without Apache
+     * HttpClient 5. Spring reads {@code @ConditionalOnClass} from a configuration class's bytecode
+     * before it loads the class, so when the library is absent this class — and the
+     * {@code CloseableHttpClient} its bean methods name — is never reached, and the rest of the
+     * wiring is unaffected. Keeping the two Apache beans at the top level instead made Spring
+     * introspect their signatures for every application: on a classpath without the library the
+     * context failed during bean-factory post-processing, naming an unrelated bean and neither the
+     * library nor the property.
      *
      * <p>
-     * The starter keeps Apache HttpClient 5 itself off the application's classpath (the module is
-     * a dependency; the library is not — another HTTP stack is the application's choice to make).
-     * An application that selects this transport declares httpclient5 itself; without it, only
-     * this bean fails, at startup, naming the missing class — the default wiring never loads it.
-     *
-     * <p>
-     * The delegate is a bean of its own, with the context's close for its own: the connection pool
-     * it holds outlives any one request, and {@link ApacheHttpClient} never closes what it was
-     * handed — so without this, the pool would outlive the context that created it. An application
-     * declaring a {@link CloseableHttpClient} of its own supplies the transport instead, pool
-     * configuration and all, and owns its disposal as it always did.
+     * The starter deliberately keeps Apache HttpClient 5 off the application's classpath (the module
+     * is a dependency; the library is not — another HTTP stack is the application's choice to make),
+     * so an application that selects this transport declares httpclient5 itself. The stock Apache
+     * client stands in as the delegate — its execution chain, pool and all, is HttpClient 5's own —
+     * while the bound {@code synapse4j.http-options.*} options reach it exactly as they reach the
+     * Spring transport. The delegate is a bean of its own, with the context's close for its own: the
+     * connection pool it holds outlives any one request, and {@link ApacheHttpClient} never closes
+     * what it was handed — so without this, the pool would outlive the context that created it. An
+     * application declaring a {@link CloseableHttpClient} of its own supplies the transport instead,
+     * pool configuration and all, and owns its disposal as it always did; one declaring its own
+     * {@link HttpClient} is served by neither bean here.
      */
-    @Bean(destroyMethod = "close")
-    @ConditionalOnMissingBean(CloseableHttpClient.class)
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(CloseableHttpClient.class)
     @Conditional(OnApacheTransport.class)
-    public CloseableHttpClient apacheTransport() {
-        return HttpClients.createDefault();
+    static class ApacheTransportConfiguration {
+
+        @Bean(destroyMethod = "close")
+        @ConditionalOnMissingBean({ CloseableHttpClient.class, HttpClient.class })
+        CloseableHttpClient apacheTransport() {
+            return HttpClients.createDefault();
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        HttpClient apacheHttpClient(CloseableHttpClient transport, Synapse4jProperties properties) {
+            return new ApacheHttpClient(transport, properties.getHttpOptions());
+        }
     }
 
     /**
-     * The Apache transport, wired to the delegate above — or to the application's own
-     * {@link CloseableHttpClient}, when it declares one.
+     * Fails the context, clearly, when {@code synapse4j.http-client=apache} is selected but Apache
+     * HttpClient 5 is not on the classpath. Without this the selection would fail as a missing
+     * {@link HttpClient} bean — an error that names neither the property nor the library — so the
+     * message here says exactly what to add.
      */
-    @Bean
-    @ConditionalOnMissingBean
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnMissingClass("org.apache.hc.client5.http.impl.classic.CloseableHttpClient")
     @Conditional(OnApacheTransport.class)
-    public HttpClient apacheHttpClient(CloseableHttpClient transport, Synapse4jProperties properties) {
-        return new ApacheHttpClient(transport, properties.getHttpOptions());
+    static class ApacheTransportMissingConfiguration {
+
+        @Bean
+        HttpClient apacheTransportMissing() {
+            throw new IllegalStateException(
+                    "synapse4j.http-client=apache needs Apache HttpClient 5 on the classpath: declare a "
+                            + "dependency on org.apache.httpcomponents.client5:httpclient5");
+        }
     }
 
     /**

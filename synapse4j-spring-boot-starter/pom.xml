@@ -52,8 +52,9 @@
       </exclusions>
     </dependency>
     <!-- Compile and test only — optional is what keeps it off the application's classpath. An
-         application that selects synapse4j.http-client=apache declares httpclient5 itself, and
-         without it that selection fails at startup with the missing class named. -->
+         application that selects synapse4j.http-client=apache declares httpclient5 itself; without
+         it that selection fails at startup with the library named, and the default wiring is
+         untouched either way — the beans that name Apache types sit behind a class condition. -->
     <dependency>
       <groupId>org.apache.httpcomponents.client5</groupId>
       <artifactId>httpclient5</artifactId>
