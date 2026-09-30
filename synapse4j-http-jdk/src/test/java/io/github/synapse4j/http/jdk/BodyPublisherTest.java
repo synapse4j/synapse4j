@@ -148,6 +148,7 @@ class BodyPublisherTest {
         // it. This is the path a run parked on a demand that will never come has to take.
         CountDownLatch firstInside = new CountDownLatch(1);
         CountDownLatch secondInside = new CountDownLatch(1);
+        CountDownLatch secondWrote = new CountDownLatch(1);
         AtomicBoolean firstRun = new AtomicBoolean(true);
         HttpBody body = sink -> {
             if (firstRun.getAndSet(false)) {
@@ -158,6 +159,7 @@ class BodyPublisherTest {
             } else {
                 secondInside.countDown();
                 sink.write(2);
+                secondWrote.countDown();
             }
         };
         JdkHttpClient.StreamingBodyPublisher publisher = new JdkHttpClient.StreamingBodyPublisher(body);
@@ -172,7 +174,10 @@ class BodyPublisherTest {
 
         first.subscription.cancel();
 
-        assertTrue(secondInside.await(5, TimeUnit.SECONDS));
+        // The cancelled run leaves at its next chunk and releases the lock, and only then does the
+        // run behind it write. Awaiting the second write's own signal rather than its entry into the
+        // body is what makes the chunk it delivered visible here.
+        assertTrue(secondWrote.await(5, TimeUnit.SECONDS));
         assertEquals(1, second.received.size());
     }
 
