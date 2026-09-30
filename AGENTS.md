@@ -122,7 +122,8 @@ one would block extension by users and providers.
 - The API is deliberately blocking, so the threading model stays simple: asynchrony relies on JDK
   facilities (Java 21 virtual threads). Do not bind the library to Reactor, RxJava or similar.
 - Thread safety is declared, never assumed: a method is safe to call from any thread only where its
-  javadoc says so, and everything else supports no concurrent access or modification.
+  javadoc says so. Every other method is simply not declared safe — read that as "no promise", not
+  as "unsafe".
 
 ## Non-goals
 
@@ -135,8 +136,7 @@ one would block extension by users and providers.
 - **Formatting is enforced by Spotless.** Run `mvn spotless:apply` right after editing Java — keep the
   tree formatted as you go rather than fixing it up later, so review sees the committed form. Do not
   hand-format. The profile is `.vscode/eclipse-formatter.xml`, the one the editor also uses, so both
-  sides produce the same output; import ordering is deliberately not enforced by either. Editing that
-  profile needs `mvn clean` first — Spotless's freshness index does not notice it changing on its own.
+  sides produce the same output; import ordering is deliberately not enforced by either.
 - **All comments are in English** — Javadoc (including on private members), inline comments and
   TODOs. Comments explain *why*; do not restate what the code does.
 - **Use Lombok instead of hand-writing boilerplate**, and only its stable annotations — nothing from
@@ -172,10 +172,9 @@ one would block extension by users and providers.
 - **Tests pin decisions, not plumbing.** A test earns its place by pinning a decision that could go
   wrong by mistake later — merge and ordering rules, contracts (a null answered loudly, a request
   handed on unchanged, one iterator pass), failure paths — and the assertion itself must be
-  defensible: a test that faithfully records a bug is worse than no test at all. A test whose
-  assertion can be re-derived by reading the code beside it — a Lombok accessor, a generated
-  toString, a literal constant, an empty default, a member left out because nothing set it — proves
-  the source works, not us. One test per decision, never one per parameter, field or case, and a
+  defensible: a test that faithfully records a bug is worse than no test at all. An assertion that
+  can be re-derived by reading the code beside it proves the source works, not us. One test per
+  decision, never one per parameter, field or case, and a
   method of a few straight-line statements earns none: a test is paid for twice, once written and
   again on every later change, so name the wrong future change it would catch, and if there is none,
   write nothing. Coverage is not measured in this build.
