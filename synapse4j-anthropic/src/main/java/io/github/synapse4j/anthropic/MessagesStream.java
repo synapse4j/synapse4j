@@ -386,7 +386,9 @@ class MessagesStream extends DefaultChatStream {
     private static void mergeUsage(ChatResponse response, Usage update) {
         Usage current = response.getUsage();
         if (current == null) {
-            response.setUsage(update);
+            // The answer owns its counts: a frame's usage is a snapshot an application may keep, so
+            // later frames merge into this copy rather than into the frame's own object.
+            response.setUsage(copyOf(update));
             return;
         }
         if (update.getInputTokens() != null) {
@@ -399,6 +401,19 @@ class MessagesStream extends DefaultChatStream {
             current.setCachedInputTokens(update.getCachedInputTokens());
         }
         current.getExtras().putAll(update.getExtras());
+    }
+
+    /**
+     * An independent copy of a frame's counts, so the answer owns the usage it carries and a frame
+     * an application kept does not change as later frames report more.
+     */
+    private static Usage copyOf(Usage usage) {
+        Usage copy = new Usage();
+        copy.setInputTokens(usage.getInputTokens());
+        copy.setOutputTokens(usage.getOutputTokens());
+        copy.setCachedInputTokens(usage.getCachedInputTokens());
+        copy.getExtras().putAll(usage.getExtras());
+        return copy;
     }
 
     /** The arguments every assembled call carries at the end: nothing said spells the empty object. */

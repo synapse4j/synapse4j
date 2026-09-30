@@ -684,6 +684,9 @@ class AnthropicChatClientTest {
         // application kept still carries only the fragment it delivered.
         assertEquals("Hi ", textOf(events.get(3)));
         assertEquals("there", textOf(events.get(4)));
+        // The counts are snapshots too: the opening frame reported one output token, and the
+        // answer's later merge must not reach back into that event.
+        assertEquals(Integer.valueOf(1), events.get(0).getUsage().getOutputTokens());
 
         ChatResponse aggregated = stream.aggregatedResponse();
         assertEquals(ChatRole.ASSISTANT, aggregated.getMessage().getRole());

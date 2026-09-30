@@ -17,6 +17,7 @@ import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
+import io.github.synapse4j.data.Usage;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.SseEvent;
 import io.github.synapse4j.http.SseEventStream;
@@ -154,7 +155,9 @@ class CompletionsStream extends DefaultChatStream {
             response.setFinishReason(event.getFinishReason());
         }
         if (event.getUsage() != null) {
-            response.setUsage(event.getUsage());
+            // The answer owns its counts: a frame's usage is a snapshot an application may keep,
+            // and the answer must not be the same object under it.
+            response.setUsage(copyOf(event.getUsage()));
         }
         // The event's own unmodelled fields belong to the answer the way they belong to a
         // blocking response — folded in as they arrive, the last frame winning, which for the
@@ -203,7 +206,7 @@ class CompletionsStream extends DefaultChatStream {
             }
             return;
         }
-        parts.add(fragment);
+        parts.add(copyOf(fragment));
     }
 
     /** Appends a fragment to the turn's text, which is one part however many chunks it took. */
@@ -213,7 +216,7 @@ class CompletionsStream extends DefaultChatStream {
             text.setText(text.getText() + fragment.getText());
             return;
         }
-        parts.add(new TextPart(fragment.getText()));
+        parts.add(copyOf(fragment));
     }
 
     /**
@@ -224,7 +227,7 @@ class CompletionsStream extends DefaultChatStream {
     private static void mergeToolCall(ChatMessage message, ToolCallPart fragment) {
         ToolCallPart call = toolCallFor(message, fragment);
         if (call == null) {
-            message.getParts().add(fragment);
+            message.getParts().add(copyOf(fragment));
             return;
         }
         if (call.getName() == null) {
@@ -235,6 +238,41 @@ class CompletionsStream extends DefaultChatStream {
         if (fragmentExtras != null) {
             call.getOrCreateExtras().putAll(fragmentExtras);
         }
+    }
+
+    /**
+     * A part the answer owns, so the fold never mutates a part an event handed out: the answer
+     * grows by merging later fragments into the part it took, and that part has to be the answer's
+     * own, or an application that kept the event would watch its text change under it.
+     */
+    private static ContentPart copyOf(ContentPart part) {
+        ContentPart copy;
+        if (part instanceof TextPart text) {
+            copy = new TextPart(text.getText());
+        } else if (part instanceof ReasoningPart reasoning) {
+            copy = new ReasoningPart(reasoning.getText());
+        } else if (part instanceof ToolCallPart call) {
+            copy = new ToolCallPart(call.getCallId(), call.getName(), call.getArgumentsJson());
+        } else {
+            return part;
+        }
+        if (part.getExtras() != null) {
+            copy.getOrCreateExtras().putAll(part.getExtras());
+        }
+        return copy;
+    }
+
+    /**
+     * An independent copy of a frame's counts, so the answer owns the usage it carries and a frame
+     * an application kept does not change as later frames report more.
+     */
+    private static Usage copyOf(Usage usage) {
+        Usage copy = new Usage();
+        copy.setInputTokens(usage.getInputTokens());
+        copy.setOutputTokens(usage.getOutputTokens());
+        copy.setCachedInputTokens(usage.getCachedInputTokens());
+        copy.getExtras().putAll(usage.getExtras());
+        return copy;
     }
 
     /** The call a fragment continues, or {@code null} when it opens a new one. */

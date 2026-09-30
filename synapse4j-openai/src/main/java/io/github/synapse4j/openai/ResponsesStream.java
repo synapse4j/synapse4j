@@ -17,6 +17,7 @@ import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
+import io.github.synapse4j.data.Usage;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.SseEvent;
 import io.github.synapse4j.http.SseEventStream;
@@ -144,7 +145,9 @@ class ResponsesStream extends DefaultChatStream {
             response.setFinishReason(event.getFinishReason());
         }
         if (event.getUsage() != null) {
-            response.setUsage(event.getUsage());
+            // The answer owns its counts: a frame's usage is a snapshot an application may keep,
+            // and the answer must not be the same object under it.
+            response.setUsage(copyOf(event.getUsage()));
         }
         // The event's own unmodelled fields belong to the answer the way they belong to a blocking
         // response — folded in as they arrive, the last frame winning, which for the fields that
@@ -165,7 +168,9 @@ class ResponsesStream extends DefaultChatStream {
             // rather than being appended to it. The frames that open the answer also carry the whole
             // response, but an empty one — appending those is harmless, replacing with them would
             // wipe what the fragments already built.
-            response.setMessage(delta);
+            // The complete turn is the answer's own, copied for the same reason a fragment is: a
+            // frame an application kept must not be the object the answer is built on.
+            response.setMessage(copyOf(delta));
             return;
         }
         ChatMessage message = response.getMessage();
@@ -282,6 +287,33 @@ class ResponsesStream extends DefaultChatStream {
         if (part.getExtras() != null) {
             copy.getOrCreateExtras().putAll(part.getExtras());
         }
+        return copy;
+    }
+
+    /** The turn the answer owns, copied so it never shares a part a frame handed out. */
+    private static ChatMessage copyOf(ChatMessage message) {
+        ChatMessage copy = new ChatMessage();
+        copy.setRole(message.getRole());
+        copy.setId(message.getId());
+        for (ContentPart part : message.getParts()) {
+            copy.getParts().add(copyOf(part));
+        }
+        if (message.getExtras() != null) {
+            copy.getOrCreateExtras().putAll(message.getExtras());
+        }
+        return copy;
+    }
+
+    /**
+     * An independent copy of a frame's counts, so the answer owns the usage it carries and a frame
+     * an application kept does not change as later frames report more.
+     */
+    private static Usage copyOf(Usage usage) {
+        Usage copy = new Usage();
+        copy.setInputTokens(usage.getInputTokens());
+        copy.setOutputTokens(usage.getOutputTokens());
+        copy.setCachedInputTokens(usage.getCachedInputTokens());
+        copy.getExtras().putAll(usage.getExtras());
         return copy;
     }
 

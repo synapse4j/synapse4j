@@ -1202,10 +1202,17 @@ class OpenAiCompletionsChatClientTest {
 
         ChatStream stream = client.stream(request);
         // Pulling is what reads the body; the fold runs as the events go by.
-        Iterator<ChatStreamEvent> events = stream.iterator();
-        while (events.hasNext()) {
-            events.next();
+        List<ChatStreamEvent> events = new ArrayList<>();
+        for (ChatStreamEvent event : stream) {
+            events.add(event);
         }
+
+        // The events are snapshots: the answer is assembled from copies, so the frame that opened
+        // the reasoning still carries only its own fragment.
+        assertEquals("weighing ",
+                assertInstanceOf(ReasoningPart.class, events.get(0).getDelta().getParts().get(0)).getText());
+        assertEquals("it up",
+                assertInstanceOf(ReasoningPart.class, events.get(1).getDelta().getParts().get(0)).getText());
 
         // One part however many chunks it took: a fold that kept the last fragment alone would send
         // a silently truncated reasoning back to a provider that requires it.
@@ -1384,13 +1391,17 @@ class OpenAiCompletionsChatClientTest {
         ChatRequest request = requestWithModel();
 
         ChatStream stream = client.stream(request);
-        Iterator<ChatStreamEvent> events = stream.iterator();
-        int frames = 0;
-        while (events.hasNext()) {
-            events.next();
-            frames++;
+        List<ChatStreamEvent> events = new ArrayList<>();
+        for (ChatStreamEvent event : stream) {
+            events.add(event);
         }
-        assertEquals(4, frames);
+        assertEquals(4, events.size());
+
+        // The events are snapshots: the frame that opened the call handed out an empty argument
+        // string, and the fragments that followed must not have been merged into it.
+        ToolCallPart opened = assertInstanceOf(ToolCallPart.class,
+                events.get(0).getDelta().getParts().get(0));
+        assertEquals("", opened.getArgumentsJson());
 
         ChatResponse aggregated = stream.aggregatedResponse();
         // The arguments were split across three chunks and the call named only once.

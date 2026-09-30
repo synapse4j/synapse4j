@@ -23,9 +23,9 @@ import org.jspecify.annotations.Nullable;
  * well-known ones are declared as constants by the provider module that produces them.
  *
  * <p>
- * An event's parts are its own: the fold copies the fragments it accumulates into the aggregated
- * answer rather than sharing them, so an event an application keeps does not change as later frames
- * arrive, and the answer does not change under one that reads it.
+ * An event's parts and usage are its own: the fold never mutates what a frame handed out, so an
+ * event an application keeps does not change as later frames arrive, and the answer does not change
+ * under one that reads it.
  */
 @Getter
 @Setter
