@@ -50,14 +50,21 @@ jobs:
             exit 1
           fi
 
-      # A version on Central is immutable: a rerun must not try to publish it again.
-      # The portal publishes atomically, so this one marker artifact standing means
-      # the whole deployment is live.
+      # A version on Central is immutable: a rerun must not try to publish it again. The portal is
+      # what the deploy waits on, and it answers immediately, whereas repo1 lags behind it — asking
+      # repo1 about a version published moments ago gets "not there", and the rerun then dies on a
+      # duplicate upload before it ever reaches the release.
       - name: Check whether this version is already published
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
         run: |
           ver="${GITHUB_REF_NAME#v}"
-          marker="https://repo1.maven.org/maven2/io/github/synapse4j/synapse4j-core/${ver}/synapse4j-core-${ver}.pom"
-          if curl -sf -o /dev/null "$marker"; then
+          token="$(printf '%s:%s' "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | base64 -w0)"
+          published="$(curl -sf -H "Authorization: Bearer $token" \
+            "https://central.sonatype.com/api/v1/publisher/published?namespace=io.github.synapse4j&name=synapse4j-core&version=${ver}" \
+            | jq -r '.published // false')"
+          if [ "$published" = "true" ]; then
             echo "already on Maven Central — skipping the publish"
             echo "SKIP_PUBLISH=true" >> "$GITHUB_ENV"
           fi

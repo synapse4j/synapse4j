@@ -29,7 +29,8 @@ jobs:
       - name: Verify
         run: mvn -B verify
       # Sources and javadoc jars are built only under the release profile, so a javadoc error is
-      # otherwise first met on a signed, publishing path. Built here with signing off, so a broken
-      # doc fails CI rather than a release.
+      # otherwise first met on a signed, publishing path. `package` never reaches the gpg plugin,
+      # which is bound to verify, and the tests already ran above — so this step costs only the two
+      # extra jars rather than a second full build.
       - name: Verify the release build
-        run: mvn -B -Prelease -Dgpg.skip=true package
+        run: mvn -B -Prelease -Dmaven.test.skip=true package
