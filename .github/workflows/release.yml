@@ -6,9 +6,11 @@ on:
       - 'v*'
 
 # One release at a time, and never cancel one mid-flight: a publish interrupted
-# halfway is harder to recover than one that waits for the previous job.
+# halfway is harder to recover than one that waits for the previous job. The group is a
+# constant, not the ref: keyed by ref, two tags pushed together landed in groups of their
+# own and published at once.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 permissions:
@@ -36,6 +38,12 @@ jobs:
       - name: Check the tag names this version
         run: |
           version="$(mvn -q -N help:evaluate -Dexpression=revision -DforceStdout | tail -n1)"
+          case "$version" in
+            *-SNAPSHOT)
+              echo "::error::revision $version is a snapshot; Maven Central refuses one"
+              exit 1
+              ;;
+          esac
           tag="${GITHUB_REF_NAME#v}"
           if [ "$version" != "$tag" ]; then
             echo "::error::tag $GITHUB_REF_NAME does not match revision $version in the pom"

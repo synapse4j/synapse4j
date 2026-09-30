@@ -28,3 +28,8 @@ jobs:
         run: mvn -version
       - name: Verify
         run: mvn -B verify
+      # Sources and javadoc jars are built only under the release profile, so a javadoc error is
+      # otherwise first met on a signed, publishing path. Built here with signing off, so a broken
+      # doc fails CI rather than a release.
+      - name: Verify the release build
+        run: mvn -B -Prelease -Dgpg.skip=true package
