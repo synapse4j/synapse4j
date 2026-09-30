@@ -141,6 +141,41 @@ class BodyPublisherTest {
         assertEquals(1, second.received.size());
     }
 
+    @Test
+    void aCancelledRunLeavesTheBodyAndTheNextRunProceeds() throws Exception {
+        // A redirect or a retry cancels the run it abandons, and cancellation is what has to get that
+        // run out of the body: the run that follows waits on the same lock, and nothing else releases
+        // it. This is the path a run parked on a demand that will never come has to take.
+        CountDownLatch firstInside = new CountDownLatch(1);
+        CountDownLatch secondInside = new CountDownLatch(1);
+        AtomicBoolean firstRun = new AtomicBoolean(true);
+        HttpBody body = sink -> {
+            if (firstRun.getAndSet(false)) {
+                firstInside.countDown();
+                // No demand will ever arrive for this run, so the write itself is where it waits —
+                // and the cancellation is what has to break that wait.
+                sink.write(1);
+            } else {
+                secondInside.countDown();
+                sink.write(2);
+            }
+        };
+        JdkHttpClient.StreamingBodyPublisher publisher = new JdkHttpClient.StreamingBodyPublisher(body);
+        RecordingSubscriber first = new RecordingSubscriber();
+        RecordingSubscriber second = new RecordingSubscriber();
+
+        publisher.subscribe(first);
+        assertTrue(firstInside.await(5, TimeUnit.SECONDS));
+        publisher.subscribe(second);
+        second.subscription.request(1);
+        assertFalse(secondInside.await(250, TimeUnit.MILLISECONDS));
+
+        first.subscription.cancel();
+
+        assertTrue(secondInside.await(5, TimeUnit.SECONDS));
+        assertEquals(1, second.received.size());
+    }
+
     /** A subscriber that records every signal and drains what it is handed, as the JDK does. */
     private static final class RecordingSubscriber implements Flow.Subscriber<ByteBuffer> {
 
