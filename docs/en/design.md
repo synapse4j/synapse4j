@@ -29,10 +29,11 @@ tools. That common ground is what the shared request and response types express.
 The hard part is everything else, because providers do not agree on the rest. The library handles
 it in four ways:
 
-1. **Fields it does not model are kept and sent back unchanged.** Every node — the request, a
-   message, a content part, a tool — can carry provider-specific fields alongside the ones the
-   library knows. Whatever a provider sent that the library has no name for is kept on the node it
-   came from and written back when that node goes out again, so nothing is lost in a round trip.
+1. **Fields it does not model are kept and sent back unchanged.** Every node that carries one — a
+   message, a content part, a tool — and the call's own options can carry provider-specific fields
+   alongside the ones the library knows. Whatever a provider sent that the library has no name for
+   is kept on the node it came from and written back when that node goes out again, so nothing is
+   lost in a round trip.
 
 2. **A field joins the shared model only when it has to survive a provider switch, and the
    providers agree on what it means.** Two providers carrying a similarly named field is not
@@ -76,7 +77,7 @@ threading model simple, and it is why nothing in the library pushes events at yo
 
 **Streaming and non-streaming share one request.** You write the request once and choose how to
 consume the answer. A streaming call hands you the provider's events as they arrive and assembles
-the same response as the blocking call would have returned.
+the turn the blocking call would have returned.
 
 **Open structures.** Types that users or providers extend are not `enum`s, `record`s or `final`
 classes. An `enum` cannot gain values, and a `record` cannot carry an extra field; either would

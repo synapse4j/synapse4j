@@ -96,13 +96,14 @@ An event with no normalized content leaves `delta` null and keeps its payload in
 
 ## Failing loudly
 
-Only one thing fails the call: a requirement on the shape of the answer that the protocol cannot
-honour. An answer that violates what was asked for but looks like success reads to the caller as a
-model that ignored its instructions — the most expensive kind of wrong — so the module refuses the
-call instead of letting it through. Everything else the protocol has no member for — a knob, a
-field, a mode — is left unsent, and the call goes on with what the protocol can carry. Refusing
-those would break the same application code the moment a provider is swapped, which is what the
-shared model exists to prevent.
+Of the things a call asks for that a protocol has no member for, only one fails the call: a
+requirement on the shape of the answer that the protocol cannot honour. An answer that violates
+what was asked for but looks like success reads to the caller as a model that ignored its
+instructions — the most expensive kind of wrong — so the module refuses the call instead of letting
+it through. Everything else the protocol has no member for — a knob, a field, a mode — is left
+unsent, and the call goes on with what the protocol can carry. Refusing those would break the same
+application code the moment a provider is swapped, which is what the shared model exists to
+prevent.
 
 ## Provider spellings as configuration
 

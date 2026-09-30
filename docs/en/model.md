@@ -47,7 +47,7 @@ The content of a message is a list of parts, each one of:
 - `ToolResultPart` — the answer to a tool call: the call id, the tool name, one or more parts, and
   whether the call failed;
 - `MediaPart` — a media payload, its kind named by a media type string such as `image/png`, carried
-  with a URI or a byte source and an optional file name.
+  with a URI or a stream of bytes and an optional file name.
 
 `ContentPart` is not final: a provider or an application adds a kind the library does not model by
 subclassing it.
@@ -63,8 +63,9 @@ ChatMessage.user("Hello").addText(", world");
 A call is tuned through `ChatOptions`: which model to call, the sampling settings, an upper bound on
 generated tokens, how much the model should reason, which tool it may call, the shape the answer
 should take, per-call transport settings and headers, and the extras bag for what this library does
-not model. Every field is optional — `null` means "no opinion", and the client's defaults fill the
-gap — and the class's Javadoc is the list of them.
+not model. Most fields are optional — `null` means "no opinion", and the client's defaults fill the
+gap — but the response format, the headers and the extras bag always hold a value. The class's
+Javadoc is the list of them.
 
 Only settings at least two providers agree on live here; a field one provider alone has goes in the
 extras bag instead.

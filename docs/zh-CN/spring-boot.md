@@ -56,9 +56,7 @@ synapse4j:
 `chat-options.extras` 按原始键绑定：键写的就是协议里的字段名，点分键指向嵌套成员。非字符串
 的值需要 YAML——`.properties` 文件会把每个值都变成字符串。
 
-每个 `synapse4j.*` 键都有配置元数据，因此 IDE 会补全它们。最常设置的选择项是
-`synapse4j.chat-client`、`synapse4j.http-client`、`synapse4j.auto-tool-calling`，以及关掉整个自动
-配置的 `synapse4j.enabled`。
+每个 `synapse4j.*` 键都有配置元数据，因此 IDE 会补全它们。`synapse4j.enabled` 会关掉整个自动配置。
 
 ## 使用
 
@@ -139,4 +137,5 @@ starter 自己不读取任何密钥。API key 和其他属性一样进来：`syn
 选择 `apache` 会使用 Apache HttpClient 5，starter 不会把它放进你的 classpath——要不要再引入一套 HTTP
 栈是应用自己的决定。你需要自己声明 `httpclient5`。Apache 相关的 bean 只在对应的类存在时才生效，默认
 接线根本不会碰到它们；选了 `apache` 却没带这个库时，上下文会失败，并告诉你加入
-`org.apache.httpcomponents.client5:httpclient5`。
+`org.apache.httpcomponents.client5:httpclient5`。这个失败只在 starter 需要自己构建传输层时发生：
+声明了自己的 `HttpClient` 的应用已经手工接好线，选择项对它不起作用。

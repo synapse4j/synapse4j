@@ -42,7 +42,8 @@ options.setResponseFormat(format);
 
 三种模式是 `TYPE_TEXT`（普通文本）、`TYPE_JSON`（任意合法 JSON）和 `TYPE_JSON_SCHEMA`（符合 schema 的
 JSON）。`strict` 要求提供商强制执行 schema，而不只是朝它努力。协议若无法关掉强制，它照样强制，因此
-`strict = false` 在那里拿到的仍是符合 schema 的答案——比要求更严，绝不会更松。
+`strict = false` 在那里拿到的仍是符合 schema 的答案——比要求更严，绝不会更松。这只针对调用确实会发出的
+schema：`TYPE_JSON` 下没有 schema 可强制，`strict` 根本不会发出。
 
 因为 schema 是文本，这里没有任何东西绑定 JSON 库：你选的编解码器产出它，模型被约束到那个编解码器
 读回的形状。

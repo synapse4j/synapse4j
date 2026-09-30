@@ -58,9 +58,8 @@ restates only the fields Spring can bind. `chat-options.extras` binds raw keys: 
 provider's own wire name, and a dotted key addresses a nested member. A non-string value needs YAML
 — a `.properties` file yields a string for every value.
 
-Every `synapse4j.*` key has configuration metadata, so your IDE completes them. The selectors you
-set most often are `synapse4j.chat-client`, `synapse4j.http-client`, `synapse4j.auto-tool-calling`,
-and `synapse4j.enabled`, which turns the whole auto-configuration off.
+Every `synapse4j.*` key has configuration metadata, so your IDE completes them. `synapse4j.enabled`
+turns the whole auto-configuration off.
 
 ## Using it
 
@@ -148,4 +147,6 @@ Selecting `apache` uses Apache HttpClient 5, which the starter does not put on y
 another HTTP stack is your application's choice to make. Declare `httpclient5` yourself. The Apache
 beans sit behind a class condition, so the default wiring never touches them; selecting `apache`
 without the library fails the context with a message telling you to add
-`org.apache.httpcomponents.client5:httpclient5`.
+`org.apache.httpcomponents.client5:httpclient5`. That failure fires only when the starter would
+build the transport itself: an application that declares its own `HttpClient` has wired one by
+hand, and the selector is inert for it.

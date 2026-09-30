@@ -54,7 +54,7 @@ dependencies {
 }
 ```
 
-上面写的 `0.0.1` 是本文档随附的版本；有更新的版本时，请从 Maven Central 取。
+上面写的 `0.0.1` 是本文档编写时对应的版本；实际使用时请以 Maven Central 上的最新发布为准。
 
 ## 2. 构建一个客户端
 
@@ -169,8 +169,8 @@ try (ChatStream stream = client.stream(request)) {
 }
 ```
 
-流在拉取过程中自行组装：循环结束后，`stream.aggregatedResponse()` 正是阻塞调用会返回的那个
-`ChatResponse`。`ChatStream` 刻意实现了 `Iterable` 与 `AutoCloseable`——带 `break` 的 `for`
+流在拉取过程中自行组装：循环结束后，`stream.aggregatedResponse()` 持有阻塞调用会返回的那个轮次。
+`ChatStream` 刻意实现了 `Iterable` 与 `AutoCloseable`——带 `break` 的 `for`
 循环就是预期的用法，提前退出时 try-with-resources 会关闭连接。
 
 ## 7. 让模型调用工具

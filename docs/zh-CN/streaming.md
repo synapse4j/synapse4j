@@ -44,7 +44,7 @@ try (ChatStream stream = client.stream(request)) {
 ChatResponse response = stream.aggregatedResponse();
 ```
 
-循环跑到结束后，它正是 `chat` 会返回的那个。它从不阻塞，也从不驱动消费——它报告迭代器已经折叠的
+循环跑到结束后，它持有 `chat` 会返回的那个轮次。它从不阻塞，也从不驱动消费——它报告迭代器已经折叠的
 内容。折叠在消费迭代器的那个线程上运行，因此也要从那个线程读取它：在流仍被消费时从别的线程调用它会与
 折叠发生竞争；流的各个方法中只有 `close()` 可以从任意线程调用。
 

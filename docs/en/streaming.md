@@ -47,7 +47,7 @@ drives a UI builds the complete answer:
 ChatResponse response = stream.aggregatedResponse();
 ```
 
-After the loop runs to its end, that is exactly what `chat` would have returned. It never blocks and
+After the loop runs to its end, it holds the turn `chat` would have returned. It never blocks and
 never drives consumption — it reports what the iterator has already folded. The fold runs on the
 thread consuming the iterator, so read it from that thread too: calling it from another thread while
 the stream is being consumed races with the fold, and of the stream's methods only `close()` is safe

@@ -68,11 +68,14 @@ ChatClient client = new ToolCallingChatClient(inner, executor);
 ```
 
 Besides the no-argument constructor, a two-argument one takes the `ExecutorService` and the
-`ErrorHandler` together; a three-argument one adds the `maxTurns` cap:
+`ErrorHandler` together; a three-argument one adds the `maxTurns` cap. The service is yours — the
+executor does not close it — so close it where you opened it:
 
 ```java
-ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
-ToolExecutor executor = new DefaultToolExecutor(workers, ErrorHandlers.rethrow(), 5);
+try (ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor()) {
+    ToolExecutor executor = new DefaultToolExecutor(workers, ErrorHandlers.rethrow(), 5);
+    ChatClient client = new ToolCallingChatClient(inner, executor);
+}
 ```
 
 - an `ExecutorService` — run the batch concurrently instead of inline, still assembling the results

@@ -55,8 +55,8 @@ dependencies {
 }
 ```
 
-The `0.0.1` above is the release these docs ship with; when a later one exists, take it from Maven
-Central.
+The `0.0.1` above is the version these docs were written against; take the current release from
+Maven Central.
 
 ## 2. Build a client
 
@@ -178,8 +178,8 @@ try (ChatStream stream = client.stream(request)) {
 }
 ```
 
-The stream assembles itself as you pull: after the loop, `stream.aggregatedResponse()` is exactly
-the `ChatResponse` the blocking call would have returned. `ChatStream` is `Iterable` and
+The stream assembles itself as you pull: after the loop, `stream.aggregatedResponse()` holds the
+turn the blocking call would have returned. `ChatStream` is `Iterable` and
 `AutoCloseable` on purpose — a `for` loop with `break` is the intended shape, and
 try-with-resources closes the connection when you leave early.
 

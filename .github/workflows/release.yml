@@ -67,12 +67,18 @@ jobs:
           code="$(curl -sS -o /tmp/published.json -w '%{http_code}' -H "Authorization: Bearer $token" "$url")"
           # The status is what carries the signal: a rotated credential or a bad gateway would
           # otherwise leave the body empty and read as "not published", which is the one answer
-          # that leads to a duplicate upload.
+          # that leads to a duplicate upload. Failing here also stops the GitHub Release below,
+          # which is deliberate: a release note for a version whose publication could not be
+          # confirmed would be misleading.
           if [ "$code" != "200" ]; then
             echo "::error::Central answered $code for $url — cannot tell whether the version is out"
             exit 1
           fi
-          if [ "$(jq -r '.published // false' /tmp/published.json)" = "true" ]; then
+          if ! published="$(jq -r '.published // false' /tmp/published.json)"; then
+            echo "::error::Central's answer was not the JSON this check expects — cannot tell whether the version is out"
+            exit 1
+          fi
+          if [ "$published" = "true" ]; then
             echo "already on Maven Central — skipping the publish"
             echo "SKIP_PUBLISH=true" >> "$GITHUB_ENV"
           fi

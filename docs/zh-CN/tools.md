@@ -62,11 +62,13 @@ ChatClient client = new ToolCallingChatClient(inner, executor);
 ```
 
 除了无参构造器，还有接收 `ExecutorService` 与 `ErrorHandler` 的双参数构造器，以及再加上
-`maxTurns` 上限的三参数构造器：
+`maxTurns` 上限的三参数构造器。这个服务归你所有——执行器不会关闭它——所以在打开它的地方关闭它：
 
 ```java
-ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
-ToolExecutor executor = new DefaultToolExecutor(workers, ErrorHandlers.rethrow(), 5);
+try (ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor()) {
+    ToolExecutor executor = new DefaultToolExecutor(workers, ErrorHandlers.rethrow(), 5);
+    ChatClient client = new ToolCallingChatClient(inner, executor);
+}
 ```
 
 - 一个 `ExecutorService`——并发运行整批，而不是内联，结果仍按调用顺序组装；
