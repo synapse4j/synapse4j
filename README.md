@@ -1,13 +1,13 @@
 # synapse4j
 
-A lightweight Java library for talking to LLM providers, decoupled from any particular framework.
-You assemble your own stack — pick the JSON library, pick the HTTP client, pick the provider — and
-the core abstractions never lean on any of them.
+**English** | [中文](README.zh-CN.md)
 
-Core capabilities: JSON Schema generation and Java-object-to-schema-conforming-JSON
-serialization/deserialization, a thin HTTP layer beneath a provider-neutral chat model with
-blocking and streaming as equal citizens, and tool calling end to end. Provider modules ship
-separately.
+A lightweight Java library for calling LLM providers. You write a call once and it works against
+whichever provider you point it at; you pick the JSON library, the HTTP client and the provider,
+and the library stays out of everything else.
+
+It covers JSON Schema generation and JSON serialization, a provider-neutral chat model with
+blocking and streaming, and tool calling end to end. Provider modules ship separately.
 
 ## Modules
 
@@ -22,6 +22,15 @@ separately.
 | `synapse4j-anthropic` | Anthropic Messages protocol |
 | `synapse4j-spring-boot-starter` | Auto-configuration for Spring Boot |
 | `synapse4j-bom` | Bill of materials for consumers |
+
+## Documentation
+
+- [Getting started](docs/en/getting-started.md) — assemble a client, make a call, stream, run a
+  tool, ask for structured output. No framework required.
+- [Design and trade-offs](docs/en/design.md) — why the library is shaped this way.
+- [Full documentation index](docs/en/index.md)
+
+中文文档见 [docs/zh-CN](docs/zh-CN/index.md)。
 
 ## Requirements
 

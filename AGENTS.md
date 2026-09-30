@@ -178,6 +178,25 @@ one would block extension by users and providers.
   again on every later change, so name the wrong future change it would catch, and if there is none,
   write nothing. Coverage is not measured in this build.
 
+## Documentation
+
+- User-facing docs live under `docs/`, one mirrored tree per language — `docs/en/` and
+  `docs/zh-CN/` today, more as they come. English is the source of truth; a translated tree may
+  lag behind it.
+- Every doc opens with a language switcher line linking to its counterparts in the other trees.
+  `README.md` and `README.zh-CN.md` are the front doors and link into the trees.
+- Plain Markdown, rendered by GitHub. Diagrams use Mermaid. Do not add a site generator.
+- Write for a developer who knows LLM APIs, JSON, HTTP and build tools but nothing about this
+  library. Do not explain or analogize the basics; do not open with this library's types or design
+  vocabulary — name a thing only once the prose around it has made clear what it is. Plain, direct
+  sentences, no essay flourishes.
+- Every language's docs read as that language: the prose is native, and a foreign word appears only
+  for code identifiers and genuine terms (HTTP, JSON, schema, JDK, class names, Java keywords,
+  product names). Write each tree; do not translate another tree's text word for word — a literal
+  rendering such as "写到线上" for "to the wire" reads as nonsense.
+- Do not restate Javadoc, the module table or the config keys in the docs — link to them. This
+  file states principles in brief; `docs/*/design.md` carries the long reasoning.
+
 ## Build and test
 
 - The build enforces its own floor first: JDK 21+ and Maven 3.6.3+ (maven-enforcer-plugin), so

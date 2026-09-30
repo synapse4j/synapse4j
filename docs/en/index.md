@@ -1,0 +1,75 @@
+# synapse4j
+
+**English** | [中文](../zh-CN/index.md)
+
+A lightweight Java library for calling LLM providers.
+
+You write a call once — the messages, the model, the tools — and it works against whichever
+provider you point it at. You choose the JSON library, the HTTP client and the provider. The
+library supplies the model in between and nothing else.
+
+```java
+JsonCodec codec = new JacksonJsonCodec();
+HttpClient http = new JdkHttpClient();
+
+OpenAiConfig config = new OpenAiConfig();
+config.setApiKey(System.getenv("OPENAI_API_KEY"));
+
+ChatClient client = new OpenAiCompletionsChatClient(http, codec, config);
+
+ChatResponse response = client.chat(new ChatRequest()
+        .addUserMessage("Why is the sky blue?"));
+
+System.out.println(response.getMessage().getParts());
+```
+
+## What makes it different
+
+Most Java LLM libraries bundle a stack: a JSON library, an HTTP client, a way to keep conversation
+history, sometimes a whole framework. synapse4j bundles none of them.
+
+- **One request and response model, for every provider.** OpenAI, Anthropic and the rest are
+  reached through the same types. Changing provider changes which client you build, not the code
+  around it.
+- **Your JSON library.** The library never serializes anything itself — it asks the codec you hand
+  it. Jackson is one implementation, not a requirement.
+- **Your HTTP client.** The JDK client, Spring's `RestClient`, Apache HttpClient 5, or your own.
+- **Blocking and streaming are both first-class**, and share the same request.
+- **Tool calling is built in.** Declare a tool, pair it with the code behind it, and let the
+  library run the model's tool-call rounds.
+- **No state.** The library stores nothing between calls; conversation history is yours to keep,
+  wherever you keep it.
+
+## Reading order
+
+1. [Getting started](getting-started.md) — a working call in a few minutes, then streaming, tools
+   and structured output.
+2. [Design and trade-offs](design.md) — what the library does and does not do, and why.
+3. *Comparison with other Java libraries — planned.*
+
+The Javadoc is the reference for the API itself.
+
+## Modules
+
+Pick the modules you need; the BOM aligns their versions.
+
+| Module | What it is |
+|---|---|
+| `synapse4j-core` | The request/response model, the JSON and HTTP interfaces, tool calling |
+| `synapse4j-jackson` | `JsonCodec` on Jackson and victools |
+| `synapse4j-http-jdk` | `HttpClient` on the JDK's `java.net.http` |
+| `synapse4j-http-apache` | `HttpClient` on Apache HttpClient 5 |
+| `synapse4j-http-restclient` | `HttpClient` on Spring's `RestClient` |
+| `synapse4j-openai` | OpenAI Chat Completions and Responses protocols |
+| `synapse4j-anthropic` | Anthropic Messages protocol |
+| `synapse4j-spring-boot-starter` | Auto-configuration for Spring Boot |
+| `synapse4j-bom` | Bill of materials for version alignment |
+
+## Requirements
+
+- Java 21 or newer.
+- Maven 3.6.3 or newer if you build the project itself (there is no wrapper; run `mvn` directly).
+
+## License
+
+Apache License 2.0 — see [LICENSE](../../LICENSE).
