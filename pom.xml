@@ -45,7 +45,7 @@
   </scm>
 
   <properties>
-    <revision>0.0.1-SNAPSHOT</revision>
+    <revision>0.0.1</revision>
 
     <!-- The versions of the build's own plugins, kept here so every pom that declares one of
          them — this file's spotless and flatten, the BOM's flatten override — references one
