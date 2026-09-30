@@ -146,8 +146,13 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
 
     @Override
     public <T> @Nullable T convert(Object value, Type type) {
-        // One pass over the decoded value — no text written out and read back for a type the
-        // mapper can reach directly, which is what makes this the hot path's conversion.
+        // This library's own types are not the shape of their class: a JsonSchema is the document it
+        // describes, which the mapper knows nothing about, so it goes the way decode reads one
+        // rather than through the mapper's direct conversion. Everything else takes the fast path —
+        // one pass over the decoded value, with no text written out and read back.
+        if (type instanceof Class<?> asked && JsonSchema.class.isAssignableFrom(asked)) {
+            return decode(encode(value), type);
+        }
         return jsonMapper.convertValue(value, jsonMapper.getTypeFactory().constructType(type));
     }
 

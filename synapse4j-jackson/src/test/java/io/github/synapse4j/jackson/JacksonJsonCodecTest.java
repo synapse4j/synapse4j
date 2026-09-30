@@ -171,6 +171,18 @@ class JacksonJsonCodecTest {
     }
 
     @Test
+    void convertReadsASchemaThroughTheDocumentItDescribes() {
+        JsonSchema schema = codec.generateEncodeSchema(Order.class);
+        Object decoded = codec.decode(codec.encode(schema), Map.class);
+
+        // The fast conversion path must not skip the library's own types: a decoded document
+        // converts to a JsonSchema through the schema it describes, exactly as decode reads one.
+        JsonSchema converted = codec.convert(decoded, JsonSchema.class);
+
+        assertEquals(schema.toMap(), converted.toMap());
+    }
+
+    @Test
     void refusesAMapperOrGeneratorThatIsNotThere() {
         assertThrows(NullPointerException.class, () -> new JacksonJsonCodec(null, null, null));
     }

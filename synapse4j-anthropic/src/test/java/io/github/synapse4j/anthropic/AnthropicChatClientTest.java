@@ -717,6 +717,46 @@ class AnthropicChatClientTest {
     }
 
     @Test
+    void anUnmodeledDeltaStaysOnTheEventAndOffTheAnswer() {
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                "message_start",
+                "{\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"type\":\"message\","
+                        + "\"role\":\"assistant\",\"content\":[],\"model\":\"claude-test\","
+                        + "\"stop_reason\":null,\"stop_sequence\":null,"
+                        + "\"usage\":{\"input_tokens\":25,\"output_tokens\":1}}}",
+                "content_block_start",
+                "{\"type\":\"content_block_start\",\"index\":0,"
+                        + "\"content_block\":{\"type\":\"text\",\"text\":\"\"}}",
+                "content_block_delta",
+                "{\"type\":\"content_block_delta\",\"index\":0,\"delta\":"
+                        + "{\"type\":\"citations_delta\",\"citation\":{\"url\":\"https://example.test\"}}}",
+                "content_block_stop",
+                "{\"type\":\"content_block_stop\",\"index\":0}",
+                "message_delta",
+                "{\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\","
+                        + "\"stop_sequence\":null},\"usage\":{\"output_tokens\":7}}",
+                "message_stop",
+                "{\"type\":\"message_stop\"}").getBytes(UTF_8)));
+
+        ChatStream stream = client.stream(requestWithModel());
+        ChatStreamEvent delta = null;
+        for (ChatStreamEvent event : stream) {
+            if (AnthropicEventTypes.CONTENT_BLOCK_DELTA.equals(event.getEventType())) {
+                delta = event;
+            }
+        }
+
+        // A delta kind this module did not model stays on the event, whole, for the application to
+        // read — and is never promoted to a member of the answer, which the blocking walk could not
+        // produce and which would make the answer depend on how it was asked for.
+        assertNotNull(delta);
+        assertNotNull(delta.getExtras().get("delta"));
+        assertFalse(stream.aggregatedResponse().getExtras().rawMap().containsKey("delta"));
+    }
+
+    @Test
     void toolInputFragmentsAccumulateIntoOneCall() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));

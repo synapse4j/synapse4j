@@ -328,13 +328,15 @@ class MessagesStream extends DefaultChatStream {
     }
 
     /**
-     * The event's own extras onto the answer, minus the block bracket's position: {@code index}
-     * says which block a frame arrived for, which belongs to the event and not to the message
-     * document a blocking call reads — the answer must not depend on which way it was asked for.
+     * The event's own extras onto the answer, minus what belongs to the event alone: {@code index}
+     * says which block a frame arrived for, and {@code delta} is a frame's own fragment — a kind
+     * this module did not model, kept on the event for the application rather than promoted to a
+     * member of the answer a blocking call could never produce. The answer must not depend on which
+     * way it was asked for.
      */
     private static void foldExtras(ProviderExtras responseExtras, ProviderExtras eventExtras) {
         for (Map.Entry<String, Object> member : eventExtras.rawMap().entrySet()) {
-            if (!"index".equals(member.getKey())) {
+            if (!"index".equals(member.getKey()) && !"delta".equals(member.getKey())) {
                 responseExtras.putRaw(member.getKey(), member.getValue());
             }
         }
