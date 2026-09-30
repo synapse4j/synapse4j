@@ -7,7 +7,12 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Condition;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.context.annotation.Conditional;
+import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.web.client.RestClient;
 
 import io.github.synapse4j.anthropic.AnthropicChatClient;
@@ -94,7 +99,7 @@ public class Synapse4jAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    @ConditionalOnProperty(prefix = "synapse4j", name = "http-client", havingValue = "restclient", matchIfMissing = true)
+    @Conditional(OnRestClientTransport.class)
     public HttpClient httpClient(ObjectProvider<RestClient.Builder> builders, Synapse4jProperties properties) {
         RestClient.Builder builder = builders.getIfAvailable(RestClient::builder);
         return new RestClientHttpClient(builder.build(), properties.getHttpOptions());
@@ -122,7 +127,7 @@ public class Synapse4jAutoConfiguration {
      */
     @Bean(destroyMethod = "close")
     @ConditionalOnMissingBean(CloseableHttpClient.class)
-    @ConditionalOnProperty(prefix = "synapse4j", name = "http-client", havingValue = "apache")
+    @Conditional(OnApacheTransport.class)
     public CloseableHttpClient apacheTransport() {
         return HttpClients.createDefault();
     }
@@ -133,9 +138,39 @@ public class Synapse4jAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    @ConditionalOnProperty(prefix = "synapse4j", name = "http-client", havingValue = "apache")
+    @Conditional(OnApacheTransport.class)
     public HttpClient apacheHttpClient(CloseableHttpClient transport, Synapse4jProperties properties) {
         return new ApacheHttpClient(transport, properties.getHttpOptions());
+    }
+
+    /**
+     * The transport {@code synapse4j.http-client} selects, read through the same binder every other
+     * {@code synapse4j.*} key uses: a raw string comparison would accept one spelling and refuse
+     * another the user is entitled to write — {@code rest-client} binds the enum as surely as
+     * {@code restclient}, and the bean that must exist has to follow the value the client reads.
+     */
+    private static HttpClientType selectedTransport(ConditionContext context) {
+        return Binder.get(context.getEnvironment())
+                .bind("synapse4j.http-client", HttpClientType.class)
+                .orElse(HttpClientType.RESTCLIENT);
+    }
+
+    /** Matches when {@code synapse4j.http-client} binds to the Spring transport, the default. */
+    static class OnRestClientTransport implements Condition {
+
+        @Override
+        public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+            return selectedTransport(context) == HttpClientType.RESTCLIENT;
+        }
+    }
+
+    /** Matches when {@code synapse4j.http-client} binds to the Apache transport. */
+    static class OnApacheTransport implements Condition {
+
+        @Override
+        public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+            return selectedTransport(context) == HttpClientType.APACHE;
+        }
     }
 
     /**

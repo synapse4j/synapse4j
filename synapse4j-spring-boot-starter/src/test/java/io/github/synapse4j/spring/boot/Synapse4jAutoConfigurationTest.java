@@ -130,6 +130,29 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
+    void aRelaxedTransportSpellingStillSelects() {
+        // The binder accepts the spellings Spring binds everywhere else, and the bean that has to
+        // exist follows the same value the client reads. A raw string comparison accepted
+        // "restclient" but silently left no transport at all for "rest-client" — a value the IDE
+        // and Boot's own docs invite.
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(Synapse4jAutoConfiguration.class))
+                .withPropertyValues("synapse4j.http-client=rest-client")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(HttpClient.class);
+                    assertThat(context.getBean(HttpClient.class)).isInstanceOf(RestClientHttpClient.class);
+                });
+
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(Synapse4jAutoConfiguration.class))
+                .withPropertyValues("synapse4j.http-client=APACHE")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(HttpClient.class);
+                    assertThat(context.getBean(HttpClient.class)).isInstanceOf(ApacheHttpClient.class);
+                });
+    }
+
+    @Test
     void theApacheTransportClosesItsPoolWithTheContext() {
         AtomicReference<CloseableHttpClient> transport = new AtomicReference<>();
         runner.withPropertyValues("synapse4j.http-client=apache")
