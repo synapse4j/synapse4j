@@ -71,7 +71,9 @@ ToolExecutor executor = new DefaultToolExecutor(workers, ErrorHandlers.rethrow()
 
 - 一个 `ExecutorService`——并发运行整批，而不是内联，结果仍按调用顺序组装；
 - 一个 `ErrorHandler`——失败的调用去哪里：作为模型可以据此重试的文本交回，还是抛给调用方。现成的有
-  `ErrorHandlers.message(prefix)`、`.fixed(text)` 和 `.rethrow()`；
+  `ErrorHandlers.message(prefix)`、`.fixed(text)` 和 `.rethrow()`。协议没有失败标志时（两个 OpenAI
+  协议都是），这段文本是模型唯一能看到的信号，因此 `.fixed(text)` 和自己写的 handler 应当在文本里说明
+  调用失败了；`.message(prefix)` 已经这么做；
 - 一个 `maxTurns` 上限——一轮跑够那么久之后拒绝这一批，循环就地结束。
 
 调用了不存在的工具会以 `ToolNotFoundException` 失败，并和其他失败走同一条路径。

@@ -44,6 +44,11 @@ public final class ErrorHandlers {
      * whatever detail the exception carried, and the way to keep internals off the wire
      * entirely.
      *
+     * <p>
+     * Where a protocol has no member for the failure, this text is the only signal the model gets,
+     * and it reads it as the tool's own answer — so say in it that the call failed.
+     * {@link #message(String)} is the ready-made handler that does.
+     *
      * @param message the text handed back as this call's result, verbatim; never {@code null}
      * @return the handler; never {@code null}
      */

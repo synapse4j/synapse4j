@@ -79,7 +79,9 @@ ToolExecutor executor = new DefaultToolExecutor(workers, ErrorHandlers.rethrow()
   in call order;
 - an `ErrorHandler` — where a failed call goes: back to the model as text it can retry against, or
   out to the caller. `ErrorHandlers.message(prefix)`, `.fixed(text)` and `.rethrow()` are the
-  ready-made ones;
+  ready-made ones. Where a protocol has no member for the failure — both OpenAI protocols — the text
+  is the only signal the model gets, so `.fixed(text)` and a handler of your own should say in it
+  that the call failed; `.message(prefix)` does;
 - a `maxTurns` cap — decline a batch once the round has run that long, ending the loop where it
   stands.
 
