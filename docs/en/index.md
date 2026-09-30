@@ -44,8 +44,11 @@ history, sometimes a whole framework. synapse4j bundles none of them.
 
 1. [Getting started](getting-started.md) — a working call in a few minutes, then streaming, tools
    and structured output.
-2. [Design and trade-offs](design.md) — what the library does and does not do, and why.
-3. *Comparison with other Java libraries — planned.*
+2. [The call model](model.md) — the request, the response, messages, parts and options.
+3. [Conversations](conversations.md) — holding history yourself, and continuing across turns.
+4. [Tools](tools.md) — declaring tools and running the model's tool calls.
+5. [Design and trade-offs](design.md) — what the library does and does not do, and why.
+6. *Comparison with other Java libraries — planned.*
 
 The Javadoc is the reference for the API itself.
 

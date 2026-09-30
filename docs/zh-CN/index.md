@@ -39,8 +39,11 @@ System.out.println(response.getMessage().getParts());
 ## 阅读顺序
 
 1. [入门](getting-started.md)——几分钟跑通一次调用，然后是流式、工具与结构化输出。
-2. [设计与取舍](design.md)——库做什么、不做什么，以及为什么。
-3. *与其他 Java 库的对比——待补。*
+2. [调用模型](model.md)——请求、响应、消息、内容部分与选项。
+3. [对话](conversations.md)——自己持有历史，以及跨轮次继续。
+4. [工具](tools.md)——声明工具，运行模型的工具调用。
+5. [设计与取舍](design.md)——库做什么、不做什么，以及为什么。
+6. *与其他 Java 库的对比——待补。*
 
 API 本身的参考以 Javadoc 为准。
 
