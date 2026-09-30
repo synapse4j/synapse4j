@@ -27,9 +27,9 @@ import lombok.NonNull;
  *
  * <p>
  * A call may also be abandoned part-way: a transport that gives up on a request — the answer arrived
- * before the body was drained, the connection broke — makes the sink fail, and a call is expected to
- * unwind on that failure rather than try to finish writing. The next attempt runs its own call, once
- * the abandoned one has left.
+ * before the body was drained, the connection broke — makes the sink fail at the call's next write,
+ * and a call is expected to unwind on that failure rather than try to finish writing. The next
+ * attempt runs its own call, once the abandoned one has left.
  *
  * <p>
  * {@link #buffer()} is the same content where producing it would be work already done. An

@@ -172,7 +172,8 @@ public class JsonSchema {
      *
      * <p>
      * A schema reached through two different paths is visited twice, being the same object either
-     * way. One that contains itself has no walk at all, and is refused.
+     * way. One that contains itself is refused, and the walk stops where the cycle closes: the check
+     * runs as the walk descends, so the visitor has already seen the schemas above it.
      *
      * @param visitor what to do with each schema; must not be {@code null}
      * @throws SynapseException if this schema contains itself
@@ -318,6 +319,11 @@ public class JsonSchema {
      * unchanged — and so is a modelled keyword that arrives in a shape this class does not expect: a
      * {@code properties} that is not a map, an {@code items} that is a list of schemas, an
      * {@code additionalProperties} that is a schema itself.
+     *
+     * <p>
+     * The map is taken as it is: a graph that contains itself is not detected here, and a map that
+     * nests itself would recurse until the stack runs out. A document read from JSON cannot do that —
+     * JSON has no cycles — so it bites only a map assembled by hand.
      *
      * @param map the schema as a map; must not be {@code null}
      * @return the schema; never {@code null}

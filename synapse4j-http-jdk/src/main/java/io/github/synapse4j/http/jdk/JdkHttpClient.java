@@ -288,8 +288,12 @@ public class JdkHttpClient implements HttpClient {
      * this publisher's lock is held for the whole of one run's write, so a run started for a retry or a
      * redirect waits for the run before it to leave the body — {@link HttpBody} promises its calls are
      * sequential, and two runs inside it at once would be two interleaved writes. The premise is the
-     * Flow contract's own: the run being replaced is cancelled before the next exchange begins, and a
-     * cancelled run leaves the body at its next chunk, releasing the lock with it.
+     * Flow contract's own: the run being replaced is cancelled before the next exchange begins. The
+     * cancellation is seen where this publisher can see it — the run's next chunk write, which then
+     * fails and releases the lock. A body blocked inside its own {@link HttpBody#writeTo} — reading a
+     * media part from a source slow to answer, say — cannot be reached by a cancellation and holds the
+     * lock until it next writes; a source that can block indefinitely is the caller's to buffer, or to
+     * hand over through {@link HttpBody#buffer()}.
      */
     static final class StreamingBodyPublisher implements Flow.Publisher<ByteBuffer> {
 
@@ -379,7 +383,8 @@ public class JdkHttpClient implements HttpClient {
                 // The whole write runs under the publisher's lock, so a second run — a retry, a
                 // redirect — waits here for the run before it to leave the body rather than entering
                 // it at the same time. A cancelled run leaves at its next chunk and releases the lock
-                // on the way out.
+                // on the way out; one blocked inside its own write is not interrupted, and leaves
+                // when it next writes.
                 writeLock.lock();
                 try {
                     body.writeTo(chunkSink);

@@ -1387,11 +1387,11 @@ class OpenAiCompletionsChatClientTest {
         assertEquals(blocking.getModel(), aggregated.getModel());
         assertEquals(blocking.getUsage().getInputTokens(), aggregated.getUsage().getInputTokens());
         assertEquals(blocking.getUsage().getOutputTokens(), aggregated.getUsage().getOutputTokens());
-        // The provider's own unmodelled members reach the answer too. What the two answers' extras
-        // hold beyond them is whatever each way of asking happened to carry, which the library does
-        // not promise to be the same.
+        // The provider's own unmodelled members reach the answer too, and on this path both ways of
+        // asking route the same members to the same places, so the two answers' extras agree.
         assertEquals(1700000000, aggregated.getExtras().get("created"));
         assertEquals("fp_1", aggregated.getExtras().get("system_fingerprint"));
+        assertEquals(blocking.getExtras().rawMap(), aggregated.getExtras().rawMap());
     }
 
     @Test
