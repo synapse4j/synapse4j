@@ -139,7 +139,8 @@ class Synapse4jAutoConfigurationTest {
         // it was handed — so the context's close is the only close it gets. A pool still open here
         // would leave its reactor threads outliving the application that spawned them.
         ClassicHttpRequest request = new BasicClassicHttpRequest("GET", URI.create("http://localhost/"));
-        assertThatThrownBy(() -> transport.get().execute(request)).isInstanceOf(IllegalStateException.class)
+        assertThatThrownBy(() -> transport.get().execute(request, response -> response))
+                .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("shut down");
     }
 
