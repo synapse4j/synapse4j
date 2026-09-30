@@ -72,12 +72,9 @@ options.setHttpOptions(http);
 options.getHeaders().put("X-Request-Id", id);
 ```
 
-`HttpOptions` holds three knobs:
-
-| Field | What it sets |
-|---|---|
-| `responseTimeout` | how long to wait for the response headers; it does not bound reading the body |
-| `bodyWriteMode` | how a written body reaches a transport that cannot take one as it comes — the string `"streamed"` (the default) or `"buffered"`, named by the constants `HttpOptions.STREAMED` and `HttpOptions.BUFFERED` |
-| `maxFrameBytes` | the most one server-sent event frame may accumulate |
+`HttpOptions` holds the per-call HTTP settings: a timeout for the response headers (which does not
+bound reading the body), how a written body reaches a transport that cannot take one as it comes,
+and a server-sent event frame budget. The class's Javadoc names the fields and the values they take
+— the body-write mode, in particular, is the string `"streamed"` or `"buffered"`, not an enum.
 
 A request's settings merge with the implementation's own the same way the call options do.

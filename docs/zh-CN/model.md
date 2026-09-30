@@ -52,21 +52,11 @@ ChatMessage.user("你好").addText("，世界");
 
 ## 选项
 
-`ChatOptions` 承载一次调用可以调节的东西：
+一次调用通过 `ChatOptions` 调整：调用哪个模型、采样参数、生成 token 的上限、模型应该推理多少、可以
+调用哪个工具、答案该是什么形状、本次调用的传输层设置与 header，以及承载库没有建模之物的 extras 映射。
+每个字段都是可选的——`null` 表示「没有意见」，客户端的默认值会补上；字段清单以该类的 Javadoc 为准。
 
-| 字段 | 设置什么 |
-|---|---|
-| `model` | 调用哪个模型 |
-| `temperature`、`topP` | 采样 |
-| `maxOutputTokens` | 生成 token 的上限 |
-| `reasoningEffort` | 模型应该推理多少 |
-| `toolChoice`、`toolChoiceName` | 模型是否可以、以及可以调用哪个工具 |
-| `responseFormat` | 普通文本、JSON，或符合 schema 的 JSON |
-| `httpOptions`、`headers` | 本次调用的传输层设置 |
-| `extras` | 提供商特有的字段 |
-
-每个字段都是可选的：`null` 表示「没有意见」，客户端的默认值会补上。只有至少两家提供商都认同的设置
-才放在这里；某一家独有的字段放进 extras 映射。
+只有至少两家提供商都认同的设置才放在这里；某一家独有的字段放进 extras 映射。
 
 ## 提供商特有的字段
 

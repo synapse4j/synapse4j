@@ -67,12 +67,8 @@ options.setHttpOptions(http);
 options.getHeaders().put("X-Request-Id", id);
 ```
 
-`HttpOptions` 有三个设置项：
-
-| 字段 | 设置什么 |
-|---|---|
-| `responseTimeout` | 等待响应头多久；它不限制读取正文 |
-| `bodyWriteMode` | 写出的正文如何到达一个无法边写边收的传输层——字符串 `"streamed"`（默认）或 `"buffered"`，对应常量 `HttpOptions.STREAMED` 与 `HttpOptions.BUFFERED` |
-| `maxFrameBytes` | 一个 server-sent event 帧最多可累积多少字节 |
+`HttpOptions` 承载本次调用的 HTTP 层设置：等待响应头的超时（它不限制读取正文）、写出的正文如何到达
+一个无法边写边收的传输层，以及一个 server-sent event 帧的预算。字段名与取值以该类的 Javadoc 为准；
+其中正文写出模式是字符串 `"streamed"` 或 `"buffered"`，不是枚举。
 
 请求的设置与实现自身的设置合并，方式和调用选项一样。

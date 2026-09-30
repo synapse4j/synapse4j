@@ -60,22 +60,14 @@ ChatMessage.user("Hello").addText(", world");
 
 ## Options
 
-`ChatOptions` holds what a call can be tuned with:
+A call is tuned through `ChatOptions`: which model to call, the sampling settings, an upper bound on
+generated tokens, how much the model should reason, which tool it may call, the shape the answer
+should take, per-call transport settings and headers, and the extras bag for what this library does
+not model. Every field is optional — `null` means "no opinion", and the client's defaults fill the
+gap — and the class's Javadoc is the list of them.
 
-| Field | What it sets |
-|---|---|
-| `model` | which model to call |
-| `temperature`, `topP` | sampling |
-| `maxOutputTokens` | an upper bound on generated tokens |
-| `reasoningEffort` | how much the model should reason |
-| `toolChoice`, `toolChoiceName` | whether, and which, tool the model may call |
-| `responseFormat` | prose, JSON, or JSON against a schema |
-| `httpOptions`, `headers` | per-call transport settings |
-| `extras` | provider-specific fields |
-
-Every field is optional: `null` means "no opinion", and the client's defaults fill the gap. Only
-knobs at least two providers agree on live here; a field one provider alone has goes in the extras
-bag instead.
+Only settings at least two providers agree on live here; a field one provider alone has goes in the
+extras bag instead.
 
 ## Provider-specific fields
 
