@@ -16,7 +16,7 @@ import io.github.synapse4j.openai.OpenAiConfig;
  * <p>
  * The groups are the library's own configuration types held in place rather than restated:
  * {@code synapse4j.openai.*} lands on an {@link OpenAiConfig}, {@code synapse4j.anthropic.*} on
- * an {@link AnthropicConfig}, {@code synapse4j.http.*} on {@link HttpOptions}. Spring's binder
+ * an {@link AnthropicConfig}, {@code synapse4j.http-options.*} on {@link HttpOptions}. Spring's binder
  * calls a setter only for a key the environment actually
  * carries, so every property a user does not set keeps the default the library's own instance
  * carries — and there is no second copy of these fields here that could drift from them.
@@ -49,25 +49,28 @@ public class Synapse4jProperties {
 
     /**
      * Which chat client the auto-configuration builds: {@link ChatClientType#COMPLETIONS} (the
-     * default), {@link ChatClientType#RESPONSES}, or {@link ChatClientType#ANTHROPIC}.
-     *
-     * <p>
-     * Read as a Spring condition rather than from this instance — a condition evaluates before any
-     * bean of this type exists — and declared here so the selector appears in the generated
-     * configuration metadata where an IDE can surface it. The binding still matters: it is what
-     * refuses a value this starter does not wire, naming the property at startup, where the
-     * conditions alone would answer an unknown value by building nothing.
+     * default), {@link ChatClientType#RESPONSES}, or {@link ChatClientType#ANTHROPIC}. The client
+     * bean reads it to pick the protocol, and the binding is what refuses a value this starter does
+     * not wire, naming the property at startup.
      */
     private ChatClientType chatClient = ChatClientType.COMPLETIONS;
+
+    /**
+     * Whether the auto-configured chat client runs the model's tool-call rounds itself: it executes
+     * the tools a request carries and sends their results back until the model answers without
+     * calling one. Turned off, the raw calls reach the caller, which runs them itself.
+     */
+    private boolean autoToolCalling = true;
 
     /**
      * Which HTTP transport the auto-configuration builds: {@link HttpClientType#RESTCLIENT} (the
      * default) or {@link HttpClientType#APACHE}.
      *
      * <p>
-     * Read as a Spring condition rather than from this instance, for the same reason as
-     * {@link #chatClient} — and the binding refuses what the conditions would answer by building
-     * nothing.
+     * Read as a Spring condition rather than from this instance — a condition evaluates before any
+     * bean of this type exists — and declared here so the selector appears in the generated
+     * configuration metadata. The binding still matters: it is what refuses a value this starter
+     * does not wire, naming the property at startup.
      */
     private HttpClientType httpClient = HttpClientType.RESTCLIENT;
 
@@ -95,12 +98,12 @@ public class Synapse4jProperties {
      * The transport's fallback options, for what a call does not state itself.
      *
      * <p>
-     * {@code synapse4j.http.response-timeout} binds like any other {@link HttpOptions} member, but
-     * the {@code RestClient} transport has no per-request timeout to honour it: it reports the
-     * setting once and carries on, and the timeout that works is the request factory's —
+     * {@code synapse4j.http-options.response-timeout} binds like any other {@link HttpOptions}
+     * member, but the {@code RestClient} transport has no per-request timeout to honour it: it
+     * reports the setting once and carries on, and the timeout that works is the request factory's —
      * {@code spring.http.client.read-timeout}.
      */
     @NestedConfigurationProperty
-    private final HttpOptions http = new HttpOptions();
+    private final HttpOptions httpOptions = new HttpOptions();
 
 }

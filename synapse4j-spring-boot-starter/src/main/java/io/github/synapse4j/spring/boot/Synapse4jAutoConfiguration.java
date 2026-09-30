@@ -11,15 +11,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.RestClient;
 
 import io.github.synapse4j.anthropic.AnthropicChatClient;
-import io.github.synapse4j.anthropic.AnthropicConfig;
 import io.github.synapse4j.chat.ChatClient;
+import io.github.synapse4j.chat.ChatCustomizer;
+import io.github.synapse4j.chat.ToolCallingChatClient;
 import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.apache.ApacheHttpClient;
 import io.github.synapse4j.http.restclient.RestClientHttpClient;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.openai.OpenAiCompletionsChatClient;
-import io.github.synapse4j.openai.OpenAiConfig;
 import io.github.synapse4j.openai.OpenAiResponsesChatClient;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -29,6 +29,17 @@ import tools.jackson.databind.json.JsonMapper;
  * the Spring and Apache transports, {@code synapse4j.chat-client} between the two OpenAI
  * protocols and Anthropic's — with each family's config bound from its own properties and every
  * client's default options from {@code synapse4j.chat-options.*}.
+ *
+ * <p>
+ * The family configs are taken straight from the properties bean rather than republished as beans
+ * of their own — there is one instance of each and nothing to drift, and injecting
+ * {@link Synapse4jProperties} is how an application reaches one.
+ *
+ * <p>
+ * A built chat client is brought into shape before it is shared: it is wrapped in the tool-calling
+ * loop unless {@code synapse4j.auto-tool-calling} is off, the bound chat options become its
+ * defaults, every {@link ChatCustomizer} bean joins its per-call hooks, and every
+ * {@link ChatClientCustomizer} bean then gets the last word.
  *
  * <p>
  * Every bean here backs off the moment the application declares one of the same type — this
@@ -78,15 +89,15 @@ public class Synapse4jAutoConfiguration {
     /**
      * The Spring transport — the default, taken when {@code synapse4j.http-client} names no value
      * or names this one — on Boot's auto-configured {@code RestClient.Builder} when one is
-     * published and a plain one otherwise. The bound {@code synapse4j.http.*} options become the
-     * fallback every call inherits from when it states nothing itself.
+     * published and a plain one otherwise. The bound {@code synapse4j.http-options.*} options become
+     * the fallback every call inherits from when it states nothing itself.
      */
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "synapse4j", name = "http-client", havingValue = "restclient", matchIfMissing = true)
     public HttpClient httpClient(ObjectProvider<RestClient.Builder> builders, Synapse4jProperties properties) {
         RestClient.Builder builder = builders.getIfAvailable(RestClient::builder);
-        return new RestClientHttpClient(builder.build(), properties.getHttp());
+        return new RestClientHttpClient(builder.build(), properties.getHttpOptions());
     }
 
     /**
@@ -94,7 +105,7 @@ public class Synapse4jAutoConfiguration {
      * one of the two and exactly one of them exists, both backing off before a transport the
      * application declares itself. The stock Apache client stands in as the delegate — its
      * execution chain, pool and all, is HttpClient 5's own — while the bound
-     * {@code synapse4j.http.*} options reach it exactly as they reach the Spring transport.
+     * {@code synapse4j.http-options.*} options reach it exactly as they reach the Spring transport.
      *
      * <p>
      * The starter keeps Apache HttpClient 5 itself off the application's classpath (the module is
@@ -124,83 +135,48 @@ public class Synapse4jAutoConfiguration {
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "synapse4j", name = "http-client", havingValue = "apache")
     public HttpClient apacheHttpClient(CloseableHttpClient transport, Synapse4jProperties properties) {
-        return new ApacheHttpClient(transport, properties.getHttp());
+        return new ApacheHttpClient(transport, properties.getHttpOptions());
     }
 
     /**
-     * The OpenAI family configuration, bound from {@code synapse4j.openai.*} onto the library's
-     * own type — the properties object and this bean are the same instance, so a default the
-     * binder never touched is exactly what the client sends. An application wanting to source the
-     * config elsewhere — its own properties, a vault — declares an {@link OpenAiConfig} bean and
-     * wins.
+     * The chat client the application talks to: the protocol {@code synapse4j.chat-client} names —
+     * the default completions one, Responses, or Anthropic's — wrapped in the tool-calling loop
+     * unless {@code synapse4j.auto-tool-calling} is off.
+     *
+     * <p>
+     * Declared as the interface, not the protocol's own type, because the loop wrapper is not one of
+     * them. A caller that needs the provider's surface — {@code setConfig}, say — declares its own
+     * {@link ChatClient} bean, and this whole default backs off.
      */
     @Bean
     @ConditionalOnMissingBean
-    public OpenAiConfig openAiConfig(Synapse4jProperties properties) {
-        return properties.getOpenai();
+    public ChatClient chatClient(HttpClient http, JsonCodec codec, Synapse4jProperties properties,
+            ObjectProvider<ChatCustomizer> chatCustomizers,
+            ObjectProvider<ChatClientCustomizer> clientCustomizers) {
+        ChatClient client = switch (properties.getChatClient()) {
+            case COMPLETIONS -> new OpenAiCompletionsChatClient(http, codec, properties.getOpenai());
+            case RESPONSES -> new OpenAiResponsesChatClient(http, codec, properties.getOpenai());
+            case ANTHROPIC -> new AnthropicChatClient(http, codec, properties.getAnthropic());
+        };
+        if (properties.isAutoToolCalling()) {
+            client = new ToolCallingChatClient(client);
+        }
+        return assemble(client, properties, chatCustomizers, clientCustomizers);
     }
 
     /**
-     * The Anthropic family configuration, bound from {@code synapse4j.anthropic.*} — the same
-     * arrangement as {@link #openAiConfig}: the properties object and this bean are the same
-     * instance, and an application sourcing it elsewhere declares an {@link AnthropicConfig} bean
-     * and wins.
+     * Brings a freshly built client into shape before it is shared: the bound {@code
+     * synapse4j.chat-options.*} become its default options, every {@link ChatCustomizer} bean joins
+     * its per-call hooks, and every {@link ChatClientCustomizer} bean then gets the last word.
+     * Applied here rather than through a constructor because the clients' own constructors are the
+     * library's API and take no options.
      */
-    @Bean
-    @ConditionalOnMissingBean
-    public AnthropicConfig anthropicConfig(Synapse4jProperties properties) {
-        return properties.getAnthropic();
-    }
-
-    /**
-     * The chat completions client — the default, taken when {@code synapse4j.chat-client} names
-     * no value or names this one. Declared as its concrete type so a caller may reach the
-     * OpenAI-specific surface, but the missing-bean condition watches the interface: a client of
-     * the application's own — another provider, a decorator — is the whole answer and this one
-     * never comes into being.
-     */
-    @Bean
-    @ConditionalOnMissingBean(ChatClient.class)
-    @ConditionalOnProperty(prefix = "synapse4j", name = "chat-client", havingValue = "completions", matchIfMissing = true)
-    public OpenAiCompletionsChatClient openAiCompletionsChatClient(HttpClient http, JsonCodec codec,
-            OpenAiConfig config, Synapse4jProperties properties) {
-        return withDefaultOptions(new OpenAiCompletionsChatClient(http, codec, config), properties);
-    }
-
-    /**
-     * The Responses client, the other OpenAI protocol {@code synapse4j.chat-client} can name:
-     * the property names one protocol, exactly one of the three beans exists, and all watch the
-     * interface the same way, so an application's own {@link ChatClient} wins over any of them.
-     */
-    @Bean
-    @ConditionalOnMissingBean(ChatClient.class)
-    @ConditionalOnProperty(prefix = "synapse4j", name = "chat-client", havingValue = "responses")
-    public OpenAiResponsesChatClient openAiResponsesChatClient(HttpClient http, JsonCodec codec,
-            OpenAiConfig config, Synapse4jProperties properties) {
-        return withDefaultOptions(new OpenAiResponsesChatClient(http, codec, config), properties);
-    }
-
-    /**
-     * The Anthropic Messages client, the third value {@code synapse4j.chat-client} takes — a
-     * second provider over the same {@link ChatClient} interface, under its own config bound from
-     * {@code synapse4j.anthropic.*}. The same missing-bean condition as the OpenAI pair: an
-     * application's own client is the whole answer and this one never comes into being.
-     */
-    @Bean
-    @ConditionalOnMissingBean(ChatClient.class)
-    @ConditionalOnProperty(prefix = "synapse4j", name = "chat-client", havingValue = "anthropic")
-    public AnthropicChatClient anthropicChatClient(HttpClient http, JsonCodec codec,
-            AnthropicConfig config, Synapse4jProperties properties) {
-        return withDefaultOptions(new AnthropicChatClient(http, codec, config), properties);
-    }
-
-    /**
-     * Applies the bound chat options to a freshly built client, so every call it makes inherits the
-     * standing model, temperature or response format. Applied here rather than through a constructor
-     * because the clients' own constructors are the library's API and take no options.
-     */
-    private static <T extends ChatClient> T withDefaultOptions(T client, Synapse4jProperties properties) {
+    private static ChatClient assemble(ChatClient client, Synapse4jProperties properties,
+            ObjectProvider<ChatCustomizer> chatCustomizers,
+            ObjectProvider<ChatClientCustomizer> clientCustomizers) {
         client.setDefaultOptions(properties.getChatOptions().toChatOptions());
+        chatCustomizers.orderedStream().forEach(client::addChatCustomizer);
+        clientCustomizers.orderedStream().forEach(customizer -> customizer.customize(client));
         return client;
     }
 

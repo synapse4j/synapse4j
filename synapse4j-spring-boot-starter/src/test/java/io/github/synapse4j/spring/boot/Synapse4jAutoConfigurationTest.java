@@ -11,7 +11,9 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -25,6 +27,8 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import io.github.synapse4j.anthropic.AnthropicChatClient;
 import io.github.synapse4j.anthropic.AnthropicConfig;
 import io.github.synapse4j.chat.ChatClient;
+import io.github.synapse4j.chat.ChatCustomizer;
+import io.github.synapse4j.chat.ToolCallingChatClient;
 import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.exception.SynapseException;
@@ -54,15 +58,31 @@ class Synapse4jAutoConfigurationTest {
     void wiresTheWholeStackWithNoProperties() {
         runner.run(context -> {
             assertThat(context).hasSingleBean(ChatClient.class);
-            assertThat(context.getBean(ChatClient.class)).isInstanceOf(OpenAiCompletionsChatClient.class);
+            // The tool-calling loop is on by default, so the bean is the wrapper around the
+            // protocol client rather than the client itself.
+            assertThat(context.getBean(ChatClient.class)).isInstanceOf(ToolCallingChatClient.class);
             assertThat(context).hasSingleBean(JsonCodec.class);
             assertThat(context.getBean(JsonCodec.class)).isInstanceOf(JacksonJsonCodec.class);
             assertThat(context).hasSingleBean(HttpClient.class);
             assertThat(context.getBean(HttpClient.class)).isInstanceOf(RestClientHttpClient.class);
             // No property named a base URL, so the starter must leave the library's own default
             // alone — the failure mode is a null guard dropped and a blank URL going out.
-            assertThat(context.getBean(OpenAiConfig.class).getBaseUrl())
+            assertThat(context.getBean(Synapse4jProperties.class).getOpenai().getBaseUrl())
                     .isEqualTo(new OpenAiConfig().getBaseUrl());
+            // The family configs live in the properties bean, not republished as beans of their
+            // own: one instance of each, nothing to drift.
+            assertThat(context).doesNotHaveBean(OpenAiConfig.class);
+            assertThat(context).doesNotHaveBean(AnthropicConfig.class);
+        });
+    }
+
+    @Test
+    void theProtocolClientIsCompletionsByDefault() {
+        // The loop is off so the protocol client itself shows, which is the only way to see which
+        // protocol the default picked.
+        runner.withPropertyValues("synapse4j.auto-tool-calling=false").run(context -> {
+            assertThat(context).hasSingleBean(ChatClient.class);
+            assertThat(context.getBean(ChatClient.class)).isInstanceOf(OpenAiCompletionsChatClient.class);
         });
     }
 
@@ -70,18 +90,19 @@ class Synapse4jAutoConfigurationTest {
     void selectsTheResponsesClientFromItsProperty() {
         // The key and its values are the starter's public contract, like every other key bound
         // here: a rename silently reverts every application that asked for Responses back to
-        // the default client, and no other test would notice.
-        runner.withPropertyValues("synapse4j.chat-client=responses").run(context -> {
-            assertThat(context).hasSingleBean(ChatClient.class);
-            assertThat(context.getBean(ChatClient.class)).isInstanceOf(OpenAiResponsesChatClient.class);
-        });
+        // the default client, and no other test would notice. The loop is off so the protocol
+        // client itself shows.
+        runner.withPropertyValues("synapse4j.chat-client=responses", "synapse4j.auto-tool-calling=false")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(ChatClient.class);
+                    assertThat(context.getBean(ChatClient.class)).isInstanceOf(OpenAiResponsesChatClient.class);
+                });
     }
 
     @Test
     void anUnknownChatClientValueFailsTheContext() {
-        // The conditions alone would answer an unknown value by building no client at all — a
-        // missing-bean error far away from the typo. The binding is what refuses it here, at
-        // startup, with the property named.
+        // The switch has no case for an unknown value — it would be a missing-bean error far away
+        // from the typo. The binding is what refuses it here, at startup, with the property named.
         runner.withPropertyValues("synapse4j.chat-client=bogus")
                 .run(context -> assertThat(context).hasFailed());
     }
@@ -90,10 +111,11 @@ class Synapse4jAutoConfigurationTest {
     void selectsTheAnthropicClientFromItsProperty() {
         // The value is part of the same contract as the key: a rename silently falls every
         // application that asked for Anthropic back to the default client.
-        runner.withPropertyValues("synapse4j.chat-client=anthropic").run(context -> {
-            assertThat(context).hasSingleBean(ChatClient.class);
-            assertThat(context.getBean(ChatClient.class)).isInstanceOf(AnthropicChatClient.class);
-        });
+        runner.withPropertyValues("synapse4j.chat-client=anthropic", "synapse4j.auto-tool-calling=false")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(ChatClient.class);
+                    assertThat(context.getBean(ChatClient.class)).isInstanceOf(AnthropicChatClient.class);
+                });
     }
 
     @Test
@@ -132,7 +154,7 @@ class Synapse4jAutoConfigurationTest {
                     // The property names are the starter's public contract: a renamed key here
                     // breaks every application's configuration while every test but this one
                     // stays green.
-                    OpenAiConfig config = context.getBean(OpenAiConfig.class);
+                    OpenAiConfig config = context.getBean(Synapse4jProperties.class).getOpenai();
                     assertThat(config.getApiKey()).isEqualTo("sk-test");
                     assertThat(config.getBaseUrl()).isEqualTo("https://example.test/v1");
                     assertThat(config.getOrganization()).isEqualTo("org-1");
@@ -149,7 +171,7 @@ class Synapse4jAutoConfigurationTest {
                 .run(context -> {
                     // Same contract as the OpenAI binding test above: the property names are
                     // what applications configure against.
-                    AnthropicConfig config = context.getBean(AnthropicConfig.class);
+                    AnthropicConfig config = context.getBean(Synapse4jProperties.class).getAnthropic();
                     assertThat(config.getApiKey()).isEqualTo("sk-ant-test");
                     assertThat(config.getBaseUrl()).isEqualTo("https://example.test/v1");
                     assertThat(config.getAnthropicVersion()).isEqualTo("2023-06-01-custom");
@@ -157,14 +179,51 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void bindsHttpProperties() {
+    void bindsHttpOptionsProperties() {
         runner.withPropertyValues(
-                "synapse4j.http.max-frame-bytes=8192",
-                "synapse4j.http.body-write-mode=buffered")
+                "synapse4j.http-options.max-frame-bytes=8192",
+                "synapse4j.http-options.body-write-mode=buffered")
                 .run(context -> {
-                    HttpOptions http = context.getBean(Synapse4jProperties.class).getHttp();
+                    HttpOptions http = context.getBean(Synapse4jProperties.class).getHttpOptions();
                     assertThat(http.getMaxFrameBytes()).isEqualTo(8192);
                     assertThat(http.getBodyWriteMode()).isEqualTo("buffered");
+                });
+    }
+
+    @Test
+    void chatCustomizerBeansRunOnEveryCall() {
+        List<String> ran = new ArrayList<>();
+        runner.withPropertyValues(
+                "synapse4j.openai.api-key=sk-test",
+                "synapse4j.chat-options.model=gpt-4o")
+                .withBean(HttpClient.class, StubHttpClient::new)
+                .withBean(ChatCustomizer.class, () -> new ChatCustomizer() {
+                    @Override
+                    public void customizeRequest(ChatClient client, ChatRequest request) {
+                        ran.add("ran");
+                    }
+                })
+                .run(context -> {
+                    context.getBean(ChatClient.class).chat(new ChatRequest().addUserMessage("hi"));
+                    assertThat(ran).containsExactly("ran");
+                });
+    }
+
+    @Test
+    void aChatClientCustomizerHasTheLastWordOverTheBoundOptions() {
+        StubHttpClient transport = new StubHttpClient();
+        runner.withPropertyValues(
+                "synapse4j.openai.api-key=sk-test",
+                "synapse4j.chat-options.model=from-properties")
+                .withBean(HttpClient.class, () -> transport)
+                .withBean(ChatClientCustomizer.class, () -> client -> {
+                    ChatOptions options = new ChatOptions();
+                    options.setModel("from-customizer");
+                    client.setDefaultOptions(options);
+                })
+                .run(context -> {
+                    context.getBean(ChatClient.class).chat(new ChatRequest().addUserMessage("hi"));
+                    assertThat(transport.capturedBody).contains("\"model\":\"from-customizer\"");
                 });
     }
 
