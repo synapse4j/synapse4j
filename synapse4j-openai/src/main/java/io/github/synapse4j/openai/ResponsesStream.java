@@ -38,10 +38,10 @@ import org.jspecify.annotations.Nullable;
  * reader opened over each payload's bytes, and the end of the body.
  *
  * <p>
- * The fold is what makes a streamed answer the same answer a blocking call returns: the fragments
- * are accumulated the way the reader reads a single response, and the frames that carry the whole
- * response replace what the fragments built with the complete turn. So a turn that arrived as twenty
- * text fragments ends up as the one message a single response would have carried.
+ * The fold is what turns the frames back into a turn: the fragments are accumulated the way the
+ * reader reads a single response, and the frames that carry the whole response replace what the
+ * fragments built with the complete turn. So a turn that arrived as twenty text fragments ends up as
+ * the one message a single response would have carried.
  *
  * <p>
  * One instance per exchange, built by {@link OpenAiResponsesChatClient} while the response is open;

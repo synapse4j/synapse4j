@@ -25,7 +25,7 @@ import io.github.synapse4j.json.JsonWriter;
  *
  * <p>
  * A streamed answer asks for it with a {@code stream} member of its own; the frames become events
- * one for one, and the fold makes the assembled answer the same answer a blocking call returns.
+ * one for one, and the fold assembles them back into the turn a blocking call returns.
  */
 public class OpenAiResponsesChatClient extends AbstractOpenAiChatClient {
 

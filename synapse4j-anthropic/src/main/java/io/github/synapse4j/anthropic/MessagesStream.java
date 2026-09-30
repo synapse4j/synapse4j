@@ -41,9 +41,9 @@ import org.jspecify.annotations.Nullable;
  * payload's bytes, and the terminal frame that ends the answer.
  *
  * <p>
- * The fold is what makes a streamed answer the same answer a blocking call returns. This protocol
- * brackets every block with a start and a stop frame, and the fold uses that grammar rather than
- * guessing: the frame that opens a block births the block's part outright and registers it under
+ * The fold is what turns the frames back into a turn. This protocol brackets every block with a
+ * start and a stop frame, and the fold uses that grammar rather than guessing: the frame that opens
+ * a block births the block's part outright and registers it under
  * the block's index, and every delta joins the part its own index names — so one block is one part,
  * however many frames it took, and two adjacent blocks never merge into one. Tool input arrives as
  * fragments of JSON text

@@ -39,9 +39,9 @@ import org.jspecify.annotations.Nullable;
  * over each payload's bytes, and the sentinel frame that ends the answer.
  *
  * <p>
- * The fold is what makes a streamed answer the same answer a blocking call returns: it sums the
- * fragments the way {@link CompletionsReader} reads them, so a turn that arrived as twenty
- * chunks ends up as the one message, and the one tool call, a single response would have carried.
+ * The fold is what turns the fragments back into a turn: it sums them the way
+ * {@link CompletionsReader} reads them, so a turn that arrived as twenty chunks ends up as the one
+ * message, and the one tool call, a single response would have carried.
  *
  * <p>
  * One instance per exchange, built by {@link OpenAiCompletionsChatClient} while the response is open; closing

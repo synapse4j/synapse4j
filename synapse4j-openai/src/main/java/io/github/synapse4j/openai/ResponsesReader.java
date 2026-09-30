@@ -389,8 +389,8 @@ class ResponsesReader {
         event.setModel(whole.getModel());
         event.setUsage(whole.getUsage());
         event.setFinishReason(whole.getFinishReason());
-        // The response's unmodelled members travel with it, so the fold assembles the extras a
-        // blocking call would have kept — the answer must not depend on which way it was asked for.
+        // The response's unmodelled members travel with it, so the fold takes this protocol's own
+        // extras from the frames that carry the whole response rather than from the fragments.
         event.getExtras().putAll(whole.getExtras());
         // The whole turn, not a fragment: the fold replaces what the fragments built with it.
         event.setDelta(whole.getMessage());
