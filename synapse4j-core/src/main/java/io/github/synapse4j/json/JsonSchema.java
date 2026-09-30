@@ -2,13 +2,17 @@ package io.github.synapse4j.json;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.exception.SynapseException;
 import org.jspecify.annotations.Nullable;
 
 import lombok.Getter;
@@ -166,13 +170,25 @@ public class JsonSchema {
      * during the walk is not visited, and one removed during the walk is still walked through. That
      * also means the walk cannot be stopped early by removing the schema it is at.
      *
+     * <p>
+     * A schema reached through two different paths is visited twice, being the same object either
+     * way. One that contains itself has no walk at all, and is refused.
+     *
      * @param visitor what to do with each schema; must not be {@code null}
+     * @throws SynapseException if this schema contains itself
      */
     public void visit(@NonNull Consumer<JsonSchema> visitor) {
+        visit(visitor, Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private void visit(Consumer<JsonSchema> visitor, Set<JsonSchema> path) {
+        requireNotCyclic(path);
+        path.add(this);
         visitor.accept(this);
         for (JsonSchema subSchema : subSchemas()) {
-            subSchema.visit(visitor);
+            subSchema.visit(visitor, path);
         }
+        path.remove(this);
     }
 
     /**
@@ -210,9 +226,20 @@ public class JsonSchema {
      * stands; an open entry whose name is a keyword this class models is ignored, so a field always
      * wins over the open part.
      *
+     * <p>
+     * A schema reached through two different paths is written out at each of them, JSON having no way
+     * to share one. One that contains itself has no document at all, and is refused.
+     *
      * @return the schema as a map; never {@code null}
+     * @throws SynapseException if this schema contains itself
      */
     public Map<String, Object> toMap() {
+        return toMap(Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private Map<String, Object> toMap(Set<JsonSchema> path) {
+        requireNotCyclic(path);
+        path.add(this);
         Map<String, Object> map = new LinkedHashMap<>();
         if (!type.isEmpty()) {
             map.put(TYPE, type.size() == 1 ? type.get(0) : new ArrayList<>(type));
@@ -224,13 +251,13 @@ public class JsonSchema {
             map.put(DESCRIPTION, description);
         }
         if (!properties.isEmpty()) {
-            map.put(PROPERTIES, nestedMaps(properties));
+            map.put(PROPERTIES, nestedMaps(properties, path));
         }
         if (!required.isEmpty()) {
             map.put(REQUIRED, new ArrayList<>(required));
         }
         if (items != null) {
-            map.put(ITEMS, items.toMap());
+            map.put(ITEMS, items.toMap(path));
         }
         if (additionalProperties != null) {
             map.put(ADDITIONAL_PROPERTIES, additionalProperties);
@@ -239,23 +266,48 @@ public class JsonSchema {
             map.put(ENUM, new ArrayList<>(enumValues));
         }
         if (!defs.isEmpty()) {
-            map.put(DEFS, nestedMaps(defs));
+            map.put(DEFS, nestedMaps(defs, path));
         }
         if (ref != null) {
             map.put(REF, ref);
         }
         if (!anyOf.isEmpty()) {
-            map.put(ANY_OF, nestedMaps(anyOf));
+            map.put(ANY_OF, nestedMaps(anyOf, path));
         }
         if (!oneOf.isEmpty()) {
-            map.put(ONE_OF, nestedMaps(oneOf));
+            map.put(ONE_OF, nestedMaps(oneOf, path));
         }
         if (!allOf.isEmpty()) {
-            map.put(ALL_OF, nestedMaps(allOf));
+            map.put(ALL_OF, nestedMaps(allOf, path));
         }
         // The open part fills only what no field claimed: a modelled keyword always wins.
         extras.nestedMap().forEach(map::putIfAbsent);
+        path.remove(this);
         return map;
+    }
+
+    /**
+     * Refuses a schema that contains itself. A recursive schema is spelled with {@code $ref} — a
+     * string here — so a graph that cycles can only come of nesting one of these objects inside
+     * itself, and neither a walk nor a JSON document has an answer for that.
+     */
+    private void requireNotCyclic(Set<JsonSchema> path) {
+        if (path.contains(this)) {
+            throw new SynapseException(
+                    "the schema contains itself (" + describe() + "): a recursive schema is spelled with "
+                            + "$ref, and a schema graph that cycles has no JSON document");
+        }
+    }
+
+    /** Names this schema for an error message, without going through {@link #toString()}. */
+    private String describe() {
+        if (ref != null) {
+            return "$ref " + ref;
+        }
+        if (title != null) {
+            return "titled " + title;
+        }
+        return "no $ref and no title";
     }
 
     /**
@@ -380,15 +432,15 @@ public class JsonSchema {
         extras.put(keyword, value);
     }
 
-    private static Map<String, Object> nestedMaps(Map<String, JsonSchema> schemas) {
+    private static Map<String, Object> nestedMaps(Map<String, JsonSchema> schemas, Set<JsonSchema> path) {
         Map<String, Object> maps = new LinkedHashMap<>();
-        schemas.forEach((name, schema) -> maps.put(name, schema.toMap()));
+        schemas.forEach((name, schema) -> maps.put(name, schema.toMap(path)));
         return maps;
     }
 
-    private static List<Object> nestedMaps(Collection<JsonSchema> schemas) {
+    private static List<Object> nestedMaps(Collection<JsonSchema> schemas, Set<JsonSchema> path) {
         List<Object> maps = new ArrayList<>();
-        schemas.forEach(schema -> maps.add(schema.toMap()));
+        schemas.forEach(schema -> maps.add(schema.toMap(path)));
         return maps;
     }
 

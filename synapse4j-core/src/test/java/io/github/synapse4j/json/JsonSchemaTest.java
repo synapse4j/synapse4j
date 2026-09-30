@@ -2,12 +2,14 @@ package io.github.synapse4j.json;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import io.github.synapse4j.exception.SynapseException;
 import org.junit.jupiter.api.Test;
 
 class JsonSchemaTest {
@@ -169,6 +171,38 @@ class JsonSchemaTest {
     @Test
     void toStringRendersTheDocumentShape() {
         assertEquals("JsonSchema{type=object}", typed("object").toString());
+    }
+
+    @Test
+    void aSchemaThatContainsItselfIsRefused() {
+        // A recursive schema is spelled with $ref, so a graph that cycles is a hand-built mistake:
+        // without the guard, both the walk and the document recurse until the stack is gone.
+        JsonSchema schema = typed("object");
+        JsonSchema inner = typed("object");
+        schema.getProperties().put("inner", inner);
+        inner.getProperties().put("parent", schema);
+
+        assertThrows(SynapseException.class, schema::toMap);
+        assertThrows(SynapseException.class, () -> schema.visit(each -> {
+        }));
+    }
+
+    @Test
+    void aSubSchemaReachedTwiceIsWrittenAndVisitedAtEachPath() {
+        // The guard follows the path, not everything already seen: JSON has no way to share one, so
+        // a node reached through two paths is written out at both and walked at both.
+        JsonSchema shared = typed("string");
+        JsonSchema schema = new JsonSchema();
+        schema.getProperties().put("first", shared);
+        schema.getProperties().put("second", shared);
+
+        assertEquals(Map.of("properties",
+                Map.of("first", Map.of("type", "string"), "second", Map.of("type", "string"))),
+                schema.toMap());
+
+        List<JsonSchema> visited = new ArrayList<>();
+        schema.visit(visited::add);
+        assertEquals(List.of(schema, shared, shared), visited);
     }
 
     private static JsonSchema typed(String type) {
