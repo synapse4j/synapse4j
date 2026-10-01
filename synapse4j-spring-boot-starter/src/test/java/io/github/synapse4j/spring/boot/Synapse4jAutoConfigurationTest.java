@@ -283,6 +283,22 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
+    void theStandingSystemMessageReachesTheWire() {
+        StubHttpClient transport = new StubHttpClient();
+        runner.withPropertyValues(
+                "synapse4j.openai.api-key=sk-test",
+                "synapse4j.chat-options.model=gpt-4o",
+                "synapse4j.system-message=You are terse.")
+                .withBean(HttpClient.class, () -> transport)
+                .run(context -> {
+                    // The key is the starter's public contract: a renamed one silently stops framing
+                    // every call, and no other test would notice.
+                    context.getBean(ChatClient.class).chat(new ChatRequest().addUserMessage("hi"));
+                    assertThat(transport.capturedBody).contains("You are terse.");
+                });
+    }
+
+    @Test
     void aChatClientCustomizerHasTheLastWordOverTheBoundOptions() {
         StubHttpClient transport = new StubHttpClient();
         runner.withPropertyValues(

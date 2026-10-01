@@ -39,6 +39,7 @@ synapse4j:
   chat-client: completions        # completions（默认） | responses | anthropic
   http-client: restclient         # restclient（默认） | apache
   auto-tool-calling: true
+  system-message: 你是一个简洁的助手。
   openai:
     api-key: ${OPENAI_API_KEY}
   anthropic:
@@ -57,6 +58,9 @@ synapse4j:
 的值需要 YAML——`.properties` 文件会把每个值都变成字符串。
 
 每个 `synapse4j.*` 键都有配置元数据，因此 IDE 会补全它们。`synapse4j.enabled` 会关掉整个自动配置。
+
+`synapse4j.system-message` 会为每个没有自带系统消息的调用补上一条内容为该文本的系统消息；自带
+系统消息的调用保持原样。
 
 ## 使用
 

@@ -1,6 +1,7 @@
 package io.github.synapse4j.spring.boot;
 
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
@@ -86,6 +87,13 @@ public class Synapse4jProperties {
     // silently vanish from the configuration metadata.
     @NestedConfigurationProperty
     private final AnthropicConfig anthropic = new AnthropicConfig();
+
+    /**
+     * A system message every auto-configured call runs under: instructions the model answers under,
+     * given to each request that carries no system message of its own. Absent by default, so no
+     * standing system message is sent until one is named here.
+     */
+    private @Nullable String systemMessage;
 
     /**
      * The defaults every auto-configured call inherits from, filling in what each request leaves

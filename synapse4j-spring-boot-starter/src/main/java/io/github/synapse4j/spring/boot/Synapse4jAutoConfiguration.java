@@ -1,5 +1,7 @@
 package io.github.synapse4j.spring.boot;
 
+import java.util.Objects;
+
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.springframework.beans.factory.ObjectProvider;
@@ -15,12 +17,14 @@ import org.springframework.context.annotation.Condition;
 import org.springframework.context.annotation.ConditionContext;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.web.client.RestClient;
 
 import io.github.synapse4j.anthropic.AnthropicChatClient;
 import io.github.synapse4j.chat.ChatClient;
 import io.github.synapse4j.chat.ChatCustomizer;
+import io.github.synapse4j.chat.DefaultSystemMessageCustomizer;
 import io.github.synapse4j.chat.ToolCallingChatClient;
 import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.apache.ApacheHttpClient;
@@ -71,6 +75,12 @@ import tools.jackson.databind.json.JsonMapper;
 @ConditionalOnProperty(prefix = "synapse4j", name = "enabled", havingValue = "true", matchIfMissing = true)
 @EnableConfigurationProperties(Synapse4jProperties.class)
 public class Synapse4jAutoConfiguration {
+
+    /**
+     * The order the starter's own {@link ChatCustomizer}s are given, so an application can place one
+     * of its own before or after them deliberately — a higher order runs later.
+     */
+    private static final int ORDER = 0;
 
     /**
      * The codec the whole stack serializes through, over the application's own {@code JsonMapper}
@@ -229,6 +239,29 @@ public class Synapse4jAutoConfiguration {
             client = new ToolCallingChatClient(client);
         }
         return assemble(client, properties, chatCustomizers, clientCustomizers);
+    }
+
+    /**
+     * The standing system message {@code synapse4j.system-message} names, as a
+     * {@link ChatCustomizer} bean: it fills a system message into each call that carries none, so
+     * the application's framing need not be restated per request. Declared only when the property is
+     * set — an application that names none wires none, and one that wants a different rule declares
+     * a customizer of its own, which runs beside this one and has the last word on any request it
+     * frames.
+     *
+     * <p>
+     * Ordered at {@link #ORDER}, so an application can place a customizer of its own before or after
+     * this one deliberately — a higher order runs later and so has the last word.
+     *
+     * <p>
+     * The condition is what guarantees the value is set; the narrowing makes the nullable getter
+     * meet the constructor's non-null contract.
+     */
+    @Bean
+    @Order(ORDER)
+    @ConditionalOnProperty(prefix = "synapse4j", name = "system-message")
+    public ChatCustomizer systemMessageCustomizer(Synapse4jProperties properties) {
+        return new DefaultSystemMessageCustomizer(Objects.requireNonNull(properties.getSystemMessage()));
     }
 
     /**

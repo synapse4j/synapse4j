@@ -40,6 +40,7 @@ synapse4j:
   chat-client: completions        # completions (default) | responses | anthropic
   http-client: restclient         # restclient (default) | apache
   auto-tool-calling: true
+  system-message: You are a concise assistant.
   openai:
     api-key: ${OPENAI_API_KEY}
   anthropic:
@@ -60,6 +61,9 @@ provider's own wire name, and a dotted key addresses a nested member. A non-stri
 
 Every `synapse4j.*` key has configuration metadata, so your IDE completes them. `synapse4j.enabled`
 turns the whole auto-configuration off.
+
+`synapse4j.system-message` gives every call that carries no system message of its own one saying
+that text; a call that states its own keeps it.
 
 ## Using it
 
