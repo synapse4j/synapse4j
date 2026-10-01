@@ -8,7 +8,7 @@ import io.github.synapse4j.chat.ChatCustomizer;
  * way Boot's own {@code *Customizer} types work.
  *
  * <p>
- * Every such bean is applied in order, after the {@code synapse4j.chat-options.*} defaults, so code
+ * Every such bean is applied in order, after the {@code synapse4j.chat.options.*} defaults, so code
  * has the last word on what a client sends: a customizer can replace the default options, register
  * standing tools or tool providers, or add a {@link ChatCustomizer} whose hooks run on every call.
  * A client the application declares itself is its own wiring, so these customizers never touch it.

@@ -82,7 +82,7 @@ class Synapse4jAutoConfigurationTest {
     void theProtocolClientIsCompletionsByDefault() {
         // The loop is off so the protocol client itself shows, which is the only way to see which
         // protocol the default picked.
-        runner.withPropertyValues("synapse4j.auto-tool-calling=false").run(context -> {
+        runner.withPropertyValues("synapse4j.chat.auto-tool-calling=false").run(context -> {
             assertThat(context).hasSingleBean(ChatClient.class);
             assertThat(context.getBean(ChatClient.class)).isInstanceOf(OpenAiCompletionsChatClient.class);
         });
@@ -94,7 +94,7 @@ class Synapse4jAutoConfigurationTest {
         // here: a rename silently reverts every application that asked for Responses back to
         // the default client, and no other test would notice. The loop is off so the protocol
         // client itself shows.
-        runner.withPropertyValues("synapse4j.chat-client=responses", "synapse4j.auto-tool-calling=false")
+        runner.withPropertyValues("synapse4j.chat.client=responses", "synapse4j.chat.auto-tool-calling=false")
                 .run(context -> {
                     assertThat(context).hasSingleBean(ChatClient.class);
                     assertThat(context.getBean(ChatClient.class)).isInstanceOf(OpenAiResponsesChatClient.class);
@@ -105,7 +105,7 @@ class Synapse4jAutoConfigurationTest {
     void anUnknownChatClientValueFailsTheContext() {
         // The switch has no case for an unknown value — it would be a missing-bean error far away
         // from the typo. The binding is what refuses it here, at startup, with the property named.
-        runner.withPropertyValues("synapse4j.chat-client=bogus")
+        runner.withPropertyValues("synapse4j.chat.client=bogus")
                 .run(context -> assertThat(context).hasFailed());
     }
 
@@ -113,7 +113,7 @@ class Synapse4jAutoConfigurationTest {
     void selectsTheAnthropicClientFromItsProperty() {
         // The value is part of the same contract as the key: a rename silently falls every
         // application that asked for Anthropic back to the default client.
-        runner.withPropertyValues("synapse4j.chat-client=anthropic", "synapse4j.auto-tool-calling=false")
+        runner.withPropertyValues("synapse4j.chat.client=anthropic", "synapse4j.chat.auto-tool-calling=false")
                 .run(context -> {
                     assertThat(context).hasSingleBean(ChatClient.class);
                     assertThat(context.getBean(ChatClient.class)).isInstanceOf(AnthropicChatClient.class);
@@ -123,7 +123,7 @@ class Synapse4jAutoConfigurationTest {
     @Test
     void selectsTheApacheTransportFromItsProperty() {
         // The transport key and its values are the starter's public contract for the same
-        // reason the chat-client ones are: a rename reverts every application to the Spring
+        // reason the chat.client ones are: a rename reverts every application to the Spring
         // transport without a word.
         runner.withPropertyValues("synapse4j.http-client=apache").run(context -> {
             assertThat(context).hasSingleBean(HttpClient.class);
@@ -268,7 +268,7 @@ class Synapse4jAutoConfigurationTest {
         List<String> ran = new ArrayList<>();
         runner.withPropertyValues(
                 "synapse4j.openai.api-key=sk-test",
-                "synapse4j.chat-options.model=gpt-4o")
+                "synapse4j.chat.options.model=gpt-4o")
                 .withBean(HttpClient.class, StubHttpClient::new)
                 .withBean(ChatCustomizer.class, () -> new ChatCustomizer() {
                     @Override
@@ -287,8 +287,8 @@ class Synapse4jAutoConfigurationTest {
         StubHttpClient transport = new StubHttpClient();
         runner.withPropertyValues(
                 "synapse4j.openai.api-key=sk-test",
-                "synapse4j.chat-options.model=gpt-4o",
-                "synapse4j.system-message=You are terse.")
+                "synapse4j.chat.options.model=gpt-4o",
+                "synapse4j.chat.system-message=You are terse.")
                 .withBean(HttpClient.class, () -> transport)
                 .run(context -> {
                     // The key is the starter's public contract: a renamed one silently stops framing
@@ -303,7 +303,7 @@ class Synapse4jAutoConfigurationTest {
         StubHttpClient transport = new StubHttpClient();
         runner.withPropertyValues(
                 "synapse4j.openai.api-key=sk-test",
-                "synapse4j.chat-options.model=from-properties")
+                "synapse4j.chat.options.model=from-properties")
                 .withBean(HttpClient.class, () -> transport)
                 .withBean(ChatClientCustomizer.class, () -> client -> {
                     ChatOptions options = new ChatOptions();
@@ -319,18 +319,18 @@ class Synapse4jAutoConfigurationTest {
     @Test
     void bindsChatOptionsProperties() {
         runner.withPropertyValues(
-                "synapse4j.chat-options.model=gpt-4o",
-                "synapse4j.chat-options.temperature=0.3",
-                "synapse4j.chat-options.reasoning-effort=high",
-                "synapse4j.chat-options.response-format.type=json_schema",
-                "synapse4j.chat-options.response-format.schema={\"type\":\"object\"}",
-                "synapse4j.chat-options.headers.openai-beta=responses=v1",
-                "synapse4j.chat-options.extras.service_tier=flex")
+                "synapse4j.chat.options.model=gpt-4o",
+                "synapse4j.chat.options.temperature=0.3",
+                "synapse4j.chat.options.reasoning-effort=high",
+                "synapse4j.chat.options.response-format.type=json_schema",
+                "synapse4j.chat.options.response-format.schema={\"type\":\"object\"}",
+                "synapse4j.chat.options.headers.openai-beta=responses=v1",
+                "synapse4j.chat.options.extras.service_tier=flex")
                 .run(context -> {
                     // The keys are the starter's public contract, like every other key bound here:
                     // a renamed one silently drops the default an application configured.
                     ChatOptions options = context.getBean(Synapse4jProperties.class)
-                            .getChatOptions().toChatOptions();
+                            .getChat().getOptions().toChatOptions();
                     assertThat(options.getModel()).isEqualTo("gpt-4o");
                     assertThat(options.getTemperature()).isEqualTo(0.3);
                     assertThat(options.getReasoningEffort()).isEqualTo("high");
@@ -346,8 +346,8 @@ class Synapse4jAutoConfigurationTest {
         StubHttpClient transport = new StubHttpClient();
         runner.withPropertyValues(
                 "synapse4j.openai.api-key=sk-test",
-                "synapse4j.chat-options.model=gpt-4o",
-                "synapse4j.chat-options.temperature=0.3")
+                "synapse4j.chat.options.model=gpt-4o",
+                "synapse4j.chat.options.temperature=0.3")
                 .withBean(HttpClient.class, () -> transport)
                 .run(context -> {
                     // The default supplies the model the request never states — without it the call

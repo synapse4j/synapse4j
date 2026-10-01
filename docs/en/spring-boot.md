@@ -27,8 +27,8 @@ The default wiring is three beans, each backing off if you declare your own:
   exists, so `spring.jackson.*` and every `JsonMapperBuilderCustomizer` apply to the schemas sent
   to the model and to the JSON a model sends back.
 - **`HttpClient`** — the transport `synapse4j.http-client` names.
-- **`ChatClient`** — the protocol `synapse4j.chat-client` names, wrapped in `ToolCallingChatClient`
-  unless `synapse4j.auto-tool-calling` is off.
+- **`ChatClient`** — the protocol `synapse4j.chat.client` names, wrapped in `ToolCallingChatClient`
+  unless `synapse4j.chat.auto-tool-calling` is off.
 
 Selecting the Apache transport adds a fourth bean, the `CloseableHttpClient` holding the connection
 pool. It steps aside when you declare a `CloseableHttpClient` or an `HttpClient` of your own.
@@ -37,33 +37,37 @@ pool. It steps aside when you declare a `CloseableHttpClient` or an `HttpClient`
 
 ```yaml
 synapse4j:
-  chat-client: completions        # completions (default) | responses | anthropic
   http-client: restclient         # restclient (default) | apache
-  auto-tool-calling: true
-  system-message: You are a concise assistant.
   openai:
     api-key: ${OPENAI_API_KEY}
   anthropic:
     api-key: ${ANTHROPIC_API_KEY}
-  chat-options:
-    model: gpt-4o-mini
-    temperature: 0.2
+  chat:
+    client: completions           # completions (default) | responses | anthropic
+    auto-tool-calling: true
+    system-message: You are a concise assistant.
+    options:
+      model: gpt-4o-mini
+      temperature: 0.2
 ```
 
-The `synapse4j.*` keys group by what they configure: `synapse4j.openai.*` binds `OpenAiConfig`,
-`synapse4j.anthropic.*` binds `AnthropicConfig`, `synapse4j.chat-options.*` binds
-`ChatOptionsProperties`, the starter's mirror of `ChatOptions` that `toChatOptions()` turns into the
-library type — the library type itself cannot be bound — and `synapse4j.http-options.*` binds
-`HttpOptions`. Each key is a field on the type it binds, documented there; the chat-options mirror
-restates only the fields Spring can bind. `chat-options.extras` binds raw keys: a key is the
-provider's own wire name, and a dotted key addresses a nested member. A non-string value needs YAML
-— a `.properties` file yields a string for every value.
+The `synapse4j.*` keys group by what they configure. The family settings — `synapse4j.openai.*`
+binds `OpenAiConfig`, `synapse4j.anthropic.*` binds `AnthropicConfig` — and the transport settings —
+`synapse4j.http-options.*` binds `HttpOptions` — sit at the root, because a capability shares them.
+Everything only a chat call has sits together under `synapse4j.chat.*`: `synapse4j.chat.client`,
+`synapse4j.chat.auto-tool-calling`, `synapse4j.chat.system-message`, and `synapse4j.chat.options.*`,
+which binds `ChatOptionsProperties`, the starter's mirror of `ChatOptions` that `toChatOptions()`
+turns into the library type — the library type itself cannot be bound. Each key is a field on the
+type it binds, documented there; the options mirror restates only the fields Spring can bind.
+`synapse4j.chat.options.extras` binds raw keys: a key is the provider's own wire name, and a dotted
+key addresses a nested member. A non-string value needs YAML — a `.properties` file yields a string
+for every value.
 
 Every `synapse4j.*` key has configuration metadata, so your IDE completes them. `synapse4j.enabled`
 turns the whole auto-configuration off.
 
-`synapse4j.system-message` gives every call that carries no system message of its own one saying
-that text; a call that states its own keeps it.
+`synapse4j.chat.system-message` gives every call that carries no system message of its own one
+saying that text; a call that states its own keeps it.
 
 ## Using it
 
@@ -88,7 +92,7 @@ class Assistant {
 Two kinds of bean shape the auto-configured client:
 
 - **`ChatCustomizer`** beans join its per-call hooks, so they run on every call.
-- **`ChatClientCustomizer`** beans run after the `synapse4j.chat-options.*` defaults and have the
+- **`ChatClientCustomizer`** beans run after the `synapse4j.chat.options.*` defaults and have the
   last word on the client's options and tools: they can replace the default options, register tools
   or tool providers, or add a `ChatCustomizer`.
 
@@ -107,9 +111,10 @@ ChatClientCustomizer tenantHeader(String tenant) {
 Both kinds are applied in `@Order` order.
 
 A customizer cannot change provider configuration — the base URL, the API key, the protocol's field
-spellings. `setConfig` is not on the `ChatClient` interface, and with `auto-tool-calling` on (the
-default) the customizer receives the `ToolCallingChatClient` wrapper, which exposes no delegate to
-reach through. Change the bound configuration instead. The starter hands each provider client the
+spellings. `setConfig` is not on the `ChatClient` interface, and with
+`synapse4j.chat.auto-tool-calling` on (the default) the customizer receives the
+`ToolCallingChatClient` wrapper, which exposes no delegate to reach through. Change the bound
+configuration instead. The starter hands each provider client the
 `OpenAiConfig` or `AnthropicConfig` instance held by the `Synapse4jProperties` bean, and a client
 reads its configuration afresh on every exchange, so changing that instance takes effect on the
 next call:

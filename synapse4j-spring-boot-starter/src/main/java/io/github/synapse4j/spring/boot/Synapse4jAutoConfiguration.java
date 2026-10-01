@@ -38,9 +38,9 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Wires a complete synapse4j stack into a Spring Boot application: the Jackson codec, the
  * transport and the chat client that join them — {@code synapse4j.http-client} picks between
- * the Spring and Apache transports, {@code synapse4j.chat-client} between the two OpenAI
+ * the Spring and Apache transports, {@code synapse4j.chat.client} between the two OpenAI
  * protocols and Anthropic's — with each family's config bound from its own properties and every
- * client's default options from {@code synapse4j.chat-options.*}.
+ * client's default options from {@code synapse4j.chat.options.*}.
  *
  * <p>
  * The family configs are taken straight from the properties bean rather than republished as beans
@@ -49,7 +49,7 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>
  * A built chat client is brought into shape before it is shared: it is wrapped in the tool-calling
- * loop unless {@code synapse4j.auto-tool-calling} is off, the bound chat options become its
+ * loop unless {@code synapse4j.chat.auto-tool-calling} is off, the bound chat options become its
  * defaults, every {@link ChatCustomizer} bean joins its per-call hooks, and every
  * {@link ChatClientCustomizer} bean then gets the last word.
  *
@@ -216,9 +216,9 @@ public class Synapse4jAutoConfiguration {
     }
 
     /**
-     * The chat client the application talks to: the protocol {@code synapse4j.chat-client} names —
+     * The chat client the application talks to: the protocol {@code synapse4j.chat.client} names —
      * the default completions one, Responses, or Anthropic's — wrapped in the tool-calling loop
-     * unless {@code synapse4j.auto-tool-calling} is off.
+     * unless {@code synapse4j.chat.auto-tool-calling} is off.
      *
      * <p>
      * Declared as the interface, not the protocol's own type, because the loop wrapper is not one of
@@ -230,19 +230,20 @@ public class Synapse4jAutoConfiguration {
     public ChatClient chatClient(HttpClient http, JsonCodec codec, Synapse4jProperties properties,
             ObjectProvider<ChatCustomizer> chatCustomizers,
             ObjectProvider<ChatClientCustomizer> clientCustomizers) {
-        ChatClient client = switch (properties.getChatClient()) {
+        ChatProperties chat = properties.getChat();
+        ChatClient client = switch (chat.getClient()) {
             case COMPLETIONS -> new OpenAiCompletionsChatClient(http, codec, properties.getOpenai());
             case RESPONSES -> new OpenAiResponsesChatClient(http, codec, properties.getOpenai());
             case ANTHROPIC -> new AnthropicChatClient(http, codec, properties.getAnthropic());
         };
-        if (properties.isAutoToolCalling()) {
+        if (chat.isAutoToolCalling()) {
             client = new ToolCallingChatClient(client);
         }
         return assemble(client, properties, chatCustomizers, clientCustomizers);
     }
 
     /**
-     * The standing system message {@code synapse4j.system-message} names, as a
+     * The standing system message {@code synapse4j.chat.system-message} names, as a
      * {@link ChatCustomizer} bean: it fills a system message into each call that carries none, so
      * the application's framing need not be restated per request. Declared only when the property is
      * set — an application that names none wires none, and one that wants a different rule declares
@@ -259,14 +260,15 @@ public class Synapse4jAutoConfiguration {
      */
     @Bean
     @Order(ORDER)
-    @ConditionalOnProperty(prefix = "synapse4j", name = "system-message")
+    @ConditionalOnProperty(prefix = "synapse4j.chat", name = "system-message")
     public ChatCustomizer systemMessageCustomizer(Synapse4jProperties properties) {
-        return new DefaultSystemMessageCustomizer(Objects.requireNonNull(properties.getSystemMessage()));
+        return new DefaultSystemMessageCustomizer(
+                Objects.requireNonNull(properties.getChat().getSystemMessage()));
     }
 
     /**
      * Brings a freshly built client into shape before it is shared: the bound {@code
-     * synapse4j.chat-options.*} become its default options, every {@link ChatCustomizer} bean joins
+     * synapse4j.chat.options.*} become its default options, every {@link ChatCustomizer} bean joins
      * its per-call hooks, and every {@link ChatClientCustomizer} bean then gets the last word.
      * Applied here rather than through a constructor because the clients' own constructors are the
      * library's API and take no options.
@@ -274,7 +276,7 @@ public class Synapse4jAutoConfiguration {
     private static ChatClient assemble(ChatClient client, Synapse4jProperties properties,
             ObjectProvider<ChatCustomizer> chatCustomizers,
             ObjectProvider<ChatClientCustomizer> clientCustomizers) {
-        client.setDefaultOptions(properties.getChatOptions().toChatOptions());
+        client.setDefaultOptions(properties.getChat().getOptions().toChatOptions());
         chatCustomizers.orderedStream().forEach(client::addChatCustomizer);
         clientCustomizers.orderedStream().forEach(customizer -> customizer.customize(client));
         return client;

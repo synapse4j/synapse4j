@@ -26,8 +26,8 @@ starter 需要 Spring Boot 4.1 或更新版本——这是它构建与测试所�
   `spring.jackson.*` 和每个 `JsonMapperBuilderCustomizer` 都作用于发给模型的 schema，以及模型发回
   的 JSON。
 - **`HttpClient`**——`synapse4j.http-client` 指定的传输层。
-- **`ChatClient`**——`synapse4j.chat-client` 指定的协议；除非 `synapse4j.auto-tool-calling` 关掉，
-  否则会包上 `ToolCallingChatClient`。
+- **`ChatClient`**——`synapse4j.chat.client` 指定的协议；除非 `synapse4j.chat.auto-tool-calling`
+  关掉，否则会包上 `ToolCallingChatClient`。
 
 选择 Apache 传输层会多出第四个 bean，即持有连接池的 `CloseableHttpClient`。你声明自己的
 `CloseableHttpClient` 或 `HttpClient` 时，它会退让。
@@ -36,31 +36,34 @@ starter 需要 Spring Boot 4.1 或更新版本——这是它构建与测试所�
 
 ```yaml
 synapse4j:
-  chat-client: completions        # completions（默认） | responses | anthropic
   http-client: restclient         # restclient（默认） | apache
-  auto-tool-calling: true
-  system-message: 你是一个简洁的助手。
   openai:
     api-key: ${OPENAI_API_KEY}
   anthropic:
     api-key: ${ANTHROPIC_API_KEY}
-  chat-options:
-    model: gpt-4o-mini
-    temperature: 0.2
+  chat:
+    client: completions           # completions（默认） | responses | anthropic
+    auto-tool-calling: true
+    system-message: 你是一个简洁的助手。
+    options:
+      model: gpt-4o-mini
+      temperature: 0.2
 ```
 
-`synapse4j.*` 的键按配置的内容分组：`synapse4j.openai.*` 绑定 `OpenAiConfig`，
-`synapse4j.anthropic.*` 绑定 `AnthropicConfig`，`synapse4j.chat-options.*` 绑定
-`ChatOptionsProperties`，即 starter 里 `ChatOptions` 的镜像，由 `toChatOptions()` 转成库里的类型
-——库里的类型本身无法绑定——而 `synapse4j.http-options.*` 绑定 `HttpOptions`。每个键都是它绑定的那个
-类型上的一个字段，含义在该类型上有文档；chat-options 这个镜像只重述 Spring 能绑定的字段。
-`chat-options.extras` 按原始键绑定：键写的就是协议里的字段名，点分键指向嵌套成员。非字符串
-的值需要 YAML——`.properties` 文件会把每个值都变成字符串。
+`synapse4j.*` 的键按配置的内容分组。厂商族的设置——`synapse4j.openai.*` 绑定 `OpenAiConfig`，
+`synapse4j.anthropic.*` 绑定 `AnthropicConfig`——和传输层的设置——`synapse4j.http-options.*` 绑定
+`HttpOptions`——放在根上，因为各能力共用它们。只有 chat 调用才有的东西收在 `synapse4j.chat.*`
+下面：`synapse4j.chat.client`、`synapse4j.chat.auto-tool-calling`、`synapse4j.chat.system-message`，
+以及 `synapse4j.chat.options.*`，它绑定 `ChatOptionsProperties`，即 starter 里 `ChatOptions` 的镜像，
+由 `toChatOptions()` 转成库里的类型——库里的类型本身无法绑定。每个键都是它绑定的那个类型上的一个
+字段，含义在该类型上有文档；options 这个镜像只重述 Spring 能绑定的字段。
+`synapse4j.chat.options.extras` 按原始键绑定：键写的就是协议里的字段名，点分键指向嵌套成员。
+非字符串的值需要 YAML——`.properties` 文件会把每个值都变成字符串。
 
 每个 `synapse4j.*` 键都有配置元数据，因此 IDE 会补全它们。`synapse4j.enabled` 会关掉整个自动配置。
 
-`synapse4j.system-message` 会为每个没有自带系统消息的调用补上一条内容为该文本的系统消息；自带
-系统消息的调用保持原样。
+`synapse4j.chat.system-message` 会为每个没有自带系统消息的调用补上一条内容为该文本的系统消息；
+自带系统消息的调用保持原样。
 
 ## 使用
 
@@ -85,7 +88,7 @@ class Assistant {
 两类 bean 塑造自动配置的客户端：
 
 - **`ChatCustomizer`** bean 加入它的每次调用钩子，因此每次调用都会运行。
-- **`ChatClientCustomizer`** bean 在 `synapse4j.chat-options.*` 默认值之后运行，对客户端的选项与
+- **`ChatClientCustomizer`** bean 在 `synapse4j.chat.options.*` 默认值之后运行，对客户端的选项与
   工具说了算：它们可以替换默认选项、注册工具或 `ToolProvider`，或添加一个 `ChatCustomizer`。
 
 ```java
@@ -103,10 +106,10 @@ ChatClientCustomizer tenantHeader(String tenant) {
 两类都按 `@Order` 顺序应用。
 
 customizer 改不了提供商配置——base URL、API key、协议字段的拼写。`setConfig` 不在 `ChatClient`
-接口上，而且 `auto-tool-calling` 打开时（默认如此），customizer 拿到的是 `ToolCallingChatClient`
-包装，它不暴露任何可以穿透的委托对象。要改就改绑定进来的配置：starter 交给每个提供商客户端的是
-`Synapse4jProperties` bean 持有的那个 `OpenAiConfig` 或 `AnthropicConfig` 实例，而客户端每次往来
-都会重新读取自己的配置，所以改动那个实例会在下一次调用生效：
+接口上，而且 `synapse4j.chat.auto-tool-calling` 打开时（默认如此），customizer 拿到的是
+`ToolCallingChatClient` 包装，它不暴露任何可以穿透的委托对象。要改就改绑定进来的配置：starter
+交给每个提供商客户端的是 `Synapse4jProperties` bean 持有的那个 `OpenAiConfig` 或 `AnthropicConfig`
+实例，而客户端每次往来都会重新读取自己的配置，所以改动那个实例会在下一次调用生效：
 
 ```java
 @Component

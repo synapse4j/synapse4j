@@ -2,7 +2,7 @@ package io.github.synapse4j.spring.boot;
 
 /**
  * The chat clients {@link Synapse4jAutoConfiguration} knows how to wire, as the values
- * {@code synapse4j.chat-client} accepts.
+ * {@code synapse4j.chat.client} accepts.
  *
  * <p>
  * A closed type is right here in a way it would not be in the library itself: the set is exactly

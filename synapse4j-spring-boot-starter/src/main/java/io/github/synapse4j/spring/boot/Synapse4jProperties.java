@@ -1,7 +1,6 @@
 package io.github.synapse4j.spring.boot;
 
 import lombok.Data;
-import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
@@ -15,15 +14,18 @@ import io.github.synapse4j.openai.OpenAiConfig;
  * The {@code synapse4j.*} settings this starter binds.
  *
  * <p>
- * The groups are the library's own configuration types held in place rather than restated:
- * {@code synapse4j.openai.*} lands on an {@link OpenAiConfig}, {@code synapse4j.anthropic.*} on
- * an {@link AnthropicConfig}, {@code synapse4j.http-options.*} on {@link HttpOptions}. Spring's binder
- * calls a setter only for a key the environment actually
- * carries, so every property a user does not set keeps the default the library's own instance
- * carries — and there is no second copy of these fields here that could drift from them.
+ * The keys group by what they configure. The family settings — {@code synapse4j.openai.*} on an
+ * {@link OpenAiConfig}, {@code synapse4j.anthropic.*} on an {@link AnthropicConfig} — and the
+ * transport settings — {@code synapse4j.http-options.*} on {@link HttpOptions} — are the library's
+ * own configuration types held in place rather than restated; they sit at the root because a
+ * capability shares them. What only a chat call has sits together under {@code synapse4j.chat.*}, on
+ * a {@link ChatProperties}, so a second capability adds a group of its own rather than keys a reader
+ * cannot tell from the chat ones. Spring's binder calls a setter only for a key the environment
+ * actually carries, so every property a user does not set keeps the default the library's own
+ * instance carries — and there is no second copy of these fields here that could drift from them.
  *
  * <p>
- * {@code synapse4j.chat-options.*} is the one exception, held as a {@link ChatOptionsProperties}
+ * {@code synapse4j.chat.options.*} is the one exception, held as a {@link ChatOptionsProperties}
  * rather than a {@link ChatOptions}: the library type cannot be bound, because its nested response
  * format and HTTP options are types from another jar the metadata processor will not recurse into,
  * and its {@link ProviderExtras} bag has no shape Spring can write into. The mirror restates only
@@ -48,32 +50,12 @@ public class Synapse4jProperties {
      */
     private boolean enabled = true;
 
-    /**
-     * Which chat client the auto-configuration builds: {@link ChatClientType#COMPLETIONS} (the
-     * default), {@link ChatClientType#RESPONSES}, or {@link ChatClientType#ANTHROPIC}. The client
-     * bean reads it to pick the protocol, and the binding is what refuses a value this starter does
-     * not wire, naming the property at startup.
-     */
-    private ChatClientType chatClient = ChatClientType.COMPLETIONS;
-
-    /**
-     * Whether the auto-configured chat client runs the model's tool-call rounds itself: it executes
-     * the tools a request carries and sends their results back until the model answers without
-     * calling one. Turned off, the raw calls reach the caller, which runs them itself.
-     */
-    private boolean autoToolCalling = true;
-
-    /**
-     * Which HTTP transport the auto-configuration builds: {@link HttpClientType#RESTCLIENT} (the
-     * default) or {@link HttpClientType#APACHE}.
-     *
-     * <p>
-     * Read as a Spring condition rather than from this instance — a condition evaluates before any
-     * bean of this type exists — and declared here so the selector appears in the generated
-     * configuration metadata. The binding still matters: it is what refuses a value this starter
-     * does not wire, naming the property at startup.
-     */
-    private HttpClientType httpClient = HttpClientType.RESTCLIENT;
+    /** Everything only a chat call has: the protocol, the tool loop, the framing and the defaults. */
+    // The marker earns its place here as it does on the family configs: without it the metadata
+    // processor can stop at the field and every synapse4j.chat.* key silently vanishes from the
+    // configuration metadata.
+    @NestedConfigurationProperty
+    private final ChatProperties chat = new ChatProperties();
 
     /** OpenAI family configuration: where the API lives and how the call authenticates. */
     // The marker earns its place: without it the metadata processor stops at the field, because a
@@ -89,18 +71,16 @@ public class Synapse4jProperties {
     private final AnthropicConfig anthropic = new AnthropicConfig();
 
     /**
-     * A system message every auto-configured call runs under: instructions the model answers under,
-     * given to each request that carries no system message of its own. Absent by default, so no
-     * standing system message is sent until one is named here.
+     * Which HTTP transport the auto-configuration builds: {@link HttpClientType#RESTCLIENT} (the
+     * default) or {@link HttpClientType#APACHE}.
+     *
+     * <p>
+     * Read as a Spring condition rather than from this instance — a condition evaluates before any
+     * bean of this type exists — and declared here so the selector appears in the generated
+     * configuration metadata. The binding still matters: it is what refuses a value this starter
+     * does not wire, naming the property at startup.
      */
-    private @Nullable String systemMessage;
-
-    /**
-     * The defaults every auto-configured call inherits from, filling in what each request leaves
-     * unstated.
-     */
-    @NestedConfigurationProperty
-    private final ChatOptionsProperties chatOptions = new ChatOptionsProperties();
+    private HttpClientType httpClient = HttpClientType.RESTCLIENT;
 
     /**
      * The transport's fallback options, for what a call does not state itself.

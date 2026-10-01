@@ -13,7 +13,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * The {@code synapse4j.chat-options.*} defaults every auto-configured client hands to its calls, so
+ * The {@code synapse4j.chat.options.*} defaults every auto-configured client hands to its calls, so
  * a standing model, temperature or response format need not be restated per request.
  *
  * <p>
