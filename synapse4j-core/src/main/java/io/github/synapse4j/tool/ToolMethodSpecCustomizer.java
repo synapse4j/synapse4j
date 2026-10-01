@@ -12,7 +12,7 @@ package io.github.synapse4j.tool;
  *
  * <p>
  * The parameters are reached through the spec, so a step that cares about one of them reads it off
- * {@link ToolMethodSpec#getParameters()}.
+ * the {@link ToolMethodSpec} it is handed.
  */
 @FunctionalInterface
 public interface ToolMethodSpecCustomizer {
