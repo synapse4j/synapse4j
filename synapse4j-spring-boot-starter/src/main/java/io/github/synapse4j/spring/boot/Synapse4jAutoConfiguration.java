@@ -68,8 +68,9 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>
  * Nothing here reaches for a secret or invents a default the library would not make itself: an
  * API key is whatever {@code synapse4j.openai.api-key} or {@code synapse4j.anthropic.api-key}
- * says (typically a placeholder for an environment variable), and a call made without one fails
- * exactly as it fails without Spring — when it is made, with the library's own message.
+ * says (typically a placeholder for an environment variable). Unset, it stays unset — the call
+ * goes out with no auth header, exactly as it does without Spring, which is what a server that
+ * authenticates nothing expects and what one that does answers with its own 401.
  */
 @AutoConfiguration
 @ConditionalOnProperty(prefix = "synapse4j", name = "enabled", havingValue = "true", matchIfMissing = true)

@@ -5,6 +5,8 @@ version becomes the body of the GitHub Release created when that version's tag i
 
 ## [Unreleased]
 
+- An API key is optional: leaving it unset sends no auth header, so an OpenAI-compatible server that authenticates nothing — a local runtime, say — is called as it stands instead of refused with `apiKey is required`
+
 ## [0.0.2] - 2026-10-01
 
 - A text convenience: `ChatMessage.getText()` joins a message's text parts — reasoning and the other kinds left out, an empty string when it says nothing in text — and `ChatResponse.getText()` reads the answer's text in one call

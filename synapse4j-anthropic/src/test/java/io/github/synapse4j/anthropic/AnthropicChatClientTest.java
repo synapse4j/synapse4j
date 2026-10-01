@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -1136,17 +1137,21 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void missingApiKeyAndMissingModelAreCallerBugs() {
-        AnthropicConfig noKey = new AnthropicConfig();
-        client.setConfig(noKey);
+    void missingModelIsACallerBug() {
         ChatRequest request = requestWithModel();
-        assertThrows(IllegalArgumentException.class, () -> client.chat(request));
-
-        AnthropicConfig withKey = new AnthropicConfig();
-        withKey.setApiKey("sk-ant-test");
-        client.setConfig(withKey);
         request.getOptions().setModel(null);
         assertThrows(IllegalArgumentException.class, () -> client.chat(request));
+    }
+
+    @Test
+    void anAbsentApiKeySendsNoApiKeyHeader() {
+        stubCompletion();
+        client.setConfig(new AnthropicConfig());
+
+        client.chat(requestWithModel());
+
+        // Absent, not blank: a server that authenticates nothing is asked exactly this way.
+        assertNull(stub.captured.getHeaders().get("x-api-key"));
     }
 
     @Test

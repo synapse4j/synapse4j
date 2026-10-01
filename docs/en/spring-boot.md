@@ -144,6 +144,10 @@ Spring configuration supplies — a placeholder for an environment variable, a `
 of a vault or a config server, or any other property source. Keeping the key out of the application's
 own files is the same problem it is for every other credential the application holds.
 
+If the endpoint needs no key — a local OpenAI-compatible server, say — leave the property unset.
+The call goes out with no auth header rather than with a placeholder, and the library does not
+refuse it.
+
 ## Transports
 
 The default transport is Spring's `RestClient`, built on Boot's auto-configured `RestClient.Builder`

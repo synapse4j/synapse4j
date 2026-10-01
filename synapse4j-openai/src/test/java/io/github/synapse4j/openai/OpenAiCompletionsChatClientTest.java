@@ -666,17 +666,21 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void missingApiKeyAndMissingModelAreCallerBugs() {
-        OpenAiConfig noKey = new OpenAiConfig();
-        client.setConfig(noKey);
+    void missingModelIsACallerBug() {
         ChatRequest request = requestWithModel();
-        assertThrows(IllegalArgumentException.class, () -> client.chat(request));
-
-        OpenAiConfig withKey = new OpenAiConfig();
-        withKey.setApiKey("sk-test");
-        client.setConfig(withKey);
         request.getOptions().setModel(null);
         assertThrows(IllegalArgumentException.class, () -> client.chat(request));
+    }
+
+    @Test
+    void anAbsentApiKeySendsNoAuthorizationHeader() {
+        stubCompletion();
+        client.setConfig(new OpenAiConfig());
+
+        client.chat(requestWithModel());
+
+        // Absent, not blank: a server that authenticates nothing is asked exactly this way.
+        assertNull(stub.captured.getHeaders().get("Authorization"));
     }
 
     @Test

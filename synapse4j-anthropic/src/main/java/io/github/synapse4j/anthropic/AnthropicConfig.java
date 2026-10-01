@@ -27,6 +27,10 @@ public class AnthropicConfig {
     /**
      * The API key, sent as {@code x-api-key}. Kept out of {@code toString()}: a credential belongs
      * in the header it authenticates, not in a log line or an error message.
+     *
+     * <p>
+     * {@code null} or blank sends no {@code x-api-key} header, for the servers that speak this
+     * protocol without authenticating. The hosted API refuses such a call with its own 401.
      */
     @ToString.Exclude
     private @Nullable String apiKey;

@@ -55,12 +55,12 @@ import lombok.NonNull;
  * The client is stateless apart from the configuration and safe to share across threads.
  *
  * <p>
- * Header precedence is deliberate: the module sets {@code Content-Type}, {@code x-api-key} and
- * {@code anthropic-version} first, then applies the call's own headers last, so a caller can
- * override anything — the escape-hatch philosophy this library applies everywhere. The same applies
- * to validation: a misconfigured call (no API key, no model) fails with
- * {@link IllegalArgumentException} before anything goes out — the call never happened, so it is a
- * caller bug, not a transport failure.
+ * Header precedence is deliberate: the module sets {@code Content-Type}, {@code x-api-key} — only
+ * when a key is configured — and {@code anthropic-version} first, then applies the call's own
+ * headers last, so a caller can override anything and can supply an {@code x-api-key} of its own
+ * for an endpoint whose scheme differs. The same applies to validation: a call with no model fails
+ * with {@link IllegalArgumentException} before anything goes out — the call never happened, so it
+ * is a caller bug, not a transport failure.
  *
  * @see io.github.synapse4j.chat.ChatClient
  */
@@ -139,7 +139,7 @@ public class AnthropicChatClient extends AbstractChatClient {
         // One snapshot for the whole exchange: a setConfig landing mid-call must not send this
         // request partly under the old configuration and partly under the new.
         AnthropicConfig config = this.config.get();
-        requireCallable(config, request);
+        requireCallable(request);
 
         HttpRequest httpRequest = httpRequest(config, request, out -> {
             // The body is written when the transport asks for it, and written again on every retry
@@ -171,7 +171,7 @@ public class AnthropicChatClient extends AbstractChatClient {
     protected ChatStream doStream(ChatRequest request) {
         // The same once-per-exchange snapshot the blocking path takes.
         AnthropicConfig config = this.config.get();
-        requireCallable(config, request);
+        requireCallable(request);
 
         HttpRequest httpRequest = httpRequest(config, request, out -> {
             try (JsonWriter writer = codec.writer(out)) {
@@ -239,7 +239,9 @@ public class AnthropicChatClient extends AbstractChatClient {
                 withoutTrailingSlash(config.getBaseUrl()) + "/v1/messages");
         httpRequest.setMethod(HttpRequest.POST);
         httpRequest.getHeaders().put("Content-Type", List.of("application/json"));
-        httpRequest.getHeaders().put("x-api-key", List.of(config.getApiKey()));
+        if (config.getApiKey() != null && !config.getApiKey().isBlank()) {
+            httpRequest.getHeaders().put("x-api-key", List.of(config.getApiKey()));
+        }
         // The protocol version this call declares; the endpoint answers only to versions it knows.
         httpRequest.getHeaders().put("anthropic-version", List.of(config.getAnthropicVersion()));
         // Applied last, so a caller's header wins over any of the module's own.
@@ -266,8 +268,7 @@ public class AnthropicChatClient extends AbstractChatClient {
     }
 
     /** A call the provider cannot even be asked: the caller's mistake, found before anything goes out. */
-    private static void requireCallable(AnthropicConfig config, ChatRequest request) {
-        require(config.getApiKey() != null && !config.getApiKey().isBlank(), "apiKey is required");
+    private static void requireCallable(ChatRequest request) {
         require(request.getOptions().getModel() != null && !request.getOptions().getModel().isBlank(),
                 "options.model is required");
     }

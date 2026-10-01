@@ -54,12 +54,13 @@ import lombok.NonNull;
  * The client is stateless apart from the configuration and safe to share across threads.
  *
  * <p>
- * Header precedence is deliberate: the module sets {@code Content-Type}, {@code Authorization} and
- * the organization/project headers first, then applies the call's own headers last, so a caller
- * can override anything — the escape-hatch philosophy this library applies everywhere. The same
- * applies to validation: a misconfigured call (no API key, no model) fails with
- * {@link IllegalArgumentException} before anything goes out, matching the restricted-header
- * precedent — the call never happened, so it is a caller bug, not a transport failure.
+ * Header precedence is deliberate: the module sets {@code Content-Type}, {@code Authorization} —
+ * only when a key is configured — and the organization/project headers first, then applies the
+ * call's own headers last, so a caller can override anything and can supply an {@code Authorization}
+ * of its own for an endpoint whose scheme differs. The same applies to validation: a call with no
+ * model fails with {@link IllegalArgumentException} before anything goes out, matching the
+ * restricted-header precedent — the call never happened, so it is a caller bug, not a transport
+ * failure.
  */
 public abstract class AbstractOpenAiChatClient extends AbstractChatClient {
 
@@ -134,7 +135,7 @@ public abstract class AbstractOpenAiChatClient extends AbstractChatClient {
         // One snapshot for the whole exchange: a setConfig landing mid-call must not send this
         // request partly under the old configuration and partly under the new.
         OpenAiConfig config = this.config.get();
-        requireCallable(config, request);
+        requireCallable(request);
 
         HttpRequest httpRequest = httpRequest(endpoint(), config, request, out -> {
             // The body is written when the transport asks for it, and written again on every retry
@@ -166,7 +167,7 @@ public abstract class AbstractOpenAiChatClient extends AbstractChatClient {
     protected ChatStream doStream(ChatRequest request) {
         // The same once-per-exchange snapshot the blocking path takes.
         OpenAiConfig config = this.config.get();
-        requireCallable(config, request);
+        requireCallable(request);
 
         HttpRequest httpRequest = httpRequest(endpoint(), config, request, out -> {
             try (JsonWriter writer = codec.writer(out)) {
@@ -299,7 +300,9 @@ public abstract class AbstractOpenAiChatClient extends AbstractChatClient {
                 withoutTrailingSlash(config.getBaseUrl()) + endpoint);
         httpRequest.setMethod(HttpRequest.POST);
         httpRequest.getHeaders().put("Content-Type", List.of("application/json"));
-        httpRequest.getHeaders().put("Authorization", List.of("Bearer " + config.getApiKey()));
+        if (config.getApiKey() != null && !config.getApiKey().isBlank()) {
+            httpRequest.getHeaders().put("Authorization", List.of("Bearer " + config.getApiKey()));
+        }
         if (config.getOrganization() != null) {
             httpRequest.getHeaders().put("OpenAI-Organization", List.of(config.getOrganization()));
         }
@@ -330,8 +333,7 @@ public abstract class AbstractOpenAiChatClient extends AbstractChatClient {
     }
 
     /** A call the provider cannot even be asked: the caller's mistake, found before anything goes out. */
-    private void requireCallable(OpenAiConfig config, ChatRequest request) {
-        require(config.getApiKey() != null && !config.getApiKey().isBlank(), "apiKey is required");
+    private void requireCallable(ChatRequest request) {
         require(request.getOptions().getModel() != null && !request.getOptions().getModel().isBlank(),
                 "options.model is required");
     }
