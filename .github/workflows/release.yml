@@ -22,7 +22,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     environment: release
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -69,10 +69,10 @@ jobs:
           url="https://central.sonatype.com/api/v1/publisher/published?namespace=io.github.synapse4j&name=synapse4j-core&version=${ver}"
           code="$(curl -sS -o /tmp/published.json -w '%{http_code}' -H "Authorization: Bearer $token" "$url")"
           # The status is what carries the signal: a rotated credential or a bad gateway would
-          # otherwise leave the body empty and read as "not published", which is the one answer
-          # that leads to a duplicate upload. Failing here also stops the GitHub Release below,
-          # which is deliberate: a release note for a version whose publication could not be
-          # confirmed would be misleading.
+          # otherwise leave the body empty and read as "not published", which is the one answer that
+          # leads to a duplicate upload — Central refuses a version it already holds. Failing here is
+          # deliberate for that reason alone; whether the version is out by the time the release is
+          # staged is the release step's business, below.
           if [ "$code" != "200" ]; then
             echo "::error::Central answered $code for $url — cannot tell whether the version is out"
             exit 1
@@ -94,14 +94,40 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
-      # The body is this version's section of the changelog; a missing section falls
-      # back to generated notes so a forgotten edit never blocks what Central already
-      # hosts, and an existing release makes the step a no-op on rerun.
+      # The body is this version's section of the changelog; a missing section falls back to
+      # generated notes so a forgotten edit never blocks what Central already hosts.
+      #
+      # The release is staged only once the artifacts are usable. Central publishes automatically,
+      # but on its own queue — slow enough, more than once, to outlast a whole job — so the deploy
+      # above stops at "validated" and the wait happens here, bounded: a version confirmed published
+      # gets a release, one that is not confirmed in time gets a draft, which a rerun (or an admin,
+      # from the Releases page) publishes once the artifacts are actually out.
       - name: Create the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
         run: |
           ver="${GITHUB_REF_NAME#v}"
+          token="$(printf '%s:%s' "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | base64 -w0)"
+          url="https://central.sonatype.com/api/v1/publisher/published?namespace=io.github.synapse4j&name=synapse4j-core&version=${ver}"
+
+          published=false
+          for _ in $(seq 1 30); do
+            code="$(curl -sS -o /tmp/published.json -w '%{http_code}' -H "Authorization: Bearer $token" "$url")"
+            if [ "$code" = "200" ] && [ "$(jq -r '.published // false' /tmp/published.json)" = "true" ]; then
+              published=true
+              break
+            fi
+            # A rejected token will not heal by waiting, and staging a draft would hide it.
+            if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+              echo "::error::Central answered $code for $url — the credentials are wrong, not the timing"
+              exit 1
+            fi
+            echo "$ver is not published yet (Central answered $code); waiting"
+            sleep 60
+          done
+
           awk -v ver="$ver" 'index($0, "## [" ver "]") == 1 { found=1; next } found && /^## \[/ { exit } found { print }' CHANGELOG.md > notes.md
           if [ -s notes.md ]; then
             notes=(--notes-file notes.md)
@@ -109,5 +135,19 @@ jobs:
             echo "::warning::no changelog section for $ver; generating notes from the commits"
             notes=(--generate-notes)
           fi
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" "${notes[@]}"
+
+          if [ "$published" = "true" ]; then
+            if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+              # A draft staged by an earlier run becomes the release now the artifacts are out.
+              gh release edit "$GITHUB_REF_NAME" --draft=false
+            else
+              gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" "${notes[@]}"
+            fi
+          else
+            echo "::warning::$ver is not confirmed published; staging a draft release"
+            if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+              echo "a release for $GITHUB_REF_NAME already exists; leaving it as it is"
+            else
+              gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" "${notes[@]}"
+            fi
+          fi

@@ -56,7 +56,7 @@
     <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
     <maven-javadoc-plugin.version>3.11.2</maven-javadoc-plugin.version>
     <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
-    <central-publishing-maven-plugin.version>0.9.0</central-publishing-maven-plugin.version>
+    <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
   </properties>
 
   <modules>
@@ -203,7 +203,11 @@
             </executions>
           </plugin>
           <!-- Replaces maven-deploy-plugin where it loads: uploads the whole reactor as one
-               Central Portal deployment and waits until it is actually published. -->
+               Central Portal deployment and waits until the bundle has validated — not until it is
+               published. Publishing is automatic (autoPublish), but it runs on Central's queue,
+               which has been slow enough to outlast a job's whole timeout; the release workflow
+               waits for the published state itself, with its own bound, and stages a draft release
+               when it does not arrive. waitMaxTime bounds this wait, and cannot be set below 1800. -->
           <plugin>
             <groupId>org.sonatype.central</groupId>
             <artifactId>central-publishing-maven-plugin</artifactId>
@@ -213,7 +217,8 @@
               <deploymentName>synapse4j-${project.version}</deploymentName>
               <publishingServerId>central</publishingServerId>
               <autoPublish>true</autoPublish>
-              <waitUntil>published</waitUntil>
+              <waitUntil>validated</waitUntil>
+              <waitMaxTime>1800</waitMaxTime>
             </configuration>
           </plugin>
         </plugins>
