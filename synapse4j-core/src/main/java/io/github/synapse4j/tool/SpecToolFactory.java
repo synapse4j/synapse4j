@@ -1,7 +1,7 @@
 package io.github.synapse4j.tool;
 
 /**
- * Where an {@link AnnotatedTool} comes from, given the name a tool method states in its {@code type}.
+ * Where a {@link SpecTool} comes from, given the name a tool method states in its {@code type}.
  *
  * <p>
  * A tool method does not build its tool itself: it names the implementation, and this turns that name
@@ -10,12 +10,11 @@ package io.github.synapse4j.tool;
  * instead, and then a name means whatever that application says it means.
  *
  * <p>
- * What comes back is not yet a usable tool: it is handed to {@link AnnotatedTool#initialize}, which is
- * where it learns the method it was built from. So an implementation here constructs, and nothing
- * more.
+ * What comes back is not yet a usable tool: it is handed to {@link SpecTool#initialize}, which is where
+ * it learns the method it was built from. So an implementation here constructs, and nothing more.
  */
 @FunctionalInterface
-public interface AnnotatedToolFactory {
+public interface SpecToolFactory {
 
     /**
      * Creates the tool a name stands for.
@@ -23,6 +22,6 @@ public interface AnnotatedToolFactory {
      * @param type the name a tool method stated; never {@code null}
      * @return a new tool, not yet initialized; never {@code null}
      */
-    AnnotatedTool create(String type);
+    SpecTool create(String type);
 
 }
