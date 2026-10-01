@@ -5,6 +5,12 @@ version becomes the body of the GitHub Release created when that version's tag i
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-10-01
+
+- A text convenience: `ChatMessage.getText()` joins a message's text parts — reasoning and the other kinds left out, an empty string when it says nothing in text — and `ChatResponse.getText()` reads the answer's text in one call
+- A standing system message: `DefaultSystemMessageCustomizer` in core gives a call that carries none the framing it holds, and the starter wires one from `synapse4j.chat.system-message`
+- The chat-only starter settings move under `synapse4j.chat.*`: `synapse4j.chat-client` becomes `synapse4j.chat.client`, `synapse4j.auto-tool-calling` becomes `synapse4j.chat.auto-tool-calling`, `synapse4j.system-message` becomes `synapse4j.chat.system-message`, and `synapse4j.chat-options.*` becomes `synapse4j.chat.options.*` — the family (`openai`, `anthropic`) and transport (`http-*`) keys stay at the root
+
 ## [0.0.1] - 2026-09-30
 
 - Provider-neutral chat model: messages of text, reasoning, tool calls and media parts, with blocking and streaming calls sharing one request model and stream events mapping one-to-one onto each protocol's own frames
