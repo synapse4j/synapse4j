@@ -11,9 +11,9 @@ import java.lang.annotation.Target;
  * become the arguments, and the return becomes the result.
  *
  * <p>
- * Every attribute is the value as written, blank meaning it was not written. What a blank becomes is
- * decided by the resolution that follows rather than here, which is what lets a later layer supply
- * it instead — a description read from configuration, say.
+ * Every attribute is optional and holds the text exactly as written; empty means nothing was written.
+ * What an empty value becomes is not decided here — that belongs to whatever turns this annotation
+ * into a tool, which may also supply a value from somewhere else, such as configuration.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
@@ -25,4 +25,15 @@ public @interface ToolMethod {
 
     /** What the tool does. */
     String description() default "";
+
+    /**
+     * Which implementation builds this tool, where building one from the method alone would not do —
+     * an implementation that fills a parameter from the conversation rather than from the model's
+     * arguments, say.
+     *
+     * <p>
+     * The value names an {@link AnnotatedTool}, and is a name rather than a class: whoever turns this
+     * annotation into a tool decides what the name means, and what an empty one means too.
+     */
+    String type() default "";
 }

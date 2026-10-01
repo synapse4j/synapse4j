@@ -41,6 +41,10 @@ public class ToolMethodSpec {
     @NonNull
     private String description = "";
 
+    /** Which implementation builds this tool; blank when nothing supplied one. */
+    @NonNull
+    private String type = "";
+
     /** One per declared parameter, in declaration order. */
     private final List<ToolParameterSpec> parameters = new ArrayList<>();
 }
