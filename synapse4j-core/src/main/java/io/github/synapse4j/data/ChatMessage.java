@@ -126,6 +126,27 @@ public class ChatMessage {
     }
 
     /**
+     * The text this message says: every {@link TextPart}'s text, joined in the order the parts
+     * appear, with the parts of every other kind left out.
+     *
+     * <p>
+     * No separator is inserted — the parts are consecutive pieces of one piece of writing — and a
+     * part whose text is {@code null} contributes nothing. A message that says nothing in text, a
+     * tool-call-only turn for instance, answers the empty string rather than {@code null}.
+     *
+     * @return the message's text; never {@code null}, empty when it has none
+     */
+    public String getText() {
+        StringBuilder text = new StringBuilder();
+        for (ContentPart part : parts) {
+            if (part instanceof TextPart textPart && textPart.getText() != null) {
+                text.append(textPart.getText());
+            }
+        }
+        return text.toString();
+    }
+
+    /**
      * The parts are counted rather than printed: they carry the content, and a printout that carried
      * it would be as long as the message.
      *

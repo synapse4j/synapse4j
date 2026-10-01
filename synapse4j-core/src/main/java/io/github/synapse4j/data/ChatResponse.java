@@ -62,4 +62,14 @@ public class ChatResponse {
     /** Provider-specific fields of the response itself, as opposed to one of its parts. */
     private final ProviderExtras extras = new ProviderExtras();
 
+    /**
+     * The text the answer says — {@link ChatMessage#getText()} on the assistant's turn, for the
+     * common case of reading what the model wrote.
+     *
+     * @return the answer's text; never {@code null}, empty when it has none
+     */
+    public String getText() {
+        return message.getText();
+    }
+
 }
