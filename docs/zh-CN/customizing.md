@@ -54,6 +54,18 @@ client.addChatCustomizer(new ChatCustomizer() {
 `ChatCustomizer` 按添加顺序运行，没有重写的钩子什么都不做。客户端跨线程共享时，每次调用拿到一致的
 列表，因此 `ChatCustomizer` 自身必须可并发运行。
 
+## 库自带的一个 customizer
+
+`DefaultSystemMessageCustomizer` 是库提供的一个 `ChatCustomizer`：凡是自身没有系统消息的请求，它都补上
+一条内容为构造时那段文本的系统消息。像其他 customizer 一样注册它：
+
+```java
+client.addChatCustomizer(new DefaultSystemMessageCustomizer("用一句话回答。"));
+```
+
+自带系统消息的请求保持原样——这个标准配置只填空缺。Spring Boot starter 会从
+`synapse4j.chat.system-message` 装配一个。
+
 ## 每次调用的 HTTP 设置
 
 `ChatOptions` 为单次调用携带 HTTP 层设置，与客户端自身的设置并列：

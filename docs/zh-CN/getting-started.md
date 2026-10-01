@@ -15,7 +15,7 @@ Jackson 和 OpenAI——每一个都可以换成别的模块，其余部分不�
     <dependency>
       <groupId>io.github.synapse4j</groupId>
       <artifactId>synapse4j-bom</artifactId>
-      <version>0.0.1</version>
+      <version>0.0.2</version>
       <type>pom</type>
       <scope>import</scope>
     </dependency>
@@ -46,7 +46,7 @@ Jackson 和 OpenAI——每一个都可以换成别的模块，其余部分不�
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.synapse4j:synapse4j-bom:0.0.1"))
+    implementation(platform("io.github.synapse4j:synapse4j-bom:0.0.2"))
     implementation("io.github.synapse4j:synapse4j-core")
     implementation("io.github.synapse4j:synapse4j-jackson")
     implementation("io.github.synapse4j:synapse4j-http-jdk")
@@ -54,7 +54,7 @@ dependencies {
 }
 ```
 
-上面写的 `0.0.1` 是本文档编写时对应的版本；实际使用时请以 Maven Central 上的最新发布为准。
+上面写的 `0.0.2` 是本文档编写时对应的版本；实际使用时请以 Maven Central 上的最新发布为准。
 
 ## 2. 构建一个客户端
 
@@ -105,26 +105,11 @@ ChatResponse response = client.chat(new ChatRequest()
         .systemMessage("用一句话回答。")
         .addUserMessage("天空为什么是蓝色的？"));
 
-System.out.println(text(response));
+System.out.println(response.getText());
 ```
 
-答案里助手的这一轮就是一个 `ChatMessage`——和构建请求用的是同一个类。取出其中的文本，是对它各内容
-部分的一次简短遍历：
-
-```java
-import io.github.synapse4j.data.ContentPart;
-import io.github.synapse4j.data.TextPart;
-
-static String text(ChatResponse response) {
-    StringBuilder out = new StringBuilder();
-    for (ContentPart part : response.getMessage().getParts()) {
-        if (part instanceof TextPart text) {
-            out.append(text.getText());
-        }
-    }
-    return out.toString();
-}
-```
+答案里助手的这一轮就是一个 `ChatMessage`——和构建请求用的是同一个类。`getText()` 把它读回来：按顺序
+拼接消息里的文本部分，reasoning 和其他种类不参与，得到的就是答案的文字本身。
 
 ## 5. 继续对话
 
@@ -159,11 +144,7 @@ import io.github.synapse4j.data.ChatStreamEvent;
 try (ChatStream stream = client.stream(request)) {
     for (ChatStreamEvent event : stream) {
         if (event.getDelta() != null) {
-            for (ContentPart part : event.getDelta().getParts()) {
-                if (part instanceof TextPart text) {
-                    System.out.print(text.getText());
-                }
-            }
+            System.out.print(event.getDelta().getText());
         }
     }
 }
@@ -198,7 +179,7 @@ ChatResponse answer = toolClient.chat(new ChatRequest()
         .addUserMessage("巴黎现在天气怎么样？")
         .addTool(weather));
 
-System.out.println(text(answer));
+System.out.println(answer.getText());
 ```
 
 `ToolCallingChatClient` 包装任意客户端：它跑完模型发起的各轮工具调用，直到模型不再要求调用，并在
@@ -229,7 +210,7 @@ structured.setOptions(options);
 
 ChatResponse response = client.chat(structured);
 
-Person person = codec.decode(text(response), Person.class);
+Person person = codec.decode(response.getText(), Person.class);
 ```
 
 schema 是由你的编解码器产出的 JSON Schema 文本，因此模型被约束到你的编解码器恰好能读回的那份 JSON

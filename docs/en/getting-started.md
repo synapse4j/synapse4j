@@ -16,7 +16,7 @@ Import the BOM once to align versions, then declare the modules you use.
     <dependency>
       <groupId>io.github.synapse4j</groupId>
       <artifactId>synapse4j-bom</artifactId>
-      <version>0.0.1</version>
+      <version>0.0.2</version>
       <type>pom</type>
       <scope>import</scope>
     </dependency>
@@ -47,7 +47,7 @@ The same four, in Gradle's Kotlin DSL:
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.synapse4j:synapse4j-bom:0.0.1"))
+    implementation(platform("io.github.synapse4j:synapse4j-bom:0.0.2"))
     implementation("io.github.synapse4j:synapse4j-core")
     implementation("io.github.synapse4j:synapse4j-jackson")
     implementation("io.github.synapse4j:synapse4j-http-jdk")
@@ -55,7 +55,7 @@ dependencies {
 }
 ```
 
-The `0.0.1` above is the version these docs were written against; take the current release from
+The `0.0.2` above is the version these docs were written against; take the current release from
 Maven Central.
 
 ## 2. Build a client
@@ -111,26 +111,12 @@ ChatResponse response = client.chat(new ChatRequest()
         .systemMessage("Answer in one short sentence.")
         .addUserMessage("Why is the sky blue?"));
 
-System.out.println(text(response));
+System.out.println(response.getText());
 ```
 
 The answer carries the assistant's turn as a `ChatMessage` — the same class a request is built
-from. Reading the text out of it is a short walk over its parts:
-
-```java
-import io.github.synapse4j.data.ContentPart;
-import io.github.synapse4j.data.TextPart;
-
-static String text(ChatResponse response) {
-    StringBuilder out = new StringBuilder();
-    for (ContentPart part : response.getMessage().getParts()) {
-        if (part instanceof TextPart text) {
-            out.append(text.getText());
-        }
-    }
-    return out.toString();
-}
-```
+from. `getText()` reads it back: the message's text parts joined in order, with the reasoning and
+the other kinds left out, so it is the answer as prose.
 
 ## 5. Continue the conversation
 
@@ -168,11 +154,7 @@ import io.github.synapse4j.data.ChatStreamEvent;
 try (ChatStream stream = client.stream(request)) {
     for (ChatStreamEvent event : stream) {
         if (event.getDelta() != null) {
-            for (ContentPart part : event.getDelta().getParts()) {
-                if (part instanceof TextPart text) {
-                    System.out.print(text.getText());
-                }
-            }
+            System.out.print(event.getDelta().getText());
         }
     }
 }
@@ -209,7 +191,7 @@ ChatResponse answer = toolClient.chat(new ChatRequest()
         .addUserMessage("What's the weather in Paris?")
         .addTool(weather));
 
-System.out.println(text(answer));
+System.out.println(answer.getText());
 ```
 
 `ToolCallingChatClient` wraps any client: it runs the model's tool-call rounds until the model
@@ -241,7 +223,7 @@ structured.setOptions(options);
 
 ChatResponse response = client.chat(structured);
 
-Person person = codec.decode(text(response), Person.class);
+Person person = codec.decode(response.getText(), Person.class);
 ```
 
 The schema is JSON Schema text produced by your codec, so the model is constrained to exactly the

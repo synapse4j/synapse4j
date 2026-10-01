@@ -19,7 +19,7 @@ ChatClient client = new OpenAiCompletionsChatClient(http, codec, config);
 ChatResponse response = client.chat(new ChatRequest()
         .addUserMessage("天空为什么是蓝色的？"));
 
-System.out.println(response.getMessage().getParts());
+System.out.println(response.getText());
 ```
 
 ## 它和别的库有什么不同

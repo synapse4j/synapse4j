@@ -51,7 +51,7 @@ schema：`TYPE_JSON` 下没有 schema 可强制，`strict` 根本不会发出。
 ## 把答案读回来
 
 ```java
-Person person = codec.decode(text(response), Person.class);
+Person person = codec.decode(response.getText(), Person.class);
 ```
 
 ## 各提供商的支持

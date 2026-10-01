@@ -59,6 +59,18 @@ Customizers run in the order they were added, and a hook a customizer does not o
 nothing. A client shared across threads hands each call a consistent list, so a customizer must
 itself be safe to run concurrently.
 
+## A customizer the library provides
+
+`DefaultSystemMessageCustomizer` is a `ChatCustomizer` that gives every request carrying no system
+message of its own one saying the text it was built with. Register it like any other:
+
+```java
+client.addChatCustomizer(new DefaultSystemMessageCustomizer("Answer in one short sentence."));
+```
+
+A request that states its own system message keeps it — the standing one only fills the gap. The
+Spring Boot starter wires one from `synapse4j.chat.system-message`.
+
 ## Per-call HTTP settings
 
 `ChatOptions` carries HTTP-level settings for one call, beside the client's own:

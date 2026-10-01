@@ -11,7 +11,7 @@ codec, a transport, and a chat client — with everything bound from `synapse4j.
 <dependency>
   <groupId>io.github.synapse4j</groupId>
   <artifactId>synapse4j-spring-boot-starter</artifactId>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
 </dependency>
 ```
 

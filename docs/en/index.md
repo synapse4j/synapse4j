@@ -20,7 +20,7 @@ ChatClient client = new OpenAiCompletionsChatClient(http, codec, config);
 ChatResponse response = client.chat(new ChatRequest()
         .addUserMessage("Why is the sky blue?"));
 
-System.out.println(response.getMessage().getParts());
+System.out.println(response.getText());
 ```
 
 ## What makes it different

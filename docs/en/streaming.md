@@ -10,11 +10,7 @@ the provider sends them.
 try (ChatStream stream = client.stream(request)) {
     for (ChatStreamEvent event : stream) {
         if (event.getDelta() != null) {
-            for (ContentPart part : event.getDelta().getParts()) {
-                if (part instanceof TextPart text) {
-                    System.out.print(text.getText());
-                }
-            }
+            System.out.print(event.getDelta().getText());
         }
     }
 }

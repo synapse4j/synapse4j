@@ -53,7 +53,7 @@ the model is held to the same shape that codec reads.
 ## Reading the answer back
 
 ```java
-Person person = codec.decode(text(response), Person.class);
+Person person = codec.decode(response.getText(), Person.class);
 ```
 
 ## Per-provider support
