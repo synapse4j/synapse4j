@@ -100,6 +100,12 @@
                 -XepOpt:NullAway:AnnotatedPackages=io.github.synapse4j
                 -XepOpt:NullAway:JSpecifyMode=true</arg>
             </compilerArgs>
+            <!-- A renamed API is not left for an IDE to notice: Jackson 3 turned JsonNode.asText into
+                 asString and this build said nothing. These two are elements rather than compiler args
+                 so that the test execution below, which replaces the args list to drop the checker,
+                 keeps them. -->
+            <showDeprecation>true</showDeprecation>
+            <failOnWarning>true</failOnWarning>
             <annotationProcessorPaths>
               <!-- Lombok generates the accessors and their null checks, so it has to be on the
                    processor path beside the checker; its version comes from the Boot BOM. -->
@@ -123,7 +129,9 @@
             <execution>
               <!-- The checker runs on main sources only: tests hand null to things on purpose —
                    asserting a refusal is how several of them pin a contract — and NullAway has no
-                   path-based exclusion, so the plugin flag comes off this execution instead. -->
+                   path-based exclusion, so the plugin flag comes off this execution instead. Only the
+                   argument list is replaced; the warning settings above are elements of their own and
+                   still apply here. -->
               <id>default-testCompile</id>
               <configuration>
                 <compilerArgs combine.self="override" />
