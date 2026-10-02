@@ -264,6 +264,7 @@ public class MethodTool implements SpecTool, StagedTool {
     public @Nullable Object[] resolveArguments(@Nullable String arguments, @Nullable ChatContext context)
             throws Exception {
         List<ToolParameterSpec> entries = spec.getParameters();
+        @Nullable
         Object[] values = new Object[entries.size()];
         Map<String, Object> args = null;
         for (int i = 0; i < entries.size(); i++) {
