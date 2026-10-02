@@ -6,6 +6,8 @@ version becomes the body of the GitHub Release created when that version's tag i
 ## [Unreleased]
 
 - An API key is optional: leaving it unset sends no auth header, so an OpenAI-compatible server that authenticates nothing — a local runtime, say — is called as it stands instead of refused with `apiKey is required`
+- Annotated tools: `@ToolMethod` and `@ToolParam` declare a tool on a method, and `MethodTools` reads a class's annotated methods into tools — any visibility, inherited and interface-default ones included — running `ToolMethodSpecCustomizer` steps between the annotations and the finished tool, and resolving `type` through a `SpecToolFactory`
+- A method tool is now completed from a `ToolMethodSpec` by `initialize(...)`, the `SpecTool` contract, and the resolution is validated by the tool that uses it; the declaration can no longer be handed in whole — `MethodTool.of(ToolDefinition, …)`, `define(...)` and the subclass constructor are gone, and the arguments schema beyond the per-parameter hooks is `argumentsSchema`'s to shape
 
 ## [0.0.2] - 2026-10-01
 

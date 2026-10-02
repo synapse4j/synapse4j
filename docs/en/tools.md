@@ -14,7 +14,8 @@ reads back. It can also carry `strict`, and provider-specific fields.
 ## A tool
 
 The `Tool` interface is `definition()` and `execute(arguments, context)`, plus `name()`, which
-defaults to the name on the declaration. Most tools are built from one of three classes.
+defaults to the name on the declaration. Most tools are built from one of three classes; a fourth
+path reads them off your own annotated methods.
 
 **`FunctionTool`** — a typed lambda. The model's arguments decode into your type, the lambda runs,
 and its result is rendered back:
@@ -42,6 +43,49 @@ Tool weather = MethodTool.of("get_weather", "Get the weather", method, service, 
 
 **`ManualTool`** — declaration only. Use it when you run the model's calls yourself: it carries the
 declaration and refuses to execute.
+
+## Declaring tools on your own methods
+
+`@ToolMethod` and `@ToolParam` put the declaration on the method itself, and `MethodTools` reads a
+class into tools:
+
+```java
+public class WeatherService {
+
+    @ToolMethod(name = "get_weather", description = "Get the current weather for a city")
+    public String weather(@ToolParam(name = "city") String city) {
+        ...
+    }
+}
+
+List<Tool> tools = new MethodTools(codec).from(service);
+```
+
+`from(bean)` reads every annotated method the object has — the instance ones it runs on itself, and the
+static ones, which need no instance — while `from(WeatherService.class)` reads the static ones, the only
+ones a class can supply. Visibility makes no difference, and neither does where a method sits: protected
+and private ones are read, so are the ones the class only inherits, and an override stands in for what
+it overrides. Two methods that would resolve to one tool name are refused, not left to collide.
+
+Every attribute is optional, and what is left out is left alone: the tool name falls back to the
+method's name, and a parameter keeps the name the compiler recorded for it. That last one is worth a
+`-parameters` flag in your build — without it the compiler records no names, and the argument schema
+grows properties called `arg0`.
+
+Attributes carry text, not decisions: a name or a description from your configuration arrives through a
+`ToolMethodSpecCustomizer`, which runs over each method's resolution after the annotations and before
+the tool is built:
+
+```java
+new MethodTools(codec)
+        .addCustomizer(spec -> spec.getParameters().get(0).setName(nameFromConfig))
+        .from(service);
+```
+
+`@ToolMethod.type` names the class that builds the tool, for what a `MethodTool` cannot cover — a
+parameter filled from the conversation rather than from the model's arguments, say. A blank one is a
+`MethodTool`, and `specToolFactory(...)` replaces the default, so a name means whatever your application
+says it means. What comes back is an ordinary `Tool`: register it, or put it on the request.
 
 ## Running the calls
 

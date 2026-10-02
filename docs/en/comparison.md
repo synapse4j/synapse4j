@@ -17,7 +17,7 @@ and a vendor SDK — and where synapse4j sits.
 | HTTP client | yours, behind an interface | its own clients | Spring's HTTP | its own (OkHttp) |
 | API style | blocking; a stream is pulled | blocking plus streaming callbacks | blocking plus streaming (Flux) | blocking plus streaming |
 | Declarative interface | no | yes (`AiService`) | no | no |
-| Tool calling | `Tool` plus an executor and a loop | `@Tool` annotations | `@Tool` plus `ChatClient` | raw calls |
+| Tool calling | `Tool` plus an executor and a loop; `@ToolMethod` on your own methods | `@Tool` annotations | `@Tool` plus `ChatClient` | raw calls |
 | Extending the model | open structures, plus a pass-through bag | its own types | its own types | generated types |
 
 ## LangChain4j

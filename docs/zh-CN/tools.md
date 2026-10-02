@@ -13,7 +13,7 @@
 ## 一个工具
 
 `Tool` 接口有 `definition()` 和 `execute(arguments, context)`，外加 `name()`，它默认取声明上的名字。
-多数工具由下面三个类之一构建。
+多数工具由下面三个类之一构建；还有一条路，是从你自己带注解的方法上把它们读出来。
 
 **`FunctionTool`**——一个带类型的 lambda。模型的参数被解码成你的类型，lambda 运行，返回值再被渲染
 回去：
@@ -39,6 +39,43 @@ Tool weather = MethodTool.of("get_weather", "查询天气", method, service, cod
 ```
 
 **`ManualTool`**——只有声明。当你要自己运行模型的调用时用它：它携带声明，并拒绝执行。
+
+## 用自己的方法声明工具
+
+`@ToolMethod` 和 `@ToolParam` 让声明就长在方法上，`MethodTools` 负责把一个类读成工具：
+
+```java
+public class WeatherService {
+
+    @ToolMethod(name = "get_weather", description = "查询某个城市的当前天气")
+    public String weather(@ToolParam(name = "city") String city) {
+        ...
+    }
+}
+
+List<Tool> tools = new MethodTools(codec).from(service);
+```
+
+`from(bean)` 读出这个对象上所有带注解的方法——需要它自己来跑的实例方法，以及不需要实例的静态方法；
+`from(WeatherService.class)` 只读静态方法，那是类唯一能给的东西。可见性不影响结果，声明在哪一层也
+不影响：protected、private 的方法照样读，只从父类或接口 default 方法继承来的也读，覆盖方法顶替它
+覆盖掉的那个。两个方法最终解析成同一个工具名会被拒绝，而不是留到后面撞车。
+
+注解项都是可选的，没写的就不动：工具名回退到方法名，参数沿用编译器记下的名字。最后这条值得在构建里
+开 `-parameters`——不开的话编译器不记名字，参数 schema 里就会出现叫 `arg0` 的属性。
+
+注解承载的是文本，不是决定。来自配置的名字或描述由 `ToolMethodSpecCustomizer` 送进来，它在注解之后、
+工具被建出来之前，对每个方法的解析跑一遍：
+
+```java
+new MethodTools(codec)
+        .addCustomizer(spec -> spec.getParameters().get(0).setName(nameFromConfig))
+        .from(service);
+```
+
+`@ToolMethod.type` 指定由哪个类来建这个工具，用于 `MethodTool` 覆盖不到的情况——比如某个参数应当来自
+对话而不是模型的 arguments。留空就是 `MethodTool`，`specToolFactory(...)` 可以换掉默认实现，于是这个
+名字的含义由你的应用说了算。拿到的就是普通的 `Tool`：注册到客户端上，或者放到请求里。
 
 ## 运行调用
 

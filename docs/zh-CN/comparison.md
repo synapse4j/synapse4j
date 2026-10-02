@@ -16,7 +16,7 @@
 | HTTP 客户端 | 由你选，接口背后的实现可换 | 自带客户端 | Spring 的 HTTP | 自带（OkHttp） |
 | API 风格 | 阻塞；流是拉取的 | 阻塞 + 流式回调 | 阻塞 + 流式（Flux） | 阻塞 + 流式 |
 | 声明式接口 | 无 | 有（`AiService`） | 无 | 无 |
-| 工具调用 | `Tool` 加执行器与循环 | `@Tool` 注解 | `@Tool` 加 `ChatClient` | 原始调用 |
+| 工具调用 | `Tool` 加执行器与循环；也可以用 `@ToolMethod` 标注自己的方法 | `@Tool` 注解 | `@Tool` 加 `ChatClient` | 原始调用 |
 | 扩展模型 | 开放结构，外加可透传的附加字段 | 自己的类型 | 自己的类型 | 生成的类型 |
 
 ## LangChain4j
