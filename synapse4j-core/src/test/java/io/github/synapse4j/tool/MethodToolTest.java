@@ -260,6 +260,19 @@ class MethodToolTest {
         assertTrue(failure.getMessage().contains("valueFor"));
     }
 
+    @Test
+    void theArgumentsSchemaIsTheHooksToShape() {
+        ToolMethodSpec spec = new ToolMethodSpec(method("take", String.class), null);
+        spec.setName("shaped");
+        ShapedTool tool = new ShapedTool();
+        tool.initialize(spec, codec);
+
+        // the built-in assembly ran underneath, and the hook's addition reached the declaration
+        Map<?, ?> properties = (Map<?, ?>) lastEncoded().get("properties");
+        assertEquals(List.of("message"), lastEncoded().get("required"));
+        assertTrue(properties.containsKey("extra"));
+    }
+
     // ===== harness =====
 
     private static Method method(String name, Class<?>... parameterTypes) {
@@ -343,6 +356,17 @@ class MethodToolTest {
 
     /** The application type a subclass keeps off the wire. */
     public record CurrentUser(String name) {
+    }
+
+    /** A tool that shapes the arguments schema itself, on top of what the built-in assembly says. */
+    private static class ShapedTool extends MethodTool {
+
+        @Override
+        protected JsonSchema argumentsSchema(ToolMethodSpec spec) {
+            JsonSchema envelope = super.argumentsSchema(spec);
+            envelope.getProperties().put("extra", new JsonSchema());
+            return envelope;
+        }
     }
 
     /** The extension the hooks exist for: one claim pair, schema and binding together. */

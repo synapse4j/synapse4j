@@ -1,0 +1,224 @@
+package io.github.synapse4j.tool;
+
+import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.json.JsonCodec;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.jspecify.annotations.Nullable;
+
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
+
+/**
+ * The tools a class declares: every method it has that carries {@link ToolMethod}, read into a
+ * {@link ToolMethodSpec}, customized, and built into a tool.
+ *
+ * <p>
+ * One method becomes one tool. The signature gives the structure; the annotations write the strings
+ * they carry; the customizers this reader holds rewrite what they like afterwards, which is where a
+ * name or a description from configuration enters. A blank attribute is left as it was — what a blank
+ * becomes is settled between the {@link ToolMethodSpec} constructor, the annotations that did write,
+ * and the customizers, and the one default this class states is the tool's name: a method that names
+ * no tool is known by its own name.
+ *
+ * <p>
+ * {@link #from(Object)} reads every annotated method the object has — the instance ones it runs on
+ * itself, and the static ones, which need no instance — while {@link #from(Class)} reads the annotated
+ * static ones, the only ones a class can supply. Visibility does not matter: a protected or private
+ * declaration is read like a public one. Neither does where it sits — what the object only inherits,
+ * from a superclass or an interface's default method, is read too, with an override standing in for
+ * what it overrides. Abstract methods, and the synthetic and bridge methods the compiler makes, are
+ * left alone. Both answers come in no particular order: the order reflection hands methods over is
+ * unspecified.
+ *
+ * <p>
+ * The reader holds configuration, not conversations: set the factory and add the customizers before
+ * asking for tools, and it is safe to share afterwards. It does not validate what it produced —
+ * {@link ToolMethodSpec#validate} is a service for whoever completes a tool, and what counts as usable
+ * is the completing tool's decision, not this reader's.
+ */
+@RequiredArgsConstructor
+public class MethodTools {
+
+    /** The codec every tool is completed with; never {@code null}. */
+    @NonNull
+    private final JsonCodec codec;
+
+    /** The steps every resolution goes through, in the order they were added. */
+    private final List<ToolMethodSpecCustomizer> customizers = new ArrayList<>();
+
+    /**
+     * Where a tool method's {@code type} is resolved: by default the name is a class, and a blank one
+     * is a {@link MethodTool}.
+     */
+    private SpecToolFactory specToolFactory = new ReflectiveSpecToolFactory(MethodTool::new);
+
+    /**
+     * Sets where a tool method's {@code type} is resolved.
+     *
+     * @param specToolFactory the factory to use; never {@code null}
+     * @return this reader, for chaining
+     */
+    public MethodTools specToolFactory(@NonNull SpecToolFactory specToolFactory) {
+        this.specToolFactory = specToolFactory;
+        return this;
+    }
+
+    /**
+     * Adds a step to every resolution this reader produces, in the order given.
+     *
+     * @param customizer the step to add; never {@code null}
+     * @return this reader, for chaining
+     */
+    public MethodTools addCustomizer(@NonNull ToolMethodSpecCustomizer customizer) {
+        customizers.add(customizer);
+        return this;
+    }
+
+    /**
+     * The tools {@code target} declares: the methods it carries {@link ToolMethod} on, instance and
+     * static alike.
+     *
+     * @param target the object whose methods are read; never {@code null}
+     * @return one tool per annotated method; never {@code null}, and empty when there are none
+     * @throws SynapseException if two methods resolve to one name, or a resolution cannot be built
+     *                              into a tool — see {@link #from(Class)}
+     */
+    public List<Tool> from(@NonNull Object target) {
+        return read(target.getClass(), target);
+    }
+
+    /**
+     * The tools {@code type} declares: its annotated static methods. An instance method is not read
+     * here — there is no instance to run it on; hand {@link #from(Object)} the instance instead.
+     *
+     * @param type the class whose methods are read; never {@code null}
+     * @return one tool per annotated static method; never {@code null}, and empty when there are none
+     * @throws SynapseException if two methods resolve to one name, or a resolution cannot be built
+     *                              into a tool: a {@code type} naming an unknown class or one without
+     *                              a no-argument constructor, or a tool refusing the resolution it is
+     *                              completed from
+     */
+    public List<Tool> from(@NonNull Class<?> type) {
+        return read(type, null);
+    }
+
+    /**
+     * Reads the annotated methods of {@code type} and builds a tool from each: the signature into a
+     * {@link ToolMethodSpec}, the annotations' values onto it where they wrote one, the customizers
+     * over it in order, and then the factory's tool for its {@code type}, completed with it. An
+     * instance method is read only when {@code target} says what it runs on.
+     */
+    private List<Tool> read(Class<?> type, @Nullable Object target) {
+        List<Tool> tools = new ArrayList<>();
+        Map<String, Method> named = new LinkedHashMap<>();
+        for (Method method : runnableMethods(type)) {
+            if (method.isSynthetic() || method.isBridge()) {
+                continue;
+            }
+            ToolMethod annotation = method.getAnnotation(ToolMethod.class);
+            if (annotation == null) {
+                continue;
+            }
+            boolean statik = Modifier.isStatic(method.getModifiers());
+            if (!statik && target == null) {
+                continue;
+            }
+            ToolMethodSpec spec = new ToolMethodSpec(method, statik ? null : target);
+            spec.setName(annotation.name().isBlank() ? method.getName() : annotation.name());
+            if (!annotation.description().isBlank()) {
+                spec.setDescription(annotation.description());
+            }
+            if (!annotation.type().isBlank()) {
+                spec.setType(annotation.type());
+            }
+            readParameters(method, spec);
+            for (ToolMethodSpecCustomizer customizer : customizers) {
+                customizer.customize(spec);
+            }
+            if (!spec.getName().isBlank()) {
+                Method earlier = named.putIfAbsent(spec.getName(), method);
+                if (earlier != null) {
+                    throw new SynapseException("two tool methods of " + type.getName() + " declare the name '"
+                            + spec.getName() + "': " + earlier + " and " + method);
+                }
+            }
+            SpecTool tool = specToolFactory.create(spec.getType());
+            tool.initialize(spec, codec);
+            tools.add(tool);
+        }
+        return tools;
+    }
+
+    /** Writes onto the spec whatever each parameter's {@link ToolParam} actually said. */
+    private void readParameters(Method method, ToolMethodSpec spec) {
+        Parameter[] declared = method.getParameters();
+        for (int i = 0; i < declared.length; i++) {
+            ToolParam annotation = declared[i].getAnnotation(ToolParam.class);
+            if (annotation == null) {
+                continue;
+            }
+            ToolParameterSpec entry = spec.getParameters().get(i);
+            if (!annotation.name().isBlank()) {
+                entry.setName(annotation.name());
+            }
+            if (!annotation.description().isBlank()) {
+                entry.setDescription(annotation.description());
+            }
+            if (!annotation.required().isBlank()) {
+                entry.setRequired(annotation.required());
+            }
+        }
+    }
+
+    /**
+     * Every method {@code type} can run, whatever its visibility: what it declares, then what each
+     * superclass and each interface of that chain declares, most derived first. One entry per
+     * signature — so an override takes the place of what it overrides, as Java's own method lookup
+     * has it — and nothing abstract, synthetic or bridge, which no instance runs as declared.
+     */
+    private static List<Method> runnableMethods(Class<?> type) {
+        Map<String, Method> bySignature = new LinkedHashMap<>();
+        for (Class<?> level = type; level != null && level != Object.class; level = level.getSuperclass()) {
+            for (Method method : level.getDeclaredMethods()) {
+                if (method.isSynthetic() || method.isBridge() || Modifier.isAbstract(method.getModifiers())) {
+                    continue;
+                }
+                bySignature.putIfAbsent(signature(method), method);
+            }
+            for (Class<?> face : level.getInterfaces()) {
+                readDefaultMethods(face, bySignature);
+            }
+        }
+        return List.copyOf(bySignature.values());
+    }
+
+    /** Reads an interface's default methods, and those of the interfaces it extends. */
+    private static void readDefaultMethods(Class<?> face, Map<String, Method> bySignature) {
+        for (Method method : face.getDeclaredMethods()) {
+            if (!method.isDefault() || method.isSynthetic() || method.isBridge()) {
+                continue;
+            }
+            bySignature.putIfAbsent(signature(method), method);
+        }
+        for (Class<?> parent : face.getInterfaces()) {
+            readDefaultMethods(parent, bySignature);
+        }
+    }
+
+    /** What makes two declarations one method: the name and the parameter types, as an override reads them. */
+    private static String signature(Method method) {
+        StringBuilder signature = new StringBuilder(method.getName());
+        for (Class<?> parameter : method.getParameterTypes()) {
+            signature.append(' ').append(parameter.getName());
+        }
+        return signature.toString();
+    }
+
+}
