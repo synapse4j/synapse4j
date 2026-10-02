@@ -55,11 +55,11 @@ public class ToolDefinition {
      * A tool with the given name, purpose and argument schema; nothing is said about enforcement,
      * see {@code getStrict()}.
      *
-     * @param name        the name the model calls the tool by
-     * @param description what the tool does
+     * @param name        the name the model calls the tool by, {@code null} when unnamed
+     * @param description what the tool does, {@code null} when none
      * @param inputSchema the arguments schema, as JSON Schema text
      */
-    public ToolDefinition(String name, String description, String inputSchema) {
+    public ToolDefinition(@Nullable String name, @Nullable String description, String inputSchema) {
         this.name = name;
         this.description = description;
         this.inputSchema = inputSchema;

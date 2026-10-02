@@ -4,13 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
+import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.AbstractJsonCodec;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
@@ -43,22 +43,11 @@ class MethodToolTest {
     }
 
     @Test
-    void factoryWithDeclarationRefusesMissingParts() {
-        Method greet = method("greet", String.class);
-        ToolDefinition nameless = new ToolDefinition(null, "d", "encoded");
-
-        assertThrows(NullPointerException.class, () -> MethodTool.of(null, greet, null, codec));
-        assertThrows(NullPointerException.class, () -> MethodTool.of(nameless, greet, null, codec));
-        assertThrows(NullPointerException.class,
-                () -> MethodTool.of(new ToolDefinition("n", "d", "s"), greet, null, null));
-    }
-
-    @Test
     void instanceMethodDemandsATargetStaticMethodDoesNot() {
         Method instance = method("instanceGreet", String.class);
         Method statik = method("greet", String.class);
 
-        NullPointerException refused = assertThrows(NullPointerException.class,
+        SynapseException refused = assertThrows(SynapseException.class,
                 () -> MethodTool.of("n", "d", instance, null, codec));
         assertTrue(refused.getMessage().contains("instance method"));
 
@@ -91,17 +80,6 @@ class MethodToolTest {
     }
 
     @Test
-    void handedDeclarationIsKeptAsIs() {
-        Method definition = method("withContext", ChatContext.class);
-        ToolDefinition handed = new ToolDefinition("handed", "Built by hand", "{\"type\":\"object\"}");
-
-        MethodTool tool = MethodTool.of(handed, definition, null, codec);
-
-        assertSame(handed, tool.definition());
-        assertTrue(codec.encoded.isEmpty());
-    }
-
-    @Test
     void privateMethodsRunOnceHandedOver() throws Exception {
         MethodTool tool = MethodTool.of("secret", "A private method", Target.class.getDeclaredMethod("secret"), null,
                 codec);
@@ -110,11 +88,11 @@ class MethodToolTest {
     }
 
     @Test
-    void definitionBeforeDefineIsLoud() {
-        MethodTool undefined = new MethodTool(method("greet", String.class), null, codec);
+    void definitionBeforeInitializeIsLoud() {
+        MethodTool tool = new MethodTool();
 
-        IllegalStateException failure = assertThrows(IllegalStateException.class, undefined::definition);
-        assertTrue(failure.getMessage().contains("define"));
+        IllegalStateException failure = assertThrows(IllegalStateException.class, tool::definition);
+        assertTrue(failure.getMessage().contains("initialize"));
     }
 
     // ===== resolveArguments =====
@@ -282,27 +260,6 @@ class MethodToolTest {
         assertTrue(failure.getMessage().contains("valueFor"));
     }
 
-    // ===== decoration path =====
-
-    @Test
-    void declarationCanBeDecoratedBetweenTheTwoFactories() {
-        codec.schemaDocument = Map.of("type", "object", "properties", Map.of("message", Map.of("type", "string")));
-        MethodTool generated = MethodTool.of("take", "Takes a string", method("take", String.class), null, codec);
-
-        JsonSchema schema = codec.decode(generated.definition().getInputSchema(), JsonSchema.class);
-        schema.getProperties().get("message").setDescription("what to take");
-        String rendered = codec.encode(schema);
-        // the codec answers "encoded" with whatever document was last written — keep them in step
-        codec.schemaDocument = lastEncoded();
-        ToolDefinition decorated = new ToolDefinition("take", "New description", rendered);
-
-        MethodTool rebuilt = MethodTool.of(decorated, method("take", String.class), null, codec);
-
-        assertSame(decorated, rebuilt.definition());
-        JsonSchema rebuiltSchema = codec.decode(decorated.getInputSchema(), JsonSchema.class);
-        assertEquals("what to take", rebuiltSchema.getProperties().get("message").getDescription());
-    }
-
     // ===== harness =====
 
     private static Method method(String name, Class<?>... parameterTypes) {
@@ -391,13 +348,12 @@ class MethodToolTest {
     /** The extension the hooks exist for: one claim pair, schema and binding together. */
     private static class BizTool extends MethodTool {
 
-        private BizTool(Method method, Object target, JsonCodec codec) {
-            super(method, target, codec);
-        }
-
         public static BizTool of(String name, String description, Method method, Object target, JsonCodec codec) {
-            BizTool tool = new BizTool(method, target, codec);
-            tool.define(name, description);
+            ToolMethodSpec spec = new ToolMethodSpec(method, target);
+            spec.setName(name);
+            spec.setDescription(description);
+            BizTool tool = new BizTool();
+            tool.initialize(spec, codec);
             return tool;
         }
 
@@ -419,13 +375,13 @@ class MethodToolTest {
     /** Claims a type but never learns to provide it — the default valueFor must refuse. */
     private static class ClaimOnlyTool extends MethodTool {
 
-        private ClaimOnlyTool(Method method, Object target, JsonCodec codec) {
-            super(method, target, codec);
-        }
-
-        public static ClaimOnlyTool of(String name, String description, Method method, Object target, JsonCodec codec) {
-            ClaimOnlyTool tool = new ClaimOnlyTool(method, target, codec);
-            tool.define(name, description);
+        public static ClaimOnlyTool of(String name, String description, Method method, Object target,
+                JsonCodec codec) {
+            ToolMethodSpec spec = new ToolMethodSpec(method, target);
+            spec.setName(name);
+            spec.setDescription(description);
+            ClaimOnlyTool tool = new ClaimOnlyTool();
+            tool.initialize(spec, codec);
             return tool;
         }
 
@@ -437,16 +393,13 @@ class MethodToolTest {
     }
 
     /**
-     * A codec that moves what a test sets up: the arguments map for the model's text, a value
-     * per type for the binding fallback, and a schema document for the decoration path.
+     * A codec that moves what a test sets up: the arguments map for the model's text, and a value
+     * per type for the binding fallback.
      */
     private static class FakeCodec extends AbstractJsonCodec {
 
         /** What {@code decode(argumentsText, Map.class)} answers; the text itself is ignored. */
         private Map<String, Object> arguments;
-
-        /** What {@code decode("SCHEMA", ...)} answers — the decoration path reads a document. */
-        private Map<String, Object> schemaDocument;
 
         /** What the binding fallback decodes, keyed by target type. */
         private final Map<Type, Object> decodedByType = new java.util.HashMap<>();
@@ -482,9 +435,6 @@ class MethodToolTest {
         @SuppressWarnings("unchecked")
         @Override
         protected <T> T decodeValue(String json, Type type) {
-            if ("SCHEMA".equals(json) || (type == Map.class && "encoded".equals(json))) {
-                return (T) schemaDocument;
-            }
             if (type == Map.class) {
                 return (T) arguments;
             }

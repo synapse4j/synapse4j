@@ -1,22 +1,19 @@
 package io.github.synapse4j.tool;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.util.List;
+import java.util.Map;
+
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
-import org.jspecify.annotations.Nullable;
-
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.Parameter;
-import java.lang.reflect.Type;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-
 import lombok.NonNull;
 
 /**
@@ -25,88 +22,121 @@ import lombok.NonNull;
  * holding the one act in the middle, the invoke.
  *
  * <p>
- * Construction is two steps on purpose. The constructor does only what needs no judgement —
- * assertions, accessibility, reading the signature into arrays the stages later live off — and
- * {@link #define} builds the declaration after {@code new} has returned, because building it
- * asks {@link #schemaFor}, and a subclass's hook must never run while the subclass is still
- * being constructed. The factories perform both steps; a subclass's own factory does the same
- * two.
+ * An instance is constructed empty and completed once, by {@link #initialize} — the
+ * {@link SpecTool} contract, which this class's factories follow too: they read the method into a
+ * {@link ToolMethodSpec}, construct, and initialize. Completion runs after {@code new} has
+ * returned on purpose, because building the declaration asks {@link #schemaFor} about each
+ * parameter, and a subclass's hook must never run while the subclass is still being constructed.
  *
  * <p>
- * Everything the stages read from the signature is extracted up front — names, types, the
- * model-or-environment decision — so a call pays only array reads on this class's side; the
- * costs that remain are the codec reading the arguments and the invoke itself. Once defined, an
- * instance is immutable and shareable; the target, if it has state, is the application's to
- * make thread-safe.
+ * The spec is the one carrier of everything about the method — its signature, its parameters, and
+ * the names the declaration uses. Renaming a parameter is a spec customizer's job, not this
+ * class's. What the tool adds is the one thing the run cannot read off the spec: whether the model
+ * produces each parameter's value, one {@code boolean} per parameter, decided by
+ * {@link #schemaFor} at completion.
+ *
+ * <p>
+ * Once initialized, an instance is immutable and its methods may be called from any thread;
+ * completion must precede the handover, which the {@link SpecTool} contract already sequences —
+ * {@code initialize} runs before the tool is registered or asked anything. The target, if it has
+ * state, is the application's to make thread-safe.
  */
-public class MethodTool implements StagedTool {
-
-    /** The method to run. */
-    private final Method method;
-
-    /** The instance to run an instance method on; {@code null} for a static method. */
-    private final @Nullable Object target;
+public class MethodTool implements SpecTool, StagedTool {
 
     /** The codec reading arguments and rendering results. */
-    private final JsonCodec codec;
-
-    /** The declared parameters, read once — {@link Method#getParameters()} clones every call. */
-    private final Parameter[] parameters;
-
-    /** The name of each parameter, read once — absent names are synthesized per call by the JDK. */
-    private final String[] names;
-
-    /** The declared type of each parameter, read once. */
-    private final Class<?>[] types;
-
-    /** The generic type of each parameter, read once for the binding fallback. */
-    private final Type[] genericTypes;
-
-    /** Per parameter: {@code true} when the model produces its value — see {@link #schemaFor}. */
-    private final boolean[] fromModel;
-
-    /** Whether the method returns void — asked once for the result stage. */
-    private final boolean returnsVoid;
-
-    /** The declaration; set exactly once by {@link #define}, visible to whoever the tool is shared with. */
-    private volatile @Nullable ToolDefinition definition;
+    private JsonCodec codec;
 
     /**
-     * Reads the signature and holds everything the stages need; builds nothing yet. An instance
-     * method needs a target; a static method takes {@code null}. The method is made accessible,
-     * so a private method the application hands over runs like any other.
-     *
-     * @param method the method to run; never {@code null}
-     * @param target the instance for an instance method, {@code null} for a static one
-     * @param codec  the codec reading arguments and rendering results; never {@code null}
+     * The method this tool runs, read — the resolution it was completed from when a spec drove
+     * the declaration, and the bare signature when the declaration was handed in. The run reads
+     * its parameters and their names from here.
      */
-    protected MethodTool(@NonNull Method method, @Nullable Object target, @NonNull JsonCodec codec) {
-        this.method = method;
-        this.codec = codec;
-        if (!Modifier.isStatic(method.getModifiers())) {
-            Objects.requireNonNull(target, "target must not be null: " + method + " is an instance method");
+    private ToolMethodSpec spec;
+
+    /** Per parameter: {@code true} when the model produces its value — see {@link #schemaFor}. */
+    private boolean[] fromModel;
+
+    /** Whether the method returns void — asked once for the result stage. */
+    private boolean returnsVoid;
+
+    /**
+     * The declaration, set exactly once by completion. Every completion path sets it, so a
+     * {@code null} here means the tool was never completed — the contract violation
+     * {@link #definition()} answers.
+     */
+    private ToolDefinition definition;
+
+    // The SpecTool path constructs empty and completes in initialize; the suppression answers
+    // NullAway's "field not initialized" for exactly that window. Nothing reads the fields
+    // before initialize runs — that is the interface's contract, not an accident to recheck.
+    @SuppressWarnings("NullAway.Init")
+    public MethodTool() {
+    }
+
+    /**
+     * Completes this tool from the method's resolution: reads the signature, settles which
+     * parameters the model produces, then builds the declaration — the name and description the
+     * spec carries, and the arguments schema {@link #argumentsSchema} puts together.
+     *
+     * <p>
+     * The spec is validated first, so every way of completing a tool starts from a resolution that
+     * is complete and consistent; a blank description still means none.
+     *
+     * @param spec  the resolution of the method this tool was built from; never {@code null}, and
+     *                  it must pass {@link ToolMethodSpec#validate()}
+     * @param codec the codec that generates the declaration and binds arguments; never
+     *                  {@code null}
+     * @throws SynapseException if the spec does not validate
+     */
+    @Override
+    public void initialize(@NonNull ToolMethodSpec spec, @NonNull JsonCodec codec) {
+        readSignature(spec, codec);
+        List<ToolParameterSpec> entries = spec.getParameters();
+        for (int i = 0; i < entries.size(); i++) {
+            fromModel[i] = schemaFor(entries.get(i).getParameter()) != null;
         }
-        this.target = target;
-        try {
-            method.setAccessible(true);
-        } catch (RuntimeException failure) {
-            // A module path refuses this for a package that was not opened: the caller has to open
-            // it, so the message names the method and the package it lives in.
-            throw new SynapseException("cannot reach " + method + ": open package "
-                    + method.getDeclaringClass().getPackageName()
-                    + " to this library, for example with --add-opens", failure);
+        String description = spec.getDescription();
+        this.definition = new ToolDefinition(spec.getName(), description.isBlank() ? null : description,
+                codec.encode(argumentsSchema(spec)));
+    }
+
+    /**
+     * The schema the model is given for this tool's arguments: an object with one property per
+     * parameter {@link #schemaFor} keeps on the wire, named by the spec's entry, described and
+     * required as that entry says.
+     *
+     * <p>
+     * Called while the declaration is defined, once, never on a call. Override to shape the envelope
+     * itself — its type, keywords the per-parameter schemas never carry, or another arrangement of
+     * them; take {@code super} to keep the built-in one and add to it. Binding is not this method's
+     * to change: it follows what {@link #schemaFor} answered, so a declaration shaped away from
+     * those properties is a mismatch the tool will not repair.
+     *
+     * <p>
+     * The built-in implementation asks {@link #schemaFor} once more for every parameter it lists —
+     * that answer was already needed, to settle the binding — so an override of {@code schemaFor}
+     * has to answer the same thing both times.
+     *
+     * @param spec the resolution this tool was completed from; never {@code null}
+     * @return the arguments schema to send; never {@code null}
+     */
+    protected JsonSchema argumentsSchema(ToolMethodSpec spec) {
+        JsonSchema envelope = new JsonSchema();
+        envelope.setType("object");
+        for (ToolParameterSpec entry : spec.getParameters()) {
+            JsonSchema schema = schemaFor(entry.getParameter());
+            if (schema == null) {
+                continue;
+            }
+            if (!entry.getDescription().isBlank()) {
+                schema.setDescription(entry.getDescription());
+            }
+            envelope.getProperties().put(entry.getName(), schema);
+            if (!"false".equals(entry.getRequired())) {
+                envelope.getRequired().add(entry.getName());
+            }
         }
-        this.parameters = method.getParameters();
-        this.returnsVoid = method.getReturnType() == void.class;
-        this.names = new String[parameters.length];
-        this.types = new Class<?>[parameters.length];
-        this.genericTypes = new Type[parameters.length];
-        this.fromModel = new boolean[parameters.length];
-        for (int i = 0; i < parameters.length; i++) {
-            names[i] = parameters[i].getName();
-            types[i] = parameters[i].getType();
-            genericTypes[i] = parameters[i].getParameterizedType();
-        }
+        return envelope;
     }
 
     /**
@@ -119,70 +149,40 @@ public class MethodTool implements StagedTool {
      * @param method      the method to run; never {@code null}
      * @param target      the instance for an instance method, {@code null} for a static one
      * @param codec       the codec reading arguments and rendering results; never {@code null}
-     * @return the assembled tool, defined and ready
+     * @return the assembled tool, initialized and ready
      */
     public static MethodTool of(String name, String description, Method method, @Nullable Object target,
             JsonCodec codec) {
-        MethodTool tool = new MethodTool(method, target, codec);
-        tool.define(name, description);
+        ToolMethodSpec spec = new ToolMethodSpec(method, target);
+        spec.setName(name);
+        spec.setDescription(description);
+        MethodTool tool = new MethodTool();
+        tool.initialize(spec, codec);
         return tool;
     }
 
     /**
-     * A tool under a declaration the application assembled itself. The signature is still read
-     * for binding: {@link #schemaFor} decides which parameters the model produces, whether or
-     * not this declaration was built from that same decision — keep the two consistent.
-     *
-     * @param definition the declaration to carry; never {@code null}, and its name must be set
-     * @param method     the method to run; never {@code null}
-     * @param target     the instance for an instance method, {@code null} for a static one
-     * @param codec      the codec reading arguments and rendering results; never {@code null}
-     * @return the assembled tool, defined and ready
+     * Reads the signature the spec names and holds everything the stages need; builds nothing
+     * yet. The spec is validated first, so everything downstream can read it without rechecking.
+     * The method is made accessible, so a private method the application hands over runs like any
+     * other.
      */
-    public static MethodTool of(ToolDefinition definition, Method method, @Nullable Object target, JsonCodec codec) {
-        MethodTool tool = new MethodTool(method, target, codec);
-        tool.define(definition);
-        return tool;
-    }
-
-    /**
-     * Sets the declaration built from the signature — the second step of construction, for this
-     * class's factories and for a subclass's alike. Call it exactly once, after {@code new} has
-     * returned: it asks {@link #schemaFor} for every parameter, and a subclass hook reads
-     * subclass state that does not exist during construction.
-     *
-     * @param name        the name the model calls the tool by; never {@code null}
-     * @param description what the tool does; never {@code null}
-     */
-    protected final void define(@NonNull String name, @NonNull String description) {
-        JsonSchema envelope = new JsonSchema();
-        envelope.setType("object");
-        for (int i = 0; i < parameters.length; i++) {
-            JsonSchema schema = schemaFor(parameters[i]);
-            if (schema == null) {
-                fromModel[i] = false;
-                continue;
-            }
-            fromModel[i] = true;
-            envelope.getProperties().put(names[i], schema);
-            envelope.getRequired().add(names[i]);
+    private void readSignature(ToolMethodSpec spec, JsonCodec codec) {
+        spec.validate();
+        this.spec = spec;
+        this.codec = codec;
+        Method method = spec.getMethod();
+        try {
+            method.setAccessible(true);
+        } catch (RuntimeException failure) {
+            // A module path refuses this for a package that was not opened: the caller has to open
+            // it, so the message names the method and the package it lives in.
+            throw new SynapseException("cannot reach " + method + ": open package "
+                    + method.getDeclaringClass().getPackageName()
+                    + " to this library, for example with --add-opens", failure);
         }
-        this.definition = new ToolDefinition(name, description, codec.encode(envelope));
-    }
-
-    /**
-     * Keeps a declaration the application assembled itself — the second step of construction
-     * when the signature is not the source. The model-or-environment decision is still
-     * {@link #schemaFor}'s; this only stores the declaration.
-     *
-     * @param definition the declaration to carry; never {@code null}, and its name must be set
-     */
-    protected final void define(@NonNull ToolDefinition definition) {
-        Objects.requireNonNull(definition.getName(), "definition must have a name");
-        for (int i = 0; i < parameters.length; i++) {
-            fromModel[i] = schemaFor(parameters[i]) != null;
-        }
-        this.definition = definition;
+        this.returnsVoid = method.getReturnType() == void.class;
+        this.fromModel = new boolean[spec.getParameters().size()];
     }
 
     /**
@@ -233,14 +233,17 @@ public class MethodTool implements StagedTool {
     /**
      * The declaration, whether built from the signature or handed in.
      *
-     * @return this tool as the model sees it; never {@code null} once {@link #define} has run
-     * @throws IllegalStateException if the factory steps were not both taken
+     * @return this tool as the model sees it; never {@code null} once the tool is initialized
+     * @throws IllegalStateException if completion never ran — {@link #initialize} or a factory
+     *                                   step is missing
      */
     @Override
     public ToolDefinition definition() {
+        // Non-null in every state the class allows; this answers the one it does not — being
+        // asked before completion, which the SpecTool contract forbids.
         if (definition == null) {
             throw new IllegalStateException(
-                    "no declaration: construction ends with define(...), which this tool has not had");
+                    "no declaration: a MethodTool is completed by initialize(...) or assembled by an of(...) factory, and this one has had neither");
         }
         return definition;
     }
@@ -260,18 +263,19 @@ public class MethodTool implements StagedTool {
     @Override
     public @Nullable Object[] resolveArguments(@Nullable String arguments, @Nullable ChatContext context)
             throws Exception {
-        @Nullable
-        Object[] values = new Object[parameters.length];
+        List<ToolParameterSpec> entries = spec.getParameters();
+        Object[] values = new Object[entries.size()];
         Map<String, Object> args = null;
-        for (int i = 0; i < parameters.length; i++) {
+        for (int i = 0; i < entries.size(); i++) {
+            ToolParameterSpec entry = entries.get(i);
             if (!fromModel[i]) {
-                values[i] = valueFor(parameters[i], context);
+                values[i] = valueFor(entry.getParameter(), context);
                 continue;
             }
             if (args == null) {
                 args = decodeArguments(arguments);
             }
-            values[i] = bind(i, args.get(names[i]));
+            values[i] = bind(entry, args.get(entry.getName()));
         }
         return values;
     }
@@ -290,7 +294,7 @@ public class MethodTool implements StagedTool {
     @Override
     public @Nullable Object call(@Nullable Object[] values, @Nullable ChatContext context) throws Exception {
         try {
-            return method.invoke(target, values);
+            return spec.getMethod().invoke(spec.getTarget(), values);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             if (cause instanceof Exception exception) {
@@ -332,19 +336,21 @@ public class MethodTool implements StagedTool {
         return decoded == null ? Map.of() : decoded;
     }
 
-    private @Nullable Object bind(int i, @Nullable Object raw) {
+    private @Nullable Object bind(ToolParameterSpec entry, @Nullable Object raw) {
+        Parameter parameter = entry.getParameter();
         if (raw == null) {
-            if (types[i].isPrimitive()) {
-                throw new IllegalArgumentException("parameter '" + names[i] + "' of "
+            if (parameter.getType().isPrimitive()) {
+                Method method = spec.getMethod();
+                throw new IllegalArgumentException("parameter '" + entry.getName() + "' of "
                         + method.getDeclaringClass().getSimpleName() + "." + method.getName()
                         + " is required, but the model produced no value for it");
             }
             return null;
         }
-        if (types[i].isInstance(raw)) {
+        if (parameter.getType().isInstance(raw)) {
             return raw;
         }
-        return codec.convert(raw, genericTypes[i]);
+        return codec.convert(raw, parameter.getParameterizedType());
     }
 
 }
