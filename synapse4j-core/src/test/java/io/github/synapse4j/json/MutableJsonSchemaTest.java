@@ -341,6 +341,48 @@ class MutableJsonSchemaTest {
         assertEquals(List.of(schema, shared, shared), visited);
     }
 
+    @Test
+    void copyOfCarriesEveryKeyword() {
+        MutableJsonSchema source = new MutableJsonSchema();
+        source.setType("object");
+        source.setRequired(List.of("name"));
+        source.put("format", "uuid");
+
+        MutableJsonSchema copy = MutableJsonSchema.copyOf(source);
+
+        assertNotSame(source, copy);
+        assertEquals(Set.of("type", "required", "format"), copy.keys());
+        assertEquals(JsonSchemas.toDocument(source), JsonSchemas.toDocument(copy));
+    }
+
+    @Test
+    void copyOfSharesSubSchemas() {
+        MutableJsonSchema name = typed("string");
+        MutableJsonSchema source = new MutableJsonSchema();
+        source.setProperties(Map.of("name", name));
+
+        MutableJsonSchema copy = MutableJsonSchema.copyOf(source);
+
+        assertNotSame(source, copy);
+        assertSame(name, copy.getProperties().get("name"));
+    }
+
+    @Test
+    void copyOfLeavesTheOriginalAlone() {
+        MutableJsonSchema source = typed("object");
+
+        MutableJsonSchema copy = MutableJsonSchema.copyOf(source);
+        copy.setType("array");
+
+        assertEquals(List.of("object"), source.getType());
+        assertEquals(List.of("array"), copy.getType());
+    }
+
+    @Test
+    void copyOfRefusesABooleanSchema() {
+        assertThrows(SynapseException.class, () -> MutableJsonSchema.copyOf(BooleanJsonSchema.TRUE));
+    }
+
     private static MutableJsonSchema typed(String type) {
         MutableJsonSchema schema = new MutableJsonSchema();
         schema.setType(type);

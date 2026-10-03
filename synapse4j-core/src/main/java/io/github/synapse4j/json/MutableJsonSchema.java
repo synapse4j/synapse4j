@@ -68,6 +68,33 @@ public class MutableJsonSchema implements JsonSchema {
     /** Every keyword a node carries, keyed by JSON name: the one place a node's data lives. */
     private final Map<String, Object> values = new LinkedHashMap<>();
 
+    /**
+     * Returns a mutable copy of {@code schema}.
+     *
+     * <p>
+     * The copy is shallow: a keyword whose value is a sub-schema, or a list or a map of them, is
+     * carried by reference, so the copy shares those nodes with {@code schema}. Changing a keyword of
+     * the copy leaves the original alone; changing a shared node reaches both, so a nested change goes
+     * through {@link #map} or replaces the node through a setter.
+     *
+     * <p>
+     * A boolean schema is refused: it carries no keyword, and there is no object form to copy it into.
+     *
+     * @param schema the schema to copy; must not be {@code null}
+     * @return a mutable copy sharing the sub-schemas of the original; never {@code null}
+     * @throws SynapseException if {@code schema} is the boolean form
+     */
+    public static MutableJsonSchema copyOf(@NonNull JsonSchema schema) {
+        if (schema.asBoolean() != null) {
+            throw new SynapseException("a boolean schema has no object form to copy: " + schema);
+        }
+        MutableJsonSchema copy = new MutableJsonSchema();
+        for (String keyword : schema.keys()) {
+            copy.values.put(keyword, schema.get(keyword));
+        }
+        return copy;
+    }
+
     @Override
     public @Nullable Boolean asBoolean() {
         return null;
