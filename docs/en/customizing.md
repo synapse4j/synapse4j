@@ -19,6 +19,30 @@ ChatClient client = new OpenAiCompletionsChatClient(http, codec, config);
 Nothing in a provider module or in your code changes. Writing an implementation of your own is
 covered by the Javadoc on `JsonCodec` and `HttpClient`.
 
+## The generated schema
+
+The codec generates the JSON Schema for a tool's arguments and for a structured answer, from the
+Java type and the same `JsonMapper` that binds the JSON. Which of the Jackson module's recommended
+choices to apply is a `JacksonSchemaSettings` — one flag or set per choice, defaulting to the
+recommendation. A choice turned off is simply not applied, which is how you replace it: turn it off
+and add a victools `Module` of your own in its place.
+
+```java
+JacksonSchemaSettings settings = new JacksonSchemaSettings();
+settings.setFlattenOptionals(false);            // leave the recommended choice out
+
+SchemaGeneratorConfigBuilder builder =
+        JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(mapper, settings);
+builder.with(myOptionalModule);                 // put your own rule in its place
+
+JsonCodec codec = new JacksonJsonCodec(mapper, new SchemaGenerator(builder.build()),
+        new SchemaGenerator(JacksonSchemaConfigBuilders.decodeSchemaConfigBuilder(mapper, settings).build()));
+```
+
+The settings' Javadoc names every choice and what its default does; each module's Javadoc says what
+it contributes. `null` settings applies none of the choices, leaving victools' plain configuration
+for a caller who would rather compose everything.
+
 ## Standing configuration on the client
 
 A model, a temperature or a response format that every call shares belongs on the client:

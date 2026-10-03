@@ -52,7 +52,9 @@ synapse4j:
 
 `synapse4j.*` 的键按配置的内容分组。厂商族的设置——`synapse4j.openai.*` 绑定 `OpenAiConfig`，
 `synapse4j.anthropic.*` 绑定 `AnthropicConfig`——和传输层的设置——`synapse4j.http-options.*` 绑定
-`HttpOptions`——放在根上，因为各能力共用它们。只有 chat 调用才有的东西收在 `synapse4j.chat.*`
+`HttpOptions`——放在根上，因为各能力共用它们。JSON 实现自己的设置放在它自己的键下——
+`synapse4j.jackson.*` 绑定 `JacksonSchemaSettings`，即 schema 生成器的各项选择——这样将来换一个
+实现就有一组自己的键。只有 chat 调用才有的东西收在 `synapse4j.chat.*`
 下面：`synapse4j.chat.client`、`synapse4j.chat.auto-tool-calling`、`synapse4j.chat.system-message`，
 以及 `synapse4j.chat.options.*`，它绑定 `ChatOptionsProperties`，即 starter 里 `ChatOptions` 的镜像，
 由 `toChatOptions()` 转成库里的类型——库里的类型本身无法绑定。每个键都是它绑定的那个类型上的一个
@@ -120,6 +122,24 @@ class GatewaySettings {
     }
 }
 ```
+
+## 定制 schema
+
+`synapse4j.jackson.*` 绑定 Jackson 模块的 schema 各项选择——每个选择是一个开关或一个集合，默认就是
+推荐值；你自己写的 victools `Module` bean 会在这些选择之后，挂到 codec 用的两个生成器上。把某个选择
+关掉、再挂一个模块进去，就是替换推荐规则的做法；这些选择和模块分别是什么，见
+[定制](customizing.md#生成的-schema)。
+
+```java
+@Bean
+Module optionalAsItsValue() {
+    // 针对推荐选择会描述得不一样的类型，给出你自己的规则
+    return configBuilder -> configBuilder.forTypesInGeneral().withCustomDefinitionProvider(myProvider);
+}
+```
+
+每个键都是 `JacksonSchemaSettings` 上的一个字段，含义写在那里。`synapse4j.jackson.*` 只在 starter
+组装 codec 时读取：自己声明 `JsonCodec` bean 的应用，两个生成器完全由它掌握。
 
 ## 声明你自己的 bean
 

@@ -49,7 +49,8 @@ history, sometimes a whole framework. synapse4j bundles none of them.
 4. [Tools](tools.md) — declaring tools and running the model's tool calls.
 5. [Streaming](streaming.md) — consuming an answer event by event.
 6. [Structured output](structured-output.md) — asking for JSON against a schema.
-7. [Customizing](customizing.md) — swapping components, hooks, defaults and per-call settings.
+7. [Customizing](customizing.md) — swapping components, hooks, defaults, per-call settings and the
+   generated schema.
 8. [Spring Boot](spring-boot.md) — the auto-configuring starter.
 9. [Writing a provider](writing-a-provider.md) — the shape of a provider module.
 10. [Design and trade-offs](design.md) — what the library does and does not do, and why.

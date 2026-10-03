@@ -54,7 +54,9 @@ synapse4j:
 The `synapse4j.*` keys group by what they configure. The family settings — `synapse4j.openai.*`
 binds `OpenAiConfig`, `synapse4j.anthropic.*` binds `AnthropicConfig` — and the transport settings —
 `synapse4j.http-options.*` binds `HttpOptions` — sit at the root, because a capability shares them.
-Everything only a chat call has sits together under `synapse4j.chat.*`: `synapse4j.chat.client`,
+The JSON implementation's settings sit under their own key — `synapse4j.jackson.*` binds
+`JacksonSchemaSettings`, the schema generator's choices — so a second implementation gets a group of
+its own. Everything only a chat call has sits together under `synapse4j.chat.*`: `synapse4j.chat.client`,
 `synapse4j.chat.auto-tool-calling`, `synapse4j.chat.system-message`, and `synapse4j.chat.options.*`,
 which binds `ChatOptionsProperties`, the starter's mirror of `ChatOptions` that `toChatOptions()`
 turns into the library type — the library type itself cannot be bound. Each key is a field on the
@@ -128,6 +130,26 @@ class GatewaySettings {
     }
 }
 ```
+
+## Customizing the schema
+
+`synapse4j.jackson.*` binds the Jackson module's schema choices — one flag or set per choice,
+defaulting to the recommendation — and a victools `Module` bean of your own is applied to both
+generators the codec is built with, after the choices. Turning a choice off and adding a module in
+its place is how one of the recommended rules is replaced; [Customizing](customizing.md#the-generated-schema)
+says what the choices and the modules are.
+
+```java
+@Bean
+Module optionalAsItsValue() {
+    // your own rule for a type the recommended choices would describe differently
+    return configBuilder -> configBuilder.forTypesInGeneral().withCustomDefinitionProvider(myProvider);
+}
+```
+
+Every key is a field on `JacksonSchemaSettings`, documented there. `synapse4j.jackson.*` is consulted
+only while the starter builds the codec: an application that declares its own `JsonCodec` bean owns
+the generators outright.
 
 ## Declaring your own bean
 

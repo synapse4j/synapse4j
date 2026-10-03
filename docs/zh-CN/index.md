@@ -44,7 +44,7 @@ System.out.println(response.getText());
 4. [工具](tools.md)——声明工具，运行模型的工具调用。
 5. [流式](streaming.md)——逐个事件消费答案。
 6. [结构化输出](structured-output.md)——要求符合 schema 的 JSON。
-7. [定制](customizing.md)——更换组件、钩子、默认值与每次调用的设置。
+7. [定制](customizing.md)——更换组件、钩子、默认值、每次调用的设置，以及生成的 schema。
 8. [Spring Boot](spring-boot.md)——自动配置的 starter。
 9. [编写一个提供商模块](writing-a-provider.md)——提供商模块的形状。
 10. [设计与取舍](design.md)——库做什么、不做什么，以及为什么。
