@@ -10,6 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +43,29 @@ class JacksonSchemaConfigBuildersTest {
     record Kitchen(String text, int number, Integer boxed, Optional<String> optional, List<String> list,
             List<Optional<String>> optionals, Map<String, String> map, Map<String, Object> open,
             Object anything, Nested nested) {
+    }
+
+    /**
+     * The kinds the kitchen does not carry: an enum, the other primitives, dates and a byte array.
+     *
+     * <p>
+     * The enum is written twice — once alone and once in a list — so it is described through
+     * {@code $defs} and a reference, the way a type used more than once is; the {@code byte[]} is the
+     * base64 string the mapper writes. Both are pinned here rather than in a class of their own, since
+     * what each is described as is the same kind of decision.
+     */
+    record Variety(Color color, List<Color> palette, boolean flag, double ratio, long count, BigDecimal amount,
+            byte[] data, LocalDate date, LocalDateTime time) {
+    }
+
+    /** An enum, so the schema shows how one is described: a definition others reference. */
+    enum Color {
+
+        RED, GREEN, BLUE
+    }
+
+    /** A type that contains itself with nothing in the way, so the schema has to close the cycle. */
+    record Link(String name, Link next) {
     }
 
     /**
@@ -122,7 +148,50 @@ class JacksonSchemaConfigBuildersTest {
         assertEquals(Map.of("k", Map.of("nested", List.of(1))),
                 codec.decode("{\"k\":{\"nested\":[1]}}", MAP_OF_OBJECT));
 
+        // A root that is not an object at all is described too.
         assertTrue(codec.generateDecodeSchema(Object.class).getType().isEmpty());
+        assertEquals(List.of("string"), codec.generateDecodeSchema(String.class).getType());
+        assertEquals(List.of("integer"), codec.generateDecodeSchema(int.class).getType());
+    }
+
+    @Test
+    void theScalarKindsAreDescribedByTheirType() {
+        JsonSchema schema = codec.generateDecodeSchema(Variety.class);
+        Map<String, JsonSchema> properties = schema.getProperties();
+
+        // An enum is a definition others reference, and the definition carries the values.
+        assertEquals("#/$defs/Color", properties.get("color").getRef());
+        assertEquals(List.of("string"), schema.getDefs().get("Color").getType());
+        assertEquals(List.of("RED", "GREEN", "BLUE"), schema.getDefs().get("Color").getEnumValues());
+
+        assertEquals(List.of("boolean"), properties.get("flag").getType());
+        assertEquals(List.of("number"), properties.get("ratio").getType());
+        assertEquals(List.of("integer"), properties.get("count").getType());
+        assertEquals(List.of("number"), properties.get("amount").getType());
+        // A byte[] is the base64 string the mapper writes, not the array of strings victools assumes.
+        assertEquals(List.of("string"), properties.get("data").getType());
+        assertEquals("base64", properties.get("data").getExtras().getRaw("contentEncoding"));
+        assertEquals(List.of("string"), properties.get("date").getType());
+        assertEquals("date", properties.get("date").getExtras().getRaw("format"));
+        assertEquals(List.of("string"), properties.get("time").getType());
+    }
+
+    @Test
+    void aSelfReferencingTypeStaysFinite() {
+        JsonSchema schema = codec.generateDecodeSchema(Link.class);
+
+        assertEquals(List.of("string"), schema.getProperties().get("name").getType());
+        assertEquals("#", schema.getProperties().get("next").getRef());
+    }
+
+    @Test
+    void aTypeUsedOnceIsDescribedInPlace() {
+        JsonSchema schema = codec.generateDecodeSchema(Kitchen.class);
+
+        // Nothing is swept into $defs: every type here is written once, so each is described where it
+        // is written rather than by reference.
+        assertTrue(schema.getDefs().isEmpty());
+        assertEquals(List.of("string"), schema.getProperties().get("nested").getProperties().get("value").getType());
     }
 
     @Test
@@ -141,6 +210,11 @@ class JacksonSchemaConfigBuildersTest {
 
         assertEquals(properties(schema), keysOf(codec.encode(sampleKitchen())));
         assertEquals(List.copyOf(schema.getProperties().keySet()), List.copyOf(schema.getRequired()));
+        // The container values are described as they are in the read direction: an optional value made
+        // nullable, a map's value type under additionalProperties.
+        assertTrue(allowsNull(schema, schema.getProperties().get("optional")));
+        assertEquals(Map.of("type", "string"),
+                schema.getProperties().get("map").getExtras().getRaw("additionalProperties"));
     }
 
     @Test
@@ -205,6 +279,16 @@ class JacksonSchemaConfigBuildersTest {
 
         // With the Jackson module gone, the annotation can no longer demand what the type makes optional.
         assertFalse(codecWith(settings).generateDecodeSchema(Annotated.class).getRequired().contains("optional"));
+    }
+
+    @Test
+    void theByteArrayIsAStringOnlyWhileTheChoiceIsOn() {
+        JacksonSchemaSettings settings = new JacksonSchemaSettings();
+        settings.setBase64Bytes(false);
+
+        // Off leaves victools' own description — an array of strings, which the mapper never writes.
+        assertEquals(List.of("array"), codecWith(settings).generateDecodeSchema(Variety.class)
+                .getProperties().get("data").getType());
     }
 
     /** A codec over the given choices, so a test can see what turning one off changes. */

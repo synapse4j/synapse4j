@@ -20,14 +20,11 @@ import tools.jackson.databind.json.JsonMapper;
  * behind it.
  *
  * <p>
- * The choices are made here and in the modules it applies — {@link PropertyDiscoveryModule} for which
- * properties exist, {@link FlattenedOptionalModule} for how an optional value is described,
- * {@link DecodeRequiredPropertiesModule} or {@link EncodeRequiredPropertiesModule} for which properties
- * are demanded — and nowhere else. Which of them a caller wants is a {@link JacksonSchemaSettings},
- * whose defaults are the choices this module recommends; {@code null} applies none of them, leaving the
- * bare preset for a caller who wants to configure everything themselves. {@link JacksonJsonCodec} takes
- * built generators and knows none of it, so a caller who wants other choices builds their own (through
- * the settings and the modules below, or with victools directly) and hands them over.
+ * Which choices to apply is a {@link JacksonSchemaSettings}, whose defaults are the ones this module
+ * recommends and whose {@code null} applies none of them — the bare preset, for a caller who wants to
+ * compose everything themselves. {@link JacksonJsonCodec} takes built generators and knows none of it,
+ * so a caller who wants other choices builds their own (through the settings and the modules below, or
+ * with victools directly) and hands them over.
  *
  * <p>
  * Both directions are configured from the {@link JsonMapper} they are built with, on purpose: the
@@ -87,11 +84,7 @@ public final class JacksonSchemaConfigBuilders {
      * it.
      *
      * <p>
-     * {@code PLAIN_JSON} with an explicit draft decides the vocabulary; then each choice in the settings
-     * is applied — the Jackson module and its options, {@link PropertyDiscoveryModule},
-     * {@link FlattenedOptionalModule}, the required module for the direction, and the two option sets.
-     * What is applied is applied in the order written here, which is the order the modules expect. A
-     * {@code null} settings applies none of that, leaving the preset alone.
+     * A {@code null} settings applies none of them, leaving the bare preset alone.
      *
      * @param jsonMapper the mapper whose introspection the generator should use
      * @param encoding   whether the schema describes JSON this codec writes
@@ -114,6 +107,9 @@ public final class JacksonSchemaConfigBuilders {
         }
         if (settings.isFlattenOptionals()) {
             configBuilder.with(new FlattenedOptionalModule());
+        }
+        if (settings.isBase64Bytes()) {
+            configBuilder.with(new Base64BytesModule());
         }
         if (settings.isRequiredProperties()) {
             configBuilder.with(encoding

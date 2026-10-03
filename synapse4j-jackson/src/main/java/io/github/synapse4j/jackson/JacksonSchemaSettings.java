@@ -66,4 +66,11 @@ public class JacksonSchemaSettings {
      */
     private boolean requiredProperties = true;
 
+    /**
+     * Whether a {@code byte[]} is described as a base64 string, which is what the mapper writes and reads
+     * by default. Turning it off leaves victools' own description in place — an array of strings, which
+     * the mapper never produces.
+     */
+    private boolean base64Bytes = true;
+
 }
