@@ -1,7 +1,6 @@
 package io.github.synapse4j.json;
 
 import java.lang.reflect.Type;
-import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
 
@@ -32,7 +31,7 @@ public abstract class AbstractJsonCodec implements JsonCodec {
      */
     @Override
     public String encode(@Nullable Object value) {
-        return encodeValue(value instanceof JsonSchema schema ? schema.toMap() : value);
+        return encodeValue(value instanceof JsonSchema schema ? JsonSchemas.toDocument(schema) : value);
     }
 
     /**
@@ -48,8 +47,8 @@ public abstract class AbstractJsonCodec implements JsonCodec {
     @Override
     public <T> @Nullable T decode(String json, Type type) {
         if (type instanceof Class<?> asked && JsonSchema.class.isAssignableFrom(asked)) {
-            Map<String, Object> document = decodeValue(json, Map.class);
-            return document == null ? null : cast(JsonSchema.fromMap(document));
+            Object document = decodeValue(json, Object.class);
+            return document == null ? null : cast(JsonSchemas.fromDocument(document));
         }
         return decodeValue(json, type);
     }

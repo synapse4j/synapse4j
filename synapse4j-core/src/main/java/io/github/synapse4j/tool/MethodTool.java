@@ -3,6 +3,8 @@ package io.github.synapse4j.tool;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -14,6 +16,7 @@ import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.MutableJsonSchema;
 import lombok.NonNull;
 
 /**
@@ -121,20 +124,28 @@ public class MethodTool implements SpecTool, StagedTool {
      * @return the arguments schema to send; never {@code null}
      */
     protected JsonSchema argumentsSchema(ToolMethodSpec spec) {
-        JsonSchema envelope = new JsonSchema();
+        MutableJsonSchema envelope = new MutableJsonSchema();
         envelope.setType("object");
+        Map<String, JsonSchema> properties = new LinkedHashMap<>();
+        List<String> required = new ArrayList<>();
         for (ToolParameterSpec entry : spec.getParameters()) {
             JsonSchema schema = schemaFor(entry.getParameter());
             if (schema == null) {
                 continue;
             }
-            if (!entry.getDescription().isBlank()) {
-                schema.setDescription(entry.getDescription());
+            if (schema instanceof MutableJsonSchema mutable && !entry.getDescription().isBlank()) {
+                mutable.setDescription(entry.getDescription());
             }
-            envelope.getProperties().put(entry.getName(), schema);
+            properties.put(entry.getName(), schema);
             if (!"false".equals(entry.getRequired())) {
-                envelope.getRequired().add(entry.getName());
+                required.add(entry.getName());
             }
+        }
+        if (!properties.isEmpty()) {
+            envelope.setProperties(properties);
+        }
+        if (!required.isEmpty()) {
+            envelope.setRequired(required);
         }
         return envelope;
     }

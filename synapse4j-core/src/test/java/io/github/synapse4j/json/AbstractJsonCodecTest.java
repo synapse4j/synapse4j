@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,15 +16,17 @@ class AbstractJsonCodecTest {
 
     @Test
     void writesASchemaAsTheDocumentItDescribes() {
-        JsonSchema schema = new JsonSchema();
+        MutableJsonSchema schema = new MutableJsonSchema();
         schema.setType("object");
-        schema.getProperties().put("name", subSchema("string"));
-        schema.getExtras().put("$schema", "https://json-schema.org/draft/2020-12/schema");
+        Map<String, JsonSchema> properties = new LinkedHashMap<>();
+        properties.put("name", subSchema("string"));
+        schema.setProperties(properties);
+        schema.put("$schema", "https://json-schema.org/draft/2020-12/schema");
 
         StubCodec codec = new StubCodec();
 
         assertEquals("stub", codec.encode(schema));
-        assertEquals(schema.toMap(), codec.encoded);
+        assertEquals(JsonSchemas.toDocument(schema), codec.encoded);
         assertTrue(codec.encoded instanceof Map);
     }
 
@@ -34,7 +37,8 @@ class AbstractJsonCodecTest {
 
         JsonSchema schema = codec.decode("{\"type\":\"object\"}", JsonSchema.class);
 
-        assertEquals(Map.class, codec.decodedType);
+        // The document is read as Object: a schema document may be a boolean, which a Map type cannot carry.
+        assertEquals(Object.class, codec.decodedType);
         assertEquals(List.of("object"), schema.getType());
         assertEquals(List.of("string"), schema.getProperties().get("name").getType());
     }
@@ -46,7 +50,7 @@ class AbstractJsonCodecTest {
 
         JsonSchema schema = codec.decode("{}", ExtendedSchema.class);
 
-        assertEquals(Map.class, codec.decodedType);
+        assertEquals(Object.class, codec.decodedType);
         assertEquals(List.of("string"), schema.getType());
     }
 
@@ -66,18 +70,18 @@ class AbstractJsonCodecTest {
         StubCodec codec = new InterceptingCodec();
 
         assertEquals("intercepted", codec.encode("value"));
-        assertEquals("stub", codec.encode(new JsonSchema()));
+        assertEquals("stub", codec.encode(new MutableJsonSchema()));
         assertEquals(Map.of(), codec.encoded);
     }
 
     private static JsonSchema subSchema(String type) {
-        JsonSchema schema = new JsonSchema();
+        MutableJsonSchema schema = new MutableJsonSchema();
         schema.setType(type);
         return schema;
     }
 
     /** Providers extend the schema model; decoding must treat a subclass like the base type. */
-    private static class ExtendedSchema extends JsonSchema {
+    private static class ExtendedSchema extends MutableJsonSchema {
 
     }
 

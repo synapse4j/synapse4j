@@ -1,458 +1,193 @@
 package io.github.synapse4j.json;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
-import io.github.synapse4j.data.ProviderExtras;
-import io.github.synapse4j.exception.SynapseException;
 import org.jspecify.annotations.Nullable;
-
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.NonNull;
-import lombok.Setter;
 
 /**
  * A JSON Schema: what shape a JSON document has to have.
  *
  * <p>
- * Only the keywords that decide <em>structure</em> are fields here — the ones that nest, hold
- * sub-schemas, or say what kind of value is allowed. Keywords that merely constrain a value —
- * {@code format}, {@code pattern}, numeric and length bounds, {@code uniqueItems} and the like —
- * stay in the open part below: they are leaf scalars that no traversal needs to look at, and their
- * support differs from engine to engine, which is exactly the kind of thing that should travel
- * untouched rather than be pinned down here.
+ * A schema is either a boolean — {@code true} accepts everything, {@code false} accepts nothing — or
+ * an object carrying keywords. {@link #asBoolean()} answers which: a non-null answer is the boolean
+ * form, {@code null} the object form.
  *
  * <p>
- * Providers disagree about which keywords they honour: some ignore {@code format} silently, some
- * collapse {@code oneOf} into {@code anyOf}, some support only a subset of {@code pattern}. That
- * disagreement belongs to whoever speaks to the provider — the provider module rewrites or drops what
- * its target cannot express — and never to this class.
+ * This is the read side. The keywords a caller reaches for constantly have a named getter; every other
+ * keyword is read through {@link #keys()} and {@link #get(String, Class)}, which together see everything
+ * the node carries, modelled or not. The keyword names the getters below do not cover are still walked:
+ * a keyword whose value is a sub-schema is visited and mapped like any other.
  *
  * <p>
- * A value in the open part is JSON data — a map, a list or a scalar — because that is what arrives from
- * and goes back to a JSON document. A sub-schema is none of those, so nesting one is the caller's move:
- * put {@code subSchema.toMap()} in the open part. Such a schema travels, but {@link #subSchemas()} will
- * not visit it, since a map that came from a schema cannot be told apart from one that did not.
+ * {@link #visit(Consumer)} walks the tree and lets each node be read. {@link #map(UnaryOperator)} walks
+ * it and produces a new tree: the function answers which node to use, and a node it leaves unchanged is
+ * shared rather than copied, so only the path to a change is rebuilt.
  *
  * <p>
- * Deliberately not modelled, and handled by the open part instead:
- * <ul>
- * <li>a boolean schema ({@code true} / {@code false}): a generator never produces one, and several
- * engines reject it outright;</li>
- * <li>{@code const}: JSON Schema allows {@code "const": null}, and a field of type {@link Object}
- * cannot tell that apart from "no const at all".</li>
- * </ul>
+ * Read-only — as a contract, not as something enforced. A getter hands back what the node holds: the
+ * very collection it keeps, not a copy and not an unmodifiable wrapper. A caller reads those and does
+ * not change them; changing one, or a nested schema, is unsupported and can corrupt every schema that
+ * shares the node. A schema is built once, through the mutable implementation's setters, and read from
+ * then on; a copy needed at a boundary is made explicitly.
  *
  * <p>
- * {@link #toMap()} and {@link #fromMap(Map)} convert this structure to and from the plain
- * Map/List/scalar shape a JSON document has, which is how a codec writes it out and reads it back.
- * {@link #toString()} renders that same shape, since a dump of the fields of a recursive structure
- * helps nobody.
- *
- * <p>
- * The class is open, not final: a provider or an application may extend it, as it may extend any
- * other structure here.
+ * The rule is left to the caller on purpose, and the collections are deliberately not handed out as
+ * read-only views. Guarding against a caller who would change what it was told not to is not worth the
+ * cost: a wrapper would be allocated on every get, and it would guard only half anyway — a nested
+ * {@link JsonSchema} is still the mutable implementation, changeable straight through. Freezing the
+ * collections or copying on every get would cost more still. So mutability stays in the implementation,
+ * and read-only stays this interface's contract.
  */
-@Getter
-@Setter
-@NoArgsConstructor
-public class JsonSchema {
-
-    /** JSON names of the keywords this class models, used when converting to and from a map. */
-    private static final String TYPE = "type";
-    private static final String TITLE = "title";
-    private static final String DESCRIPTION = "description";
-    private static final String PROPERTIES = "properties";
-    private static final String REQUIRED = "required";
-    private static final String ITEMS = "items";
-    private static final String ADDITIONAL_PROPERTIES = "additionalProperties";
-    private static final String ENUM = "enum";
-    private static final String DEFS = "$defs";
-    private static final String REF = "$ref";
-    private static final String ANY_OF = "anyOf";
-    private static final String ONE_OF = "oneOf";
-    private static final String ALL_OF = "allOf";
+public interface JsonSchema {
 
     /**
-     * The JSON types the value may have; empty means any type. A single entry is written back as a
-     * plain string rather than a one-element array.
+     * Whether this schema is the boolean form, and which.
+     *
+     * @return {@code true} or {@code false} for a boolean schema, {@code null} for the object form
      */
-    @NonNull
-    private List<String> type = new ArrayList<>();
-
-    /** The properties of an object, each with its own schema. Empty means the object has none. */
-    @NonNull
-    private Map<String, JsonSchema> properties = new LinkedHashMap<>();
-
-    /** Names of the properties that must be present. Empty means none are required. */
-    @NonNull
-    private List<String> required = new ArrayList<>();
-
-    /** Shorthand for the schema of the array's elements. */
-    private @Nullable JsonSchema items;
-
-    /** Whether properties beyond {@link #properties} are allowed; {@code null} means the schema is silent. */
-    private @Nullable Boolean additionalProperties;
-
-    /** The allowed values. Empty means the value is not constrained to a set. */
-    @NonNull
-    private List<Object> enumValues = new ArrayList<>();
-
-    /** Reusable sub-schemas, addressed by {@link #ref}. Empty means there are none. */
-    @NonNull
-    private Map<String, JsonSchema> defs = new LinkedHashMap<>();
-
-    /** A reference to a sub-schema, such as {@code #/$defs/Location}. */
-    private @Nullable String ref;
-
-    /** Sub-schemas of which at least one has to match. Empty means this keyword is absent. */
-    @NonNull
-    private List<JsonSchema> anyOf = new ArrayList<>();
-
-    /** Sub-schemas of which exactly one has to match. Empty means this keyword is absent. */
-    @NonNull
-    private List<JsonSchema> oneOf = new ArrayList<>();
-
-    /** Sub-schemas all of which have to match. Empty means this keyword is absent. */
-    @NonNull
-    private List<JsonSchema> allOf = new ArrayList<>();
-
-    /** Name of the schema, for readers of the document. */
-    private @Nullable String title;
-
-    /** What the value means, for the model to read. */
-    private @Nullable String description;
-
-    /** Keywords this class does not model, carried through as the JSON data they arrived as. */
-    private final ProviderExtras extras = new ProviderExtras();
+    @Nullable
+    Boolean asBoolean();
 
     /**
-     * Sets the JSON types, replacing whatever {@code getType()} held before.
+     * The JSON types the value may have.
+     *
+     * @return the types, or {@code null} if this node does not say — which allows any type
+     */
+    @Nullable
+    List<String> getType();
+
+    /**
+     * A short name for this schema, for readers of the document.
+     *
+     * @return the title, or {@code null} if this node has none
+     */
+    @Nullable
+    String getTitle();
+
+    /**
+     * What this schema means, for a reader — or a model — to read.
+     *
+     * @return the description, or {@code null} if this node has none
+     */
+    @Nullable
+    String getDescription();
+
+    /**
+     * The properties of an object, each with its own schema.
+     *
+     * @return the properties by name, or {@code null} if this node declares none
+     */
+    @Nullable
+    Map<String, JsonSchema> getProperties();
+
+    /**
+     * Names of the properties that must be present.
+     *
+     * @return the names, or {@code null} if this node requires none
+     */
+    @Nullable
+    List<String> getRequired();
+
+    /**
+     * The schema of an array's elements.
+     *
+     * @return the element schema, or {@code null} if this node does not say
+     */
+    @Nullable
+    JsonSchema getItems();
+
+    /**
+     * What the object does about properties beyond {@link #getProperties()}.
      *
      * <p>
-     * Written out rather than left to Lombok: the single-type convenience below carries the same name,
-     * and Lombok generates no setter at all once one with that name exists.
+     * This is a schema: {@code false} is the boolean form that forbids them, {@code true} the one that
+     * allows anything, and an object schema constrains what they may be.
      *
-     * @param type the types; must not be {@code null}
+     * @return the schema, or {@code null} if this node is silent
      */
-    public void setType(@NonNull List<String> type) {
-        this.type = type;
-    }
+    @Nullable
+    JsonSchema getAdditionalProperties();
 
     /**
-     * Sets a single JSON type, replacing whatever {@code getType()} held before.
+     * A reference to a sub-schema, such as {@code #/$defs/Location}.
+     *
+     * @return the reference, or {@code null} if this node is not one
+     */
+    @Nullable
+    String getRef();
+
+    /**
+     * Reusable sub-schemas, addressed by {@link #getRef()}.
+     *
+     * @return the definitions by name, or {@code null} if this node has none
+     */
+    @Nullable
+    Map<String, JsonSchema> getDefs();
+
+    /**
+     * Every keyword this node carries, the ones above included.
+     *
+     * @return the keyword names; never {@code null}
+     */
+    Set<String> keys();
+
+    /**
+     * The value of any keyword this node carries, as the JSON data it is.
      *
      * <p>
-     * A convenience: most schemas name exactly one type, and writing it as a one-element list reads
-     * worse than the type it names.
+     * The keywords with a getter above say their type there, and {@link #get(String, Class)} reads one
+     * as an expected type. This method asks for no type and answers with whatever the node holds: a
+     * sub-schema for a keyword whose value is one, the JSON data otherwise, {@code null} when the node
+     * does not carry the keyword.
      *
-     * @param type one type, for example {@code object}; must not be {@code null}
+     * @param keyword the keyword to read
+     * @return its value as it is held, or {@code null} if this node does not carry it
      */
-    public void setType(@NonNull String type) {
-        setType(new ArrayList<>(List.of(type)));
-    }
+    @Nullable
+    Object get(String keyword);
+
+    /**
+     * The value of any keyword this node carries, read as the given type.
+     *
+     * <p>
+     * The keywords with a getter above say their type there; this method is for the rest. The answer is
+     * the value when it is of the given type, and {@code null} when this node does not carry the keyword
+     * or carries something else — a value of another type is not forced into the asked one.
+     *
+     * @param <T>     the type to read the value as
+     * @param keyword the keyword to read
+     * @param type    the type to read it as; must not be {@code null}
+     * @return its value, or {@code null} if this node does not carry it as that type
+     */
+    <T> @Nullable T get(String keyword, Class<?> type);
 
     /**
      * Walks this schema and every sub-schema below it, this one first.
      *
      * <p>
-     * The visitor receives each schema and may change it in place; the sub-schemas of that schema are
-     * visited afterwards. The walk runs on a snapshot of each level's children, so a sub-schema added
-     * during the walk is not visited, and one removed during the walk is still walked through. That
-     * also means the walk cannot be stopped early by removing the schema it is at.
-     *
-     * <p>
-     * A schema reached through two different paths is visited twice, being the same object either
-     * way. One that contains itself is refused, and the walk stops where the cycle closes: the check
-     * runs as the walk descends, so the visitor has already seen the schemas above it.
+     * The visitor receives each schema and may read it. The sub-schemas of that schema are visited
+     * afterwards, and a schema that contains itself is refused rather than walked forever.
      *
      * @param visitor what to do with each schema; must not be {@code null}
-     * @throws SynapseException if this schema contains itself
      */
-    public void visit(@NonNull Consumer<JsonSchema> visitor) {
-        visit(visitor, Collections.newSetFromMap(new IdentityHashMap<>()));
-    }
-
-    private void visit(Consumer<JsonSchema> visitor, Set<JsonSchema> path) {
-        requireNotCyclic(path);
-        path.add(this);
-        visitor.accept(this);
-        for (JsonSchema subSchema : subSchemas()) {
-            subSchema.visit(visitor, path);
-        }
-        path.remove(this);
-    }
+    void visit(Consumer<JsonSchema> visitor);
 
     /**
-     * Returns every sub-schema directly below this one, so that a caller can walk the tree without
-     * knowing which field belongs to which keyword.
+     * Walks this schema and every sub-schema below it and produces a new schema.
      *
      * <p>
-     * The order is not part of the contract, hence a collection rather than a list. A sub-schema
-     * reached through {@code getExtras()} is not included: this class cannot tell which of those
-     * values are schemas.
+     * The walk is bottom-up: a node's sub-schemas are mapped first, then the function is handed that
+     * node with them already replaced. The node it answers with is the one used; answering with the
+     * same instance leaves that node shared, so only the nodes whose answer changed — and the path
+     * down to them — are rebuilt.
      *
-     * @return the sub-schemas; never {@code null}
+     * @param fn which node to use in place of each; must not be {@code null}
+     * @return the new schema; never {@code null}
      */
-    public Collection<JsonSchema> subSchemas() {
-        List<JsonSchema> subSchemas = new ArrayList<>();
-        subSchemas.addAll(properties.values());
-        subSchemas.addAll(defs.values());
-        subSchemas.addAll(anyOf);
-        subSchemas.addAll(oneOf);
-        subSchemas.addAll(allOf);
-        if (items != null) {
-            subSchemas.add(items);
-        }
-        return subSchemas;
-    }
-
-    /**
-     * Writes this schema as the plain shape a JSON document has: maps, lists and scalars, nothing of
-     * this library.
-     *
-     * <p>
-     * A field that carries nothing is left out — an empty collection and a null both mean the keyword
-     * is absent. A single {@code type} is written as a string rather than a one-element
-     * array. The open part is written at the same level, one entry per keyword, its value as it
-     * stands; an open entry whose name is a keyword this class models is ignored, so a field always
-     * wins over the open part.
-     *
-     * <p>
-     * A schema reached through two different paths is written out at each of them, JSON having no way
-     * to share one. One that contains itself has no document at all, and is refused.
-     *
-     * @return the schema as a map; never {@code null}
-     * @throws SynapseException if this schema contains itself
-     */
-    public Map<String, Object> toMap() {
-        return toMap(Collections.newSetFromMap(new IdentityHashMap<>()));
-    }
-
-    private Map<String, Object> toMap(Set<JsonSchema> path) {
-        requireNotCyclic(path);
-        path.add(this);
-        Map<String, Object> map = new LinkedHashMap<>();
-        if (!type.isEmpty()) {
-            map.put(TYPE, type.size() == 1 ? type.get(0) : new ArrayList<>(type));
-        }
-        if (title != null) {
-            map.put(TITLE, title);
-        }
-        if (description != null) {
-            map.put(DESCRIPTION, description);
-        }
-        if (!properties.isEmpty()) {
-            map.put(PROPERTIES, nestedMaps(properties, path));
-        }
-        if (!required.isEmpty()) {
-            map.put(REQUIRED, new ArrayList<>(required));
-        }
-        if (items != null) {
-            map.put(ITEMS, items.toMap(path));
-        }
-        if (additionalProperties != null) {
-            map.put(ADDITIONAL_PROPERTIES, additionalProperties);
-        }
-        if (!enumValues.isEmpty()) {
-            map.put(ENUM, new ArrayList<>(enumValues));
-        }
-        if (!defs.isEmpty()) {
-            map.put(DEFS, nestedMaps(defs, path));
-        }
-        if (ref != null) {
-            map.put(REF, ref);
-        }
-        if (!anyOf.isEmpty()) {
-            map.put(ANY_OF, nestedMaps(anyOf, path));
-        }
-        if (!oneOf.isEmpty()) {
-            map.put(ONE_OF, nestedMaps(oneOf, path));
-        }
-        if (!allOf.isEmpty()) {
-            map.put(ALL_OF, nestedMaps(allOf, path));
-        }
-        // The open part fills only what no field claimed: a modelled keyword always wins.
-        extras.nestedMap().forEach(map::putIfAbsent);
-        path.remove(this);
-        return map;
-    }
-
-    /**
-     * Refuses a schema that contains itself. A recursive schema is spelled with {@code $ref} — a
-     * string here — so a graph that cycles can only come of nesting one of these objects inside
-     * itself, and neither a walk nor a JSON document has an answer for that.
-     */
-    private void requireNotCyclic(Set<JsonSchema> path) {
-        if (path.contains(this)) {
-            throw new SynapseException(
-                    "the schema contains itself (" + describe() + "): a recursive schema is spelled with "
-                            + "$ref, and a schema graph that cycles has no JSON document");
-        }
-    }
-
-    /** Names this schema for an error message: a short label, not the whole document {@link #toString()} renders. */
-    private String describe() {
-        if (ref != null) {
-            return "$ref " + ref;
-        }
-        if (title != null) {
-            return "titled " + title;
-        }
-        return "no $ref and no title";
-    }
-
-    /**
-     * Reads a schema from the plain shape a JSON document has.
-     *
-     * <p>
-     * A keyword this class models goes into its field. Everything else is carried in the open part
-     * unchanged — and so is a modelled keyword that arrives in a shape this class does not expect: a
-     * {@code properties} that is not a map, an {@code items} that is a list of schemas, an
-     * {@code additionalProperties} that is a schema itself.
-     *
-     * <p>
-     * The map is taken as it is: a graph that contains itself is not detected here, and a map that
-     * nests itself would recurse until the stack runs out. A document read from JSON cannot do that —
-     * JSON has no cycles — so it bites only a map assembled by hand.
-     *
-     * @param map the schema as a map; must not be {@code null}
-     * @return the schema; never {@code null}
-     */
-    public static JsonSchema fromMap(@NonNull Map<String, Object> map) {
-        JsonSchema schema = new JsonSchema();
-        map.forEach(schema::read);
-        return schema;
-    }
-
-    /**
-     * Renders this schema in the shape {@link #toMap()} produces rather than dumping its fields: a
-     * recursive structure reads better the way it is written out.
-     *
-     * @return the rendered schema
-     */
-    @Override
-    public String toString() {
-        return "JsonSchema" + toMap();
-    }
-
-    private void read(String keyword, @Nullable Object value) {
-        switch (keyword) {
-            case TYPE -> readType(keyword, value);
-            case TITLE -> readText(keyword, value, this::setTitle);
-            case DESCRIPTION -> readText(keyword, value, this::setDescription);
-            case REF -> readText(keyword, value, this::setRef);
-            case REQUIRED -> readTexts(keyword, value, this::setRequired);
-            case ENUM -> readValues(keyword, value);
-            case ADDITIONAL_PROPERTIES -> readAdditionalProperties(keyword, value);
-            case PROPERTIES -> readSchemas(keyword, value, this::setProperties);
-            case DEFS -> readSchemas(keyword, value, this::setDefs);
-            case ITEMS -> readSchema(keyword, value, this::setItems);
-            case ANY_OF -> readSchemaList(keyword, value, this::setAnyOf);
-            case ONE_OF -> readSchemaList(keyword, value, this::setOneOf);
-            case ALL_OF -> readSchemaList(keyword, value, this::setAllOf);
-            default -> carry(keyword, value);
-        }
-    }
-
-    private void readType(String keyword, @Nullable Object value) {
-        if (value instanceof String single) {
-            setType(single);
-        } else if (value instanceof List<?> types && types.stream().allMatch(String.class::isInstance)) {
-            setType(new ArrayList<String>(types.stream().map(String.class::cast).toList()));
-        } else {
-            carry(keyword, value);
-        }
-    }
-
-    private void readText(String keyword, @Nullable Object value, Consumer<String> setter) {
-        if (value instanceof String text) {
-            setter.accept(text);
-        } else {
-            carry(keyword, value);
-        }
-    }
-
-    private void readTexts(String keyword, @Nullable Object value, Consumer<List<String>> setter) {
-        if (value instanceof List<?> texts && texts.stream().allMatch(String.class::isInstance)) {
-            setter.accept(new ArrayList<>(texts.stream().map(String.class::cast).toList()));
-        } else {
-            carry(keyword, value);
-        }
-    }
-
-    private void readValues(String keyword, @Nullable Object value) {
-        if (value instanceof List<?> values) {
-            setEnumValues(new ArrayList<>(values));
-        } else {
-            carry(keyword, value);
-        }
-    }
-
-    private void readAdditionalProperties(String keyword, @Nullable Object value) {
-        if (value instanceof Boolean allowed) {
-            setAdditionalProperties(allowed);
-        } else {
-            carry(keyword, value);
-        }
-    }
-
-    private void readSchemas(String keyword, @Nullable Object value, Consumer<Map<String, JsonSchema>> setter) {
-        if (value instanceof Map<?, ?> map && map.values().stream().allMatch(Map.class::isInstance)) {
-            Map<String, JsonSchema> schemas = new LinkedHashMap<>();
-            map.forEach((name, nested) -> schemas.put(String.valueOf(name), fromMap(asMap(nested))));
-            setter.accept(schemas);
-        } else {
-            carry(keyword, value);
-        }
-    }
-
-    private void readSchema(String keyword, @Nullable Object value, Consumer<JsonSchema> setter) {
-        if (value instanceof Map<?, ?> map) {
-            setter.accept(fromMap(asMap(map)));
-        } else {
-            carry(keyword, value);
-        }
-    }
-
-    private void readSchemaList(String keyword, @Nullable Object value, Consumer<List<JsonSchema>> setter) {
-        if (value instanceof List<?> list && list.stream().allMatch(Map.class::isInstance)) {
-            List<JsonSchema> schemas = new ArrayList<>();
-            list.forEach(nested -> schemas.add(fromMap(asMap(nested))));
-            setter.accept(schemas);
-        } else {
-            carry(keyword, value);
-        }
-    }
-
-    private void carry(String keyword, @Nullable Object value) {
-        extras.put(keyword, value);
-    }
-
-    private static Map<String, Object> nestedMaps(Map<String, JsonSchema> schemas, Set<JsonSchema> path) {
-        Map<String, Object> maps = new LinkedHashMap<>();
-        schemas.forEach((name, schema) -> maps.put(name, schema.toMap(path)));
-        return maps;
-    }
-
-    private static List<Object> nestedMaps(Collection<JsonSchema> schemas, Set<JsonSchema> path) {
-        List<Object> maps = new ArrayList<>();
-        schemas.forEach(schema -> maps.add(schema.toMap(path)));
-        return maps;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> asMap(@Nullable Object value) {
-        return (Map<String, Object>) Objects.requireNonNull(value, "a schema document is a map");
-    }
+    JsonSchema map(UnaryOperator<JsonSchema> fn);
 
 }

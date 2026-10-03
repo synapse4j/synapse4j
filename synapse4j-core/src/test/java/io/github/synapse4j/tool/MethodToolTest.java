@@ -16,12 +16,14 @@ import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonWriter;
+import io.github.synapse4j.json.MutableJsonSchema;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -363,8 +365,10 @@ class MethodToolTest {
 
         @Override
         protected JsonSchema argumentsSchema(ToolMethodSpec spec) {
-            JsonSchema envelope = super.argumentsSchema(spec);
-            envelope.getProperties().put("extra", new JsonSchema());
+            MutableJsonSchema envelope = (MutableJsonSchema) super.argumentsSchema(spec);
+            Map<String, JsonSchema> properties = new LinkedHashMap<>(envelope.getProperties());
+            properties.put("extra", new MutableJsonSchema());
+            envelope.setProperties(properties);
             return envelope;
         }
     }
@@ -439,13 +443,13 @@ class MethodToolTest {
 
         @Override
         public JsonSchema generateEncodeSchema(Type type) {
-            return new JsonSchema();
+            return new MutableJsonSchema();
         }
 
         @Override
         public JsonSchema generateDecodeSchema(Type type) {
             generatedFor.add(type);
-            JsonSchema schema = new JsonSchema();
+            MutableJsonSchema schema = new MutableJsonSchema();
             schema.setType("object");
             return schema;
         }

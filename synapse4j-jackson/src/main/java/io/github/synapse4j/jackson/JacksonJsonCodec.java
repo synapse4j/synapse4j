@@ -12,6 +12,7 @@ import com.github.victools.jsonschema.generator.SchemaGenerator;
 import io.github.synapse4j.json.AbstractJsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonSchemas;
 import io.github.synapse4j.json.JsonWriter;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.core.StreamWriteFeature;
@@ -164,7 +165,7 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
     private JsonSchema schema(SchemaGenerator schemaGenerator, Type type) {
         ObjectNode schemaNode = generateSchema(schemaGenerator, type);
         JavaType mapType = jsonMapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class);
-        return JsonSchema.fromMap(jsonMapper.convertValue(schemaNode, mapType));
+        return JsonSchemas.fromDocument(jsonMapper.convertValue(schemaNode, mapType));
     }
 
     /**

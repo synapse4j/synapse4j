@@ -97,7 +97,8 @@ public class FunctionTool<I, O> implements StagedTool {
     public static <I, O> FunctionTool<I, O> of(@NonNull String name, @NonNull String description,
             @NonNull Class<I> inputType, @NonNull Executor<I, O> executor, @NonNull JsonCodec codec) {
         JsonSchema schema = codec.generateDecodeSchema(inputType);
-        if (!schema.getType().contains("object")) {
+        List<String> types = schema.getType();
+        if (types == null || !types.contains("object")) {
             throw new IllegalArgumentException("inputType " + inputType.getTypeName()
                     + " does not describe an object; the protocol's arguments are an object, so wrap the parameters in a record");
         }

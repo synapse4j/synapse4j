@@ -27,6 +27,7 @@ import com.github.victools.jsonschema.generator.SchemaGenerator;
 import io.github.synapse4j.jackson.SchemaFixtures.Nested;
 import io.github.synapse4j.jackson.SchemaFixtures.Settable;
 import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonSchemas;
 
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -138,18 +139,18 @@ class JacksonSchemaConfigBuildersTest {
         JsonSchema map = codec.generateDecodeSchema(MAP_OF_STRING);
 
         assertEquals(List.of("object"), map.getType());
-        assertEquals(Map.of("type", "string"), map.getExtras().getRaw("additionalProperties"));
+        assertEquals(Map.of("type", "string"), JsonSchemas.toDocument(map.getAdditionalProperties()));
         assertEquals(Map.of("k", "v"), codec.decode("{\"k\":\"v\"}", MAP_OF_STRING));
 
         JsonSchema open = codec.generateDecodeSchema(MAP_OF_OBJECT);
 
         assertEquals(List.of("object"), open.getType());
-        assertNull(open.getExtras().getRaw("additionalProperties"));
+        assertNull(open.getAdditionalProperties());
         assertEquals(Map.of("k", Map.of("nested", List.of(1))),
                 codec.decode("{\"k\":{\"nested\":[1]}}", MAP_OF_OBJECT));
 
         // A root that is not an object at all is described too.
-        assertTrue(codec.generateDecodeSchema(Object.class).getType().isEmpty());
+        assertNull(codec.generateDecodeSchema(Object.class).getType());
         assertEquals(List.of("string"), codec.generateDecodeSchema(String.class).getType());
         assertEquals(List.of("integer"), codec.generateDecodeSchema(int.class).getType());
     }
@@ -162,7 +163,7 @@ class JacksonSchemaConfigBuildersTest {
         // An enum is a definition others reference, and the definition carries the values.
         assertEquals("#/$defs/Color", properties.get("color").getRef());
         assertEquals(List.of("string"), schema.getDefs().get("Color").getType());
-        assertEquals(List.of("RED", "GREEN", "BLUE"), schema.getDefs().get("Color").getEnumValues());
+        assertEquals(List.of("RED", "GREEN", "BLUE"), schema.getDefs().get("Color").get("enum", List.class));
 
         assertEquals(List.of("boolean"), properties.get("flag").getType());
         assertEquals(List.of("number"), properties.get("ratio").getType());
@@ -170,9 +171,9 @@ class JacksonSchemaConfigBuildersTest {
         assertEquals(List.of("number"), properties.get("amount").getType());
         // A byte[] is the base64 string the mapper writes, not the array of strings victools assumes.
         assertEquals(List.of("string"), properties.get("data").getType());
-        assertEquals("base64", properties.get("data").getExtras().getRaw("contentEncoding"));
+        assertEquals("base64", properties.get("data").get("contentEncoding", String.class));
         assertEquals(List.of("string"), properties.get("date").getType());
-        assertEquals("date", properties.get("date").getExtras().getRaw("format"));
+        assertEquals("date", properties.get("date").get("format", String.class));
         assertEquals(List.of("string"), properties.get("time").getType());
     }
 
@@ -190,7 +191,7 @@ class JacksonSchemaConfigBuildersTest {
 
         // Nothing is swept into $defs: every type here is written once, so each is described where it
         // is written rather than by reference.
-        assertTrue(schema.getDefs().isEmpty());
+        assertNull(schema.getDefs());
         assertEquals(List.of("string"), schema.getProperties().get("nested").getProperties().get("value").getType());
     }
 
@@ -214,7 +215,7 @@ class JacksonSchemaConfigBuildersTest {
         // nullable, a map's value type under additionalProperties.
         assertTrue(allowsNull(schema, schema.getProperties().get("optional")));
         assertEquals(Map.of("type", "string"),
-                schema.getProperties().get("map").getExtras().getRaw("additionalProperties"));
+                JsonSchemas.toDocument(schema.getProperties().get("map").getAdditionalProperties()));
     }
 
     @Test
@@ -244,8 +245,8 @@ class JacksonSchemaConfigBuildersTest {
         // None of the option sets, module flags or Jackson options are applied: no additionalProperties,
         // the preset's own $schema, and no required list.
         assertNull(schema.getAdditionalProperties());
-        assertTrue(schema.getExtras().nestedMap().containsKey("$schema"));
-        assertTrue(schema.getRequired().isEmpty());
+        assertTrue(schema.keys().contains("$schema"));
+        assertNull(schema.getRequired());
     }
 
     @Test
@@ -257,7 +258,7 @@ class JacksonSchemaConfigBuildersTest {
         JsonSchema schema = codecWith(settings).generateEncodeSchema(Kitchen.class);
 
         assertNull(schema.getAdditionalProperties());
-        assertTrue(schema.getExtras().nestedMap().containsKey("$schema"));
+        assertTrue(schema.keys().contains("$schema"));
     }
 
     @Test
@@ -266,7 +267,7 @@ class JacksonSchemaConfigBuildersTest {
         settings.setRequiredProperties(false);
         settings.setFlattenOptionals(false);
 
-        assertTrue(codecWith(settings).generateDecodeSchema(Kitchen.class).getRequired().isEmpty());
+        assertNull(codecWith(settings).generateDecodeSchema(Kitchen.class).getRequired());
         // The preset's own FLATTENED_OPTIONALS answers now: the value type, without the null branch.
         JsonSchema optional = codecWith(settings).generateDecodeSchema(OPTIONAL_STRING);
         assertFalse(allowsNull(optional, optional));
@@ -335,7 +336,14 @@ class JacksonSchemaConfigBuildersTest {
         JsonSchema definition = schema.getRef() == null
                 ? schema
                 : root.getDefs().get(schema.getRef().substring(schema.getRef().lastIndexOf('/') + 1));
-        return definition.getAnyOf().stream().anyMatch(branch -> branch.getType().contains("null"));
+        Object anyOf = definition.get("anyOf");
+        if (!(anyOf instanceof List<?> branches)) {
+            return false;
+        }
+        return branches.stream().anyMatch(branch -> {
+            List<String> types = branch instanceof JsonSchema subSchema ? subSchema.getType() : null;
+            return types != null && types.contains("null");
+        });
     }
 
     private List<String> keysOf(String json) {

@@ -21,7 +21,9 @@ import com.github.victools.jsonschema.generator.SchemaGenerator;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.json.BooleanJsonSchema;
 import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonSchemas;
 import io.github.synapse4j.json.JsonWriter;
 import lombok.Data;
 import org.junit.jupiter.api.Test;
@@ -59,7 +61,7 @@ class JacksonJsonCodecTest {
     @Test
     void aGetterWithoutASetterIsDescribedOnlyForWriting() {
         assertEquals(List.of("renamed", "sessions"), sorted(codec.generateEncodeSchema(Sessions.class)));
-        assertTrue(properties(codec.generateDecodeSchema(Sessions.class)).isEmpty());
+        assertNull(codec.generateDecodeSchema(Sessions.class).getProperties());
     }
 
     @Test
@@ -93,8 +95,8 @@ class JacksonJsonCodecTest {
     void theDefaultSchemaForbidsPropertiesItDoesNotDescribe() {
         JsonSchema schema = codec.generateEncodeSchema(Order.class);
 
-        assertEquals(Boolean.FALSE, schema.getAdditionalProperties());
-        assertFalse(schema.getExtras().nestedMap().containsKey("$schema"));
+        assertEquals(BooleanJsonSchema.FALSE, schema.getAdditionalProperties());
+        assertFalse(schema.keys().contains("$schema"));
     }
 
     @Test
@@ -117,7 +119,8 @@ class JacksonJsonCodecTest {
                 new JacksonSchemaSettings());
         SchemaGenerator fromBuilder = new SchemaGenerator(configBuilder.build());
 
-        assertEquals(codec.generateEncodeSchema(Order.class).toMap(), readSchema(fromBuilder, Order.class).toMap());
+        assertEquals(JsonSchemas.toDocument(codec.generateEncodeSchema(Order.class)),
+                JsonSchemas.toDocument(readSchema(fromBuilder, Order.class)));
     }
 
     @Test
@@ -170,8 +173,8 @@ class JacksonJsonCodecTest {
         String json = codec.encode(schema);
         JsonSchema decoded = codec.decode(json, JsonSchema.class);
 
-        assertEquals(codec.encode(schema.toMap()), json);
-        assertEquals(schema.toMap(), decoded.toMap());
+        assertEquals(codec.encode(JsonSchemas.toDocument(schema)), json);
+        assertEquals(JsonSchemas.toDocument(schema), JsonSchemas.toDocument(decoded));
     }
 
     @Test
@@ -183,7 +186,7 @@ class JacksonJsonCodecTest {
         // converts to a JsonSchema through the schema it describes, exactly as decode reads one.
         JsonSchema converted = codec.convert(decoded, JsonSchema.class);
 
-        assertEquals(schema.toMap(), converted.toMap());
+        assertEquals(JsonSchemas.toDocument(schema), JsonSchemas.toDocument(converted));
     }
 
     @Test
@@ -239,7 +242,7 @@ class JacksonJsonCodecTest {
 
     private JsonSchema readSchema(SchemaGenerator schemaGenerator, Class<?> type) {
         JavaType mapType = jsonMapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class);
-        return JsonSchema.fromMap(jsonMapper.convertValue(schemaGenerator.generateSchema(type), mapType));
+        return JsonSchemas.fromDocument(jsonMapper.convertValue(schemaGenerator.generateSchema(type), mapType));
     }
 
     private static Order sampleOrder() {
