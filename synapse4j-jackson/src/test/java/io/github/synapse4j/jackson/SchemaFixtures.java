@@ -11,10 +11,8 @@ import java.util.OptionalLong;
 
 import com.github.victools.jsonschema.generator.Module;
 import com.github.victools.jsonschema.generator.Option;
-import com.github.victools.jsonschema.generator.OptionPreset;
 import com.github.victools.jsonschema.generator.SchemaGenerator;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
-import com.github.victools.jsonschema.generator.SchemaVersion;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -78,15 +76,15 @@ final class SchemaFixtures {
     static final Type MAP_OF_OBJECT = new TypeReference<Map<String, Object>>() {
     }.getType();
 
-    /** A generator over a plain victools configuration carrying the given modules. */
+    /** A generator over the bare preset carrying the given modules. */
     static SchemaGenerator generator(Module... modules) {
         return generator(MAPPER, modules);
     }
 
     /** The same over a mapper configured for the test asking, whose settings the modules then answer. */
     static SchemaGenerator generator(JsonMapper jsonMapper, Module... modules) {
-        SchemaGeneratorConfigBuilder configBuilder = new SchemaGeneratorConfigBuilder(jsonMapper,
-                SchemaVersion.DRAFT_2020_12, OptionPreset.PLAIN_JSON);
+        SchemaGeneratorConfigBuilder configBuilder = JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(jsonMapper,
+                null);
         for (Module module : modules) {
             configBuilder.with(module);
         }

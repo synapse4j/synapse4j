@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.github.victools.jsonschema.generator.SchemaGenerator;
 
 import io.github.synapse4j.jackson.SchemaFixtures.Nested;
 import io.github.synapse4j.jackson.SchemaFixtures.Settable;
@@ -160,6 +161,59 @@ class JacksonSchemaConfigBuildersTest {
                 .changeDefaultPropertyInclusion(incl -> incl.withValueInclusion(JsonInclude.Include.NON_NULL))
                 .build());
         assertFalse(omittingNulls.generateEncodeSchema(Kitchen.class).getRequired().contains("optional"));
+    }
+
+    @Test
+    void nullSettingsApplyNoneOfTheChoices() {
+        JsonSchema schema = codecWith(null).generateEncodeSchema(Kitchen.class);
+
+        // None of the option sets, module flags or Jackson options are applied: no additionalProperties,
+        // the preset's own $schema, and no required list.
+        assertNull(schema.getAdditionalProperties());
+        assertTrue(schema.getExtras().nestedMap().containsKey("$schema"));
+        assertTrue(schema.getRequired().isEmpty());
+    }
+
+    @Test
+    void theOptionSetsAreTheOnesInTheSettings() {
+        JacksonSchemaSettings settings = new JacksonSchemaSettings();
+        settings.getOptions().clear();
+        settings.getSuppressedOptions().clear();
+
+        JsonSchema schema = codecWith(settings).generateEncodeSchema(Kitchen.class);
+
+        assertNull(schema.getAdditionalProperties());
+        assertTrue(schema.getExtras().nestedMap().containsKey("$schema"));
+    }
+
+    @Test
+    void theModuleFlagsAreTheOnesInTheSettings() {
+        JacksonSchemaSettings settings = new JacksonSchemaSettings();
+        settings.setRequiredProperties(false);
+        settings.setFlattenOptionals(false);
+
+        assertTrue(codecWith(settings).generateDecodeSchema(Kitchen.class).getRequired().isEmpty());
+        // The preset's own FLATTENED_OPTIONALS answers now: the value type, without the null branch.
+        JsonSchema optional = codecWith(settings).generateDecodeSchema(OPTIONAL_STRING);
+        assertFalse(allowsNull(optional, optional));
+    }
+
+    @Test
+    void theJacksonOptionsAreTheOnesInTheSettings() {
+        JacksonSchemaSettings settings = new JacksonSchemaSettings();
+        settings.getJacksonOptions().clear();
+
+        // With the Jackson module gone, the annotation can no longer demand what the type makes optional.
+        assertFalse(codecWith(settings).generateDecodeSchema(Annotated.class).getRequired().contains("optional"));
+    }
+
+    /** A codec over the given choices, so a test can see what turning one off changes. */
+    private JacksonJsonCodec codecWith(JacksonSchemaSettings settings) {
+        return new JacksonJsonCodec(jsonMapper,
+                new SchemaGenerator(
+                        JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(jsonMapper, settings).build()),
+                new SchemaGenerator(
+                        JacksonSchemaConfigBuilders.decodeSchemaConfigBuilder(jsonMapper, settings).build()));
     }
 
     /** The mapper settings a generated schema has to stay honest under. */
