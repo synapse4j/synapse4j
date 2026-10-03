@@ -2,6 +2,10 @@ package io.github.synapse4j.spring.boot;
 
 import java.util.Objects;
 
+import com.github.victools.jsonschema.generator.Module;
+import com.github.victools.jsonschema.generator.SchemaGenerator;
+import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
+
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.springframework.beans.factory.ObjectProvider;
@@ -30,6 +34,8 @@ import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.apache.ApacheHttpClient;
 import io.github.synapse4j.http.restclient.RestClientHttpClient;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
+import io.github.synapse4j.jackson.JacksonSchemaConfigBuilders;
+import io.github.synapse4j.jackson.JacksonSchemaSettings;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.openai.OpenAiCompletionsChatClient;
 import io.github.synapse4j.openai.OpenAiResponsesChatClient;
@@ -97,12 +103,30 @@ public class Synapse4jAutoConfiguration {
      * already been applied to it — so anything configured for the rest of the application holds for
      * tool arguments and structured output too. A mapper tuned for a web layer travels with its
      * stricter policies; the schema comes from the same mapper, so the two still agree.
+     *
+     * <p>
+     * The two generators are built from {@code synapse4j.jackson.*} — which of the recommended choices
+     * to apply, held on a {@link JacksonSchemaSettings} — and every victools {@link Module} bean is
+     * applied to both, in order, so an application adds to the schema policy without restating it. A
+     * choice turned off in the properties is simply not applied, which is how a module of the
+     * application's own replaces one of the recommended ones.
      */
     @Bean
     @ConditionalOnMissingBean
-    public JsonCodec jsonCodec(ObjectProvider<JsonMapper> mappers) {
-        JsonMapper mapper = mappers.getIfAvailable();
-        return mapper == null ? new JacksonJsonCodec() : new JacksonJsonCodec(mapper);
+    public JsonCodec jsonCodec(ObjectProvider<JsonMapper> mappers, Synapse4jProperties properties,
+            ObjectProvider<Module> schemaModules) {
+        JsonMapper mapper = mappers.getIfAvailable(() -> JsonMapper.builder().build());
+        JacksonSchemaSettings settings = properties.getJackson();
+        SchemaGeneratorConfigBuilder encodeBuilder = JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(mapper,
+                settings);
+        SchemaGeneratorConfigBuilder decodeBuilder = JacksonSchemaConfigBuilders.decodeSchemaConfigBuilder(mapper,
+                settings);
+        schemaModules.orderedStream().forEach(module -> {
+            encodeBuilder.with(module);
+            decodeBuilder.with(module);
+        });
+        return new JacksonJsonCodec(mapper, new SchemaGenerator(encodeBuilder.build()),
+                new SchemaGenerator(decodeBuilder.build()));
     }
 
     /**

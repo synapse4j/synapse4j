@@ -8,6 +8,7 @@ import io.github.synapse4j.anthropic.AnthropicConfig;
 import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.http.HttpOptions;
+import io.github.synapse4j.jackson.JacksonSchemaSettings;
 import io.github.synapse4j.openai.OpenAiConfig;
 
 /**
@@ -18,7 +19,9 @@ import io.github.synapse4j.openai.OpenAiConfig;
  * {@link OpenAiConfig}, {@code synapse4j.anthropic.*} on an {@link AnthropicConfig} — and the
  * transport settings — {@code synapse4j.http-options.*} on {@link HttpOptions} — are the library's
  * own configuration types held in place rather than restated; they sit at the root because a
- * capability shares them. What only a chat call has sits together under {@code synapse4j.chat.*}, on
+ * capability shares them. The JSON implementation's settings sit under its own key —
+ * {@code synapse4j.jackson.*} on a {@link JacksonSchemaSettings} — so a second implementation gets a
+ * group of its own. What only a chat call has sits together under {@code synapse4j.chat.*}, on
  * a {@link ChatProperties}, so a second capability adds a group of its own rather than keys a reader
  * cannot tell from the chat ones. Spring's binder calls a setter only for a key the environment
  * actually carries, so every property a user does not set keeps the default the library's own
@@ -93,5 +96,14 @@ public class Synapse4jProperties {
      */
     @NestedConfigurationProperty
     private final HttpOptions httpOptions = new HttpOptions();
+
+    /**
+     * The Jackson implementation's settings: which of the schema generator's recommended choices to
+     * apply and which to leave out. Held as the library's own {@link JacksonSchemaSettings}, whose
+     * defaults are the recommended choices. Grouped under the implementation's own key, so a second
+     * implementation — a different JSON library — gets a group of its own.
+     */
+    @NestedConfigurationProperty
+    private final JacksonSchemaSettings jackson = new JacksonSchemaSettings();
 
 }
