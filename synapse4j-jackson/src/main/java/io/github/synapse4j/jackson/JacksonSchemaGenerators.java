@@ -2,6 +2,7 @@ package io.github.synapse4j.jackson;
 
 import java.util.Objects;
 
+import com.github.victools.jsonschema.generator.Module;
 import com.github.victools.jsonschema.generator.Option;
 import com.github.victools.jsonschema.generator.OptionPreset;
 import com.github.victools.jsonschema.generator.SchemaGenerator;
@@ -23,8 +24,8 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>
  * Every choice about keywords — the draft, the option preset, the Jackson module, what to do about a
  * naming strategy — is made here and nowhere else. {@link JacksonJsonCodec} takes built generators and
- * knows none of it, so a caller who wants other choices builds their own (through the customizers
- * below, or with victools directly) and hands them over.
+ * knows none of it, so a caller who wants other choices builds their own (through the modules below, or
+ * with victools directly) and hands them over.
  *
  * <p>
  * Both directions are configured from the {@link JsonMapper} they are built with, on purpose: the
@@ -39,8 +40,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>
  * There are two shapes. The generator factories are the one-call shape. The config-builder methods are
  * the two-step shape a framework integration wants: take the builder with the defaults already on it,
- * run the {@link SchemaGeneratorConfigBuilderCustomizer}s the framework collects over it, then build a
- * generator from the result.
+ * run the {@link Module}s the framework collects over it, then build a generator from the result.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class JacksonSchemaGenerators {
@@ -48,37 +48,35 @@ public final class JacksonSchemaGenerators {
     /**
      * Builds the generator for the schema of the JSON this codec writes.
      *
-     * @param jsonMapper  the mapper whose introspection the generator should use; must not be
-     *                        {@code null}
-     * @param customizers what to change about the defaults, applied in the order given; may be empty
+     * @param jsonMapper the mapper whose introspection the generator should use; must not be
+     *                       {@code null}
+     * @param modules    what to change about the defaults, applied in the order given; may be empty
      * @return the generator; never {@code null}
      */
-    public static SchemaGenerator encodeSchemaGenerator(JsonMapper jsonMapper,
-            SchemaGeneratorConfigBuilderCustomizer... customizers) {
-        return new SchemaGenerator(config(encodeSchemaConfigBuilder(jsonMapper), customizers));
+    public static SchemaGenerator encodeSchemaGenerator(JsonMapper jsonMapper, Module... modules) {
+        return new SchemaGenerator(config(encodeSchemaConfigBuilder(jsonMapper), modules));
     }
 
     /**
      * Builds the generator for the schema of the JSON this codec reads.
      *
-     * @param jsonMapper  the mapper whose introspection the generator should use; must not be
-     *                        {@code null}
-     * @param customizers what to change about the defaults, applied in the order given; may be empty
+     * @param jsonMapper the mapper whose introspection the generator should use; must not be
+     *                       {@code null}
+     * @param modules    what to change about the defaults, applied in the order given; may be empty
      * @return the generator; never {@code null}
      */
-    public static SchemaGenerator decodeSchemaGenerator(JsonMapper jsonMapper,
-            SchemaGeneratorConfigBuilderCustomizer... customizers) {
-        return new SchemaGenerator(config(decodeSchemaConfigBuilder(jsonMapper), customizers));
+    public static SchemaGenerator decodeSchemaGenerator(JsonMapper jsonMapper, Module... modules) {
+        return new SchemaGenerator(config(decodeSchemaConfigBuilder(jsonMapper), modules));
     }
 
     /**
      * Creates the configuration builder for the schema of the JSON this codec writes, with this
-     * module's defaults already applied and no {@link SchemaGeneratorConfigBuilderCustomizer} run yet.
+     * module's defaults already applied and no {@link Module} run yet.
      *
      * <p>
-     * Running customizers and building a generator from the result is the caller's part. A framework
-     * that manages beans collects customizers and wants the step in between to be its own; this method
-     * is that step, so the defaults a caller starts from are exactly the ones this module ships.
+     * Running modules and building a generator from the result is the caller's part. A framework that
+     * manages beans collects modules and wants the step in between to be its own; this method is that
+     * step, so the defaults a caller starts from are exactly the ones this module ships.
      *
      * @param jsonMapper the mapper whose introspection the generator should use; must not be
      *                       {@code null}
@@ -90,10 +88,10 @@ public final class JacksonSchemaGenerators {
 
     /**
      * Creates the configuration builder for the schema of the JSON this codec reads, with this
-     * module's defaults already applied and no {@link SchemaGeneratorConfigBuilderCustomizer} run yet.
+     * module's defaults already applied and no {@link Module} run yet.
      *
      * <p>
-     * Running customizers and building a generator from the result is the caller's part; see
+     * Running modules and building a generator from the result is the caller's part; see
      * {@link #encodeSchemaConfigBuilder(JsonMapper)} for why this method exists.
      *
      * @param jsonMapper the mapper whose introspection the generator should use; must not be
@@ -105,7 +103,7 @@ public final class JacksonSchemaGenerators {
     }
 
     /**
-     * Assembles the configuration this module starts from, before any customizer has seen it.
+     * Assembles the configuration this module starts from, before any module a caller adds has seen it.
      *
      * <p>
      * {@code PLAIN_JSON} with an explicit draft decides the vocabulary; {@link JacksonPropertyDiscovery}
@@ -122,28 +120,26 @@ public final class JacksonSchemaGenerators {
      * @return the configuration builder; never {@code null}
      */
     private static SchemaGeneratorConfigBuilder configBuilder(@NonNull JsonMapper jsonMapper, boolean encoding) {
-        SchemaGeneratorConfigBuilder configBuilder = new SchemaGeneratorConfigBuilder(jsonMapper,
+        return new SchemaGeneratorConfigBuilder(jsonMapper,
                 SchemaVersion.DRAFT_2020_12,
                 OptionPreset.PLAIN_JSON)
                 .with(new JacksonSchemaModule(JacksonOption.RESPECT_JSONPROPERTY_REQUIRED))
+                .with(new JacksonPropertyDiscovery(jsonMapper, encoding))
                 .with(Option.FORBIDDEN_ADDITIONAL_PROPERTIES_BY_DEFAULT, Option.MAP_VALUES_AS_ADDITIONAL_PROPERTIES)
                 .without(Option.SCHEMA_VERSION_INDICATOR);
-        // What Jackson considers a property decides membership, names and order before anything a caller adds.
-        new JacksonPropertyDiscovery(jsonMapper, encoding).customize(configBuilder);
-        return configBuilder;
     }
 
     /**
-     * Runs the given customizers over the builder, in order, and builds the configuration.
+     * Applies the given modules to the builder, in order, and builds the configuration.
      *
-     * @param configBuilder the builder to customize and build; must not be {@code null}
-     * @param customizers   what to change about the defaults, applied in the order given
+     * @param configBuilder the builder to configure and build; must not be {@code null}
+     * @param modules       what to change about the defaults, applied in the order given
      * @return the configuration; never {@code null}
      */
     private static SchemaGeneratorConfig config(@NonNull SchemaGeneratorConfigBuilder configBuilder,
-            @NonNull SchemaGeneratorConfigBuilderCustomizer... customizers) {
-        for (SchemaGeneratorConfigBuilderCustomizer customizer : customizers) {
-            Objects.requireNonNull(customizer, "customizer must not be null").customize(configBuilder);
+            @NonNull Module... modules) {
+        for (Module module : modules) {
+            configBuilder.with(Objects.requireNonNull(module, "module must not be null"));
         }
         return configBuilder.build();
     }

@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.github.victools.jsonschema.generator.MemberScope;
+import com.github.victools.jsonschema.generator.Module;
 import com.github.victools.jsonschema.generator.Option;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 
@@ -66,7 +67,7 @@ import tools.jackson.databind.json.JsonMapper;
  * every field and method reaches the checks above instead of being filtered out first.
  */
 @RequiredArgsConstructor
-final class JacksonPropertyDiscovery implements SchemaGeneratorConfigBuilderCustomizer {
+final class JacksonPropertyDiscovery implements Module {
 
     private final JsonMapper jsonMapper;
 
@@ -76,7 +77,7 @@ final class JacksonPropertyDiscovery implements SchemaGeneratorConfigBuilderCust
     private final Map<Class<?>, Properties> cache = new ConcurrentHashMap<>();
 
     @Override
-    public void customize(SchemaGeneratorConfigBuilder configBuilder) {
+    public void applyToConfigBuilder(SchemaGeneratorConfigBuilder configBuilder) {
         configBuilder.with(Option.GETTER_METHODS, Option.NONSTATIC_NONVOID_NONGETTER_METHODS,
                 Option.FIELDS_DERIVED_FROM_ARGUMENTFREE_METHODS);
         configBuilder.forFields().withIgnoreCheck(this::isNotJacksonProperty)
