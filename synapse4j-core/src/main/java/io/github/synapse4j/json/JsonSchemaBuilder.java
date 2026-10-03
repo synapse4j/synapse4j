@@ -201,7 +201,7 @@ public class JsonSchemaBuilder {
      * @return the schema; never {@code null}
      */
     public ObjectJsonSchema build() {
-        return new ObjectJsonSchema(ObjectJsonSchema.freeze(values));
+        return new ObjectJsonSchema(values);
     }
 
     private void putOrRemove(String keyword, @Nullable Object value) {

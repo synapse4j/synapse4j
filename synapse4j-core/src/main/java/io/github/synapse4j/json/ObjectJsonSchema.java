@@ -42,19 +42,24 @@ import org.jspecify.annotations.Nullable;
  * The document shape — the maps, lists and scalars a JSON document is made of — is not this class's
  * business: {@link JsonSchemas} reads one into a schema and writes one back. {@link #toString()} renders
  * that shape.
+ *
+ * <p>
+ * The class is open, not final: a provider or an application may extend it. The constructor freezes
+ * what it is given, so a subclass inherits the immutable contract.
  */
-public final class ObjectJsonSchema implements JsonSchema {
+public class ObjectJsonSchema implements JsonSchema {
 
     /** Every keyword a node carries, keyed by JSON name: frozen, never changed after construction. */
     private final Map<String, Object> values;
 
     /**
-     * Creates the object form from its keywords.
+     * Creates the object form from its keywords, freezing the map and every collection below it so
+     * nothing a getter hands out can change the schema.
      *
-     * @param frozenValues the keywords, already frozen; must not be {@code null}
+     * @param values the keywords; must not be {@code null}
      */
-    ObjectJsonSchema(Map<String, Object> frozenValues) {
-        this.values = frozenValues;
+    protected ObjectJsonSchema(Map<String, Object> values) {
+        this.values = freeze(values);
     }
 
     @Override
@@ -154,7 +159,7 @@ public final class ObjectJsonSchema implements JsonSchema {
             }
         }
         if (changed != null) {
-            result = new ObjectJsonSchema(freeze(changed));
+            result = new ObjectJsonSchema(changed);
         }
         return fn.apply(result);
     }
@@ -223,7 +228,7 @@ public final class ObjectJsonSchema implements JsonSchema {
      * @param values the keywords to freeze; must not be {@code null}
      * @return the frozen keywords; never {@code null}
      */
-    static Map<String, Object> freeze(Map<String, Object> values) {
+    private static Map<String, Object> freeze(Map<String, Object> values) {
         Map<String, Object> frozen = new LinkedHashMap<>();
         values.forEach((keyword, value) -> frozen.put(keyword, freezeValue(value)));
         return Collections.unmodifiableMap(frozen);

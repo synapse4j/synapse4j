@@ -80,10 +80,10 @@ class AbstractJsonCodecTest {
     }
 
     /** Providers extend the schema model; decoding must treat a subclass like the base type. */
-    private static class ExtendedSchema extends BooleanJsonSchema {
+    private static class ExtendedSchema extends ObjectJsonSchema {
 
         ExtendedSchema() {
-            super(true);
+            super(Map.of());
         }
     }
 

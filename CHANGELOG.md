@@ -10,6 +10,9 @@ version becomes the body of the GitHub Release created when that version's tag i
 - An API key is optional: leaving it unset sends no auth header, so an OpenAI-compatible server that authenticates nothing — a local runtime, say — is called as it stands instead of refused with `apiKey is required`
 - Annotated tools: `@ToolMethod` and `@ToolParam` declare a tool on a method, and `MethodTools` reads a class's annotated methods into tools — any visibility, inherited and interface-default ones included — running `ToolMethodSpecCustomizer` steps between the annotations and the finished tool, and resolving `type` through a `SpecToolFactory`
 - A method tool is now completed from a `ToolMethodSpec` by `initialize(...)`, the `SpecTool` contract, and the resolution is validated by the tool that uses it; the declaration can no longer be handed in whole — `MethodTool.of(ToolDefinition, …)`, `define(...)` and the subclass constructor are gone, and the arguments schema beyond the per-parameter hooks is `argumentsSchema`'s to shape
+- A schema is read-only: `JsonSchema` answers what a node carries and is never changed, the object form is the immutable `ObjectJsonSchema` built through `JsonSchemaBuilder`, and a change is a new schema rather than a change to this one — the JSON Schema keyword names are public in `JsonSchemaKeywords`
+- The Jackson schema generator is configurable: `JacksonSchemaSettings` carries the choices — which optional types are flattened, how a property's being required is decided, and so on — the generators are built from it, and the Spring starter takes victools `Module` beans over the defaults
+- A `byte[]` is described as the base64 string the mapper writes it as, rather than as an array of numbers
 
 ## [0.0.2] - 2026-10-01
 
