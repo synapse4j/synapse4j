@@ -1,5 +1,7 @@
 package io.github.synapse4j.json;
 
+import static io.github.synapse4j.json.JsonSchemaKeywords.*;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,33 +25,6 @@ import lombok.NoArgsConstructor;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class JsonSchemas {
-
-    /** JSON names of the keywords this class reads, writes and walks. */
-    private static final String PROPERTIES = "properties";
-    private static final String PATTERN_PROPERTIES = "patternProperties";
-    private static final String DEFS = "$defs";
-    private static final String DEFINITIONS = "definitions";
-    private static final String DEPENDENT_SCHEMAS = "dependentSchemas";
-    private static final String ITEMS = "items";
-    private static final String ADDITIONAL_ITEMS = "additionalItems";
-    private static final String ADDITIONAL_PROPERTIES = "additionalProperties";
-    private static final String NOT = "not";
-    private static final String IF = "if";
-    private static final String THEN = "then";
-    private static final String ELSE = "else";
-    private static final String CONTAINS = "contains";
-    private static final String PROPERTY_NAMES = "propertyNames";
-    private static final String UNEVALUATED_ITEMS = "unevaluatedItems";
-    private static final String UNEVALUATED_PROPERTIES = "unevaluatedProperties";
-    private static final String CONTENT_SCHEMA = "contentSchema";
-    private static final String ALL_OF = "allOf";
-    private static final String ANY_OF = "anyOf";
-    private static final String ONE_OF = "oneOf";
-    private static final String PREFIX_ITEMS = "prefixItems";
-
-    /** The reference keyword, and the prefix a reference into {@code $defs} is spelled with. */
-    private static final String REF = "$ref";
-    private static final String DEFS_PREFIX = "#/$defs/";
 
     /** The shape of a schema-valued keyword's value. */
     private enum Shape {
@@ -103,99 +78,90 @@ public final class JsonSchemas {
      * @return a copy with its references resolved; never {@code null}
      */
     public static JsonSchema inline(JsonSchema schema) {
-        Map<String, Object> root = asMap((Map<?, ?>) toDocument(schema));
-        Map<String, Object> inlined = inlineSchema(root, root, Collections.newSetFromMap(new IdentityHashMap<>()));
-        pruneDefs(inlined);
-        return fromDocument(inlined);
+        return pruneDefs(inlineSchema(schema, schema, Collections.newSetFromMap(new IdentityHashMap<>())));
     }
 
     /**
-     * Inlines one schema document. {@code path} holds the schemas currently being expanded, by
-     * identity, so a reference back to one of them is recognised as a cycle.
+     * Inlines one schema. A boolean schema carries no sub-schema and no reference and is answered as it
+     * is; an object-form schema is copied with its sub-schemas inlined. {@code path} holds the schemas
+     * currently being expanded, by identity, so a reference back to one of them is recognised as a
+     * cycle.
      */
-    private static Map<String, Object> inlineSchema(
-            Map<String, Object> node, Map<String, Object> root, Set<Map<String, Object>> path) {
-        boolean added = path.add(node);
+    private static JsonSchema inlineSchema(JsonSchema node, JsonSchema root, Set<JsonSchema> path) {
+        return node.asBoolean() == null ? inlineObject(node, root, path).build() : node;
+    }
+
+    /**
+     * Inlines an object-form schema into a new builder. A reference that resolves is replaced by the
+     * inlined definition it names, with this node's other keywords on top; otherwise the node is copied
+     * as it is, its {@code $ref} kept.
+     */
+    private static JsonSchemaBuilder inlineObject(JsonSchema node, JsonSchema root, Set<JsonSchema> path) {
+        path.add(node);
         try {
-            Object ref = node.get(REF);
-            if (ref instanceof String reference) {
-                Map<String, Object> target = resolve(reference, root);
-                if (target != null && !path.contains(target)) {
-                    Map<String, Object> inlined = inlineSchema(target, root, path);
-                    inlined.putAll(inlineBody(node, root, path, false));
+            String ref = node.getRef();
+            if (ref != null) {
+                JsonSchema target = resolve(ref, root);
+                if (target != null && target.asBoolean() == null && !path.contains(target)) {
+                    JsonSchemaBuilder inlined = inlineObject(target, root, path);
+                    inlineKeywords(inlined, node, root, path, false);
                     return inlined;
                 }
             }
-            return inlineBody(node, root, path, true);
+            JsonSchemaBuilder copy = new JsonSchemaBuilder();
+            inlineKeywords(copy, node, root, path, true);
+            return copy;
         } finally {
-            if (added) {
-                path.remove(node);
-            }
+            path.remove(node);
         }
     }
 
     /**
-     * Copies a schema document's keywords, resolving the sub-schemas among them. {@code $ref} is kept
-     * only when the caller could not resolve it; otherwise it has already been replaced by the
+     * Copies a node's keywords into {@code target}, inlining the sub-schemas among them. {@code $ref} is
+     * kept only when the caller could not resolve it; otherwise it has already been replaced by the
      * definition it named.
      */
-    private static Map<String, Object> inlineBody(
-            Map<String, Object> node, Map<String, Object> root, Set<Map<String, Object>> path, boolean keepRef) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : node.entrySet()) {
-            String keyword = entry.getKey();
-            Object value = entry.getValue();
+    private static void inlineKeywords(
+            JsonSchemaBuilder target, JsonSchema node, JsonSchema root, Set<JsonSchema> path, boolean keepRef) {
+        for (String keyword : node.keys()) {
             if (REF.equals(keyword)) {
                 if (keepRef) {
-                    result.put(keyword, value);
+                    target.put(keyword, node.get(keyword));
                 }
                 continue;
             }
-            result.put(keyword, inlineValue(keyword, value, root, path));
+            target.put(keyword, inlineValue(node.get(keyword), root, path));
         }
-        return result;
     }
 
-    private static Object inlineValue(
-            String keyword, Object value, Map<String, Object> root, Set<Map<String, Object>> path) {
-        if ((PROPERTIES.equals(keyword) || DEFS.equals(keyword)) && value instanceof Map<?, ?> schemas) {
-            return inlineSchemas(schemas, root, path);
+    /** Inlines a keyword's value: a sub-schema, or the sub-schemas in a list or a map of them. */
+    private static @Nullable Object inlineValue(@Nullable Object value, JsonSchema root, Set<JsonSchema> path) {
+        if (value instanceof JsonSchema schema) {
+            return inlineSchema(schema, root, path);
         }
-        if ((ITEMS.equals(keyword) || ADDITIONAL_PROPERTIES.equals(keyword)) && value instanceof Map<?, ?> schema) {
-            return inlineSchema(asMap(schema), root, path);
+        if (value instanceof List<?> list) {
+            List<Object> inlined = new ArrayList<>(list.size());
+            for (Object element : list) {
+                inlined.add(inlineValue(element, root, path));
+            }
+            return inlined;
         }
-        if ((ANY_OF.equals(keyword) || ONE_OF.equals(keyword) || ALL_OF.equals(keyword))
-                && value instanceof List<?> list) {
-            return inlineList(list, root, path);
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> inlined = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                inlined.put(String.valueOf(entry.getKey()), inlineValue(entry.getValue(), root, path));
+            }
+            return inlined;
         }
         return value;
     }
 
-    private static Map<String, Object> inlineSchemas(
-            Map<?, ?> schemas, Map<String, Object> root, Set<Map<String, Object>> path) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        for (Map.Entry<?, ?> entry : schemas.entrySet()) {
-            Object nested = entry.getValue();
-            result.put(String.valueOf(entry.getKey()),
-                    nested instanceof Map<?, ?> schema ? inlineSchema(asMap(schema), root, path) : nested);
-        }
-        return result;
-    }
-
-    private static List<Object> inlineList(List<?> list, Map<String, Object> root, Set<Map<String, Object>> path) {
-        List<Object> result = new ArrayList<>();
-        for (Object element : list) {
-            result.add(element instanceof Map<?, ?> schema ? inlineSchema(asMap(schema), root, path) : element);
-        }
-        return result;
-    }
-
     /**
-     * Looks a reference up against the root document: {@code #} is the root itself and
+     * Looks a reference up against the root schema: {@code #} is the root itself and
      * {@code #/$defs/Name} is the definition of that name. Anything else names nothing here, which
      * includes a name {@code $defs} does not hold.
      */
-    private static @Nullable Map<String, Object> resolve(String ref, Map<String, Object> root) {
+    private static @Nullable JsonSchema resolve(String ref, JsonSchema root) {
         if (ref.equals("#")) {
             return root;
         }
@@ -203,12 +169,8 @@ public final class JsonSchemas {
         if (name == null) {
             return null;
         }
-        Object defs = root.get(DEFS);
-        if (!(defs instanceof Map<?, ?> definitions)) {
-            return null;
-        }
-        Object definition = definitions.get(name);
-        return definition instanceof Map<?, ?> schema ? asMap(schema) : null;
+        Map<String, JsonSchema> defs = root.getDefs();
+        return defs == null ? null : defs.get(name);
     }
 
     /**
@@ -216,13 +178,38 @@ public final class JsonSchemas {
      * gone from the answer. A definition a kept one still references is reached through that one, so
      * the walk follows references out of the definitions it keeps.
      */
-    private static void pruneDefs(Map<String, Object> result) {
-        Object defsValue = result.get(DEFS);
-        if (!(defsValue instanceof Map<?, ?>)) {
-            return;
+    private static JsonSchema pruneDefs(JsonSchema result) {
+        Map<String, JsonSchema> defs = result.getDefs();
+        if (defs == null) {
+            return result;
         }
-        Map<String, Object> defs = asMap((Map<?, ?>) defsValue);
+        Set<String> kept = reachableDefs(result, defs);
+        if (kept.containsAll(defs.keySet())) {
+            return result;
+        }
+        JsonSchemaBuilder pruned = new JsonSchemaBuilder();
+        for (String keyword : result.keys()) {
+            if (!DEFS.equals(keyword)) {
+                pruned.put(keyword, result.get(keyword));
+            }
+        }
+        if (!kept.isEmpty()) {
+            Map<String, JsonSchema> remaining = new LinkedHashMap<>();
+            defs.forEach((name, definition) -> {
+                if (kept.contains(name)) {
+                    remaining.put(name, definition);
+                }
+            });
+            pruned.setDefs(remaining);
+        }
+        return pruned.build();
+    }
 
+    /**
+     * The names of the definitions a kept reference reaches, starting from the references outside
+     * {@code $defs} and following the references out of every definition that is itself reached.
+     */
+    private static Set<String> reachableDefs(JsonSchema result, Map<String, JsonSchema> defs) {
         Set<String> kept = new LinkedHashSet<>();
         Deque<String> pending = new ArrayDeque<>();
         Set<String> refs = new LinkedHashSet<>();
@@ -234,7 +221,7 @@ public final class JsonSchemas {
             }
         }
         while (!pending.isEmpty()) {
-            Object definition = defs.get(pending.poll());
+            JsonSchema definition = defs.get(pending.poll());
             if (definition == null) {
                 continue;
             }
@@ -247,26 +234,29 @@ public final class JsonSchemas {
                 }
             }
         }
-
-        defs.keySet().retainAll(kept);
-        if (defs.isEmpty()) {
-            result.remove(DEFS);
-        }
+        return kept;
     }
 
-    /** Collects every {@code $ref} string below {@code node}, skipping the named key at its own level. */
+    /** Collects every {@code $ref} string below {@code node}, skipping the named keyword at its own level. */
     private static void collectRefs(@Nullable Object node, @Nullable String skip, Set<String> refs) {
-        if (node instanceof Map<?, ?> map) {
-            for (Map.Entry<?, ?> entry : map.entrySet()) {
-                String keyword = String.valueOf(entry.getKey());
+        if (node instanceof JsonSchema schema) {
+            for (String keyword : schema.keys()) {
                 if (keyword.equals(skip)) {
                     continue;
                 }
-                if (REF.equals(keyword) && entry.getValue() instanceof String reference) {
+                Object value = schema.get(keyword);
+                if (REF.equals(keyword) && value instanceof String reference) {
                     refs.add(reference);
                 } else {
-                    collectRefs(entry.getValue(), null, refs);
+                    collectRefs(value, null, refs);
                 }
+            }
+        } else if (node instanceof Map<?, ?> map) {
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (String.valueOf(entry.getKey()).equals(skip)) {
+                    continue;
+                }
+                collectRefs(entry.getValue(), null, refs);
             }
         } else if (node instanceof List<?> list) {
             for (Object element : list) {
@@ -285,44 +275,36 @@ public final class JsonSchemas {
      *
      * <p>
      * A schema reached through two different paths is written out at each of them, JSON having no way
-     * to share one. One that contains itself has no document at all, and is refused.
+     * to share one. A schema graph cannot contain itself — a node is immutable and built from nodes that
+     * already exist — so the write needs no guard against a cycle.
      *
      * @param schema the schema to write; must not be {@code null}
      * @return the schema as JSON data — a {@link Boolean} or a {@link Map}; never {@code null}
-     * @throws SynapseException if the schema contains itself
      */
     public static Object toDocument(JsonSchema schema) {
-        return document(schema, Collections.newSetFromMap(new IdentityHashMap<>()));
-    }
-
-    private static Object document(JsonSchema schema, Set<JsonSchema> path) {
         Boolean asBoolean = schema.asBoolean();
         if (asBoolean != null) {
             return asBoolean;
         }
-        if (!path.add(schema)) {
-            throw cycle();
-        }
         Map<String, Object> document = new LinkedHashMap<>();
         for (String keyword : schema.keys()) {
-            document.put(keyword, document(schema.get(keyword), path));
+            document.put(keyword, document(schema.get(keyword)));
         }
-        path.remove(schema);
         return document;
     }
 
-    private static @Nullable Object document(@Nullable Object value, Set<JsonSchema> path) {
+    private static @Nullable Object document(@Nullable Object value) {
         if (value instanceof JsonSchema schema) {
-            return document(schema, path);
+            return toDocument(schema);
         }
         if (value instanceof List<?> list) {
             List<Object> documents = new ArrayList<>(list.size());
-            list.forEach(element -> documents.add(document(element, path)));
+            list.forEach(element -> documents.add(document(element)));
             return documents;
         }
         if (value instanceof Map<?, ?> map) {
             Map<String, Object> documents = new LinkedHashMap<>();
-            map.forEach((name, element) -> documents.put(String.valueOf(name), document(element, path)));
+            map.forEach((name, element) -> documents.put(String.valueOf(name), document(element)));
             return documents;
         }
         return value;
@@ -348,12 +330,12 @@ public final class JsonSchemas {
             return flag ? BooleanJsonSchema.TRUE : BooleanJsonSchema.FALSE;
         }
         if (document instanceof Map<?, ?> map) {
-            MutableJsonSchema schema = new MutableJsonSchema();
+            JsonSchemaBuilder schema = new JsonSchemaBuilder();
             map.forEach((name, value) -> {
                 String keyword = String.valueOf(name);
                 schema.put(keyword, fromValue(keyword, value));
             });
-            return schema;
+            return schema.build();
         }
         throw new SynapseException("a schema is an object or a boolean, not " + document);
     }
@@ -389,16 +371,6 @@ public final class JsonSchemas {
 
     private static boolean isSchema(@Nullable Object value) {
         return value instanceof Map<?, ?> || value instanceof Boolean;
-    }
-
-    private static SynapseException cycle() {
-        return new SynapseException(
-                "the schema contains itself: a recursive schema is spelled with $ref, and a schema graph that cycles has no JSON document");
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> asMap(Map<?, ?> map) {
-        return (Map<String, Object>) map;
     }
 
 }

@@ -16,7 +16,7 @@ import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonWriter;
-import io.github.synapse4j.json.MutableJsonSchema;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
@@ -365,11 +365,10 @@ class MethodToolTest {
 
         @Override
         protected JsonSchema argumentsSchema(ToolMethodSpec spec) {
-            MutableJsonSchema envelope = (MutableJsonSchema) super.argumentsSchema(spec);
-            Map<String, JsonSchema> properties = new LinkedHashMap<>(envelope.getProperties());
-            properties.put("extra", new MutableJsonSchema());
-            envelope.setProperties(properties);
-            return envelope;
+            JsonSchema base = super.argumentsSchema(spec);
+            Map<String, JsonSchema> properties = new LinkedHashMap<>(base.getProperties());
+            properties.put("extra", new JsonSchemaBuilder().build());
+            return JsonSchemaBuilder.from(base).setProperties(properties).build();
         }
     }
 
@@ -443,15 +442,13 @@ class MethodToolTest {
 
         @Override
         public JsonSchema generateEncodeSchema(Type type) {
-            return new MutableJsonSchema();
+            return new JsonSchemaBuilder().build();
         }
 
         @Override
         public JsonSchema generateDecodeSchema(Type type) {
             generatedFor.add(type);
-            MutableJsonSchema schema = new MutableJsonSchema();
-            schema.setType("object");
-            return schema;
+            return new JsonSchemaBuilder().setType("object").build();
         }
 
         @Override

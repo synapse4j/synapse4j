@@ -46,7 +46,8 @@ import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.http.HttpRequest;
 import io.github.synapse4j.http.HttpResponse;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
-import io.github.synapse4j.json.MutableJsonSchema;
+import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 import io.github.synapse4j.tool.ManualTool;
 import io.github.synapse4j.tool.ToolDefinition;
 import io.github.synapse4j.util.InputStreamSupplier;
@@ -1105,8 +1106,7 @@ class OpenAiCompletionsChatClientTest {
     void aSchemaInAnExtraGoesOutAsTheDocumentItDescribes() {
         stubCompletion();
 
-        MutableJsonSchema schema = new MutableJsonSchema();
-        schema.setType("object");
+        JsonSchema schema = new JsonSchemaBuilder().setType("object").build();
         ChatRequest request = requestWithModel();
         request.getOptions().getExtras().put("schema", schema);
 

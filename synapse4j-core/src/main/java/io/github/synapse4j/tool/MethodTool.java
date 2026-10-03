@@ -16,7 +16,7 @@ import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
-import io.github.synapse4j.json.MutableJsonSchema;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 import lombok.NonNull;
 
 /**
@@ -124,8 +124,7 @@ public class MethodTool implements SpecTool, StagedTool {
      * @return the arguments schema to send; never {@code null}
      */
     protected JsonSchema argumentsSchema(ToolMethodSpec spec) {
-        MutableJsonSchema envelope = new MutableJsonSchema();
-        envelope.setType("object");
+        JsonSchemaBuilder envelope = new JsonSchemaBuilder().setType("object");
         Map<String, JsonSchema> properties = new LinkedHashMap<>();
         List<String> required = new ArrayList<>();
         for (ToolParameterSpec entry : spec.getParameters()) {
@@ -133,8 +132,8 @@ public class MethodTool implements SpecTool, StagedTool {
             if (schema == null) {
                 continue;
             }
-            if (schema instanceof MutableJsonSchema mutable && !entry.getDescription().isBlank()) {
-                mutable.setDescription(entry.getDescription());
+            if (schema.asBoolean() == null && !entry.getDescription().isBlank()) {
+                schema = JsonSchemaBuilder.from(schema).setDescription(entry.getDescription()).build();
             }
             properties.put(entry.getName(), schema);
             if (!"false".equals(entry.getRequired())) {
@@ -147,7 +146,7 @@ public class MethodTool implements SpecTool, StagedTool {
         if (!required.isEmpty()) {
             envelope.setRequired(required);
         }
-        return envelope;
+        return envelope.build();
     }
 
     /**

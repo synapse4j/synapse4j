@@ -16,7 +16,8 @@ import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.json.JsonWriter;
-import io.github.synapse4j.json.MutableJsonSchema;
+import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 import tools.jackson.databind.json.JsonMapper;
 
 class JacksonJsonWriterTest {
@@ -141,8 +142,7 @@ class JacksonJsonWriterTest {
     void writesThisLibrariesOwnTypesAsTheDocumentsTheyDescribe() {
         RecordingOutputStream sink = new RecordingOutputStream();
         ProviderExtras extras = new ProviderExtras().put(List.of("annotations", "title"), "x");
-        MutableJsonSchema schema = new MutableJsonSchema();
-        schema.setType("object");
+        JsonSchema schema = new JsonSchemaBuilder().setType("object").build();
 
         JsonWriter writer = codec.writer(sink);
         writer.writeStartObject()
@@ -160,8 +160,7 @@ class JacksonJsonWriterTest {
     @Test
     void writesAnOwnTypeNestedInAMapTheSameWay() {
         RecordingOutputStream sink = new RecordingOutputStream();
-        MutableJsonSchema schema = new MutableJsonSchema();
-        schema.setType("string");
+        JsonSchema schema = new JsonSchemaBuilder().setType("string").build();
 
         JsonWriter writer = codec.writer(sink);
         writer.writeStartObject().writeName("nested").writeValue(Map.of("inner", schema)).writeEndObject();

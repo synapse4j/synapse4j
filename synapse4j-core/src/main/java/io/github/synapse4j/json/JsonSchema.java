@@ -28,19 +28,15 @@ import org.jspecify.annotations.Nullable;
  * shared rather than copied, so only the path to a change is rebuilt.
  *
  * <p>
- * Read-only — as a contract, not as something enforced. A getter hands back what the node holds: the
- * very collection it keeps, not a copy and not an unmodifiable wrapper. A caller reads those and does
- * not change them; changing one, or a nested schema, is unsupported and can corrupt every schema that
- * shares the node. A schema is built once, through the mutable implementation's setters, and read from
- * then on; a copy needed at a boundary is made explicitly.
+ * Read-only: a schema is assembled through {@link JsonSchemaBuilder} and read from then on. The built-in
+ * implementations freeze what they carry, so nothing a getter hands back can change the schema. A change
+ * is a new schema rather than a change to this one — {@link #map(UnaryOperator)} produces one, sharing
+ * the nodes it leaves alone.
  *
  * <p>
- * The rule is left to the caller on purpose, and the collections are deliberately not handed out as
- * read-only views. Guarding against a caller who would change what it was told not to is not worth the
- * cost: a wrapper would be allocated on every get, and it would guard only half anyway — a nested
- * {@link JsonSchema} is still the mutable implementation, changeable straight through. Freezing the
- * collections or copying on every get would cost more still. So mutability stays in the implementation,
- * and read-only stays this interface's contract.
+ * A schema graph cannot contain itself: a node is immutable and built from nodes that already exist, so
+ * a cycle is not constructible — a recursive schema is spelled with {@code $ref} instead. The walks of
+ * {@link #visit(Consumer)} and {@link #map(UnaryOperator)} therefore need no guard against one.
  */
 public interface JsonSchema {
 
@@ -170,7 +166,7 @@ public interface JsonSchema {
      *
      * <p>
      * The visitor receives each schema and may read it. The sub-schemas of that schema are visited
-     * afterwards, and a schema that contains itself is refused rather than walked forever.
+     * afterwards.
      *
      * @param visitor what to do with each schema; must not be {@code null}
      */

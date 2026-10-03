@@ -13,14 +13,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import io.github.synapse4j.exception.SynapseException;
 import org.junit.jupiter.api.Test;
 
-class MutableJsonSchemaTest {
+class ObjectJsonSchemaTest {
 
     @Test
     void newSchemaCarriesNothing() {
-        MutableJsonSchema schema = new MutableJsonSchema();
+        JsonSchema schema = built();
 
         assertNull(schema.asBoolean());
         assertNull(schema.getType());
@@ -39,7 +38,7 @@ class MutableJsonSchemaTest {
 
     @Test
     void anEmptyKeywordIsNotTheSameAsAbsent() {
-        JsonSchema absent = new MutableJsonSchema();
+        JsonSchema absent = built();
         JsonSchema empty = JsonSchemas.fromDocument(Map.of(
                 "required", List.of(),
                 "properties", Map.of()));
@@ -53,7 +52,7 @@ class MutableJsonSchemaTest {
 
     @Test
     void readingDoesNotChangeTheSchema() {
-        MutableJsonSchema schema = new MutableJsonSchema();
+        JsonSchema schema = built();
 
         schema.getType();
         schema.getProperties();
@@ -66,11 +65,27 @@ class MutableJsonSchemaTest {
     }
 
     @Test
+    void theBuiltSchemaIsFrozen() {
+        // Nothing a getter hands out can change the schema: the top map and every collection below it
+        // are unmodifiable.
+        JsonSchema schema = new JsonSchemaBuilder()
+                .setType("object")
+                .setRequired(List.of("name"))
+                .setProperties(Map.of("name", typed("string")))
+                .put("enum", new ArrayList<>(List.of("a")))
+                .build();
+
+        assertThrows(UnsupportedOperationException.class, () -> schema.keys().clear());
+        assertThrows(UnsupportedOperationException.class, () -> schema.getRequired().add("other"));
+        assertThrows(UnsupportedOperationException.class, () -> schema.getProperties().put("other", typed("string")));
+        assertThrows(UnsupportedOperationException.class, () -> rawList(schema, "enum").add("b"));
+    }
+
+    @Test
     void aSingleTypeIsWrittenAsAStringAndSeveralAsAnArray() {
         assertEquals(Map.of("type", "object"), JsonSchemas.toDocument(typed("object")));
 
-        MutableJsonSchema nullable = new MutableJsonSchema();
-        nullable.setType(List.of("string", "null"));
+        JsonSchema nullable = new JsonSchemaBuilder().setType(List.of("string", "null")).build();
 
         assertEquals(Map.of("type", List.of("string", "null")), JsonSchemas.toDocument(nullable));
     }
@@ -79,10 +94,8 @@ class MutableJsonSchemaTest {
     void theTypeFormFollowsTheSetterThatWasUsed() {
         // Set as a string, written as a string; set as a list, written as an array — a one-element
         // list is not folded into the string form.
-        MutableJsonSchema single = new MutableJsonSchema();
-        single.setType("object");
-        MutableJsonSchema array = new MutableJsonSchema();
-        array.setType(List.of("object"));
+        JsonSchema single = new JsonSchemaBuilder().setType("object").build();
+        JsonSchema array = new JsonSchemaBuilder().setType(List.of("object")).build();
 
         assertEquals(Map.of("type", "object"), JsonSchemas.toDocument(single));
         assertEquals(Map.of("type", List.of("object")), JsonSchemas.toDocument(array));
@@ -92,18 +105,19 @@ class MutableJsonSchemaTest {
 
     @Test
     void onlyWhatIsSetIsWritten() {
-        MutableJsonSchema schema = typed("object");
+        JsonSchema schema = typed("object");
 
         assertEquals(Map.of("type", "object"), JsonSchemas.toDocument(schema));
     }
 
     @Test
     void nestedSchemasAreWrittenAsMaps() {
-        MutableJsonSchema schema = new MutableJsonSchema();
-        schema.setProperties(Map.of("name", typed("string")));
-        schema.setItems(typed("number"));
-        schema.setDefs(Map.of("D", typed("boolean")));
-        schema.setAdditionalProperties(BooleanJsonSchema.FALSE);
+        JsonSchema schema = new JsonSchemaBuilder()
+                .setProperties(Map.of("name", typed("string")))
+                .setItems(typed("number"))
+                .setDefs(Map.of("D", typed("boolean")))
+                .setAdditionalProperties(BooleanJsonSchema.FALSE)
+                .build();
 
         Map<String, Object> map = document(schema);
 
@@ -115,9 +129,11 @@ class MutableJsonSchemaTest {
 
     @Test
     void extraKeywordsAreReadThroughKeysAndGet() {
-        MutableJsonSchema schema = typed("object");
-        schema.put("$schema", "https://json-schema.org/draft/2020-12/schema");
-        schema.put("format", "uuid");
+        JsonSchema schema = new JsonSchemaBuilder()
+                .setType("object")
+                .put("$schema", "https://json-schema.org/draft/2020-12/schema")
+                .put("format", "uuid")
+                .build();
 
         assertEquals(Set.of("type", "$schema", "format"), schema.keys());
         assertEquals("uuid", schema.get("format", String.class));
@@ -131,9 +147,11 @@ class MutableJsonSchemaTest {
 
     @Test
     void titleAndDescriptionAreNamedKeywords() {
-        MutableJsonSchema schema = typed("object");
-        schema.setTitle("WeatherQuery");
-        schema.setDescription("A request for the weather.");
+        JsonSchema schema = new JsonSchemaBuilder()
+                .setType("object")
+                .setTitle("WeatherQuery")
+                .setDescription("A request for the weather.")
+                .build();
 
         assertEquals("WeatherQuery", schema.getTitle());
         assertEquals("A request for the weather.", schema.getDescription());
@@ -145,17 +163,18 @@ class MutableJsonSchemaTest {
 
     @Test
     void everyModelledKeywordSurvivesARoundTrip() {
-        MutableJsonSchema schema = new MutableJsonSchema();
-        schema.setType(List.of("string", "null"));
-        schema.setTitle("WeatherQuery");
-        schema.setDescription("A request for the weather.");
-        schema.setAdditionalProperties(BooleanJsonSchema.FALSE);
-        schema.setRequired(List.of("locations"));
-        schema.setProperties(Map.of("locations", typed("array")));
-        schema.setItems(typed("string"));
-        schema.setDefs(Map.of("Location", typed("object")));
-        schema.setRef("#/$defs/Location");
-        schema.put("format", "uuid");
+        JsonSchema schema = new JsonSchemaBuilder()
+                .setType(List.of("string", "null"))
+                .setTitle("WeatherQuery")
+                .setDescription("A request for the weather.")
+                .setAdditionalProperties(BooleanJsonSchema.FALSE)
+                .setRequired(List.of("locations"))
+                .setProperties(Map.of("locations", typed("array")))
+                .setItems(typed("string"))
+                .setDefs(Map.of("Location", typed("object")))
+                .setRef("#/$defs/Location")
+                .put("format", "uuid")
+                .build();
 
         JsonSchema read = JsonSchemas.fromDocument(JsonSchemas.toDocument(schema));
 
@@ -172,16 +191,6 @@ class MutableJsonSchemaTest {
         assertEquals(Set.of("const"), schema.keys());
         assertNull(schema.get("const", Object.class));
         assertEquals(document, JsonSchemas.toDocument(schema));
-    }
-
-    @Test
-    void settingAModelledKeywordToNullClearsIt() {
-        MutableJsonSchema schema = typed("object");
-        schema.setTitle("WeatherQuery");
-        schema.setTitle(null);
-
-        assertEquals(Set.of("type"), schema.keys());
-        assertNull(schema.getTitle());
     }
 
     @Test
@@ -270,9 +279,10 @@ class MutableJsonSchemaTest {
 
     @Test
     void visitReachesEverySchema() {
-        MutableJsonSchema schema = new MutableJsonSchema();
-        schema.setProperties(Map.of("name", typed("string")));
-        schema.setItems(typed("object"));
+        JsonSchema schema = new JsonSchemaBuilder()
+                .setProperties(Map.of("name", typed("string")))
+                .setItems(typed("object"))
+                .build();
 
         List<JsonSchema> seen = new ArrayList<>();
         schema.visit(seen::add);
@@ -283,14 +293,13 @@ class MutableJsonSchemaTest {
 
     @Test
     void mapRebuildsOnlyThePathThatChanged() {
-        MutableJsonSchema schema = new MutableJsonSchema();
-        MutableJsonSchema name = typed("string");
-        schema.setProperties(Map.of("name", name));
+        JsonSchema name = typed("string");
+        JsonSchema schema = new JsonSchemaBuilder().setProperties(Map.of("name", name)).build();
 
         JsonSchema mapped = schema.map(node -> node == name ? typed("number") : node);
 
         assertNotSame(schema, mapped);
-        assertTrue(mapped instanceof MutableJsonSchema);
+        assertTrue(mapped instanceof ObjectJsonSchema);
         assertEquals(Map.of("properties", Map.of("name", Map.of("type", "number"))),
                 JsonSchemas.toDocument(mapped));
         assertEquals(List.of("string"), name.getType());
@@ -298,39 +307,22 @@ class MutableJsonSchemaTest {
 
     @Test
     void mapSharesNodesItLeavesAlone() {
-        MutableJsonSchema schema = new MutableJsonSchema();
-        schema.setProperties(Map.of("name", typed("string")));
+        JsonSchema schema = new JsonSchemaBuilder().setProperties(Map.of("name", typed("string"))).build();
 
         assertSame(schema, schema.map(node -> node));
     }
 
     @Test
     void toStringRendersTheDocumentShape() {
-        assertEquals("MutableJsonSchema{type=object}", typed("object").toString());
-    }
-
-    @Test
-    void aSchemaThatContainsItselfIsRefused() {
-        // A recursive schema is spelled with $ref, so a graph that cycles is a hand-built mistake:
-        // without the guard, both the walk and the document recurse until the stack is gone.
-        MutableJsonSchema schema = typed("object");
-        MutableJsonSchema inner = typed("object");
-        schema.setProperties(Map.of("inner", inner));
-        inner.setProperties(Map.of("parent", schema));
-
-        assertThrows(SynapseException.class, () -> JsonSchemas.toDocument(schema));
-        assertThrows(SynapseException.class, () -> schema.visit(each -> {
-        }));
-        assertThrows(SynapseException.class, () -> schema.map(node -> node));
+        assertEquals("ObjectJsonSchema{type=object}", typed("object").toString());
     }
 
     @Test
     void aSubSchemaReachedTwiceIsWrittenAndVisitedAtEachPath() {
-        // The guard follows the path, not everything already seen: JSON has no way to share one, so
-        // a node reached through two paths is written out at both and walked at both.
-        MutableJsonSchema shared = typed("string");
-        MutableJsonSchema schema = new MutableJsonSchema();
-        schema.setProperties(Map.of("first", shared, "second", shared));
+        // JSON has no way to share one, so a node reached through two paths is written out at both and
+        // walked at both.
+        JsonSchema shared = typed("string");
+        JsonSchema schema = new JsonSchemaBuilder().setProperties(Map.of("first", shared, "second", shared)).build();
 
         assertEquals(Map.of("properties",
                 Map.of("first", Map.of("type", "string"), "second", Map.of("type", "string"))),
@@ -341,58 +333,23 @@ class MutableJsonSchemaTest {
         assertEquals(List.of(schema, shared, shared), visited);
     }
 
-    @Test
-    void copyOfCarriesEveryKeyword() {
-        MutableJsonSchema source = new MutableJsonSchema();
-        source.setType("object");
-        source.setRequired(List.of("name"));
-        source.put("format", "uuid");
-
-        MutableJsonSchema copy = MutableJsonSchema.copyOf(source);
-
-        assertNotSame(source, copy);
-        assertEquals(Set.of("type", "required", "format"), copy.keys());
-        assertEquals(JsonSchemas.toDocument(source), JsonSchemas.toDocument(copy));
+    private static JsonSchema built() {
+        return new JsonSchemaBuilder().build();
     }
 
-    @Test
-    void copyOfSharesSubSchemas() {
-        MutableJsonSchema name = typed("string");
-        MutableJsonSchema source = new MutableJsonSchema();
-        source.setProperties(Map.of("name", name));
-
-        MutableJsonSchema copy = MutableJsonSchema.copyOf(source);
-
-        assertNotSame(source, copy);
-        assertSame(name, copy.getProperties().get("name"));
-    }
-
-    @Test
-    void copyOfLeavesTheOriginalAlone() {
-        MutableJsonSchema source = typed("object");
-
-        MutableJsonSchema copy = MutableJsonSchema.copyOf(source);
-        copy.setType("array");
-
-        assertEquals(List.of("object"), source.getType());
-        assertEquals(List.of("array"), copy.getType());
-    }
-
-    @Test
-    void copyOfRefusesABooleanSchema() {
-        assertThrows(SynapseException.class, () -> MutableJsonSchema.copyOf(BooleanJsonSchema.TRUE));
-    }
-
-    private static MutableJsonSchema typed(String type) {
-        MutableJsonSchema schema = new MutableJsonSchema();
-        schema.setType(type);
-        return schema;
+    private static JsonSchema typed(String type) {
+        return new JsonSchemaBuilder().setType(type).build();
     }
 
     /** The document of an object-form schema, as the map a test compares against. */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> document(JsonSchema schema) {
         return (Map<String, Object>) JsonSchemas.toDocument(schema);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Object> rawList(JsonSchema schema, String keyword) {
+        return (List<Object>) schema.get(keyword);
     }
 
 }

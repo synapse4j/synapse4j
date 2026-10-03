@@ -15,7 +15,7 @@ import io.github.synapse4j.json.AbstractJsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonWriter;
-import io.github.synapse4j.json.MutableJsonSchema;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
@@ -202,13 +202,13 @@ class FunctionToolTest {
 
         @Override
         public JsonSchema generateEncodeSchema(Type type) {
-            return new MutableJsonSchema();
+            return new JsonSchemaBuilder().build();
         }
 
         @Override
         public JsonSchema generateDecodeSchema(Type type) {
             generatedFor.add(type);
-            MutableJsonSchema schema = new MutableJsonSchema();
+            JsonSchemaBuilder schema = new JsonSchemaBuilder();
             if (type == String.class) {
                 schema.setType("string");
             } else if (type == int.class || type == Integer.class) {
@@ -216,7 +216,7 @@ class FunctionToolTest {
             } else {
                 schema.setType("object");
             }
-            return schema;
+            return schema.build();
         }
 
         @Override

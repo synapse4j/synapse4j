@@ -16,12 +16,13 @@ class AbstractJsonCodecTest {
 
     @Test
     void writesASchemaAsTheDocumentItDescribes() {
-        MutableJsonSchema schema = new MutableJsonSchema();
-        schema.setType("object");
         Map<String, JsonSchema> properties = new LinkedHashMap<>();
         properties.put("name", subSchema("string"));
-        schema.setProperties(properties);
-        schema.put("$schema", "https://json-schema.org/draft/2020-12/schema");
+        JsonSchema schema = new JsonSchemaBuilder()
+                .setType("object")
+                .setProperties(properties)
+                .put("$schema", "https://json-schema.org/draft/2020-12/schema")
+                .build();
 
         StubCodec codec = new StubCodec();
 
@@ -70,19 +71,20 @@ class AbstractJsonCodecTest {
         StubCodec codec = new InterceptingCodec();
 
         assertEquals("intercepted", codec.encode("value"));
-        assertEquals("stub", codec.encode(new MutableJsonSchema()));
+        assertEquals("stub", codec.encode(new JsonSchemaBuilder().build()));
         assertEquals(Map.of(), codec.encoded);
     }
 
     private static JsonSchema subSchema(String type) {
-        MutableJsonSchema schema = new MutableJsonSchema();
-        schema.setType(type);
-        return schema;
+        return new JsonSchemaBuilder().setType(type).build();
     }
 
     /** Providers extend the schema model; decoding must treat a subclass like the base type. */
-    private static class ExtendedSchema extends MutableJsonSchema {
+    private static class ExtendedSchema extends BooleanJsonSchema {
 
+        ExtendedSchema() {
+            super(true);
+        }
     }
 
     private static class StubCodec extends AbstractJsonCodec {
