@@ -132,9 +132,10 @@ public class ToolCallingChatClient extends AbstractChatClient {
      * {@inheritDoc}
      *
      * <p>
-     * This is the loop itself: the first trip out, then — while the answer carries tool calls
-     * — execute, append, count the turn up, and go again. An executor answering {@code null}
-     * ends the round where it stands.
+     * Keeps going while an answer carries tool calls: each round's batch is executed and its
+     * results appended before the next round, so the returned answer is the first that asks for no
+     * calls. An executor answering {@code null} stops the loop there, and the answer that carried
+     * the calls is returned unanswered.
      */
     @Override
     protected ChatResponse doChat(ChatRequest request) {
@@ -302,10 +303,8 @@ public class ToolCallingChatClient extends AbstractChatClient {
         }
 
         /**
-         * Whether another event is due, running the loop forward when the current round is
-         * over: while the round's stream has nothing left, the calls it ended with — if any —
-         * run, the request grows, the turn counts up, and the next round opens. A decline, or
-         * an answer asking for no calls, ends the stream.
+         * Whether another event is due, running the loop forward when the current round is over. A
+         * decline, or an answer asking for no calls, ends the stream.
          */
         private boolean advance() {
             if (cancelled) {
@@ -364,9 +363,9 @@ public class ToolCallingChatClient extends AbstractChatClient {
         }
 
         /**
-         * Ends the stream on a failure: recorded for any later pull, and the round in progress
-         * released — a failure must not leave a connection open behind it. A close that fails
-         * on the way is suppressed onto the original rather than replacing it.
+         * Ends the stream on a failure so nothing keeps reading behind it: the failure is recorded
+         * for any later pull and the round in progress released. A close that fails on the way is
+         * suppressed onto the original rather than replacing it.
          */
         private void die(Throwable caught) {
             failure = caught;

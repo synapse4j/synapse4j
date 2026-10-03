@@ -159,17 +159,12 @@ class ResponsesWriter {
     }
 
     /**
-     * The conversation as the array of items it goes out as. A message contributes the item holding
-     * what it says, and then one item for each part this protocol carries beside a message rather
-     * than inside it — so a turn that called a tool is replayed as the message it was and the call it
-     * made, in the order the caller built them.
+     * The conversation as the array of items it goes out as, in the order the caller built them.
      *
      * <p>
-     * How much of the conversation that is depends on where the server already stands. With a chain
-     * anchor — the application sets {@code previous_response_id} in the options bag, and it merges
-     * into the document from there as it always has — the server holds the history itself, so only
-     * the pending messages go out. Without one the server holds nothing, and the whole conversation
-     * goes: the history first, then the pending.
+     * With a chain anchor — the application sets {@code previous_response_id} in the options bag —
+     * the server already holds the history, so only the pending messages go out. Without one the
+     * whole conversation goes: the history first, then the pending.
      */
     private List<Map<String, Object>> input(ChatRequest request) {
         List<Map<String, Object>> input = new ArrayList<>();
@@ -567,7 +562,6 @@ class ResponsesWriter {
         return entry;
     }
 
-    /** Puts a member, or nothing at all when the value is not set. */
     private static void putIfSet(Map<String, Object> members, String name, @Nullable Object value) {
         if (value != null) {
             members.put(name, value);

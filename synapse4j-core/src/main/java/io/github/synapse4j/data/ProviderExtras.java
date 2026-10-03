@@ -294,9 +294,8 @@ public class ProviderExtras {
     }
 
     /**
-     * Clears whatever stands in the way of a path being set: the entries it would contain, and the
-     * entry it would sit inside. Setting a path replaces that position in the tree the way a map's
-     * put replaces a key, rather than being refused for overlapping what is already there.
+     * Setting a path replaces that position in the tree the way a map's put replaces a key, rather
+     * than being refused for overlapping what is already there.
      */
     private void clearAround(String key) {
         String descendants = key + SEPARATOR;

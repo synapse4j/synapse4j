@@ -267,8 +267,7 @@ class MessagesReader {
 
     /**
      * Moves every member of a content block the part does not model into the part's extras, under
-     * the name it came in — the fields collected while the block's type was still unknown, landing
-     * on the part that type turned out to be.
+     * the name it came in.
      *
      * @param block   the block as the wire spelled it
      * @param part    the part the block became

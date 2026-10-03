@@ -60,9 +60,11 @@ public interface StagedTool extends Tool {
     List<ContentPart> resolveResult(@Nullable Object returnValue, @Nullable ChatContext context) throws Exception;
 
     /**
-     * Runs the three stages in order: resolve, call, render. A failure from any stage passes
-     * through as itself — what becomes of it is the caller's policy, as it is for any {@link
-     * Tool}.
+     * {@inheritDoc}
+     *
+     * <p>
+     * A failure from any stage passes through as itself; what becomes of it is the caller's
+     * policy, as it is for any {@link Tool}.
      *
      * @param arguments the arguments the model produced, as JSON text
      * @param context   the conversation this call belongs to; {@code null} when none was attached

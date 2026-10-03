@@ -146,7 +146,6 @@ class JacksonJsonWriter extends AbstractJsonWriter {
         write(generator::close);
     }
 
-    /** Runs one write and returns this writer, so that the interface stays fluent. */
     private JsonWriter write(Runnable write) {
         return translate("Writing the JSON document failed", () -> {
             write.run();
@@ -154,7 +153,11 @@ class JacksonJsonWriter extends AbstractJsonWriter {
         });
     }
 
-    /** Runs one write, translating what Jackson reports into what this library reports. */
+    /**
+     * Runs one write, translating Jackson's own failures into this library's: an I/O failure into
+     * a {@link SynapseIOException}, anything else into a {@link SynapseException}, each under the
+     * given message.
+     */
     private static <T> T translate(String message, Supplier<T> write) {
         try {
             return write.get();

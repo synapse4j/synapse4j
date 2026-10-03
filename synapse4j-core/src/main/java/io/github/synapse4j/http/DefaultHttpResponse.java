@@ -105,7 +105,6 @@ public class DefaultHttpResponse implements HttpResponse {
         return false;
     }
 
-    /** The media type of one header value: everything before its parameters, trimmed. */
     private static String mediaTypeOf(String value) {
         int parameters = value.indexOf(';');
         return (parameters < 0 ? value : value.substring(0, parameters)).trim();

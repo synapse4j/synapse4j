@@ -89,11 +89,10 @@ public class OpenAiResponsesChatClient extends AbstractOpenAiChatClient {
     }
 
     /**
-     * Whether this call asks the endpoint to keep its answers, in the order the decision is
-     * resolved: the {@code store} member the application set in this request's extras — the
-     * member goes out on the wire whichever way, so it is also the decision the chain lives by —
-     * then the family configuration, then the endpoint's own default, which both providers fix as
-     * keep. A member that is not a boolean cannot be read as a decision and is passed over.
+     * Whether this call asks the endpoint to keep its answers: the {@code store} member set in the
+     * request's extras wins — the member goes out on the wire either way, so it is also the
+     * decision the chain lives by — then the family configuration, then the endpoint's own default
+     * of keep. A member that is not a boolean cannot be read as a decision and is passed over.
      *
      * @param request the request being folded into; never {@code null}
      * @return whether this call keeps its answers

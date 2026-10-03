@@ -292,11 +292,9 @@ public class Synapse4jAutoConfiguration {
     }
 
     /**
-     * Brings a freshly built client into shape before it is shared: the bound {@code
-     * synapse4j.chat.options.*} become its default options, every {@link ChatCustomizer} bean joins
-     * its per-call hooks, and every {@link ChatClientCustomizer} bean then gets the last word.
-     * Applied here rather than through a constructor because the clients' own constructors are the
-     * library's API and take no options.
+     * The {@link ChatClientCustomizer} beans run last, so a bean has the final say on the client
+     * it is handed. Applied here rather than through a constructor because the clients' own
+     * constructors are the library's API and take no options.
      */
     private static ChatClient assemble(ChatClient client, Synapse4jProperties properties,
             ObjectProvider<ChatCustomizer> chatCustomizers,

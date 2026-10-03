@@ -109,12 +109,6 @@ public class MethodTools {
         return read(type, null);
     }
 
-    /**
-     * Reads the annotated methods of {@code type} and builds a tool from each: the signature into a
-     * {@link ToolMethodSpec}, the annotations' values onto it where they wrote one, the customizers
-     * over it in order, and then the factory's tool for its {@code type}, completed with it. An
-     * instance method is read only when {@code target} says what it runs on.
-     */
     private List<Tool> read(Class<?> type, @Nullable Object target) {
         List<Tool> tools = new ArrayList<>();
         Map<String, Method> named = new LinkedHashMap<>();
@@ -178,10 +172,9 @@ public class MethodTools {
     }
 
     /**
-     * Every method {@code type} can run, whatever its visibility: what it declares, then what each
-     * superclass and each interface of that chain declares, most derived first. One entry per
-     * signature — so an override takes the place of what it overrides, as Java's own method lookup
-     * has it — and nothing abstract, synthetic or bridge, which no instance runs as declared.
+     * Every method {@code type} can run, whatever its visibility, one entry per signature with the
+     * most derived declaration first — so an override takes the place of what it overrides, as
+     * Java's own method lookup has it — and nothing abstract, synthetic or bridge.
      */
     private static List<Method> runnableMethods(Class<?> type) {
         Map<String, Method> bySignature = new LinkedHashMap<>();
@@ -199,7 +192,11 @@ public class MethodTools {
         return List.copyOf(bySignature.values());
     }
 
-    /** Reads an interface's default methods, and those of the interfaces it extends. */
+    /**
+     * Reads an interface's default methods into the given map, then those its extended interfaces
+     * declare. A signature already present is left as it stands, so the most derived declaration
+     * wins.
+     */
     private static void readDefaultMethods(Class<?> face, Map<String, Method> bySignature) {
         for (Method method : face.getDeclaredMethods()) {
             if (!method.isDefault() || method.isSynthetic() || method.isBridge()) {

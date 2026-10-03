@@ -177,7 +177,6 @@ class JacksonJsonReader extends AbstractJsonReader {
                 + Arrays.toString(rest) + ", but the current token is " + current);
     }
 
-    /** Reads one value, translating what Jackson reports into what this library reports. */
     private <T> @Nullable T read(Supplier<T> read) {
         return translate("Reading the JSON document failed", read);
     }
@@ -191,7 +190,6 @@ class JacksonJsonReader extends AbstractJsonReader {
         return Objects.requireNonNull(read(read), "Jackson answered no value where one was due");
     }
 
-    /** Performs one read whose result is not handed back, with the same translation as {@link #read}. */
     private void run(Runnable read) {
         this.read(() -> {
             read.run();
@@ -199,7 +197,11 @@ class JacksonJsonReader extends AbstractJsonReader {
         });
     }
 
-    /** Runs one read, translating what Jackson reports into what this library reports. */
+    /**
+     * Runs one read, translating Jackson's own failures into this library's: an I/O failure into a
+     * {@link SynapseIOException}, anything else into a {@link SynapseException}, each under the
+     * given message.
+     */
     private static <T> @Nullable T translate(String message, Supplier<T> read) {
         try {
             return read.get();

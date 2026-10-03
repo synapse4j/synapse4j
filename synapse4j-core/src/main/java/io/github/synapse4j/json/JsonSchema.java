@@ -300,7 +300,7 @@ public class JsonSchema {
         }
     }
 
-    /** Names this schema for an error message, without going through {@link #toString()}. */
+    /** Names this schema for an error message: a short label, not the whole document {@link #toString()} renders. */
     private String describe() {
         if (ref != null) {
             return "$ref " + ref;

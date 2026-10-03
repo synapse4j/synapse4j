@@ -136,9 +136,8 @@ public class DefaultToolExecutor implements ToolExecutor {
     }
 
     /**
-     * One call, answered: through the tool on the way out, through the handler when anything
-     * goes wrong — the handler's text coming back as a failed result, the handler itself
-     * throwing to let the failure out of here.
+     * One call, answered: the tool's parts, or the handler's text as a failed result when the call
+     * fails. An interruption leaves as itself rather than being reported as this call's failure.
      */
     private ToolResultPart run(ToolCallPart call, List<Tool> available, @Nullable ChatContext context)
             throws Exception {

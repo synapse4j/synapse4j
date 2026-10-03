@@ -124,7 +124,11 @@ public class DefaultSseEventStream implements SseEventStream {
         source.close();
     }
 
-    /** Reads lines until one frame is complete, or the body ends. */
+    /**
+     * Reads lines until one frame is complete.
+     *
+     * @return the frame, or {@code null} when the body ends before one is complete
+     */
     private @Nullable SseEvent readFrame() {
         StringBuilder data = new StringBuilder();
         String event = null;
@@ -212,8 +216,8 @@ public class DefaultSseEventStream implements SseEventStream {
     }
 
     /**
-     * The body's next byte, filling the read-ahead buffer when it runs dry; {@code -1} at the end
-     * of the body. An {@link IOException} is the transport's own and travels as the library's.
+     * The body's next byte, {@code -1} at its end. An {@link IOException} from the transport
+     * travels as the library's own rather than being left raw.
      */
     private int nextByte() {
         if (position >= limit) {

@@ -112,7 +112,6 @@ public class Base64Reader extends Reader {
         closeStream();
     }
 
-    /** Reads one chunk of the source and encodes it, or marks the source as read to its end. */
     private void fill() throws IOException {
         if (stream == null) {
             stream = source.get();

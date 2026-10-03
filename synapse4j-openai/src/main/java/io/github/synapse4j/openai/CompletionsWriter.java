@@ -126,10 +126,8 @@ class CompletionsWriter {
     }
 
     /**
-     * The whole conversation as the array of messages: the system message that frames it first —
-     * only when this call carries one — then the history as it stands, then what this call is
-     * about to send. In that order a system message keeps the place it had when the conversation
-     * was a single list.
+     * The whole conversation as the array of messages. The system message comes first, only when
+     * this call carries one, so it keeps the place it had when the conversation was a single list.
      */
     private List<Map<String, Object>> messages(ChatRequest request) {
         List<Map<String, Object>> written = new ArrayList<>();
@@ -449,7 +447,6 @@ class CompletionsWriter {
         return entry;
     }
 
-    /** Puts a member, or nothing at all when the value is not set. */
     private static void putIfSet(Map<String, Object> members, String name, @Nullable Object value) {
         if (value != null) {
             members.put(name, value);

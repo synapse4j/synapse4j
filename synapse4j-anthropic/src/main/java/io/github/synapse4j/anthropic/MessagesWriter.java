@@ -196,9 +196,8 @@ class MessagesWriter {
     }
 
     /**
-     * The conversation as the array of messages: the history as it stands, then what this call is
-     * about to send. The system message is not in here — this protocol keeps no turn for it, and
-     * the framing travels as its own field on every call.
+     * The conversation as the array of messages. The system message is not among them — this
+     * protocol keeps no turn for it, and the framing travels as its own field on every call.
      */
     private List<Map<String, Object>> messages(ChatRequest request) {
         List<Map<String, Object>> written = new ArrayList<>();
@@ -568,7 +567,6 @@ class MessagesWriter {
         return tool;
     }
 
-    /** Puts a member, or nothing at all when the value is not set. */
     private static void putIfSet(Map<String, Object> members, String name, @Nullable Object value) {
         if (value != null) {
             members.put(name, value);

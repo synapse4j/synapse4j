@@ -265,10 +265,9 @@ public abstract class AbstractChatClient implements ChatClient {
     }
 
     /**
-     * Records the response, adopts any session id the exchange reported into a context of its
-     * own — only into one still empty, so the application's value always wins — and hands this
-     * context back on the answer: it holds the request, the response and whatever the turn
-     * says, and is the instance the caller can carry into the next call.
+     * Records the response on the context and hands that context back on the answer, so the caller
+     * can carry it into the next call. A session id the exchange reported is adopted only into a
+     * context that has none of its own, so the application's value always wins.
      */
     private static void carryContext(ChatContext context, ChatResponse response) {
         ChatContext reported = response.getContext();
@@ -301,9 +300,9 @@ public abstract class AbstractChatClient implements ChatClient {
     }
 
     /**
-     * Merges the standing tool set into the request's own, in one fixed shape: the default tools in
-     * registration order, each provider's answer in registration order, then the request's own — a
-     * later source wins by name at the slot the name first took, a new name appends.
+     * Merges the standing tool set into the request's own: a later source wins by name at the slot
+     * the name first took, and a new name appends. Default tools come first, then each provider's
+     * answer, then the request's own.
      *
      * @param request the request as the caller built it
      */

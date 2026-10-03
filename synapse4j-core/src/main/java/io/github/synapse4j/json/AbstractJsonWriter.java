@@ -87,9 +87,9 @@ public abstract class AbstractJsonWriter implements JsonWriter {
     protected abstract JsonWriter writeValueDirect(Object value);
 
     /**
-     * Writes a number as the narrowest JSON number that holds it exactly: a decimal goes out through
-     * {@link #writeNumber(BigDecimal)} rather than a {@code double}, which would round it, and an
-     * integer too large for a {@code long} goes out as a decimal rather than being truncated.
+     * Writes a number as the narrowest JSON number that holds it exactly, so nothing is rounded or
+     * truncated: a decimal, or an integer past the {@code long} range, goes out as a decimal
+     * rather than a {@code double}.
      */
     private JsonWriter writeNumber(Number number) {
         if (number instanceof Double || number instanceof Float) {

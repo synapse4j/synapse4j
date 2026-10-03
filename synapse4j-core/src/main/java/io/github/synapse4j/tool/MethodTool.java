@@ -162,10 +162,8 @@ public class MethodTool implements SpecTool, StagedTool {
     }
 
     /**
-     * Reads the signature the spec names and holds everything the stages need; builds nothing
-     * yet. The spec is validated first, so everything downstream can read it without rechecking.
-     * The method is made accessible, so a private method the application hands over runs like any
-     * other.
+     * Validates the spec once, so the stages that follow read it without rechecking, and makes the
+     * method accessible so a private one the application hands over runs like any other.
      */
     private void readSignature(ToolMethodSpec spec, JsonCodec codec) {
         spec.validate();

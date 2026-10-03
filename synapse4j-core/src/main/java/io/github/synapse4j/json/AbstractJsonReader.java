@@ -72,15 +72,10 @@ public abstract class AbstractJsonReader implements JsonReader {
     }
 
     /**
-     * Turns a number's text into the number it denotes: the narrowest integral type that holds a whole
-     * number, and a {@code Double} for anything else.
-     *
-     * <p>
-     * A whole number is classified by how many digits it is spelled with, which is how a JSON library
-     * decides the type to keep a number in: up to nine digits fits an {@code int} whatever it says, up
-     * to eighteen a {@code long} with the tenth checked against the {@code int} range, and a longer one
-     * is a {@code BigInteger} only when it is past the {@code long} range as well. Nothing here throws:
-     * a number too big for a {@code long} is still a number, and keeping it as one is the point.
+     * Turns a number's text into the number it denotes, in the narrowest Java type that holds it
+     * exactly, with a {@code Double} for anything that is not a whole number. Nothing here throws
+     * or truncates: a whole number too big for a {@code long} is still a number, and comes back as
+     * a {@code BigInteger} rather than being cut down.
      */
     private static Object captureNumber(String text) {
         if (text.indexOf('.') >= 0 || text.indexOf('e') >= 0 || text.indexOf('E') >= 0) {
