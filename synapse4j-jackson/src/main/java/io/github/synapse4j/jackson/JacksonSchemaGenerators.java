@@ -19,13 +19,15 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Builds the victools configuration and generators this module works with, one per direction, and
- * holds all of the option policy behind them.
+ * composes the policy behind them.
  *
  * <p>
- * Every choice about keywords — the draft, the option preset, the Jackson module, what to do about a
- * naming strategy — is made here and nowhere else. {@link JacksonJsonCodec} takes built generators and
- * knows none of it, so a caller who wants other choices builds their own (through the modules below, or
- * with victools directly) and hands them over.
+ * The choices are made here and in the modules it applies — {@link PropertyDiscoveryModule} for which
+ * properties exist, {@link FlattenedOptionalModule} for how an optional value is described,
+ * {@link DecodeRequiredPropertiesModule} or {@link EncodeRequiredPropertiesModule} for which properties
+ * are demanded — and nowhere else.
+ * {@link JacksonJsonCodec} takes built generators and knows none of it, so a caller who wants other
+ * choices builds their own (through the modules below, or with victools directly) and hands them over.
  *
  * <p>
  * Both directions are configured from the {@link JsonMapper} they are built with, on purpose: the
@@ -40,7 +42,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>
  * There are two shapes. The generator factories are the one-call shape. The config-builder methods are
  * the two-step shape a framework integration wants: take the builder with the defaults already on it,
- * run the {@link Module}s the framework collects over it, then build a generator from the result.
+ * apply the {@link Module}s the framework collects to it, then build a generator from the result.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class JacksonSchemaGenerators {
@@ -71,10 +73,10 @@ public final class JacksonSchemaGenerators {
 
     /**
      * Creates the configuration builder for the schema of the JSON this codec writes, with this
-     * module's defaults already applied and no {@link Module} run yet.
+     * module's defaults already applied and no {@link Module} added yet.
      *
      * <p>
-     * Running modules and building a generator from the result is the caller's part. A framework that
+     * Applying modules and building a generator from the result is the caller's part. A framework that
      * manages beans collects modules and wants the step in between to be its own; this method is that
      * step, so the defaults a caller starts from are exactly the ones this module ships.
      *
@@ -88,10 +90,10 @@ public final class JacksonSchemaGenerators {
 
     /**
      * Creates the configuration builder for the schema of the JSON this codec reads, with this
-     * module's defaults already applied and no {@link Module} run yet.
+     * module's defaults already applied and no {@link Module} added yet.
      *
      * <p>
-     * Running modules and building a generator from the result is the caller's part; see
+     * Applying modules and building a generator from the result is the caller's part; see
      * {@link #encodeSchemaConfigBuilder(JsonMapper)} for why this method exists.
      *
      * @param jsonMapper the mapper whose introspection the generator should use; must not be
@@ -108,12 +110,15 @@ public final class JacksonSchemaGenerators {
      * <p>
      * {@code PLAIN_JSON} with an explicit draft decides the vocabulary; {@link PropertyDiscoveryModule}
      * then imposes the mapper's own answer to which properties exist, what they are called and in what
-     * order; and what is left are two choices about meaning — {@code additionalProperties: false}
-     * written out on every object rather than left implicit, because silence is read differently
-     * depending on who reads the document, and {@code MAP_VALUES_AS_ADDITIONAL_PROPERTIES}, so a map
-     * describes its value type rather than degrading to a bare object — and one about noise: no
-     * {@code $schema} indicator, since the draft is already implied by the keywords that are written
-     * and the marker only tells a validator which dialect it is reading.
+     * order; {@link FlattenedOptionalModule} answers for an optional value in every position and
+     * {@link DecodeRequiredPropertiesModule} or {@link EncodeRequiredPropertiesModule} for which
+     * properties are demanded; and what is left are two choices about meaning — {@code additionalProperties:
+     * false} written out on every object that declares properties rather than left implicit, because
+     * silence is read differently depending on who reads the document, and
+     * {@code MAP_VALUES_AS_ADDITIONAL_PROPERTIES}, so a map describes its value type rather than
+     * degrading to a bare object — and one about noise: no {@code $schema} indicator, since the draft is
+     * already implied by the keywords that are written and the marker only tells a validator which
+     * dialect it is reading.
      *
      * @param jsonMapper the mapper whose introspection the generator should use
      * @param encoding   whether the schema describes JSON this codec writes
@@ -125,6 +130,10 @@ public final class JacksonSchemaGenerators {
                 OptionPreset.PLAIN_JSON)
                 .with(new JacksonSchemaModule(JacksonOption.RESPECT_JSONPROPERTY_REQUIRED))
                 .with(new PropertyDiscoveryModule(jsonMapper, encoding))
+                .with(new FlattenedOptionalModule())
+                .with(encoding
+                        ? new EncodeRequiredPropertiesModule(jsonMapper)
+                        : new DecodeRequiredPropertiesModule(jsonMapper))
                 .with(Option.FORBIDDEN_ADDITIONAL_PROPERTIES_BY_DEFAULT, Option.MAP_VALUES_AS_ADDITIONAL_PROPERTIES)
                 .without(Option.SCHEMA_VERSION_INDICATOR);
     }

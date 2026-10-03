@@ -5,6 +5,8 @@ version becomes the body of the GitHub Release created when that version's tag i
 
 ## [Unreleased]
 
+- A generated schema now states what the types ask for instead of nothing: a decode schema requires every property except one the type makes optional, and an `Optional` is nullable in every position — a method parameter, a property, a list item, a map value — where it used to come out as a bare object at the root and as its value type alone inside a list or a map
+- An encode schema lists every property as required while the mapper writes every property and drops one an inclusion setting may leave out, and a decode schema demands every property once the mapper is set to refuse a missing creator property
 - An API key is optional: leaving it unset sends no auth header, so an OpenAI-compatible server that authenticates nothing — a local runtime, say — is called as it stands instead of refused with `apiKey is required`
 - Annotated tools: `@ToolMethod` and `@ToolParam` declare a tool on a method, and `MethodTools` reads a class's annotated methods into tools — any visibility, inherited and interface-default ones included — running `ToolMethodSpecCustomizer` steps between the annotations and the finished tool, and resolving `type` through a `SpecToolFactory`
 - A method tool is now completed from a `ToolMethodSpec` by `initialize(...)`, the `SpecTool` contract, and the resolution is validated by the tool that uses it; the declaration can no longer be handed in whole — `MethodTool.of(ToolDefinition, …)`, `define(...)` and the subclass constructor are gone, and the arguments schema beyond the per-parameter hooks is `argumentsSchema`'s to shape

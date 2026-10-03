@@ -2,6 +2,7 @@ package io.github.synapse4j.jackson;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -98,14 +99,13 @@ class JacksonJsonCodecTest {
 
     @Test
     void aCustomizerCanChangeWhatTheGeneratedSchemaSays() {
-        SchemaGenerator requiredGenerator = JacksonSchemaGenerators.encodeSchemaGenerator(jsonMapper,
-                configBuilder -> configBuilder.forFields().withRequiredCheck(field -> true));
-        JacksonJsonCodec customizedCodec = new JacksonJsonCodec(jsonMapper, requiredGenerator,
+        SchemaGenerator titledGenerator = JacksonSchemaGenerators.encodeSchemaGenerator(jsonMapper,
+                configBuilder -> configBuilder.forFields().withTitleResolver(field -> field.getDeclaredName()));
+        JacksonJsonCodec customizedCodec = new JacksonJsonCodec(jsonMapper, titledGenerator,
                 JacksonSchemaGenerators.decodeSchemaGenerator(jsonMapper));
 
-        assertTrue(codec.generateEncodeSchema(Order.class).getRequired().isEmpty());
-        assertEquals(List.of("id", "labels", "quantity", "shipTo"),
-                List.copyOf(new TreeSet<>(customizedCodec.generateEncodeSchema(Order.class).getRequired())));
+        assertNull(codec.generateEncodeSchema(Point.class).getProperties().get("x").getTitle());
+        assertEquals("x", customizedCodec.generateEncodeSchema(Point.class).getProperties().get("x").getTitle());
     }
 
     @Test
@@ -119,13 +119,12 @@ class JacksonJsonCodecTest {
     @Test
     void aCustomizerAppliedToTheConfigBuilderReachesTheSchema() {
         SchemaGeneratorConfigBuilder configBuilder = JacksonSchemaGenerators.encodeSchemaConfigBuilder(jsonMapper);
-        configBuilder.forFields().withRequiredCheck(field -> true);
+        configBuilder.forFields().withTitleResolver(field -> field.getDeclaredName());
         SchemaGenerator fromBuilder = new SchemaGenerator(configBuilder.build());
 
         JsonSchema schema = readSchema(fromBuilder, Order.class);
 
-        assertEquals(List.of("id", "labels", "quantity", "shipTo"),
-                List.copyOf(new TreeSet<>(schema.getRequired())));
+        assertEquals("id", schema.getProperties().get("id").getTitle());
     }
 
     @Test
