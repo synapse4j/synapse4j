@@ -318,6 +318,12 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
+    void toStringRendersTheBooleanForm() {
+        assertEquals("BooleanJsonSchema(true)", BooleanJsonSchema.TRUE.toString());
+        assertEquals("BooleanJsonSchema(false)", BooleanJsonSchema.FALSE.toString());
+    }
+
+    @Test
     void aSubSchemaReachedTwiceIsWrittenAndVisitedAtEachPath() {
         // JSON has no way to share one, so a node reached through two paths is written out at both and
         // walked at both.

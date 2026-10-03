@@ -112,7 +112,7 @@ public class BooleanJsonSchema implements JsonSchema {
 
     @Override
     public String toString() {
-        return "BooleanJsonSchema" + value;
+        return "BooleanJsonSchema(" + value + ")";
     }
 
 }
