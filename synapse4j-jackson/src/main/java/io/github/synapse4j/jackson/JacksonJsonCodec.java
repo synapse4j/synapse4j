@@ -29,7 +29,7 @@ import lombok.NonNull;
  * <p>
  * Both halves come from the same mapper on purpose. A schema is only worth generating if it describes
  * the JSON the mapper really moves, so the mapper is what tells the generator which properties exist,
- * what they are called and in what order — see {@link JacksonPropertyDiscovery}. Where the mapper answers
+ * what they are called and in what order — see {@link PropertyDiscoveryModule}. Where the mapper answers
  * differently for writing than for reading, the two schemas differ with it.
  *
  * <p>

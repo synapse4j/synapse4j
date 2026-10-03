@@ -67,7 +67,7 @@ import tools.jackson.databind.json.JsonMapper;
  * every field and method reaches the checks above instead of being filtered out first.
  */
 @RequiredArgsConstructor
-final class JacksonPropertyDiscovery implements Module {
+final class PropertyDiscoveryModule implements Module {
 
     private final JsonMapper jsonMapper;
 

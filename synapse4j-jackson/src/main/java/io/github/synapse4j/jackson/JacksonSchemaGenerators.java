@@ -35,7 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>
  * The two directions differ in which Jackson introspection answers that question — what the mapper
  * writes, or what it reads — and therefore sometimes differ in the schema they produce. That is not an
- * accident to be papered over: see {@link JacksonPropertyDiscovery}.
+ * accident to be papered over: see {@link PropertyDiscoveryModule}.
  *
  * <p>
  * There are two shapes. The generator factories are the one-call shape. The config-builder methods are
@@ -106,7 +106,7 @@ public final class JacksonSchemaGenerators {
      * Assembles the configuration this module starts from, before any module a caller adds has seen it.
      *
      * <p>
-     * {@code PLAIN_JSON} with an explicit draft decides the vocabulary; {@link JacksonPropertyDiscovery}
+     * {@code PLAIN_JSON} with an explicit draft decides the vocabulary; {@link PropertyDiscoveryModule}
      * then imposes the mapper's own answer to which properties exist, what they are called and in what
      * order; and what is left are two choices about meaning — {@code additionalProperties: false}
      * written out on every object rather than left implicit, because silence is read differently
@@ -124,7 +124,7 @@ public final class JacksonSchemaGenerators {
                 SchemaVersion.DRAFT_2020_12,
                 OptionPreset.PLAIN_JSON)
                 .with(new JacksonSchemaModule(JacksonOption.RESPECT_JSONPROPERTY_REQUIRED))
-                .with(new JacksonPropertyDiscovery(jsonMapper, encoding))
+                .with(new PropertyDiscoveryModule(jsonMapper, encoding))
                 .with(Option.FORBIDDEN_ADDITIONAL_PROPERTIES_BY_DEFAULT, Option.MAP_VALUES_AS_ADDITIONAL_PROPERTIES)
                 .without(Option.SCHEMA_VERSION_INDICATOR);
     }
