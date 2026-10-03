@@ -139,6 +139,10 @@ one would block extension by users and providers.
   sides produce the same output; import ordering is deliberately not enforced by either.
 - **All comments are in English** — Javadoc (including on private members), inline comments and
   TODOs. Comments explain *why*; do not restate what the code does.
+- **Javadoc states the contract, not the implementation.** Say what a type or method promises — what it
+  takes, what it answers, what it refuses, the invariants a caller relies on — not the steps it takes or
+  the pieces it applies. The body beside it already says that, and a second copy drifts; a private helper
+  whose javadoc lists what it applies earns nothing a reader of the method cannot see.
 - **Use Lombok instead of hand-writing boilerplate**, and only its stable annotations — nothing from
   `lombok.experimental`. Constructors count: one that only assigns its parameters is
   `@RequiredArgsConstructor`/`@AllArgsConstructor`/`@NoArgsConstructor`, with `@NonNull` where a null
