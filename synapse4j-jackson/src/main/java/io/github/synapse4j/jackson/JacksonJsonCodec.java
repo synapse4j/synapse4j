@@ -33,7 +33,7 @@ import lombok.NonNull;
  * differently for writing than for reading, the two schemas differ with it.
  *
  * <p>
- * What a schema should say beyond that is decided in {@link JacksonSchemaGenerators}, so a caller who
+ * What a schema should say beyond that is decided in {@link JacksonSchemaConfigBuilders}, so a caller who
  * wants other choices builds their own generators and passes them to
  * {@link #JacksonJsonCodec(JsonMapper, SchemaGenerator, SchemaGenerator)}.
  *
@@ -89,8 +89,13 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
      * @param jsonMapper the mapper to bind values with; must not be {@code null}
      */
     public JacksonJsonCodec(JsonMapper jsonMapper) {
-        this(jsonMapper, JacksonSchemaGenerators.encodeSchemaGenerator(jsonMapper),
-                JacksonSchemaGenerators.decodeSchemaGenerator(jsonMapper));
+        this(jsonMapper,
+                new SchemaGenerator(
+                        JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(jsonMapper, new JacksonSchemaSettings())
+                                .build()),
+                new SchemaGenerator(
+                        JacksonSchemaConfigBuilders.decodeSchemaConfigBuilder(jsonMapper, new JacksonSchemaSettings())
+                                .build()));
     }
 
     /**

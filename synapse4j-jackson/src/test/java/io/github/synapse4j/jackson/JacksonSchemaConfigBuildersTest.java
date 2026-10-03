@@ -28,12 +28,12 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Pins what {@link JacksonSchemaGenerators} decides about a generated schema, through the codec that
+ * Pins what {@link JacksonSchemaConfigBuilders} decides about a generated schema, through the codec that
  * hands one out: whatever the schema allows, binding accepts, and binding produces only what the schema
  * allows. Where a schema is stricter than the binder — the decode direction states what the types ask
  * for rather than everything a lenient binder tolerates — that is the contract, not a mistake.
  */
-class JacksonSchemaGeneratorsTest {
+class JacksonSchemaConfigBuildersTest {
 
     /** Every kind of property a type can declare, so one schema shows how each is described. */
     record Kitchen(String text, int number, Integer boxed, Optional<String> optional, List<String> list,

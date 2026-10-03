@@ -99,10 +99,13 @@ class JacksonJsonCodecTest {
 
     @Test
     void aCustomizerCanChangeWhatTheGeneratedSchemaSays() {
-        SchemaGenerator titledGenerator = JacksonSchemaGenerators.encodeSchemaGenerator(jsonMapper,
-                configBuilder -> configBuilder.forFields().withTitleResolver(field -> field.getDeclaredName()));
+        SchemaGeneratorConfigBuilder titledBuilder = JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(jsonMapper,
+                new JacksonSchemaSettings());
+        titledBuilder.forFields().withTitleResolver(field -> field.getDeclaredName());
+        SchemaGenerator titledGenerator = new SchemaGenerator(titledBuilder.build());
         JacksonJsonCodec customizedCodec = new JacksonJsonCodec(jsonMapper, titledGenerator,
-                JacksonSchemaGenerators.decodeSchemaGenerator(jsonMapper));
+                new SchemaGenerator(JacksonSchemaConfigBuilders.decodeSchemaConfigBuilder(jsonMapper,
+                        new JacksonSchemaSettings()).build()));
 
         assertNull(codec.generateEncodeSchema(Point.class).getProperties().get("x").getTitle());
         assertEquals("x", customizedCodec.generateEncodeSchema(Point.class).getProperties().get("x").getTitle());
@@ -110,7 +113,8 @@ class JacksonJsonCodecTest {
 
     @Test
     void theConfigBuilderCarriesTheSameDefaultsAsTheFactory() {
-        SchemaGeneratorConfigBuilder configBuilder = JacksonSchemaGenerators.encodeSchemaConfigBuilder(jsonMapper);
+        SchemaGeneratorConfigBuilder configBuilder = JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(jsonMapper,
+                new JacksonSchemaSettings());
         SchemaGenerator fromBuilder = new SchemaGenerator(configBuilder.build());
 
         assertEquals(codec.generateEncodeSchema(Order.class).toMap(), readSchema(fromBuilder, Order.class).toMap());
@@ -118,7 +122,8 @@ class JacksonJsonCodecTest {
 
     @Test
     void aCustomizerAppliedToTheConfigBuilderReachesTheSchema() {
-        SchemaGeneratorConfigBuilder configBuilder = JacksonSchemaGenerators.encodeSchemaConfigBuilder(jsonMapper);
+        SchemaGeneratorConfigBuilder configBuilder = JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(jsonMapper,
+                new JacksonSchemaSettings());
         configBuilder.forFields().withTitleResolver(field -> field.getDeclaredName());
         SchemaGenerator fromBuilder = new SchemaGenerator(configBuilder.build());
 
