@@ -69,6 +69,34 @@ permanent. Here you can swap either one, and neither a provider module nor your 
 This is the rule behind the module split: the core states the interface, and each JSON or HTTP
 library gets a module of its own.
 
+## What a generated schema promises
+
+A schema is generated from a Java type, and it makes one promise: whatever the schema allows, the
+codec accepts. It may promise less — the schema you send to a model deliberately does — but never
+more.
+
+That promise runs in a direction. The schema you hand to whoever produces JSON — the arguments of a
+tool the model calls, the shape of a structured answer — is the decode schema: what the codec is
+willing to read. The schema describing what this library produced — a model told what a call returns
+— is the encode schema. The two can differ, and where a binder is asymmetric they do.
+
+The decode schema follows the types rather than the binder's leniency. A value the type makes
+optional — `Optional`, `OptionalInt` and their kin — may be absent and may be null, wherever it is
+written: a method parameter, a property, a list item, a map value. Everything else is required and
+not nullable. A `Map` keeps its free keys, with its value type becoming `additionalProperties`, while
+an object that declares properties says `additionalProperties: false`. All of it is stricter than the
+binder, which would read an absent `String` as null without complaining: the room a lenient binder
+has is simply not offered to the producer.
+
+The encode schema follows the mapper instead, because it describes what writing really produces.
+While the mapper writes every property, every property is required; once an inclusion setting may
+leave a value out, it is not.
+
+What a provider accepts is a separate question. Some demand every property in `required`, some spell
+a nullable value their own way, some honour only a subset of the keywords — and that translation
+belongs to the provider module, not to the schema generator. One codec serves every provider you talk
+to.
+
 ## What the API looks like, and why
 
 **Blocking, not reactive.** A call returns when the answer is complete. Asynchrony is left to the

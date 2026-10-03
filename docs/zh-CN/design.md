@@ -54,6 +54,18 @@
 任何一个，提供商模块和你的代码都不用改。模块的拆分就源于这条规则：core 只给出接口，每个 JSON 或
 HTTP 库各有一个自己的模块。
 
+## 生成的 schema 承诺了什么
+
+schema 是从 Java 类型生成的，它只承诺一件事：**schema 允许的，codec 一定收**。它可以承诺得更少——发给模型的那份就是有意更少的——但绝不会更多。
+
+这个承诺是有方向的。交给产出 JSON 的一方的 schema——模型要调用的工具的入参、结构化回答的形状——是**读方向的 schema**，说的是 codec 愿意读什么。描述本库产出物的 schema——告诉模型一次调用会返回什么——是**写方向的 schema**。两者可以不同；binder 本身不对称时，它们就应该不同。
+
+读方向的 schema 跟着类型走，而不是跟着 binder 的宽容度走。类型声明为可空的值——`Optional`、`OptionalInt` 这一类——既可以缺席也可以是 null，不管它写在哪儿：方法参数、属性、数组元素、Map 的值。其余的都必填且不可空。`Map` 保留自由键，值类型落在 `additionalProperties` 上；声明了固定属性的对象则写 `additionalProperties: false`。这比 binder 更严：binder 会把缺席的 `String` 当成 null 收下，而这份 schema 干脆不把这个余地留给产出方。
+
+写方向的 schema 反过来跟着 mapper 走，因为它描述的是写出去的真实结果。mapper 每个属性都写时，每个属性都必填；一旦 inclusion 设置可能省略某个值，它就不再必填。
+
+至于某个服务收不收这份 schema，是另一回事。有的要求所有属性都进 `required`，有的用自己的写法表达可空，有的只认关键字的一个子集——这些转换属于 provider 模块，不属于 schema 生成器。一个 codec 服务你对接的所有 provider。
+
 ## API 长什么样，以及为什么
 
 **阻塞，而非响应式。** 调用在答案完整后返回。异步交给 JDK——Java 21 虚拟线程——而不把库绑到

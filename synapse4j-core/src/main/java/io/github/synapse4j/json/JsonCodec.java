@@ -26,10 +26,30 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  *
  * <p>
- * A schema is only worth generating if it describes JSON the codec really moves, so both must be
- * derived from the same settings that bind values, and neither may describe a property the codec does
- * not move in that direction. Nothing here requires the two directions to agree: where a binder is
- * asymmetric, a schema that claimed to describe both would be describing one of them wrongly.
+ * Which direction a caller wants follows from who produces the JSON. The decode schema is the one to
+ * hand to whoever produces it — the arguments of a tool the model calls, the shape of a structured
+ * answer. The encode schema describes what this codec produced, for whoever reads it: a model told
+ * what a call returns, a caller shown a tool's result.
+ *
+ * <p>
+ * A schema is worth generating only if it describes JSON the codec really moves, so the guarantee runs
+ * one way: the schema never allows what the codec would refuse. {@link #decode(String, Type)} accepts
+ * every document {@link #generateDecodeSchema(Type)} allows, and {@link #encode(Object)} produces
+ * nothing {@link #generateEncodeSchema(Type)} forbids. A schema may be stricter than the codec — it is
+ * a contract for whoever produces that JSON, so demanding more than a lenient binder would need is the
+ * point, not a mistake. The two directions answer the binder's questions the same way — which
+ * properties exist, what they are called, in what order — and may differ only in how much they demand;
+ * an asymmetric binder is why they are separate, and one schema covering both would describe one of
+ * them wrongly.
+ *
+ * <p>
+ * What a particular service accepts is not this interface's business: providers differ about which
+ * keywords they honour, how they spell a nullable value, and whether every property must be listed as
+ * required. Translating the {@link JsonSchema} into what a target takes is the provider module's job —
+ * never a keyword here or an option on an implementation, since one codec serves every provider an
+ * application talks to. Such a translation needs one thing from an implementation, so it is required
+ * here: a property whose absence the codec tolerates must be one whose schema allows null. A protocol
+ * that can express "optional" only as "nullable" has nothing else to go on.
  *
  * <p>
  * No JSON library appears in these signatures — only JDK types and types owned by this library. An
