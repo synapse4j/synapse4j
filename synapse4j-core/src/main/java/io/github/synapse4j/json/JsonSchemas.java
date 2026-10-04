@@ -26,37 +26,72 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class JsonSchemas {
 
-    /** The shape of a schema-valued keyword's value. */
-    private enum Shape {
-        SCHEMA, SCHEMA_LIST, SCHEMA_MAP
+    /**
+     * A form the value of a keyword takes: a sub-schema, a list of them, or a map of them by name.
+     *
+     * <p>
+     * Only the forms this library models appear here. More may be added — and more keywords given
+     * shapes — without {@link #shapesOf(String)} changing.
+     */
+    public enum Shape {
+
+        /** A single sub-schema. */
+        SCHEMA,
+
+        /** A list of sub-schemas. */
+        SCHEMA_LIST,
+
+        /** Sub-schemas by name. */
+        SCHEMA_MAP
+
     }
 
     /**
-     * Every keyword whose value is a schema, a list of schemas or a map of them, and which shape it
-     * has. This is what tells {@link #fromDocument(Object)} how to read a document.
+     * Every keyword whose value carries sub-schemas, and the forms that value may take. This is what
+     * tells {@link #fromDocument(Object)} how to read a document, and what {@link #shapesOf(String)}
+     * answers with.
      */
-    private static final Map<String, Shape> SCHEMA_KEYWORDS = Map.ofEntries(
-            Map.entry(PROPERTIES, Shape.SCHEMA_MAP),
-            Map.entry(PATTERN_PROPERTIES, Shape.SCHEMA_MAP),
-            Map.entry(DEFS, Shape.SCHEMA_MAP),
-            Map.entry(DEFINITIONS, Shape.SCHEMA_MAP),
-            Map.entry(DEPENDENT_SCHEMAS, Shape.SCHEMA_MAP),
-            Map.entry(ITEMS, Shape.SCHEMA),
-            Map.entry(ADDITIONAL_ITEMS, Shape.SCHEMA),
-            Map.entry(ADDITIONAL_PROPERTIES, Shape.SCHEMA),
-            Map.entry(NOT, Shape.SCHEMA),
-            Map.entry(IF, Shape.SCHEMA),
-            Map.entry(THEN, Shape.SCHEMA),
-            Map.entry(ELSE, Shape.SCHEMA),
-            Map.entry(CONTAINS, Shape.SCHEMA),
-            Map.entry(PROPERTY_NAMES, Shape.SCHEMA),
-            Map.entry(UNEVALUATED_ITEMS, Shape.SCHEMA),
-            Map.entry(UNEVALUATED_PROPERTIES, Shape.SCHEMA),
-            Map.entry(CONTENT_SCHEMA, Shape.SCHEMA),
-            Map.entry(ALL_OF, Shape.SCHEMA_LIST),
-            Map.entry(ANY_OF, Shape.SCHEMA_LIST),
-            Map.entry(ONE_OF, Shape.SCHEMA_LIST),
-            Map.entry(PREFIX_ITEMS, Shape.SCHEMA_LIST));
+    private static final Map<String, Set<Shape>> SCHEMA_KEYWORDS = Map.ofEntries(
+            Map.entry(PROPERTIES, Set.of(Shape.SCHEMA_MAP)),
+            Map.entry(PATTERN_PROPERTIES, Set.of(Shape.SCHEMA_MAP)),
+            Map.entry(DEFS, Set.of(Shape.SCHEMA_MAP)),
+            Map.entry(DEFINITIONS, Set.of(Shape.SCHEMA_MAP)),
+            Map.entry(DEPENDENT_SCHEMAS, Set.of(Shape.SCHEMA_MAP)),
+            Map.entry(ITEMS, Set.of(Shape.SCHEMA, Shape.SCHEMA_LIST)),
+            Map.entry(ADDITIONAL_ITEMS, Set.of(Shape.SCHEMA)),
+            Map.entry(ADDITIONAL_PROPERTIES, Set.of(Shape.SCHEMA)),
+            Map.entry(NOT, Set.of(Shape.SCHEMA)),
+            Map.entry(IF, Set.of(Shape.SCHEMA)),
+            Map.entry(THEN, Set.of(Shape.SCHEMA)),
+            Map.entry(ELSE, Set.of(Shape.SCHEMA)),
+            Map.entry(CONTAINS, Set.of(Shape.SCHEMA)),
+            Map.entry(PROPERTY_NAMES, Set.of(Shape.SCHEMA)),
+            Map.entry(UNEVALUATED_ITEMS, Set.of(Shape.SCHEMA)),
+            Map.entry(UNEVALUATED_PROPERTIES, Set.of(Shape.SCHEMA)),
+            Map.entry(CONTENT_SCHEMA, Set.of(Shape.SCHEMA)),
+            Map.entry(ALL_OF, Set.of(Shape.SCHEMA_LIST)),
+            Map.entry(ANY_OF, Set.of(Shape.SCHEMA_LIST)),
+            Map.entry(ONE_OF, Set.of(Shape.SCHEMA_LIST)),
+            Map.entry(PREFIX_ITEMS, Set.of(Shape.SCHEMA_LIST)));
+
+    /**
+     * The forms this library knows the value of the given keyword may take, or {@code null} when the
+     * library has not modelled the keyword at all.
+     *
+     * <p>
+     * Only the keywords whose value carries sub-schemas are modelled: this library is built for
+     * talking to language models, not for validating JSON Schema in full, so it types the subset it
+     * needs rather than every keyword the specification gives a type. A {@code null} answer says the
+     * library has no knowledge of the keyword — not that its value is untyped, since the
+     * specification types every one. The set grows as more keywords are modelled, without this method
+     * changing.
+     *
+     * @param keyword the keyword name
+     * @return the forms, or {@code null} when the keyword is not modelled
+     */
+    public static @Nullable Set<Shape> shapesOf(String keyword) {
+        return SCHEMA_KEYWORDS.get(keyword);
+    }
 
     /**
      * Returns a copy of {@code schema} with its {@code $ref}s resolved.
@@ -341,16 +376,16 @@ public final class JsonSchemas {
     }
 
     /**
-     * Reads one keyword's value into its shape. A value the shape does not fit is carried as it
-     * arrived. A list is read as a list of schemas whether or not the keyword is modelled as one:
-     * {@code items} is a single schema in 2020-12 and an array of them in draft-07.
+     * Reads one keyword's value into the form it has. A value the keyword's modelled forms do not fit
+     * is carried as it arrived. A list is read as a list of schemas whichever forms the keyword is
+     * modelled with — {@code items} is a single schema in 2020-12 and an array of them in draft-07.
      */
     private static @Nullable Object fromValue(String keyword, @Nullable Object value) {
-        Shape shape = SCHEMA_KEYWORDS.get(keyword);
-        if (shape == null) {
+        Set<Shape> shapes = SCHEMA_KEYWORDS.get(keyword);
+        if (shapes == null) {
             return value;
         }
-        if (shape == Shape.SCHEMA_MAP) {
+        if (shapes.contains(Shape.SCHEMA_MAP)) {
             if (value instanceof Map<?, ?> map && map.values().stream().allMatch(JsonSchemas::isSchema)) {
                 Map<String, JsonSchema> schemas = new LinkedHashMap<>();
                 map.forEach((name, nested) -> schemas.put(String.valueOf(name), fromDocument(nested)));

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -116,6 +117,16 @@ class JsonSchemasTest {
 
         assertEquals(before, JsonSchemas.toDocument(schema));
         assertTrue(schema.getDefs().containsKey("Place"));
+    }
+
+    @Test
+    void shapesOfAnswersTheFormsAKeywordTakes() {
+        assertEquals(Set.of(JsonSchemas.Shape.SCHEMA_MAP), JsonSchemas.shapesOf("properties"));
+        assertEquals(Set.of(JsonSchemas.Shape.SCHEMA, JsonSchemas.Shape.SCHEMA_LIST),
+                JsonSchemas.shapesOf("items"));
+        // A keyword the library does not model answers null — no knowledge of it, not "untyped".
+        assertNull(JsonSchemas.shapesOf("type"));
+        assertNull(JsonSchemas.shapesOf("x-provider-extension"));
     }
 
 }
