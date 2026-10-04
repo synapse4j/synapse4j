@@ -389,6 +389,22 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
+    void bindsTheJacksonSchemaSettings() {
+        // synapse4j.jackson.* is the JSON implementation's own group, and the setting here shows in
+        // a schema: with it on, a byte[] is the base64 string the mapper really writes; turned off,
+        // victools' own array description comes back. A key that never bound would leave the base64
+        // description in place, and no other test sets a key in this group.
+        runner.withPropertyValues("synapse4j.jackson.base64-bytes=false").run(context -> {
+            JsonSchema schema = context.getBean(JsonCodec.class).generateEncodeSchema(Blob.class);
+            assertThat(schema.getProperties().get("data").getType()).containsExactly("array");
+        });
+    }
+
+    /** A type whose byte[] the Jackson schema settings describe. */
+    record Blob(byte[] data) {
+    }
+
+    @Test
     void applicationBeansWinOverEveryDefault() {
         JsonCodec codec = new JacksonJsonCodec();
         HttpClient http = new RestClientHttpClient();

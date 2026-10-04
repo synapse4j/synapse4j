@@ -128,15 +128,33 @@ class MethodToolTest {
     }
 
     @Test
-    void mismatchedTypeFallsBackThroughTheCodec() throws Exception {
+    void matchingPrimitiveTypeTakesTheValueWithoutTheCodec() throws Exception {
+        // A decoded number arrives boxed, and a primitive declared type matches only through its
+        // wrapper: without that, every primitive argument would be pushed through codec.convert even
+        // when it already fits.
         codec.arguments = Map.of("n", 21);
-        codec.decodedByType.put(int.class, 21);
         MethodTool tool = MethodTool.of("twice", "Doubles a number", method("twice", int.class), null, codec);
+        int encodingsBefore = codec.encoded.size();
 
         Object[] values = tool.resolveArguments("{\"n\":21}", null);
 
         assertEquals(21, values[0]);
-        assertTrue(codec.encoded.contains(21));
+        assertEquals(encodingsBefore, codec.encoded.size());
+        assertTrue(codec.decodedFor.isEmpty());
+    }
+
+    @Test
+    void mismatchedTypeFallsBackThroughTheCodec() throws Exception {
+        // A string where an int is declared is a real mismatch, so the value goes through the codec
+        // rather than being handed to the method as it stands.
+        codec.arguments = Map.of("n", "21");
+        codec.decodedByType.put(int.class, 21);
+        MethodTool tool = MethodTool.of("twice", "Doubles a number", method("twice", int.class), null, codec);
+
+        Object[] values = tool.resolveArguments("{\"n\":\"21\"}", null);
+
+        assertEquals(21, values[0]);
+        assertTrue(codec.encoded.contains("21"));
         assertTrue(codec.decodedFor.contains(int.class));
     }
 

@@ -389,10 +389,30 @@ public class MethodTool implements SpecTool, StagedTool {
             }
             return null;
         }
-        if (parameter.getType().isInstance(raw)) {
+        if (boxed(parameter.getType()).isInstance(raw)) {
             return raw;
         }
         return codec.convert(raw, parameter.getParameterizedType());
+    }
+
+    /**
+     * The wrapper each primitive type's values arrive as: a primitive declared type matches nothing
+     * through {@link Class#isInstance}, since reflection hands back the boxed value, so a decoded
+     * primitive argument would otherwise be pushed through {@code codec.convert} even when it fits.
+     */
+    private static final Map<Class<?>, Class<?>> WRAPPERS = Map.of(
+            boolean.class, Boolean.class,
+            byte.class, Byte.class,
+            char.class, Character.class,
+            short.class, Short.class,
+            int.class, Integer.class,
+            long.class, Long.class,
+            float.class, Float.class,
+            double.class, Double.class);
+
+    /** The class a value of the given declared type is tested against: the wrapper for a primitive. */
+    private static Class<?> boxed(Class<?> type) {
+        return WRAPPERS.getOrDefault(type, type);
     }
 
 }
