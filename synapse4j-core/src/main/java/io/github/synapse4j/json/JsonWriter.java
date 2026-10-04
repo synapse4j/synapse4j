@@ -136,8 +136,9 @@ public interface JsonWriter extends Flushable, AutoCloseable {
      * what it becomes — a value whose fields the protocol spells differently belongs in a map instead.
      *
      * <p>
-     * {@link AbstractJsonWriter} implements this over the tokens; an implementation that does not
-     * extend it carries the same obligation.
+     * {@link AbstractJsonWriter} implements the {@link ProviderExtras} part of this over the tokens; a
+     * {@link JsonSchema} is bound by the implementation, the way a codec binds every type it owns — an
+     * implementation that does not extend it carries the same obligation.
      *
      * @param value the value to write; {@code null} writes JSON {@code null}
      */

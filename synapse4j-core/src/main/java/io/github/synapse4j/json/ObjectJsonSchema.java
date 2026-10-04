@@ -31,9 +31,11 @@ import lombok.EqualsAndHashCode;
  * {@code null} for a keyword that was not set and leaves the node as it was.
  *
  * <p>
- * The map and every collection below it are frozen, so nothing a getter hands out can change the
- * schema. A node is assembled through {@link JsonSchemaBuilder} and read from then on; a change is a
- * new schema, built from the old one.
+ * The map and every collection and map below it are frozen, so no getter can change the schema's
+ * structure. A value that is neither a map nor a collection is carried as it was given: an application
+ * that stores a mutable object as a keyword value and changes it afterwards changes what the schema
+ * reads, so that value is the caller's to keep still. A node is assembled through
+ * {@link JsonSchemaBuilder} and read from then on; a change is a new schema, built from the old one.
  *
  * <p>
  * A keyword whose value is a sub-schema is kept as a {@link JsonSchema} (or a list or a map of them),

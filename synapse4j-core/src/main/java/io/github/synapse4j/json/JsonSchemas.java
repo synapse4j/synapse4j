@@ -104,8 +104,8 @@ public final class JsonSchemas {
      * definition that was fully inlined is dropped.
      *
      * <p>
-     * The argument is untouched: the answer is a new schema. This is the opposite of
-     * {@link JsonSchema#visit}, which changes the schema it walks.
+     * The argument is untouched: the answer is a new schema. {@link JsonSchema#visit} walks a schema
+     * without producing one; this returns a changed copy instead.
      *
      * @param schema the schema to inline; must not be {@code null}
      * @return a copy with its references resolved; never {@code null}
