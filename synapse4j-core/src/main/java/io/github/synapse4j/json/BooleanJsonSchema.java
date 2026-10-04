@@ -8,6 +8,8 @@ import java.util.function.UnaryOperator;
 
 import org.jspecify.annotations.Nullable;
 
+import lombok.EqualsAndHashCode;
+
 /**
  * The boolean form of a schema: {@code true} accepts everything, {@code false} accepts nothing.
  *
@@ -15,6 +17,7 @@ import org.jspecify.annotations.Nullable;
  * It carries no keyword, so every getter that answers for one answers empty, and it has no sub-schema,
  * so a walk visits only this node. An instance is immutable and may be shared.
  */
+@EqualsAndHashCode
 public class BooleanJsonSchema implements JsonSchema {
 
     /** The schema that accepts everything. */
@@ -112,7 +115,7 @@ public class BooleanJsonSchema implements JsonSchema {
 
     @Override
     public String toString() {
-        return "BooleanJsonSchema(" + value + ")";
+        return Boolean.toString(value);
     }
 
 }

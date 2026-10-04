@@ -14,6 +14,8 @@ import java.util.function.UnaryOperator;
 
 import org.jspecify.annotations.Nullable;
 
+import lombok.EqualsAndHashCode;
+
 /**
  * A {@link JsonSchema} in its object form, immutable.
  *
@@ -40,13 +42,13 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>
  * The document shape — the maps, lists and scalars a JSON document is made of — is not this class's
- * business: {@link JsonSchemas} reads one into a schema and writes one back. {@link #toString()} renders
- * that shape.
+ * business: {@link JsonSchemas} reads one into a schema and writes one back.
  *
  * <p>
  * The class is open, not final: a provider or an application may extend it. The constructor freezes
  * what it is given, so a subclass inherits the immutable contract.
  */
+@EqualsAndHashCode
 public class ObjectJsonSchema implements JsonSchema {
 
     /** Every keyword a node carries, keyed by JSON name: frozen, never changed after construction. */
@@ -164,15 +166,9 @@ public class ObjectJsonSchema implements JsonSchema {
         return fn.apply(result);
     }
 
-    /**
-     * Renders this schema in the shape {@link JsonSchemas#toDocument(JsonSchema)} produces rather than
-     * dumping its fields: a recursive structure reads better the way it is written out.
-     *
-     * @return the rendered schema
-     */
     @Override
     public String toString() {
-        return "ObjectJsonSchema" + JsonSchemas.toDocument(this);
+        return values.toString();
     }
 
     private List<JsonSchema> subSchemas() {

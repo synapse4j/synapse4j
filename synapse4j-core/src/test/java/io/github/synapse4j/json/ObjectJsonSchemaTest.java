@@ -1,6 +1,7 @@
 package io.github.synapse4j.json;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -313,14 +314,30 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void toStringRendersTheDocumentShape() {
-        assertEquals("ObjectJsonSchema{type=object}", typed("object").toString());
+    void toStringRendersTheValueItCarries() {
+        assertEquals("{type=object}", typed("object").toString());
+        // A sub-schema renders as its own value, so a nested schema reads as one document.
+        assertEquals("{properties={name={type=string}}}",
+                new JsonSchemaBuilder().setProperties(Map.of("name", typed("string"))).build().toString());
     }
 
     @Test
-    void toStringRendersTheBooleanForm() {
-        assertEquals("BooleanJsonSchema(true)", BooleanJsonSchema.TRUE.toString());
-        assertEquals("BooleanJsonSchema(false)", BooleanJsonSchema.FALSE.toString());
+    void toStringRendersTheBooleanValue() {
+        assertEquals("true", BooleanJsonSchema.TRUE.toString());
+        assertEquals("false", BooleanJsonSchema.FALSE.toString());
+    }
+
+    @Test
+    void twoSchemasCarryingTheSameKeywordsAreEqual() {
+        JsonSchema one = new JsonSchemaBuilder().setType("object")
+                .setProperties(Map.of("name", typed("string"))).build();
+        JsonSchema other = new JsonSchemaBuilder().setType("object")
+                .setProperties(Map.of("name", typed("string"))).build();
+
+        assertEquals(one, other);
+        assertEquals(one.hashCode(), other.hashCode());
+        assertNotEquals(one, typed("object"));
+        assertNotEquals(one, BooleanJsonSchema.TRUE);
     }
 
     @Test
