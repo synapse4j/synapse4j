@@ -34,9 +34,11 @@ import org.jspecify.annotations.Nullable;
  * the nodes it leaves alone.
  *
  * <p>
- * A schema graph cannot contain itself: a node is immutable and built from nodes that already exist, so
- * a cycle is not constructible — a recursive schema is spelled with {@code $ref} instead. The walks of
- * {@link #visit(Consumer)} and {@link #map(UnaryOperator)} therefore need no guard against one.
+ * A schema built through {@link JsonSchemaBuilder} cannot contain itself: a node is built from nodes
+ * that already exist, so a cycle is not constructible, and a recursive schema is spelled with
+ * {@code $ref} instead. The interface is open, though, so an implementation that hands out itself as
+ * its own sub-schema is possible; the walks of {@link #visit(Consumer)} and {@link #map(UnaryOperator)}
+ * do not guard against one.
  *
  * <p>
  * A schema is a value: two schemas are equal when they carry the same content.
