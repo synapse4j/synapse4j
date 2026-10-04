@@ -11,11 +11,18 @@ import java.lang.annotation.Target;
  * means, and whether the model has to produce it.
  *
  * <p>
- * Every attribute holds text, not a value, for the reason {@link ToolMethod} gives: the completion step
- * reads it, so it may be a literal or something to resolve. A blank string means the attribute was not
- * written. The built-in completion reads {@code required} as text as well — an argument is optional
- * only when it is exactly {@code "false"}, and required otherwise, blank included — and a completion
- * step of the application's own may read it another way.
+ * Every attribute is a {@code String} defaulting to {@code ""}, for the reason {@link ToolMethod} gives:
+ * the text is resolved — an annotation default, an application's configuration, a dynamic expression —
+ * and what it resolves to is what configures the argument; text that resolves to blank falls to the
+ * field's own default:
+ *
+ * <ul>
+ * <li>{@code name} blank becomes the parameter's own name;</li>
+ * <li>{@code description} blank becomes no description;</li>
+ * <li>{@code required} blank is judged from the parameter itself: a value the type makes optional (an
+ * {@code Optional}, say) is not required, and anything else is. A written value overrides that — the
+ * built-in completion reads the argument as optional only when it is exactly {@code "false"}.</li>
+ * </ul>
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.PARAMETER)

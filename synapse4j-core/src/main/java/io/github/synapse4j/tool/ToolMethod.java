@@ -11,10 +11,17 @@ import java.lang.annotation.Target;
  * become the arguments, and the return becomes the result.
  *
  * <p>
- * Every attribute holds text, not a value, and deliberately so: the text is read by whoever completes
- * the tool, which may resolve it rather than take it literally — a value looked up in configuration, or
- * an expression such as a SpEL one. An empty string is the one form that means nothing was written;
- * what an empty value becomes is the completion step's to decide, not this annotation's.
+ * Every attribute is a {@code String} defaulting to {@code ""}, and that is the configuration seam, not
+ * an accident. An attribute supplies a default; an application may override it from its own
+ * configuration; a completion step may resolve it dynamically — a SpEL expression, say. Whatever the
+ * text resolves to is what configures the tool; text that resolves to blank means "nothing supplied",
+ * and falls to the field's own default rule. Each field defines its own, where it is read:
+ *
+ * <ul>
+ * <li>{@code name} blank becomes the method's own name;</li>
+ * <li>{@code description} blank becomes no description;</li>
+ * <li>{@code type} blank becomes the implementation the reading uses by default.</li>
+ * </ul>
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)

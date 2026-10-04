@@ -20,11 +20,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class MethodToolTest {
@@ -302,6 +304,15 @@ class MethodToolTest {
     }
 
     @Test
+    void requiredComesFromTheTypeUnlessTheAnnotationWroteAWord() {
+        Tool tool = new MethodTools(codec).from(new Requirable()).get(0);
+
+        // plain and optional say nothing, so their own schemas decide; demanded and loosened each carry a
+        // written word, which overrides what the type would have said.
+        assertEquals(List.of("plain", "demanded"), tool.definition().getInputSchema().getRequired());
+    }
+
+    @Test
     void anEmptyDescriptionBecomesNoDescriptionAtAll() {
         MethodTool tool = MethodTool.of("noop", "", method("noop"), null, codec);
 
@@ -410,6 +421,17 @@ class MethodToolTest {
         }
     }
 
+    /** One method covering all four ways a parameter's required word is settled. */
+    public static class Requirable {
+
+        @ToolMethod(name = "requirable")
+        public String run(String plain, Optional<String> optional,
+                @ToolParam(required = "true") Optional<String> demanded,
+                @ToolParam(required = "false") String loosened) {
+            return "ok";
+        }
+    }
+
     /** The application type a subclass keeps off the wire. */
     public record CurrentUser(String name) {
     }
@@ -502,6 +524,14 @@ class MethodToolTest {
         @Override
         public JsonSchema generateDecodeSchema(Type type) {
             generatedFor.add(type);
+            if (type instanceof ParameterizedType parameterized && parameterized.getRawType() == Optional.class) {
+                // What the real codec gives an Optional: the value's schema beside a null branch, so the
+                // parameter reads as nullable and the required judgement can see it.
+                return new JsonSchemaBuilder()
+                        .put("anyOf", List.of(new JsonSchemaBuilder().setType("string").build(),
+                                new JsonSchemaBuilder().setType("null").build()))
+                        .build();
+            }
             return new JsonSchemaBuilder().setType("object").build();
         }
 

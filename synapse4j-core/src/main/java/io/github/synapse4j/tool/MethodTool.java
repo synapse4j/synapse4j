@@ -155,7 +155,7 @@ public class MethodTool implements SpecTool, StagedTool {
                 schema = JsonSchemaBuilder.from(schema).setDescription(entry.getDescription()).build();
             }
             properties.put(entry.getName(), schema);
-            if (!"false".equals(entry.getRequired())) {
+            if (isRequired(entry, schema)) {
                 required.add(entry.getName());
             }
         }
@@ -166,6 +166,31 @@ public class MethodTool implements SpecTool, StagedTool {
             envelope.setRequired(required);
         }
         return envelope.build();
+    }
+
+    /**
+     * Whether the model has to produce this argument. The annotation's word wins when it gave one;
+     * otherwise the parameter's own schema decides — a value the type makes optional (a nullable schema,
+     * an {@link java.util.Optional}, say) is not required, and anything else is.
+     */
+    private static boolean isRequired(ToolParameterSpec entry, JsonSchema schema) {
+        if (!entry.getRequired().isBlank()) {
+            return !"false".equals(entry.getRequired());
+        }
+        return !allowsNull(schema);
+    }
+
+    /**
+     * Whether a schema admits null: a union with a branch whose type is {@code null}. That is the shape a
+     * type made optional is described in — an {@code Optional} arrives as {@code anyOf} of its value
+     * schema and a null one.
+     */
+    private static boolean allowsNull(JsonSchema schema) {
+        if (!(schema.get("anyOf") instanceof List<?> branches)) {
+            return false;
+        }
+        return branches.stream().anyMatch(branch -> branch instanceof JsonSchema sub
+                && sub.getType() != null && sub.getType().contains("null"));
     }
 
     /**
