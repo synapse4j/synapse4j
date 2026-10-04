@@ -329,9 +329,7 @@ public class ProviderExtras {
 
     @Override
     public String toString() {
-        // Rendered as the raw entries, the spelling the caller assembles; @ToString cannot produce
-        // it, because it always prints the member name next to the value.
-        return "ProviderExtras" + rawMap();
+        return values.toString();
     }
 
     private ProviderExtras putPath(@Nullable Object value, @NonNull List<String> path) {

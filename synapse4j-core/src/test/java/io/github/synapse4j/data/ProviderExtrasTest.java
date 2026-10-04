@@ -284,7 +284,7 @@ class ProviderExtrasTest {
     void toStringShowsTheRawEntries() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
 
-        assertEquals("ProviderExtras{a.b=1}", extras.toString());
+        assertEquals("{a.b=1}", extras.toString());
     }
 
     @Test
