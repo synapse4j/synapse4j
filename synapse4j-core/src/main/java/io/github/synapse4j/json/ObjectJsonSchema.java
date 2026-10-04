@@ -15,6 +15,7 @@ import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
 
 import lombok.EqualsAndHashCode;
+import lombok.NonNull;
 
 /**
  * A {@link JsonSchema} in its object form, immutable.
@@ -132,14 +133,14 @@ public class ObjectJsonSchema implements JsonSchema {
     }
 
     @Override
-    public <T> @Nullable T get(String keyword, Class<T> type) {
+    public <T> @Nullable T get(String keyword, @NonNull Class<T> type) {
         Object value = values.get(keyword);
         return type.isInstance(value) ? type.cast(value) : null;
     }
 
     @Override
     @SuppressWarnings("unchecked")
-    public <T> @Nullable List<T> getList(String keyword, Class<T> type) {
+    public <T> @Nullable List<T> getList(String keyword, @NonNull Class<T> type) {
         Object value = values.get(keyword);
         if (!(value instanceof List<?> list)) {
             return null;
@@ -154,7 +155,7 @@ public class ObjectJsonSchema implements JsonSchema {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <T> @Nullable Map<String, T> getMap(String keyword, Class<T> type) {
+    public <T> @Nullable Map<String, T> getMap(String keyword, @NonNull Class<T> type) {
         Object value = values.get(keyword);
         if (!(value instanceof Map<?, ?> map)) {
             return null;
@@ -168,7 +169,7 @@ public class ObjectJsonSchema implements JsonSchema {
     }
 
     @Override
-    public void visit(Consumer<JsonSchema> visitor) {
+    public void visit(@NonNull Consumer<JsonSchema> visitor) {
         visitor.accept(this);
         for (JsonSchema subSchema : subSchemas()) {
             subSchema.visit(visitor);
@@ -176,7 +177,7 @@ public class ObjectJsonSchema implements JsonSchema {
     }
 
     @Override
-    public JsonSchema map(UnaryOperator<JsonSchema> fn) {
+    public JsonSchema map(@NonNull UnaryOperator<JsonSchema> fn) {
         JsonSchema result = this;
         Map<String, Object> changed = null;
         for (Map.Entry<String, Object> entry : values.entrySet()) {

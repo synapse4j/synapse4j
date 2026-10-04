@@ -9,6 +9,7 @@ import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
 
 import lombok.EqualsAndHashCode;
+import lombok.NonNull;
 
 /**
  * The boolean form of a schema: {@code true} accepts everything, {@code false} accepts nothing.
@@ -94,27 +95,27 @@ public class BooleanJsonSchema implements JsonSchema {
     }
 
     @Override
-    public <T> @Nullable T get(String keyword, Class<T> type) {
+    public <T> @Nullable T get(String keyword, @NonNull Class<T> type) {
         return null;
     }
 
     @Override
-    public <T> @Nullable List<T> getList(String keyword, Class<T> type) {
+    public <T> @Nullable List<T> getList(String keyword, @NonNull Class<T> type) {
         return null;
     }
 
     @Override
-    public <T> @Nullable Map<String, T> getMap(String keyword, Class<T> type) {
+    public <T> @Nullable Map<String, T> getMap(String keyword, @NonNull Class<T> type) {
         return null;
     }
 
     @Override
-    public void visit(Consumer<JsonSchema> visitor) {
+    public void visit(@NonNull Consumer<JsonSchema> visitor) {
         visitor.accept(this);
     }
 
     @Override
-    public JsonSchema map(UnaryOperator<JsonSchema> fn) {
+    public JsonSchema map(@NonNull UnaryOperator<JsonSchema> fn) {
         return fn.apply(this);
     }
 

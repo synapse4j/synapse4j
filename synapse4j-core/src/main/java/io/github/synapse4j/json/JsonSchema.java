@@ -8,6 +8,8 @@ import java.util.function.UnaryOperator;
 
 import org.jspecify.annotations.Nullable;
 
+import lombok.NonNull;
+
 /**
  * A JSON Schema: what shape a JSON document has to have.
  *
@@ -156,7 +158,7 @@ public interface JsonSchema {
      * @param type    the type to read it as; must not be {@code null}
      * @return its value, or {@code null} if this node does not carry it as that type
      */
-    <T> @Nullable T get(String keyword, Class<T> type);
+    <T> @Nullable T get(String keyword, @NonNull Class<T> type);
 
     /**
      * The value of any keyword this node carries, read as a list of the given element type.
@@ -171,7 +173,7 @@ public interface JsonSchema {
      * @param type    the element type to read it as; must not be {@code null}
      * @return the list, or {@code null} if this node does not carry one of that element type
      */
-    <T> @Nullable List<T> getList(String keyword, Class<T> type);
+    <T> @Nullable List<T> getList(String keyword, @NonNull Class<T> type);
 
     /**
      * The value of any keyword this node carries, read as a map of the given value type by string key.
@@ -186,7 +188,7 @@ public interface JsonSchema {
      * @param type    the value type to read it as; must not be {@code null}
      * @return the map, or {@code null} if this node does not carry one of that value type
      */
-    <T> @Nullable Map<String, T> getMap(String keyword, Class<T> type);
+    <T> @Nullable Map<String, T> getMap(String keyword, @NonNull Class<T> type);
 
     /**
      * Walks this schema and every sub-schema below it, this one first.
@@ -197,7 +199,7 @@ public interface JsonSchema {
      *
      * @param visitor what to do with each schema; must not be {@code null}
      */
-    void visit(Consumer<JsonSchema> visitor);
+    void visit(@NonNull Consumer<JsonSchema> visitor);
 
     /**
      * Walks this schema and every sub-schema below it and produces a new schema.
@@ -211,6 +213,6 @@ public interface JsonSchema {
      * @param fn which node to use in place of each; must not be {@code null}
      * @return the new schema; never {@code null}
      */
-    JsonSchema map(UnaryOperator<JsonSchema> fn);
+    JsonSchema map(@NonNull UnaryOperator<JsonSchema> fn);
 
 }

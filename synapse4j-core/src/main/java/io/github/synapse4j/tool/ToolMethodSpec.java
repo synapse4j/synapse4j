@@ -33,7 +33,7 @@ import lombok.ToString;
  */
 @Getter
 @Setter
-@ToString
+@ToString(exclude = "target")
 public class ToolMethodSpec {
 
     /** The method the values were read from; the signature the declaration will be built from. */
