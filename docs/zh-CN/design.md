@@ -60,7 +60,7 @@ schema 是从 Java 类型生成的，它只承诺一件事：**schema 允许的�
 
 这个承诺是有方向的。交给产出 JSON 的一方的 schema——模型要调用的工具的入参、结构化回答的形状——是**读方向的 schema**，说的是 codec 愿意读什么。描述本库产出物的 schema——告诉模型一次调用会返回什么——是**写方向的 schema**。两者可以不同；binder 本身不对称时，它们就应该不同。
 
-读方向的 schema 跟着类型走，而不是跟着 binder 的宽容度走。类型声明为可空的值——`Optional`、`OptionalInt` 这一类——既可以缺席也可以是 null，不管它写在哪儿：方法参数、属性、数组元素、Map 的值。其余的都必填且不可空。`Map` 保留自由键，值类型落在 `additionalProperties` 上；声明了固定属性的对象则写 `additionalProperties: false`。这比 binder 更严：binder 会把缺席的 `String` 当成 null 收下，而这份 schema 干脆不把这个余地留给产出方。
+读方向的 schema 跟着类型走，而不是跟着 binder 的宽容度走。类型声明为可空的值——`Optional`、`OptionalInt` 这一类——既可以缺席也可以是 null，不管它写在哪儿：方法参数、属性、数组元素、Map 的值。其余的都必填且不可空。`Map` 保留自由键，值类型落在 `additionalProperties` 上。声明了固定属性的对象，在读的一方拒绝未声明的属性时会封闭——写 `additionalProperties: false`——读的一方接受时则保持开放。比 binder 更严的是必填与可空这部分：binder 会把缺席的 `String` 当成 null 收下，而这份 schema 干脆不把这个余地留给产出方。
 
 写方向的 schema 反过来跟着 mapper 走，因为它描述的是写出去的真实结果。mapper 每个属性都写时，每个属性都必填；一旦 inclusion 设置可能省略某个值，它就不再必填。
 

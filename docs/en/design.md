@@ -83,10 +83,12 @@ willing to read. The schema describing what this library produced — a model to
 The decode schema follows the types rather than the binder's leniency. A value the type makes
 optional — `Optional`, `OptionalInt` and their kin — may be absent and may be null, wherever it is
 written: a method parameter, a property, a list item, a map value. Everything else is required and
-not nullable. A `Map` keeps its free keys, with its value type becoming `additionalProperties`, while
-an object that declares properties says `additionalProperties: false`. All of it is stricter than the
-binder, which would read an absent `String` as null without complaining: the room a lenient binder
-has is simply not offered to the producer.
+not nullable. A `Map` keeps its free keys, with its value type becoming `additionalProperties`. An
+object that declares properties is closed against the ones it does not list — `additionalProperties:
+false` — where the reading refuses a property the JSON leaves undeclared, and left open where the
+reading accepts one. The required-and-nullable part is stricter than the binder, which would read an
+absent `String` as null without complaining: the room a lenient binder has is simply not offered to
+the producer.
 
 The encode schema follows the mapper instead, because it describes what writing really produces.
 While the mapper writes every property, every property is required; once an inclusion setting may

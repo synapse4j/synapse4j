@@ -219,6 +219,13 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
+    void theEncodeSchemaIsNotClosedAgainstUndeclaredProperties() {
+        // Only the decode schema answers the binder's refusal of an undeclared property; what this
+        // library writes names exactly the properties the schema lists.
+        assertNull(codec.generateEncodeSchema(Kitchen.class).getAdditionalProperties());
+    }
+
+    @Test
     void thePromiseHoldsUnderOtherMapperSettings() {
         for (JsonMapper mapper : otherMappers()) {
             JacksonJsonCodec other = new JacksonJsonCodec(mapper.rebuild());

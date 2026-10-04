@@ -32,10 +32,9 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>
  * A wrapper {@link #isOptional} does not accept is not flattened, and is described as the bare object
- * victools sees: with the default {@link Option#FORBIDDEN_ADDITIONAL_PROPERTIES_BY_DEFAULT} that is
- * {@code {type: object, additionalProperties: false}} — a schema admitting no property at all. An
- * application adding a {@code Maybe<T>} therefore gets that empty object until it overrides
- * {@link #isOptional} to accept the type; overriding {@link #valueTypeOf} alone changes nothing.
+ * victools sees — an object listing no property at all. An application adding a {@code Maybe<T>}
+ * therefore gets that empty object until it overrides {@link #isOptional} to accept the type;
+ * overriding {@link #valueTypeOf} alone changes nothing.
  */
 public class FlattenedOptionalModule implements Module {
 

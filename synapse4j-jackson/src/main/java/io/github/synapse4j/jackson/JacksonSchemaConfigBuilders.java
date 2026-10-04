@@ -13,6 +13,7 @@ import com.github.victools.jsonschema.module.jackson.JacksonSchemaModule;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -116,6 +117,9 @@ public final class JacksonSchemaConfigBuilders {
                     ? new EncodeRequiredPropertiesModule(jsonMapper)
                     : new DecodeRequiredPropertiesModule(jsonMapper));
         }
+        if (!encoding && settings.isDisfavorAdditionalProperties() && refusesUndeclaredProperties(jsonMapper)) {
+            configBuilder.with(new DisfavoredAdditionalPropertiesModule());
+        }
         for (Option option : settings.getOptions()) {
             configBuilder.with(option);
         }
@@ -123,6 +127,15 @@ public final class JacksonSchemaConfigBuilders {
             configBuilder.without(option);
         }
         return configBuilder;
+    }
+
+    /**
+     * Whether the mapper refuses a property the JSON leaves undeclared — the reading that closing an
+     * object answers. It is a mapper setting, fixed for the life of the generator, so it is read once
+     * here rather than per node.
+     */
+    private static boolean refusesUndeclaredProperties(JsonMapper jsonMapper) {
+        return jsonMapper.deserializationConfig().isEnabled(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 
 }

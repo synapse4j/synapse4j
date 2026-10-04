@@ -43,6 +43,16 @@ import org.jspecify.annotations.Nullable;
  * them wrongly.
  *
  * <p>
+ * Generating a schema is best-effort, because a type is not the whole story: a serializer or
+ * deserializer registered for it, an annotation the implementation does not read, a feature of the
+ * library it does not model — any of these can settle the JSON where the type does not. So an
+ * implementation describes the types it can and no more, and a type it cannot describe faithfully is
+ * the application's to describe: the application supplies that type's schema, and the serialization
+ * behind it when the JSON is what the application settled. This interface cannot say how — the way to
+ * hand an implementation a schema of your own is the implementation's to define, and is stated where
+ * the implementation is.
+ *
+ * <p>
  * What a particular service accepts is not this interface's business: providers differ about which
  * keywords they honour, how they spell a nullable value, and whether every property must be listed as
  * required. Translating the {@link JsonSchema} into what a target takes is the provider module's job —

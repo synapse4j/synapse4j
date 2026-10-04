@@ -28,6 +28,7 @@ import io.github.synapse4j.json.JsonWriter;
 import lombok.Data;
 import org.junit.jupiter.api.Test;
 import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -91,11 +92,20 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void theDefaultSchemaForbidsPropertiesItDoesNotDescribe() {
-        JsonSchema schema = codec.generateEncodeSchema(Order.class);
+    void theDecodeSchemaForbidsPropertiesItDoesNotDescribeWhereTheMapperRefusesThem() {
+        JacksonJsonCodec strict = new JacksonJsonCodec(JsonMapper.builder()
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES));
+        JsonSchema schema = strict.generateDecodeSchema(Order.class);
 
         assertEquals(BooleanJsonSchema.FALSE, schema.getAdditionalProperties());
         assertFalse(schema.keys().contains("$schema"));
+    }
+
+    @Test
+    void theDecodeSchemaLeavesUndeclaredPropertiesOpenWhereTheMapperAcceptsThem() {
+        // Jackson 3 accepts an undeclared property by default, so the default decode schema leaves it
+        // open too — the keyword is written only where the reading refuses one.
+        assertNull(codec.generateDecodeSchema(Order.class).getAdditionalProperties());
     }
 
     @Test

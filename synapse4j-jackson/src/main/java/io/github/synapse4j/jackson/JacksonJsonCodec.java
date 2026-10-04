@@ -38,6 +38,24 @@ import lombok.NonNull;
  * {@link #JacksonJsonCodec(JsonMapper.Builder, SchemaGenerator, SchemaGenerator)}.
  *
  * <p>
+ * A type the generator cannot describe faithfully — its JSON settled by a serializer or deserializer,
+ * its shape decided by an annotation the generator does not read — is the application's to describe,
+ * and Jackson is where both halves are supplied: a serializer and deserializer on the mapper, so the
+ * JSON the schema must match is the JSON the mapper moves; and a victools
+ * {@link com.github.victools.jsonschema.generator.Module} of the caller's own, registering a custom
+ * definition provider for that type, so its schema is the caller's rather than a guess. The module
+ * goes on a builder from {@link JacksonSchemaConfigBuilders}, the serializers on the mapper's builder,
+ * and the generator that results is passed to
+ * {@link #JacksonJsonCodec(JsonMapper.Builder, SchemaGenerator, SchemaGenerator)}.
+ *
+ * <p>
+ * A provider of the caller's is consulted after this module's own, and the first to answer wins — so
+ * where one of this module's choices claims a type (an {@code Optional}, a {@code byte[]}), turn that
+ * choice off in {@link JacksonSchemaSettings} and the caller's provider answers instead. A
+ * type-attribute override of the caller's runs after this module's, so it has the last word on what a
+ * type's node says.
+ *
+ * <p>
  * The token-level {@link JsonWriter} and {@link JsonReader} are built on a factory derived from the
  * same mapper's, so a document written or read token by token is parsed and encoded under the same
  * features as one bound through the mapper — only the two auto-close features differ, and

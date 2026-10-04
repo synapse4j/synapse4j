@@ -4,6 +4,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import com.github.victools.jsonschema.generator.Option;
+import com.github.victools.jsonschema.generator.SchemaKeyword;
 import com.github.victools.jsonschema.module.jackson.JacksonOption;
 
 import lombok.Data;
@@ -31,12 +32,10 @@ public class JacksonSchemaSettings {
 
     /**
      * The victools options to turn on beyond the {@code PLAIN_JSON} preset. Defaults to
-     * {@link Option#FORBIDDEN_ADDITIONAL_PROPERTIES_BY_DEFAULT}, so an object that declares properties
-     * says so explicitly, and {@link Option#MAP_VALUES_AS_ADDITIONAL_PROPERTIES}, so a map describes
-     * its value type rather than degrading to a bare object.
+     * {@link Option#MAP_VALUES_AS_ADDITIONAL_PROPERTIES}, so a map describes its value type rather
+     * than degrading to a bare object.
      */
     private final Set<Option> options = new LinkedHashSet<>(Set.of(
-            Option.FORBIDDEN_ADDITIONAL_PROPERTIES_BY_DEFAULT,
             Option.MAP_VALUES_AS_ADDITIONAL_PROPERTIES));
 
     /**
@@ -72,5 +71,15 @@ public class JacksonSchemaSettings {
      * the mapper never produces.
      */
     private boolean base64Bytes = true;
+
+    /**
+     * Whether the decode schema disfavors additional properties: an object that lists properties is
+     * described as closed — {@link SchemaKeyword#TAG_ADDITIONAL_PROPERTIES
+     * additionalProperties: false} — where the mapper refuses a property the JSON leaves undeclared
+     * (Jackson's {@code FAIL_ON_UNKNOWN_PROPERTIES}), and left open where the mapper accepts one. The
+     * encode schema is not touched: the JSON it describes is this library's own output, which names
+     * exactly the properties it lists.
+     */
+    private boolean disfavorAdditionalProperties = true;
 
 }
