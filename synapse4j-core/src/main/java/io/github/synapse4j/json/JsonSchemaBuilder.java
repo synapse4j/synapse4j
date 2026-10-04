@@ -17,8 +17,9 @@ import lombok.NonNull;
  * <p>
  * Keywords are accumulated here, keyed by their JSON name, and frozen into an immutable
  * {@link ObjectJsonSchema} by {@link #build()}. The keywords the interface names have a setter; every
- * other keyword is written with {@link #put(String, Object)}. {@link #keys()} on the built schema
- * enumerates what a node carries, modelled or not, so a keyword this class does not know survives.
+ * other keyword is written with {@link #put(String, Object)}. {@link JsonSchema#keys()} on the built
+ * schema enumerates what a node carries, modelled or not, so a keyword this class does not know
+ * survives.
  *
  * <p>
  * A keyword is carried exactly when it was set, {@code null} and all, so a keyword whose JSON value is
