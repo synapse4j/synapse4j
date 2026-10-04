@@ -68,6 +68,18 @@ class Synapse4jJacksonModuleTest {
         assertEquals(List.of("object", "null"), schema.getType());
     }
 
+    @Test
+    void addingTheModuleTwiceRegistersItOnce() {
+        JsonMapper twice = JsonMapper.builder()
+                .addModule(new Synapse4jJacksonModule())
+                .addModule(new Synapse4jJacksonModule())
+                .build();
+
+        // The module's name is its registration id, so the second add replaces the first rather than
+        // registering a second: a mapper an application already taught about a JsonSchema is safe.
+        assertEquals(1, twice.registeredModules().size());
+    }
+
     /** A value carrying schemas the way a model type would: one field, and a list of them. */
     record Carries(JsonSchema schema, List<JsonSchema> more) {
     }

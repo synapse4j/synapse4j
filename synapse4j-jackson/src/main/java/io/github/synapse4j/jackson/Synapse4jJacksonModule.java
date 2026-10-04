@@ -17,6 +17,13 @@ import tools.jackson.databind.module.SimpleModule;
  * <p>
  * A type is registered under the interface it is reached by, so a {@link JsonSchema} is covered in both
  * its object and boolean forms, and by any implementation of it.
+ *
+ * <p>
+ * The name it is built with doubles as its registration id, so adding it to a mapper that already
+ * carries one replaces that instance rather than registering a second — adding it is idempotent, and a
+ * mapper an application has already taught about {@link JsonSchema} is safe to hand in. The name is
+ * therefore load-bearing: an unnamed {@code SimpleModule} would be given a fresh id per instance and
+ * would register twice.
  */
 public class Synapse4jJacksonModule extends SimpleModule {
 
