@@ -199,7 +199,7 @@ record Person(String name, int age) {}
 ChatResponseFormat format = new ChatResponseFormat();
 format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
 format.setName("person");
-format.setSchema(codec.encode(codec.generateDecodeSchema(Person.class)));
+format.setSchema(codec.generateDecodeSchema(Person.class));
 format.setStrict(true);
 
 ChatOptions options = new ChatOptions();
@@ -213,7 +213,7 @@ ChatResponse response = client.chat(structured);
 Person person = codec.decode(response.getText(), Person.class);
 ```
 
-schema 是由你的编解码器产出的 JSON Schema 文本，因此模型被约束到你的编解码器恰好能读回的那份 JSON
+schema 是由你的编解码器产出的 `JsonSchema` 值，因此模型被约束到你的编解码器恰好能读回的那份 JSON
 ——不用第二个库，也不用手写 schema。
 
 ## 下一步

@@ -212,7 +212,7 @@ record Person(String name, int age) {}
 ChatResponseFormat format = new ChatResponseFormat();
 format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
 format.setName("person");
-format.setSchema(codec.encode(codec.generateDecodeSchema(Person.class)));
+format.setSchema(codec.generateDecodeSchema(Person.class));
 format.setStrict(true);
 
 ChatOptions options = new ChatOptions();
@@ -226,7 +226,7 @@ ChatResponse response = client.chat(structured);
 Person person = codec.decode(response.getText(), Person.class);
 ```
 
-The schema is JSON Schema text produced by your codec, so the model is constrained to exactly the
+The schema is a `JsonSchema` produced by your codec, so the model is constrained to exactly the
 JSON your codec reads back — no second library, no hand-written schema.
 
 ## Where to go next

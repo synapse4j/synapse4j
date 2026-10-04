@@ -6,7 +6,7 @@
 
 ## 声明
 
-`ToolDefinition` 是模型看到的东西：名字、描述，以及作为 JSON Schema 文本的 `inputSchema`。schema
+`ToolDefinition` 是模型看到的东西：名字、描述，以及一个 `inputSchema`——一个 `JsonSchema`。schema
 由你的编解码器生成，因此它描述的正是你的编解码器能读回的 JSON。它还可以携带 `strict` 和提供商特有的
 字段。
 

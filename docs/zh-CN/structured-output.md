@@ -17,7 +17,6 @@
 
 ```java
 JsonSchema schema = codec.generateDecodeSchema(Person.class);
-String schemaText = codec.encode(schema);
 ```
 
 类型是 `Type` 而不是 `Class`，因此泛型类型带着它的类型参数一起到达：`List<Order>` 描述的是一组
@@ -33,7 +32,7 @@ record Person(String name, int age) {}
 ChatResponseFormat format = new ChatResponseFormat();
 format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
 format.setName("person");
-format.setSchema(codec.encode(codec.generateDecodeSchema(Person.class)));
+format.setSchema(codec.generateDecodeSchema(Person.class));
 format.setStrict(true);
 
 ChatOptions options = new ChatOptions();
@@ -45,8 +44,8 @@ JSON）。`strict` 要求提供商强制执行 schema，而不只是朝它努力
 `strict = false` 在那里拿到的仍是符合 schema 的答案——比要求更严，绝不会更松。这只针对调用确实会发出的
 schema：`TYPE_JSON` 下没有 schema 可强制，`strict` 根本不会发出。
 
-因为 schema 是文本，这里没有任何东西绑定 JSON 库：你选的编解码器产出它，模型被约束到那个编解码器
-读回的形状。
+schema 是一个 `JsonSchema` 值，因此这里没有任何东西绑定 JSON 库：你选的编解码器产出它，模型被约束到
+那个编解码器读回的形状。
 
 ## 把答案读回来
 

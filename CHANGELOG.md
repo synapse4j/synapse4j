@@ -13,6 +13,10 @@ version becomes the body of the GitHub Release created when that version's tag i
 - A schema is read-only: `JsonSchema` answers what a node carries and is never changed, the object form is the immutable `ObjectJsonSchema` built through `JsonSchemaBuilder`, and a change is a new schema rather than a change to this one — the JSON Schema keyword names are public in `JsonSchemaKeywords`
 - The Jackson schema generator is configurable: `JacksonSchemaSettings` carries the choices — which optional types are flattened, how a property's being required is decided, and so on — the generators are built from it, and the Spring starter takes victools `Module` beans over the defaults
 - A `byte[]` is described as the base64 string the mapper writes it as, rather than as an array of numbers
+- A tool's argument schema and a response format's schema are carried as `JsonSchema` values rather than text: `ToolDefinition` and `ChatResponseFormat` take the schema itself, so a provider reshapes it for the wire instead of parsing a string first
+- A `JsonSchema` is bound natively in the Jackson module — `Synapse4jJacksonModule` registers a serializer and a deserializer for it, with `JsonSchemas.shapesOf` naming the shape each keyword takes — and the document form is gone: `JsonSchemas.toDocument`/`fromDocument` are removed, and a schema travels as a `JsonSchema` end to end
+- A schema compares by value and prints as its own value: `ObjectJsonSchema` and `BooleanJsonSchema` implement `equals`/`hashCode`, and `toString` renders the schema's own JSON rather than a class name glued to a value
+- `JacksonJsonCodec` is built from a `JsonMapper.Builder` and the two schema generators, binding its module itself, and the Spring starter rebuilds the application's mapper rather than registering a second one
 
 ## [0.0.2] - 2026-10-01
 

@@ -17,7 +17,6 @@ value, you want the decode schema — the JSON your codec will accept:
 
 ```java
 JsonSchema schema = codec.generateDecodeSchema(Person.class);
-String schemaText = codec.encode(schema);
 ```
 
 The type is a `Type`, not a `Class`, so a generic type arrives with its arguments: `List<Order>`
@@ -33,7 +32,7 @@ record Person(String name, int age) {}
 ChatResponseFormat format = new ChatResponseFormat();
 format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
 format.setName("person");
-format.setSchema(codec.encode(codec.generateDecodeSchema(Person.class)));
+format.setSchema(codec.generateDecodeSchema(Person.class));
 format.setStrict(true);
 
 ChatOptions options = new ChatOptions();
@@ -47,8 +46,8 @@ gets a schema-shaped answer — stricter than asked for, never looser. That hold
 the call actually sends: under `TYPE_JSON` there is no schema to enforce, and `strict` is not sent
 at all.
 
-Because the schema is text, nothing here binds a JSON library: the codec you chose produces it, and
-the model is held to the same shape that codec reads.
+The schema is a `JsonSchema` value, so nothing here binds a JSON library: the codec you chose
+produces it, and the model is held to the same shape that codec reads.
 
 ## Reading the answer back
 
