@@ -8,10 +8,12 @@ import org.jspecify.annotations.Nullable;
 
 import com.github.victools.jsonschema.generator.SchemaGenerator;
 
+import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.AbstractJsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonWriter;
+import tools.jackson.core.JacksonException;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.core.StreamWriteFeature;
 import tools.jackson.core.json.JsonFactory;
@@ -154,12 +156,20 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
 
     @Override
     protected String encodeValue(@Nullable Object value) {
-        return jsonMapper.writeValueAsString(value);
+        try {
+            return jsonMapper.writeValueAsString(value);
+        } catch (JacksonException failure) {
+            throw new SynapseException("Writing the value as JSON failed", failure);
+        }
     }
 
     @Override
     protected <T> @Nullable T decodeValue(String json, Type type) {
-        return jsonMapper.readValue(json, jsonMapper.getTypeFactory().constructType(type));
+        try {
+            return jsonMapper.readValue(json, jsonMapper.getTypeFactory().constructType(type));
+        } catch (JacksonException failure) {
+            throw new SynapseException("Reading the JSON into " + type.getTypeName() + " failed", failure);
+        }
     }
 
     /**
@@ -167,7 +177,11 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
      */
     @Override
     public <T> @Nullable T convert(Object value, Type type) {
-        return jsonMapper.convertValue(value, jsonMapper.getTypeFactory().constructType(type));
+        try {
+            return jsonMapper.convertValue(value, jsonMapper.getTypeFactory().constructType(type));
+        } catch (JacksonException failure) {
+            throw new SynapseException("Converting the value into " + type.getTypeName() + " failed", failure);
+        }
     }
 
     private JsonSchema schema(SchemaGenerator schemaGenerator, Type type) {

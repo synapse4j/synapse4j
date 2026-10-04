@@ -358,6 +358,12 @@ class JacksonJsonCodecTest {
         assertEquals("value", boxed.value());
     }
 
+    @Test
+    void aBindingFailureIsReportedAsASynapseException() {
+        assertThrows(SynapseException.class, () -> codec.decode("{ not json", Point.class));
+        assertThrows(SynapseException.class, () -> codec.convert(Map.of("x", "not a number"), Point.class));
+    }
+
     /** An immutable type whose JSON name arrives only on the creator parameter. */
     static final class Boxed {
 
