@@ -176,30 +176,44 @@ one would block extension by users and providers.
 ## Tests
 
 A test earns its place by pinning a decision that could go wrong by mistake later — merge and
-ordering rules, contracts (a null answered loudly, a request handed on unchanged, one iterator
-pass), failure paths. An assertion that can be re-derived by reading the code beside it proves the
-source works, not us, and a test that faithfully records a bug is worse than none.
+ordering rules, contracts (a null a hand-written check refuses, a request handed on unchanged, one
+iterator pass), failure paths. An assertion that can be re-derived by reading the code beside it
+proves the source works, not us. A test that faithfully records a bug is worse than none: fix the
+behavior, or say in the test's name why it stands.
 
-- **Assert the product, not the call.** What a test checks is what came out, not who was called or
-  how often. `verify` and interaction assertions are out unless the interaction itself is the
-  contract (one iterator pass, a request handed on unchanged).
-- **A stand-in is a mock, not a hand-written fake.** A fake drifts with the implementation and drags
-  its mechanism into the test. Running the real collaborator is not a stand-in.
+- **A test is owed to a decision, not to coverage.** What earns one is the logic behind it: a knob
+  that drives real behavior is a decision, a knob with nothing behind it is not, and neither is a
+  branch, guard or assertion whose absence no reader could observe. A method of a few straight-line
+  statements earns none either, nor what the declaration already enforces — a `@NonNull` parameter
+  refusing null, the accessor Lombok writes. Write the test only when there is a wrong future change
+  to catch, and name it; before adding one, ask whether an existing test already pins the fact or can
+  be extended to, because a suite grows worse the same way code does.
+- **Assert what came out.** Not who was called, or how often, unless the interaction is itself the
+  contract (one iterator pass, a request handed on unchanged); what the library placed is the product
+  too — a bean in a context, a value in a document. A test does not assert its collaborator's
+  behavior: that is its own tests' business, and running one is how the product is exercised, the only
+  way for a stream, a codec or a transport. Its stand-in is a mock when it only answers return values,
+  since a hand-written one drifts with the implementation and drags its mechanism into the test; a
+  stand-in that has to behave like the collaborator — a stream that blocks, a transport that consumes
+  the body before it answers — is part of what is being tested. Running the real collaborator is not a
+  stand-in.
 - **Test the public contract, never the inside.** No private methods or state, no test-only handles,
-  no naming the means an implementation uses (the probe, say). Swapping a means must not move a test.
+  and no naming in a test's name or failure message the means an implementation happens to use.
+  Swapping a means must not move a test.
 - **One decision, one test.** Many inputs or types under one decision are a table-driven
-  (parameterized) test, not a method per case — the JSON schema across types is one such table.
-- **A test is a cost, not a goal.** A method of a few straight-line statements earns none, and
-  neither does what Lombok writes — a plain accessor, a value with no logic. Coverage is not measured
-  in this build; write the test only when there is a wrong future change to catch, and name it.
-- **A unit test tests one class or method, not its collaborators.** What a collaborator does is its
-  own tests' business, and it is a stand-in here. A test combining components is rare, and it does
-  not enumerate the input variants the focused tests already cover.
-- **Self-contained and deterministic.** No order dependence between tests, no shared mutable state,
-  no external world — no network, no real clock, no shared file.
-- **Test code is production code.** Name the class `<Class>Test` after what it tests unless the case
-  is genuinely special; keep shared fixtures in a class of their own rather than copying them; keep
-  the test as readable as the code beside it.
+  (parameterized) test, not a method per case — the JSON schema across types is one such table. A
+  test may carry several checks and keeps every check that lets it stand on its own; what does not
+  earn a place is a second test whose whole content repeats another's check, or a second copy of an
+  expectation block to keep in step.
+- **A claim that survives a transformation is pinned at its boundary.** Read then fold then replay,
+  build then serialize then deserialize, blocking against streaming: one test at the boundary that
+  could break it, asserting both directions rather than only the one in use.
+- **Write it like production code, and keep it self-contained.** No order dependence between tests,
+  no shared mutable state, no external world — no network, no real clock, no shared file. Name the
+  class `<Class>Test` after what it tests unless the case is genuinely special; name a method for the
+  behavior it pins in the fewest words, with no article and no sentence around it; keep shared
+  fixtures in a class of their own rather than copying them; keep the test as readable as the code
+  beside it.
 
 ## Documentation
 
