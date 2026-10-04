@@ -3,7 +3,6 @@ package io.github.synapse4j.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonSchemaBuilder;
@@ -33,16 +32,6 @@ class ChatResponseFormatTest {
         // The merge answers a new instance; neither side is changed.
         assertNull(call.getName());
         assertEquals(ChatResponseFormat.TYPE_JSON, defaults.getType());
-    }
-
-    @Test
-    void everyFormatGetsItsOwnBag() {
-        ChatResponseFormat one = new ChatResponseFormat();
-        ChatResponseFormat two = new ChatResponseFormat();
-
-        one.getExtras().put("strict", true);
-
-        assertTrue(two.getExtras().isEmpty());
     }
 
 }

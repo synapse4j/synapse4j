@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Method;
@@ -157,6 +159,7 @@ class MethodToolTest {
         // null and blank both mean the model produced none, which is not a document to decode.
         assertNull(tool.resolveArguments(null, null)[0]);
         assertNull(tool.resolveArguments("   ", null)[0]);
+        verify(codec, never()).decode(any(), any());
     }
 
     @Test
@@ -278,10 +281,12 @@ class MethodToolTest {
 
     @Test
     void writtenWordOverridesTheSchema() {
+        when(codec.generateDecodeSchema(Nully.class)).thenReturn(nullableObjectSchema());
         Tool tool = new MethodTools(codec).from(new Written()).get(0);
 
-        // the plain schema demands both properties; the word on one takes it back
-        assertEquals(List.of("plain"), tool.definition().getInputSchema().getRequired());
+        // the plain schema demands both properties; the word on one takes it back, and the word on
+        // a type the schema would leave out puts it back
+        assertEquals(List.of("plain", "forced"), tool.definition().getInputSchema().getRequired());
     }
 
     // ===== harness =====
@@ -382,13 +387,18 @@ class MethodToolTest {
         }
     }
 
-    /** One method whose parameter's required word is settled by the annotation alone. */
+    /** One method whose parameters' required words are settled by the annotation alone. */
     public static class Written {
 
         @ToolMethod(name = "written")
-        public String run(String plain, @ToolParam(required = "false") String loosened) {
+        public String run(String plain, @ToolParam(required = "false") String loosened,
+                @ToolParam(required = "true") Nully forced) {
             return "ok";
         }
+    }
+
+    /** A type the codec is told to describe as optional, so only the annotation's word can require it. */
+    public static class Nully {
     }
 
     /** The application type a subclass keeps off the wire. */

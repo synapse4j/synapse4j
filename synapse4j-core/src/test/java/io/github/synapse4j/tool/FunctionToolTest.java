@@ -127,6 +127,9 @@ class FunctionToolTest {
                 (input, context) -> null, codec);
 
         assertEquals("null", execute(tool, "{\"value\":\"x\"}"));
+
+        // the null return is the codec's to render, not an answer the tool supplies on its own
+        verify(codec).encode(null);
     }
 
     @Test
