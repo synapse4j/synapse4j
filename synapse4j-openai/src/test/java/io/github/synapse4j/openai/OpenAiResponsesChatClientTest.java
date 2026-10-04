@@ -1,10 +1,12 @@
 package io.github.synapse4j.openai;
 
+import static io.github.synapse4j.openai.OpenAiFixtures.assertNoNullValues;
+import static io.github.synapse4j.openai.OpenAiFixtures.requestWithModel;
+import static io.github.synapse4j.openai.OpenAiFixtures.textOf;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -639,10 +641,6 @@ class OpenAiResponsesChatClientTest {
         return (List<Map<String, Object>>) wire.get("input");
     }
 
-    private static void assertNoNullValues(Map<String, Object> map) {
-        map.forEach((key, value) -> assertNotNull(value, "wire field '" + key + "' was serialized as null"));
-    }
-
     /** An SSE body of the given frames, each followed by the blank line that dispatches it. */
     private static String sse(String... frames) {
         StringBuilder body = new StringBuilder();
@@ -655,21 +653,6 @@ class OpenAiResponsesChatClientTest {
     /** One named frame: its {@code event:} line and the {@code data:} line that follows it. */
     private static String namedFrame(String event, String data) {
         return "event: " + event + "\ndata: " + data;
-    }
-
-    /** The text one event contributes, or {@code null} when it contributes none. */
-    private static String textOf(ChatStreamEvent event) {
-        if (event.getDelta() == null || event.getDelta().getParts().isEmpty()) {
-            return null;
-        }
-        return ((TextPart) event.getDelta().getParts().get(0)).getText();
-    }
-
-    /** A request with a model set, which is all the request-writing tests here need. */
-    private static ChatRequest requestWithModel() {
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        return request;
     }
 
 }

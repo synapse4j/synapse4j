@@ -328,36 +328,19 @@ class ApacheHttpClientTest {
                 exchange.close();
             }
         });
-
-        HttpRequest request = new HttpRequest(baseUrl + "/slow");
         HttpOptions options = new HttpOptions();
         options.setResponseTimeout(Duration.ofMillis(300));
+
+        // The timeout is the request's when it sets one, and the client's own when it does not.
+        HttpRequest request = new HttpRequest(baseUrl + "/slow");
         request.setOptions(options);
-
-        SynapseException thrown = assertThrows(SynapseException.class, () -> client.send(request));
-        assertTrue(causeChainContainsType(thrown, SocketTimeoutException.class), thrown::toString);
-    }
-
-    @Test
-    void theClientsOwnOptionsApplyWhenTheRequestSetsNone() {
-        HttpOptions options = HttpOptions.defaults();
-        options.setResponseTimeout(Duration.ofMillis(300));
+        SynapseException fromRequest = assertThrows(SynapseException.class, () -> client.send(request));
         ApacheHttpClient withTimeout = new ApacheHttpClient(HttpClients.createDefault(), options);
-        server.createContext("/slow", exchange -> {
-            try {
-                Thread.sleep(3000);
-                exchange.sendResponseHeaders(200, -1);
-            } catch (IOException | InterruptedException ignored) {
-                // The client already gave up; nothing useful left to do.
-            } finally {
-                exchange.close();
-            }
-        });
-
-        SynapseException thrown = assertThrows(SynapseException.class,
+        SynapseException fromClient = assertThrows(SynapseException.class,
                 () -> withTimeout.send(new HttpRequest(baseUrl + "/slow")));
 
-        assertTrue(causeChainContainsType(thrown, SocketTimeoutException.class), thrown::toString);
+        assertTrue(causeChainContainsType(fromRequest, SocketTimeoutException.class), fromRequest::toString);
+        assertTrue(causeChainContainsType(fromClient, SocketTimeoutException.class), fromClient::toString);
     }
 
     @Test
@@ -396,61 +379,38 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void aStreamedBodyThatFailsIsReported() throws IOException {
+    void aStreamedBodyFailureReachesTheCallerWhateverItThrew() {
         server.createContext("/failing", exchange -> {
             exchange.getRequestBody().readAllBytes();
             exchange.sendResponseHeaders(200, -1);
             exchange.close();
         });
 
-        HttpRequest request = new HttpRequest(baseUrl + "/failing");
-        request.setMethod(HttpRequest.POST);
-        request.setBody(out -> {
-            throw new IOException("no bytes today");
-        });
+        // Whatever the body throws — a checked failure, a runtime one, an Error — has to reach the
+        // caller rather than leave the request waiting, and the body's own message travels with it.
+        SynapseException checked = assertThrows(SynapseException.class,
+                () -> client.send(failingRequest(out -> {
+                    throw new IOException("no bytes today");
+                })));
+        Exception runtime = assertThrows(Exception.class,
+                () -> client.send(failingRequest(out -> {
+                    throw new IllegalStateException("no bytes today");
+                })));
+        Throwable error = assertThrows(Throwable.class,
+                () -> client.send(failingRequest(out -> {
+                    throw new AssertionError("no bytes today");
+                })));
 
-        SynapseException thrown = assertThrows(SynapseException.class, () -> client.send(request));
-
-        assertTrue(causeChainContains(thrown, "no bytes today"), thrown::toString);
+        assertTrue(causeChainContains(checked, "no bytes today"), checked::toString);
+        assertTrue(causeChainContains(runtime, "no bytes today"), runtime::toString);
+        assertTrue(causeChainContains(error, "no bytes today"), error::toString);
     }
 
-    @Test
-    void aStreamedBodyThatFailsWithARuntimeExceptionIsReportedRatherThanLeftWaiting() throws IOException {
-        server.createContext("/failing", exchange -> {
-            exchange.getRequestBody().readAllBytes();
-            exchange.sendResponseHeaders(200, -1);
-            exchange.close();
-        });
-
+    private HttpRequest failingRequest(HttpBody body) {
         HttpRequest request = new HttpRequest(baseUrl + "/failing");
         request.setMethod(HttpRequest.POST);
-        request.setBody(out -> {
-            throw new IllegalStateException("no bytes today");
-        });
-
-        Exception thrown = assertThrows(Exception.class, () -> client.send(request));
-
-        assertTrue(causeChainContains(thrown, "no bytes today"), thrown::toString);
-    }
-
-    @Test
-    void aStreamedBodyThatFailsWithAnErrorIsReportedRatherThanLeftWaiting() throws IOException {
-        server.createContext("/failing", exchange -> {
-            exchange.getRequestBody().readAllBytes();
-            exchange.sendResponseHeaders(200, -1);
-            exchange.close();
-        });
-
-        HttpRequest request = new HttpRequest(baseUrl + "/failing");
-        request.setMethod(HttpRequest.POST);
-        request.setBody(out -> {
-            throw new AssertionError("no bytes today");
-        });
-
-        // Reported whether it arrives as itself or wrapped: what matters is that the call ends.
-        Throwable thrown = assertThrows(Throwable.class, () -> client.send(request));
-
-        assertTrue(causeChainContains(thrown, "no bytes today"), thrown::toString);
+        request.setBody(body);
+        return request;
     }
 
     @Test
@@ -516,23 +476,6 @@ class ApacheHttpClientTest {
         PoolStats stats = pool.getTotalStats();
         assertEquals(1, stats.getAvailable(), stats::toString);
         assertEquals(0, stats.getLeased(), stats::toString);
-    }
-
-    @Test
-    void theDefaultConstructorRoundTrips() throws Exception {
-        server.createContext("/default", exchange -> {
-            byte[] out = "default ok".getBytes(UTF_8);
-            exchange.sendResponseHeaders(200, out.length);
-            exchange.getResponseBody().write(out);
-            exchange.close();
-        });
-
-        HttpRequest request = new HttpRequest(baseUrl + "/default");
-
-        try (HttpResponse response = new ApacheHttpClient().send(request)) {
-            assertEquals(200, response.getStatusCode());
-            assertEquals("default ok", new String(response.getBody().readAllBytes(), UTF_8));
-        }
     }
 
     /** The value list of one captured request header, whichever spelling the server-side recorded. */

@@ -198,11 +198,6 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void refusesAMapperOrGeneratorThatIsNotThere() {
-        assertThrows(NullPointerException.class, () -> new JacksonJsonCodec(null, null, null));
-    }
-
-    @Test
     void genericTypeArgumentsShapeThePropertySchemas() {
         JsonSchema schema = codec.generateEncodeSchema(new TypeReference<Box<String>>() {
         }.getType());

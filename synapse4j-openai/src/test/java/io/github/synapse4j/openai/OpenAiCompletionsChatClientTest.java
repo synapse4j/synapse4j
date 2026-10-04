@@ -1,11 +1,13 @@
 package io.github.synapse4j.openai;
 
+import static io.github.synapse4j.openai.OpenAiFixtures.assertNoNullValues;
+import static io.github.synapse4j.openai.OpenAiFixtures.requestWithModel;
+import static io.github.synapse4j.openai.OpenAiFixtures.textOf;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -1668,56 +1670,43 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aRequestLevelFrameBudgetAppliesToTheStream() {
-        stub.canned.setStatusCode(200);
-        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
-        stub.canned.setBody(new ByteArrayInputStream(sse(bigChunk(), "[DONE]").getBytes(UTF_8)));
+    void theFrameBudgetResolvesFromTheRequestThenTheTransportThenTheDefault() {
+        // The request's own budget, when it sets one.
+        HttpOptions requestBudget = new HttpOptions();
+        requestBudget.setMaxFrameBytes(64);
+        ChatRequest budgeted = requestWithModel();
+        budgeted.getOptions().setHttpOptions(requestBudget);
+        stubStreamCrossing(64);
 
-        ChatRequest request = requestWithModel();
-        HttpOptions http = new HttpOptions();
-        http.setMaxFrameBytes(64);
-        request.getOptions().setHttpOptions(http);
+        Iterator<ChatStreamEvent> requestEvents = client.stream(budgeted).iterator();
+        SynapseException fromRequest = assertThrows(SynapseException.class, requestEvents::hasNext);
+        assertTrue(fromRequest.getMessage().contains("64"), fromRequest.getMessage());
 
-        Iterator<ChatStreamEvent> events = client.stream(request).iterator();
-
-        SynapseException thrown = assertThrows(SynapseException.class, events::hasNext);
-        assertTrue(thrown.getMessage().contains("64"), thrown.getMessage());
-    }
-
-    @Test
-    void theStandardFrameBudgetAppliesWhenNothingIsSet() {
-        stub.canned.setStatusCode(200);
-        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
-        stub.canned.setBody(new ByteArrayInputStream(sse("x".repeat(300 * 1024), "[DONE]").getBytes(UTF_8)));
-
-        ChatRequest request = requestWithModel();
-
-        Iterator<ChatStreamEvent> events = client.stream(request).iterator();
-
-        SynapseException thrown = assertThrows(SynapseException.class, events::hasNext);
-        assertTrue(thrown.getMessage().contains("262144"), thrown.getMessage());
-    }
-
-    @Test
-    void theClientOwnFrameBudgetAppliesWhenTheRequestSetsNothing() {
+        // The transport's own, when the request sets none.
         stub.options.setMaxFrameBytes(64);
-        stub.canned.setStatusCode(200);
-        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
-        stub.canned.setBody(new ByteArrayInputStream(sse(bigChunk(), "[DONE]").getBytes(UTF_8)));
+        stubStreamCrossing(64);
 
-        ChatRequest request = requestWithModel();
+        Iterator<ChatStreamEvent> transportEvents = client.stream(requestWithModel()).iterator();
+        SynapseException fromTransport = assertThrows(SynapseException.class, transportEvents::hasNext);
+        assertTrue(fromTransport.getMessage().contains("64"), fromTransport.getMessage());
 
-        Iterator<ChatStreamEvent> events = client.stream(request).iterator();
+        // Neither: the standard budget stands.
+        stub.options = HttpOptions.defaults();
+        stubStreamCrossing(300 * 1024);
 
-        SynapseException thrown = assertThrows(SynapseException.class, events::hasNext);
-        assertTrue(thrown.getMessage().contains("64"), thrown.getMessage());
+        Iterator<ChatStreamEvent> defaultEvents = client.stream(requestWithModel()).iterator();
+        SynapseException fromDefault = assertThrows(SynapseException.class, defaultEvents::hasNext);
+        assertTrue(fromDefault.getMessage().contains("262144"), fromDefault.getMessage());
     }
 
-    /** One chunk frame with a content long enough to blow any small frame budget. */
-    private static String bigChunk() {
-        return "{\"id\":\"chatcmpl-9\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-test\","
-                + "\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\""
-                + "x".repeat(100) + "\"},\"finish_reason\":null}]}";
+    /** A stream whose only frame is long enough to cross the given budget. */
+    private void stubStreamCrossing(int frameBytes) {
+        // A fresh response per exchange: one remembers the event stream it handed out, so reusing
+        // it would answer the second call off the first one's already-read body.
+        stub.canned = new DefaultHttpResponse();
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        stub.canned.setBody(new ByteArrayInputStream(sse("x".repeat(frameBytes), "[DONE]").getBytes(UTF_8)));
     }
 
     /** A canned completion, for the tests that only care about the request. */
@@ -1745,10 +1734,6 @@ class OpenAiCompletionsChatClientTest {
         }
     }
 
-    private static void assertNoNullValues(Map<String, Object> map) {
-        map.forEach((key, value) -> assertNotNull(value, "wire field '" + key + "' was serialized as null"));
-    }
-
     /** The content of the one message the wire carries, as the tests that send one message read it. */
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> contentOf(Map<String, Object> wire) {
@@ -1773,21 +1758,6 @@ class OpenAiCompletionsChatClientTest {
             body.append("data: ").append(frame).append("\n\n");
         }
         return body.toString();
-    }
-
-    /** The text one event contributes, or {@code null} when it contributes none. */
-    private static String textOf(ChatStreamEvent event) {
-        if (event.getDelta() == null || event.getDelta().getParts().isEmpty()) {
-            return null;
-        }
-        return ((TextPart) event.getDelta().getParts().get(0)).getText();
-    }
-
-    /** A request with a model set, which is all the request-writing tests here need. */
-    private static ChatRequest requestWithModel() {
-        ChatRequest request = new ChatRequest();
-        request.getOptions().setModel("gpt-test");
-        return request;
     }
 
     /** A part type this module has no wire shape for: the model is open, the protocol is not. */

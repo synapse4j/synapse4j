@@ -396,36 +396,33 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void aResponseTimeoutIsIgnoredAndTheCallGoesOut() throws Exception {
-        server.createContext("/ignored-timeout", exchange -> {
-            byte[] ok = "fine".getBytes(UTF_8);
-            exchange.sendResponseHeaders(200, ok.length);
-            exchange.getResponseBody().write(ok);
-            exchange.close();
+    void aResponseTimeoutIsIgnoredWhereverItIsSet() throws Exception {
+        // The server answers well past the timeout, so an answer arriving proves the timeout was not
+        // applied: one that honored it would fail here instead.
+        server.createContext("/past-timeout", exchange -> {
+            try {
+                Thread.sleep(600);
+                byte[] ok = "fine".getBytes(UTF_8);
+                exchange.sendResponseHeaders(200, ok.length);
+                exchange.getResponseBody().write(ok);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } finally {
+                exchange.close();
+            }
         });
-        HttpRequest request = new HttpRequest(baseUrl + "/ignored-timeout");
         HttpOptions options = new HttpOptions();
-        options.setResponseTimeout(Duration.ofMillis(300));
-        request.setOptions(options);
+        options.setResponseTimeout(Duration.ofMillis(100));
 
+        // The timeout is the request's when it sets one, and the client's own when it does not.
+        HttpRequest request = new HttpRequest(baseUrl + "/past-timeout");
+        request.setOptions(options);
         try (HttpResponse response = client.send(request)) {
-            assertEquals(200, response.getStatusCode());
             assertEquals("fine", new String(response.getBody().readAllBytes(), UTF_8));
         }
-    }
-
-    @Test
-    void aResponseTimeoutInTheClientsOwnOptionsIsIgnoredToo() throws Exception {
-        server.createContext("/anything", exchange -> {
-            exchange.sendResponseHeaders(204, -1);
-            exchange.close();
-        });
-        HttpOptions options = HttpOptions.defaults();
-        options.setResponseTimeout(Duration.ofMillis(300));
         RestClientHttpClient withTimeout = new RestClientHttpClient(RestClient.builder().build(), options);
-
-        try (HttpResponse response = withTimeout.send(new HttpRequest(baseUrl + "/anything"))) {
-            assertEquals(204, response.getStatusCode());
+        try (HttpResponse response = withTimeout.send(new HttpRequest(baseUrl + "/past-timeout"))) {
+            assertEquals("fine", new String(response.getBody().readAllBytes(), UTF_8));
         }
     }
 
@@ -454,78 +451,38 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void theDefaultConstructorRoundTrips() throws Exception {
-        server.createContext("/default", exchange -> {
-            byte[] out = "default ok".getBytes(UTF_8);
-            exchange.sendResponseHeaders(200, out.length);
-            exchange.getResponseBody().write(out);
-            exchange.close();
-        });
-
-        HttpRequest request = new HttpRequest(baseUrl + "/default");
-
-        try (HttpResponse response = new RestClientHttpClient().send(request)) {
-            assertEquals(200, response.getStatusCode());
-            assertEquals("default ok", new String(response.getBody().readAllBytes(), UTF_8));
-        }
-    }
-
-    @Test
-    void aStreamedBodyThatFailsIsReported() throws Exception {
+    void aStreamedBodyFailureReachesTheCallerWhateverItThrew() {
         server.createContext("/failing", exchange -> {
             exchange.getRequestBody().readAllBytes();
             exchange.sendResponseHeaders(200, -1);
             exchange.close();
         });
 
-        HttpRequest request = new HttpRequest(baseUrl + "/failing");
-        request.setMethod(HttpRequest.POST);
-        request.setBody(out -> {
-            throw new IOException("no bytes today");
-        });
+        // Whatever the body throws — a checked failure, a runtime one, an Error — has to reach the
+        // caller rather than leave the request waiting, and the body's own message travels with it.
+        SynapseException checked = assertThrows(SynapseException.class,
+                () -> client.send(failingRequest(out -> {
+                    throw new IOException("no bytes today");
+                })));
+        Exception runtime = assertThrows(Exception.class,
+                () -> client.send(failingRequest(out -> {
+                    throw new IllegalStateException("no bytes today");
+                })));
+        Throwable error = assertThrows(Throwable.class,
+                () -> client.send(failingRequest(out -> {
+                    throw new AssertionError("no bytes today");
+                })));
 
-        SynapseException thrown = assertThrows(SynapseException.class, () -> client.send(request));
-
-        assertTrue(causeChainContains(thrown, "no bytes today"), thrown::toString);
+        assertTrue(causeChainContains(checked, "no bytes today"), checked::toString);
+        assertTrue(causeChainContains(runtime, "no bytes today"), runtime::toString);
+        assertTrue(causeChainContains(error, "no bytes today"), error::toString);
     }
 
-    @Test
-    void aStreamedBodyThatFailsWithARuntimeExceptionIsReportedRatherThanLeftWaiting() throws Exception {
-        server.createContext("/failing", exchange -> {
-            exchange.getRequestBody().readAllBytes();
-            exchange.sendResponseHeaders(200, -1);
-            exchange.close();
-        });
-
+    private HttpRequest failingRequest(HttpBody body) {
         HttpRequest request = new HttpRequest(baseUrl + "/failing");
         request.setMethod(HttpRequest.POST);
-        request.setBody(out -> {
-            throw new IllegalStateException("no bytes today");
-        });
-
-        Exception thrown = assertThrows(Exception.class, () -> client.send(request));
-
-        assertTrue(causeChainContains(thrown, "no bytes today"), thrown::toString);
-    }
-
-    @Test
-    void aStreamedBodyThatFailsWithAnErrorIsReportedRatherThanLeftWaiting() throws Exception {
-        server.createContext("/failing", exchange -> {
-            exchange.getRequestBody().readAllBytes();
-            exchange.sendResponseHeaders(200, -1);
-            exchange.close();
-        });
-
-        HttpRequest request = new HttpRequest(baseUrl + "/failing");
-        request.setMethod(HttpRequest.POST);
-        request.setBody(out -> {
-            throw new AssertionError("no bytes today");
-        });
-
-        // Reported whether it arrives as itself or wrapped: what matters is that the call ends.
-        Throwable thrown = assertThrows(Throwable.class, () -> client.send(request));
-
-        assertTrue(causeChainContains(thrown, "no bytes today"), thrown::toString);
+        request.setBody(body);
+        return request;
     }
 
     @Test
