@@ -198,7 +198,7 @@ class JacksonJsonCodecTest {
         assertEquals(List.of("string"), schema.getProperties().get("content").getType());
         assertEquals(List.of("array"), schema.getProperties().get("items").getType());
         assertEquals(List.of("string"),
-                schema.getProperties().get("items").<JsonSchema>get("items", JsonSchema.class).getType());
+                schema.getProperties().get("items").get("items", JsonSchema.class).getType());
     }
 
     @Test
@@ -211,7 +211,7 @@ class JacksonJsonCodecTest {
         assertEquals(List.of("string"), order.getProperties().get("id").getType());
         assertEquals("#/$defs/Order", schema.getProperties().get("content").getRef());
         assertEquals("#/$defs/Order",
-                schema.getProperties().get("items").<JsonSchema>get("items", JsonSchema.class).getRef());
+                schema.getProperties().get("items").get("items", JsonSchema.class).getRef());
     }
 
     @Test
@@ -221,7 +221,7 @@ class JacksonJsonCodecTest {
 
         assertEquals(List.of("array"), schema.getType());
         assertEquals(List.of("string"),
-                schema.<JsonSchema>get("items", JsonSchema.class).getProperties().get("id").getType());
+                schema.get("items", JsonSchema.class).getProperties().get("id").getType());
     }
 
     private List<String> properties(JsonSchema schema) {

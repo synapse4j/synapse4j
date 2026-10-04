@@ -178,6 +178,7 @@ class ObjectJsonSchemaTest {
                 .build();
 
         assertNull(schema.get("items", JsonSchema.class));
+        assertEquals(List.of(typed("string"), typed("number")), schema.getList("items", JsonSchema.class));
 
         List<JsonSchema> visited = new ArrayList<>();
         schema.visit(visited::add);

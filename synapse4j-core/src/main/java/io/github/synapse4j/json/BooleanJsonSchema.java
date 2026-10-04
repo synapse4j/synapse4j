@@ -94,7 +94,17 @@ public class BooleanJsonSchema implements JsonSchema {
     }
 
     @Override
-    public <T> @Nullable T get(String keyword, Class<?> type) {
+    public <T> @Nullable T get(String keyword, Class<T> type) {
+        return null;
+    }
+
+    @Override
+    public <T> @Nullable List<T> getList(String keyword, Class<T> type) {
+        return null;
+    }
+
+    @Override
+    public <T> @Nullable Map<String, T> getMap(String keyword, Class<T> type) {
         return null;
     }
 

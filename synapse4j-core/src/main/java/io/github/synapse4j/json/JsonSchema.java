@@ -146,15 +146,45 @@ public interface JsonSchema {
      *
      * <p>
      * The keywords with a getter above say their type there; this method is for the rest. The answer is
-     * the value when it is of the given type, and {@code null} when this node does not carry the keyword
-     * or carries something else — a value of another type is not forced into the asked one.
+     * the value when it is an instance of the given type, and {@code null} when this node does not carry
+     * the keyword or carries something else — a value of another type is not forced into the asked one.
      *
      * @param <T>     the type to read the value as
      * @param keyword the keyword to read
      * @param type    the type to read it as; must not be {@code null}
      * @return its value, or {@code null} if this node does not carry it as that type
      */
-    <T> @Nullable T get(String keyword, Class<?> type);
+    <T> @Nullable T get(String keyword, Class<T> type);
+
+    /**
+     * The value of any keyword this node carries, read as a list of the given element type.
+     *
+     * <p>
+     * The answer is the value when it is a list whose every element is an instance of the given type,
+     * and {@code null} when this node does not carry the keyword, carries something else, or carries a
+     * list an element of which is of another type.
+     *
+     * @param <T>     the element type to read the list as
+     * @param keyword the keyword to read
+     * @param type    the element type to read it as; must not be {@code null}
+     * @return the list, or {@code null} if this node does not carry one of that element type
+     */
+    <T> @Nullable List<T> getList(String keyword, Class<T> type);
+
+    /**
+     * The value of any keyword this node carries, read as a map of the given value type by string key.
+     *
+     * <p>
+     * The answer is the value when it is a map whose keys are strings and whose every value is an
+     * instance of the given type, and {@code null} when this node does not carry the keyword, carries
+     * something else, or carries a map holding something else.
+     *
+     * @param <T>     the value type to read the map as
+     * @param keyword the keyword to read
+     * @param type    the value type to read it as; must not be {@code null}
+     * @return the map, or {@code null} if this node does not carry one of that value type
+     */
+    <T> @Nullable Map<String, T> getMap(String keyword, Class<T> type);
 
     /**
      * Walks this schema and every sub-schema below it, this one first.

@@ -79,7 +79,7 @@ public class ObjectJsonSchema implements JsonSchema {
         if (type instanceof String single) {
             return List.of(single);
         }
-        return get(TYPE, List.class);
+        return getList(TYPE, String.class);
     }
 
     @Override
@@ -94,12 +94,12 @@ public class ObjectJsonSchema implements JsonSchema {
 
     @Override
     public @Nullable Map<String, JsonSchema> getProperties() {
-        return get(PROPERTIES, Map.class);
+        return getMap(PROPERTIES, JsonSchema.class);
     }
 
     @Override
     public @Nullable List<String> getRequired() {
-        return get(REQUIRED, List.class);
+        return getList(REQUIRED, String.class);
     }
 
     @Override
@@ -114,7 +114,7 @@ public class ObjectJsonSchema implements JsonSchema {
 
     @Override
     public @Nullable Map<String, JsonSchema> getDefs() {
-        return get(DEFS, Map.class);
+        return getMap(DEFS, JsonSchema.class);
     }
 
     @Override
@@ -128,10 +128,39 @@ public class ObjectJsonSchema implements JsonSchema {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public <T> @Nullable T get(String keyword, Class<?> type) {
+    public <T> @Nullable T get(String keyword, Class<T> type) {
         Object value = values.get(keyword);
-        return type.isInstance(value) ? (T) value : null;
+        return type.isInstance(value) ? type.cast(value) : null;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> @Nullable List<T> getList(String keyword, Class<T> type) {
+        Object value = values.get(keyword);
+        if (!(value instanceof List<?> list)) {
+            return null;
+        }
+        for (Object element : list) {
+            if (!type.isInstance(element)) {
+                return null;
+            }
+        }
+        return (List<T>) list;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> @Nullable Map<String, T> getMap(String keyword, Class<T> type) {
+        Object value = values.get(keyword);
+        if (!(value instanceof Map<?, ?> map)) {
+            return null;
+        }
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            if (!(entry.getKey() instanceof String) || !type.isInstance(entry.getValue())) {
+                return null;
+            }
+        }
+        return (Map<String, T>) map;
     }
 
     @Override

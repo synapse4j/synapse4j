@@ -163,7 +163,7 @@ class JacksonSchemaConfigBuildersTest {
         // An enum is a definition others reference, and the definition carries the values.
         assertEquals("#/$defs/Color", properties.get("color").getRef());
         assertEquals(List.of("string"), schema.getDefs().get("Color").getType());
-        assertEquals(List.of("RED", "GREEN", "BLUE"), schema.getDefs().get("Color").get("enum", List.class));
+        assertEquals(List.of("RED", "GREEN", "BLUE"), schema.getDefs().get("Color").getList("enum", Object.class));
 
         assertEquals(List.of("boolean"), properties.get("flag").getType());
         assertEquals(List.of("number"), properties.get("ratio").getType());
