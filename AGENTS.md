@@ -173,15 +173,33 @@ one would block extension by users and providers.
   value a contract says is non-null checked again: believing the contract is what the annotation is
   for, and if it cannot be believed the declaration is the thing to fix. What is answered at a
   crossing is the null that would otherwise travel on silently, whoever wrote the value.
-- **Tests pin decisions, not plumbing.** A test earns its place by pinning a decision that could go
-  wrong by mistake later — merge and ordering rules, contracts (a null answered loudly, a request
-  handed on unchanged, one iterator pass), failure paths — and the assertion itself must be
-  defensible: a test that faithfully records a bug is worse than no test at all. An assertion that
-  can be re-derived by reading the code beside it proves the source works, not us. One test per
-  decision, never one per parameter, field or case, and a
-  method of a few straight-line statements earns none: a test is paid for twice, once written and
-  again on every later change, so name the wrong future change it would catch, and if there is none,
-  write nothing. Coverage is not measured in this build.
+## Tests
+
+A test earns its place by pinning a decision that could go wrong by mistake later — merge and
+ordering rules, contracts (a null answered loudly, a request handed on unchanged, one iterator
+pass), failure paths. An assertion that can be re-derived by reading the code beside it proves the
+source works, not us, and a test that faithfully records a bug is worse than none.
+
+- **Assert the product, not the call.** What a test checks is what came out, not who was called or
+  how often. `verify` and interaction assertions are out unless the interaction itself is the
+  contract (one iterator pass, a request handed on unchanged).
+- **A stand-in is a mock, not a hand-written fake.** A fake drifts with the implementation and drags
+  its mechanism into the test. Running the real collaborator is not a stand-in.
+- **Test the public contract, never the inside.** No private methods or state, no test-only handles,
+  no naming the means an implementation uses (the probe, say). Swapping a means must not move a test.
+- **One decision, one test.** Many inputs or types under one decision are a table-driven
+  (parameterized) test, not a method per case — the JSON schema across types is one such table.
+- **A test is a cost, not a goal.** A method of a few straight-line statements earns none, and
+  neither does what Lombok writes — a plain accessor, a value with no logic. Coverage is not measured
+  in this build; write the test only when there is a wrong future change to catch, and name it.
+- **A unit test tests one class or method, not its collaborators.** What a collaborator does is its
+  own tests' business, and it is a stand-in here. A test combining components is rare, and it does
+  not enumerate the input variants the focused tests already cover.
+- **Self-contained and deterministic.** No order dependence between tests, no shared mutable state,
+  no external world — no network, no real clock, no shared file.
+- **Test code is production code.** Name the class `<Class>Test` after what it tests unless the case
+  is genuinely special; keep shared fixtures in a class of their own rather than copying them; keep
+  the test as readable as the code beside it.
 
 ## Documentation
 
