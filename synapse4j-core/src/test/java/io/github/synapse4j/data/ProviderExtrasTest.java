@@ -13,8 +13,12 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class ProviderExtrasTest {
 
@@ -399,109 +403,71 @@ class ProviderExtrasTest {
         assertEquals(extras, restored);
     }
 
-    @Test
-    void mergeIntoSetsPathsTheMapDoesNotHaveYet() {
-        ProviderExtras extras = new ProviderExtras().put(List.of("metadata", "trace_id"), "abc");
-        Map<String, Object> members = new LinkedHashMap<>();
+    @ParameterizedTest(name = "mergeInto {0}")
+    @MethodSource("mergeCases")
+    void mergeIntoFollowsTheRules(String rule, List<Put> puts, Map<String, Object> members,
+            Map<String, Object> expected) {
+        ProviderExtras extras = new ProviderExtras();
+        for (Put put : puts) {
+            extras.put(put.path(), put.value());
+        }
+        Map<String, Object> target = new LinkedHashMap<>(members);
 
-        ProviderExtras returned = extras.mergeInto(members);
+        ProviderExtras returned = extras.mergeInto(target);
 
         assertSame(extras, returned);
-        assertEquals(Map.of("metadata", Map.of("trace_id", "abc")), members);
+        assertEquals(expected, target);
     }
 
-    @Test
-    void mergeIntoLetsTheBagWinOverAValueAtTheSamePosition() {
-        ProviderExtras extras = new ProviderExtras().put("temperature", 0.7);
-        Map<String, Object> members = new LinkedHashMap<>();
-        members.put("temperature", 0.3);
-
-        extras.mergeInto(members);
-
-        assertEquals(Map.of("temperature", 0.7), members);
+    /** Each rule the merge follows: the writes the bag makes, and the map they land in. */
+    private static Stream<Arguments> mergeCases() {
+        return Stream.of(
+                Arguments.of("sets paths the map does not have yet",
+                        List.of(new Put(List.of("metadata", "trace_id"), "abc")), Map.of(),
+                        Map.of("metadata", Map.of("trace_id", "abc"))),
+                Arguments.of("lets the bag win over a value at the same position",
+                        List.of(new Put(List.of("temperature"), 0.7)), Map.of("temperature", 0.3),
+                        Map.of("temperature", 0.7)),
+                Arguments.of("leaves members the bag never sets",
+                        List.of(new Put(List.of("temperature"), 0.7)),
+                        Map.of("model", "gpt-4o", "temperature", 0.3),
+                        Map.of("model", "gpt-4o", "temperature", 0.7)),
+                Arguments.of("walks through a container and keeps its other members",
+                        List.of(new Put(List.of("response_format", "json_schema", "strict"), true)),
+                        mapOf("response_format",
+                                mapOf("type", "json_schema", "json_schema", mapOf("name", "response"))),
+                        mapOf("response_format",
+                                mapOf("type", "json_schema", "json_schema",
+                                        mapOf("name", "response", "strict", true)))),
+                Arguments.of("discards a leaf blocking the way",
+                        List.of(new Put(List.of("content", "cache_control"), "ephemeral")),
+                        Map.of("content", "hello"), Map.of("content", Map.of("cache_control", "ephemeral"))),
+                Arguments.of("replaces the whole position when the path stops there",
+                        List.of(new Put(List.of("response_format"), Map.of("type", "text"))),
+                        Map.of("response_format", Map.of("type", "json_schema", "name", "response")),
+                        Map.of("response_format", Map.of("type", "text"))),
+                Arguments.of("discards a list blocking the way", List.of(new Put(List.of("a", "b"), 1)),
+                        Map.of("a", List.of(1, 2)), Map.of("a", Map.of("b", 1))),
+                Arguments.of("with an empty bag changes nothing", List.of(), Map.of("model", "gpt-4o"),
+                        Map.of("model", "gpt-4o")),
+                Arguments.of("accepts a null value", List.of(new Put(List.of("stop"), null)), Map.of(),
+                        mapOf("stop", null)));
     }
 
-    @Test
-    void mergeIntoLeavesMembersTheBagNeverSets() {
-        ProviderExtras extras = new ProviderExtras().put("temperature", 0.7);
-        Map<String, Object> members = new LinkedHashMap<>();
-        members.put("model", "gpt-4o");
-        members.put("temperature", 0.3);
-
-        extras.mergeInto(members);
-
-        assertEquals(Map.of("model", "gpt-4o", "temperature", 0.7), members);
+    /**
+     * A mutable map, which the merge needs for every container it walks into — {@link Map#of} refuses
+     * both a later write and the null value a bag may hold.
+     */
+    private static Map<String, Object> mapOf(Object... pairs) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        for (int i = 0; i < pairs.length; i += 2) {
+            map.put((String) pairs[i], pairs[i + 1]);
+        }
+        return map;
     }
 
-    @Test
-    void mergeIntoWalksThroughAContainerAndKeepsItsOtherMembers() {
-        Map<String, Object> schema = new LinkedHashMap<>();
-        schema.put("name", "response");
-        Map<String, Object> format = new LinkedHashMap<>();
-        format.put("type", "json_schema");
-        format.put("json_schema", schema);
-        Map<String, Object> members = new LinkedHashMap<>();
-        members.put("response_format", format);
-        ProviderExtras extras = new ProviderExtras().put(List.of("response_format", "json_schema", "strict"), true);
-
-        extras.mergeInto(members);
-
-        assertEquals(Map.of("type", "json_schema", "json_schema", Map.of("name", "response", "strict", true)),
-                members.get("response_format"));
-    }
-
-    @Test
-    void mergeIntoDiscardsALeafBlockingTheWay() {
-        ProviderExtras extras = new ProviderExtras().put(List.of("content", "cache_control"), "ephemeral");
-        Map<String, Object> members = new LinkedHashMap<>();
-        members.put("content", "hello");
-
-        extras.mergeInto(members);
-
-        assertEquals(Map.of("content", Map.of("cache_control", "ephemeral")), members);
-    }
-
-    @Test
-    void mergeIntoReplacesTheWholePositionWhenThePathStopsThere() {
-        ProviderExtras extras = new ProviderExtras().put("response_format", Map.of("type", "text"));
-        Map<String, Object> members = new LinkedHashMap<>();
-        members.put("response_format", Map.of("type", "json_schema", "name", "response"));
-
-        extras.mergeInto(members);
-
-        assertEquals(Map.of("response_format", Map.of("type", "text")), members);
-    }
-
-    @Test
-    void mergeIntoDiscardsAListBlockingTheWay() {
-        ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
-        Map<String, Object> members = new LinkedHashMap<>();
-        members.put("a", List.of(1, 2));
-
-        extras.mergeInto(members);
-
-        assertEquals(Map.of("a", Map.of("b", 1)), members);
-    }
-
-    @Test
-    void mergeIntoWithAnEmptyBagChangesNothing() {
-        Map<String, Object> members = new LinkedHashMap<>();
-        members.put("model", "gpt-4o");
-
-        new ProviderExtras().mergeInto(members);
-
-        assertEquals(Map.of("model", "gpt-4o"), members);
-    }
-
-    @Test
-    void mergeIntoAcceptsANullValue() {
-        ProviderExtras extras = new ProviderExtras().put("stop", null);
-        Map<String, Object> members = new LinkedHashMap<>();
-
-        extras.mergeInto(members);
-
-        assertTrue(members.containsKey("stop"));
-        assertNull(members.get("stop"));
+    /** One write into the bag: the path it lands on, and the value it carries. */
+    private record Put(List<String> path, Object value) {
     }
 
     @Test

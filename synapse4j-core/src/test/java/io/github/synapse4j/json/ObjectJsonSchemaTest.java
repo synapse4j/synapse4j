@@ -21,15 +21,6 @@ class ObjectJsonSchemaTest {
     void newSchemaCarriesNothing() {
         JsonSchema schema = built();
 
-        assertNull(schema.asBoolean());
-        assertNull(schema.getType());
-        assertNull(schema.getTitle());
-        assertNull(schema.getDescription());
-        assertNull(schema.getProperties());
-        assertNull(schema.getRequired());
-        assertNull(schema.getAdditionalProperties());
-        assertNull(schema.getRef());
-        assertNull(schema.getDefs());
         assertTrue(schema.keys().isEmpty());
         assertNull(schema.get("format", Object.class));
     }

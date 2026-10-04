@@ -158,10 +158,7 @@ class AbstractChatClientTest {
         client.addChatCustomizer(customizer);
 
         client.chat(new ChatRequest());
-        var events = client.stream(new ChatRequest()).iterator();
-        while (events.hasNext()) {
-            events.next();
-        }
+        drain(client.stream(new ChatRequest()));
 
         assertEquals(List.of("request", "response", "request", "event", "response"), ran);
 
@@ -189,10 +186,7 @@ class AbstractChatClientTest {
 
         client.chat(new ChatRequest());
         ChatStream stream = client.stream(new ChatRequest());
-        var events = stream.iterator();
-        while (events.hasNext()) {
-            events.next();
-        }
+        drain(stream);
 
         // Four passes: the request and the response of each call — the streamed response once
         // the stream is drained — and every one of them names this client.
@@ -437,10 +431,7 @@ class AbstractChatClientTest {
         });
 
         ChatStream stream = client.stream(request);
-        var events = stream.iterator();
-        while (events.hasNext()) {
-            events.next();
-        }
+        drain(stream);
 
         ChatResponse response = stream.aggregatedResponse();
         assertSame(context, response.getContext());
@@ -485,10 +476,7 @@ class AbstractChatClientTest {
         });
 
         ChatStream stream = client.stream(new ChatRequest());
-        var events = stream.iterator();
-        while (events.hasNext()) {
-            events.next();
-        }
+        drain(stream);
 
         assertEquals("stub+first+second", stream.aggregatedResponse().getFinishReason());
     }
@@ -504,10 +492,7 @@ class AbstractChatClientTest {
             }
         });
 
-        var events = stream.iterator();
-        while (events.hasNext()) {
-            events.next();
-        }
+        drain(stream);
 
         assertEquals("stub", stream.aggregatedResponse().getFinishReason());
     }
@@ -531,12 +516,7 @@ class AbstractChatClientTest {
     @Test
     void aRemovedResponseCustomizerNoLongerRuns() {
         List<String> ran = new ArrayList<>();
-        ChatCustomizer customizer = new ChatCustomizer() {
-            @Override
-            public void customizeResponse(ChatClient it, ChatResponse response) {
-                ran.add("run");
-            }
-        };
+        ChatCustomizer customizer = namedResponse("run", ran);
         StubChatClient client = new StubChatClient();
         client.addChatCustomizer(customizer);
 
@@ -562,10 +542,7 @@ class AbstractChatClientTest {
         });
 
         ChatStream stream = client.stream(request);
-        var events = stream.iterator();
-        while (events.hasNext()) {
-            events.next();
-        }
+        drain(stream);
 
         assertEquals(1, seen.size());
         assertSame(context, seen.get(0).getContext());
@@ -576,12 +553,7 @@ class AbstractChatClientTest {
     void anAbandonedStreamNeverRunsItsResponseCustomizers() {
         StubChatClient client = new StubChatClient();
         List<String> ran = new ArrayList<>();
-        client.addChatCustomizer(new ChatCustomizer() {
-            @Override
-            public void customizeResponse(ChatClient it, ChatResponse response) {
-                ran.add("run");
-            }
-        });
+        client.addChatCustomizer(namedResponse("run", ran));
 
         ChatStream stream = client.stream(new ChatRequest());
         stream.close();
@@ -882,6 +854,13 @@ class AbstractChatClientTest {
             names.add(tool.name());
         }
         return names;
+    }
+
+    /** Pull a stream to its end, which is what runs its response pass. */
+    private static void drain(ChatStream stream) {
+        for (ChatStreamEvent ignored : stream) {
+            // the iteration is the point
+        }
     }
 
     /** A response customizer that records a name instead of touching the response. */
