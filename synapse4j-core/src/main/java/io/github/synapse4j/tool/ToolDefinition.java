@@ -12,8 +12,10 @@ import lombok.ToString;
  * A tool the model may call: what it is called, what it does, and what arguments it takes.
  *
  * <p>
- * A declaration is read-only: nothing can change one after it is built, so it is safe to hand to a
- * tool and to share across concurrent calls.
+ * A declaration is read-only: its own fields cannot change after it is built, so it is safe to hand to
+ * a tool and to share across concurrent calls. The extras it carries are frozen shallowly, so a value
+ * stored there that the caller still holds and later changes is seen through the declaration too — such
+ * a value is the caller's to keep still.
  *
  * <p>
  * Where the adapter merges a tool's {@link ProviderExtras} bag is part of the adapter's contract;

@@ -22,6 +22,8 @@ JsonSchema schema = codec.generateDecodeSchema(Person.class);
 类型是 `Type` 而不是 `Class`，因此泛型类型带着它的类型参数一起到达：`List<Order>` 描述的是一组
 order。
 
+schema 通常由编解码器生成，但当它并非从某个类型推导而来时，也可以用 `JsonSchemaBuilder` 手工拼装。
+
 ## 提出要求
 
 答案应取的形状放在选项里的 `ChatResponseFormat` 上：

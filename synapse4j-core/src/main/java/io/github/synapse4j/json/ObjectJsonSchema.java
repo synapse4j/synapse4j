@@ -48,7 +48,9 @@ import lombok.EqualsAndHashCode;
  *
  * <p>
  * The class is open, not final: a provider or an application may extend it. The constructor freezes
- * what it is given, so a subclass inherits the immutable contract.
+ * what it is given, so a subclass inherits the immutable contract. A rewrite —
+ * {@link #map(UnaryOperator)} or {@link JsonSchemas#inline} — answers a plain
+ * {@code ObjectJsonSchema}, so a subclass's own behaviour is not carried through one.
  */
 @EqualsAndHashCode
 public class ObjectJsonSchema implements JsonSchema {
