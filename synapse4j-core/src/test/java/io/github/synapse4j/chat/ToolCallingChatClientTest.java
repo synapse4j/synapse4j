@@ -30,6 +30,7 @@ import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 import io.github.synapse4j.tool.DefaultToolExecutor;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolDefinition;
@@ -479,7 +480,7 @@ class ToolCallingChatClientTest {
 
     /** A declare-only tool whose execution runs the given body. */
     private static Tool tool(String name, Body body) {
-        ToolDefinition definition = new ToolDefinition(name, "a test tool", "{}");
+        ToolDefinition definition = new ToolDefinition(name, "a test tool", new JsonSchemaBuilder().build());
         return new Tool() {
 
             @Override

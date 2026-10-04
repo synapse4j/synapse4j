@@ -40,7 +40,7 @@ class FunctionToolTest {
 
         assertEquals("echo", tool.definition().getName());
         assertEquals("Echoes back", tool.definition().getDescription());
-        assertEquals("encoded", tool.definition().getInputSchema());
+        assertEquals(List.of("object"), tool.definition().getInputSchema().getType());
         assertTrue(codec.generatedFor.contains(Input.class));
         assertSame(Input.class, lastOf(codec.generatedFor));
     }
@@ -66,7 +66,8 @@ class FunctionToolTest {
 
     @Test
     void handedDeclarationKeptAsIsAndStillDemandsTheRest() {
-        ToolDefinition handed = new ToolDefinition("handed", "Built by hand", "{\"type\":\"object\"}");
+        ToolDefinition handed = new ToolDefinition("handed", "Built by hand",
+                new JsonSchemaBuilder().setType("object").build());
 
         FunctionTool<Input, String> tool = FunctionTool.of(handed, Input.class, (input, context) -> "x", codec);
         assertSame(handed, tool.definition());

@@ -561,7 +561,7 @@ class MessagesWriter {
         Map<String, Object> tool = new LinkedHashMap<>();
         putIfSet(tool, "name", definition.getName());
         putIfSet(tool, "description", definition.getDescription());
-        putIfSet(tool, "input_schema", parseSchema(definition.getInputSchema()));
+        putIfSet(tool, "input_schema", definition.getInputSchema());
         putIfSet(tool, "strict", definition.getStrict());
         definition.getExtras().mergeInto(tool);
         return tool;

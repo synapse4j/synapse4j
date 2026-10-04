@@ -389,7 +389,9 @@ class OpenAiCompletionsChatClientTest {
         ChatRequest request = requestWithModel();
         request.addUserMessage("weather?");
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather",
-                "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}}}");
+                new JsonSchemaBuilder().setType("object")
+                        .setProperties(Map.of("city", new JsonSchemaBuilder().setType("string").build()))
+                        .build());
         request.getTools().add(new ManualTool(tool));
 
         ChatResponse response = client.chat(request);
@@ -404,7 +406,7 @@ class OpenAiCompletionsChatClientTest {
         Map<String, Object> function = (Map<String, Object>) tools.get(0).get("function");
         assertEquals("get_weather", function.get("name"));
         assertEquals("Fetches weather", function.get("description"));
-        // The schema string left the shared model as text and reaches the wire as a parsed object.
+        // The schema reaches the wire as the object it describes.
         @SuppressWarnings("unchecked")
         Map<String, Object> parameters = (Map<String, Object>) function.get("parameters");
         assertEquals("object", parameters.get("type"));
@@ -749,7 +751,8 @@ class OpenAiCompletionsChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
+        ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather",
+                new JsonSchemaBuilder().setType("object").build());
         tool.getExtras().put("function", Map.of("name", "other"));
         request.getTools().add(new ManualTool(tool));
 
@@ -768,7 +771,8 @@ class OpenAiCompletionsChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
+        ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather",
+                new JsonSchemaBuilder().setType("object").build());
         tool.getExtras().put(List.of("function", "strict"), true);
         request.getTools().add(new ManualTool(tool));
 
@@ -812,7 +816,8 @@ class OpenAiCompletionsChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
+        ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather",
+                new JsonSchemaBuilder().setType("object").build());
         tool.setStrict(true);
         request.getTools().add(new ManualTool(tool));
 
@@ -835,7 +840,8 @@ class OpenAiCompletionsChatClientTest {
         ChatResponseFormat format = request.getOptions().getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setSchema("{\"type\":\"object\"}");
-        ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather", "{\"type\":\"object\"}");
+        ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather",
+                new JsonSchemaBuilder().setType("object").build());
         request.getTools().add(new ManualTool(tool));
 
         client.chat(request);

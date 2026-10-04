@@ -100,7 +100,7 @@ public class MethodTool implements SpecTool, StagedTool {
         }
         String description = spec.getDescription();
         this.definition = new ToolDefinition(spec.getName(), description.isBlank() ? null : description,
-                codec.encode(argumentsSchema(spec)));
+                argumentsSchema(spec));
     }
 
     /**

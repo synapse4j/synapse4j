@@ -2,7 +2,6 @@ package io.github.synapse4j.tool;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -64,20 +63,21 @@ class MethodToolTest {
 
         assertEquals("weather", definition.getName());
         assertEquals("Looks up weather", definition.getDescription());
-        assertEquals("encoded", definition.getInputSchema());
-        assertInstanceOf(Map.class, lastEncoded());
-        assertTrue(lastEncoded().containsKey("properties"));
-        assertEquals(List.of("message"), lastEncoded().get("required"));
+        JsonSchema schema = definition.getInputSchema();
+        assertTrue(schema.getProperties().containsKey("message"));
+        assertEquals(List.of("message"), schema.getRequired());
         assertTrue(codec.generatedFor.contains(String.class));
     }
 
     @Test
     void chatContextParameterStaysOutOfTheSchema() {
-        MethodTool.of("ctx", "Takes the context", method("withContext", ChatContext.class), null, codec);
+        MethodTool tool = MethodTool.of("ctx", "Takes the context", method("withContext", ChatContext.class), null,
+                codec);
 
-        // toMap omits empty collections, so an envelope with nothing in it carries neither keyword
-        assertFalse(lastEncoded().containsKey("properties"));
-        assertFalse(lastEncoded().containsKey("required"));
+        // an envelope with nothing in it carries neither keyword
+        JsonSchema schema = tool.definition().getInputSchema();
+        assertFalse(schema.keys().contains("properties"));
+        assertFalse(schema.keys().contains("required"));
         assertTrue(codec.generatedFor.isEmpty());
     }
 
@@ -244,7 +244,7 @@ class MethodToolTest {
                 null, codec);
 
         // schema side: the claimed parameter is not declared to the model
-        Map<?, ?> properties = (Map<?, ?>) lastEncoded().get("properties");
+        Map<String, JsonSchema> properties = tool.definition().getInputSchema().getProperties();
         assertTrue(properties.containsKey("route"));
         assertFalse(properties.containsKey("user"));
 
@@ -270,9 +270,9 @@ class MethodToolTest {
         tool.initialize(spec, codec);
 
         // the built-in assembly ran underneath, and the hook's addition reached the declaration
-        Map<?, ?> properties = (Map<?, ?>) lastEncoded().get("properties");
-        assertEquals(List.of("message"), lastEncoded().get("required"));
-        assertTrue(properties.containsKey("extra"));
+        JsonSchema schema = tool.definition().getInputSchema();
+        assertEquals(List.of("message"), schema.getRequired());
+        assertTrue(schema.getProperties().containsKey("extra"));
     }
 
     // ===== harness =====
@@ -293,11 +293,6 @@ class MethodToolTest {
         List<ContentPart> parts = tool.execute(arguments, context);
         assertEquals(1, parts.size());
         return ((TextPart) parts.get(0)).getText();
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> lastEncoded() {
-        return (Map<String, Object>) codec.encoded.get(codec.encoded.size() - 1);
     }
 
     /** The method under test; public members are reached through reflection. */

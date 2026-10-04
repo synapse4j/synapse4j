@@ -102,7 +102,7 @@ public class FunctionTool<I, O> implements StagedTool {
             throw new IllegalArgumentException("inputType " + inputType.getTypeName()
                     + " does not describe an object; the protocol's arguments are an object, so wrap the parameters in a record");
         }
-        ToolDefinition definition = new ToolDefinition(name, description, codec.encode(schema));
+        ToolDefinition definition = new ToolDefinition(name, description, schema);
         return new FunctionTool<>(definition, inputType, executor, codec);
     }
 

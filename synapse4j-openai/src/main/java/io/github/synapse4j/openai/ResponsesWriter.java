@@ -492,7 +492,7 @@ class ResponsesWriter {
         tool.put("type", "function");
         tool.put("name", definition.getName());
         putIfSet(tool, "description", definition.getDescription());
-        putIfSet(tool, "parameters", parseSchema(definition.getInputSchema()));
+        putIfSet(tool, "parameters", definition.getInputSchema());
         putIfSet(tool, "strict", definition.getStrict());
         definition.getExtras().mergeInto(tool);
         return tool;

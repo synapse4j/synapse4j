@@ -40,6 +40,7 @@ import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.http.HttpRequest;
 import io.github.synapse4j.http.HttpResponse;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 import io.github.synapse4j.tool.ManualTool;
 import io.github.synapse4j.tool.ToolDefinition;
 import tools.jackson.databind.json.JsonMapper;
@@ -262,7 +263,9 @@ class OpenAiResponsesChatClientTest {
 
         ChatRequest request = requestWithModel();
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather",
-                "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}}}");
+                new JsonSchemaBuilder().setType("object")
+                        .setProperties(Map.of("city", new JsonSchemaBuilder().setType("string").build()))
+                        .build());
         tool.setStrict(true);
         request.getTools().add(new ManualTool(tool));
         request.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_TOOL);

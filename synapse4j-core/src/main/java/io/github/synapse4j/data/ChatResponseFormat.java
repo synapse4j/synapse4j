@@ -15,8 +15,8 @@ import lombok.ToString;
  * requirement: a request either asks for a shape or it does not.
  *
  * <p>
- * The schema is JSON Schema text, for the same reason a tool's argument schema is: this library does
- * not bind a JSON library, so the schema is produced by the codec the application chose.
+ * The schema is JSON Schema text: this library does not bind a JSON library, so the schema is
+ * produced by the codec the application chose.
  *
  * <p>
  * A protocol that cannot express a mode has to fail loudly. Answering in prose when a shape was

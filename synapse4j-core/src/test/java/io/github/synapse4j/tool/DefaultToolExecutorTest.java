@@ -24,6 +24,7 @@ import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.ToolNotFoundException;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 
 class DefaultToolExecutorTest {
 
@@ -327,7 +328,7 @@ class DefaultToolExecutorTest {
 
     /** A tool whose execution runs the given body against the raw arguments. */
     private static Tool tool(String name, Body body) {
-        ToolDefinition definition = new ToolDefinition(name, "a test tool", "{}");
+        ToolDefinition definition = new ToolDefinition(name, "a test tool", new JsonSchemaBuilder().build());
         return new Tool() {
 
             @Override

@@ -411,7 +411,7 @@ class CompletionsWriter {
         Map<String, Object> function = new LinkedHashMap<>();
         function.put("name", definition.getName());
         function.put("description", definition.getDescription());
-        putIfSet(function, "parameters", parseSchema(definition.getInputSchema()));
+        putIfSet(function, "parameters", definition.getInputSchema());
         // This protocol carries the enforcement flag inside the function object, beside the schema.
         putIfSet(function, "strict", definition.getStrict());
 
