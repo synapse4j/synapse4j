@@ -265,8 +265,8 @@ class OpenAiResponsesChatClientTest {
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather",
                 new JsonSchemaBuilder().setType("object")
                         .setProperties(Map.of("city", new JsonSchemaBuilder().setType("string").build()))
-                        .build());
-        tool.setStrict(true);
+                        .build(),
+                true, null);
         request.getTools().add(new ManualTool(tool));
         request.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_TOOL);
         request.getOptions().setToolChoiceName("get_weather");

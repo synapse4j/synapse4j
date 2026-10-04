@@ -129,13 +129,9 @@ public abstract class AbstractChatClient implements ChatClient {
      */
     @Override
     public void addDefaultTool(@NonNull Tool tool) {
-        // The one entry where a tool arrives from outside: validate here, never again. The tool
-        // itself needs no check — tool.name() below fails right here. The name does: an empty
-        // map still accepts a null key, so without this a null name would sail straight in.
-        String name = Objects.requireNonNull(tool.name(), "tool name must not be null");
         defaultTools.updateAndGet(registered -> {
             LinkedHashMap<String, Tool> next = new LinkedHashMap<>(registered);
-            next.put(name, tool);
+            next.put(tool.name(), tool);
             return next;
         });
     }

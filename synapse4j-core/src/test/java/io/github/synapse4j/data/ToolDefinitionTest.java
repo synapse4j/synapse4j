@@ -1,5 +1,7 @@
 package io.github.synapse4j.data;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -9,13 +11,15 @@ import io.github.synapse4j.tool.ToolDefinition;
 class ToolDefinitionTest {
 
     @Test
-    void everyToolGetsItsOwnExtrasBag() {
-        ToolDefinition one = new ToolDefinition();
-        ToolDefinition two = new ToolDefinition();
+    void aDeclarationKeepsItsOwnFrozenCopyOfTheExtras() {
+        ProviderExtras extras = new ProviderExtras().put("strict", true);
+        ToolDefinition definition = new ToolDefinition("get_weather", null, null, null, extras);
 
-        one.getExtras().put("strict", true);
+        extras.put("later", 1);
 
-        assertTrue(two.getExtras().isEmpty());
+        assertTrue(definition.getExtras().contains("strict"));
+        assertFalse(definition.getExtras().contains("later"));
+        assertThrows(UnsupportedOperationException.class, () -> definition.getExtras().put("x", 1));
     }
 
 }

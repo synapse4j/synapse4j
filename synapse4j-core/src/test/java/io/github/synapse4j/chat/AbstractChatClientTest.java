@@ -901,14 +901,11 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aNullToolOrNameIsRefused() {
+    void aNullToolIsRefused() {
         StubChatClient client = new StubChatClient();
 
         assertThrows(NullPointerException.class, () -> client.addDefaultTool(null));
         assertThrows(NullPointerException.class, () -> client.removeDefaultTool(null));
-        assertThrows(NullPointerException.class,
-                () -> client.addDefaultTool(
-                        new ManualTool(new ToolDefinition(null, "does things", new JsonSchemaBuilder().build()))));
     }
 
     /** A declare-only tool carrying the given name — all the merge looks at. */

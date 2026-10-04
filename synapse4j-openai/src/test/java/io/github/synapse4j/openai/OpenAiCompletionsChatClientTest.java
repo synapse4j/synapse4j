@@ -751,9 +751,9 @@ class OpenAiCompletionsChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
+        ProviderExtras extras = new ProviderExtras().put("function", Map.of("name", "other"));
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather",
-                new JsonSchemaBuilder().setType("object").build());
-        tool.getExtras().put("function", Map.of("name", "other"));
+                new JsonSchemaBuilder().setType("object").build(), null, extras);
         request.getTools().add(new ManualTool(tool));
 
         client.chat(request);
@@ -771,9 +771,9 @@ class OpenAiCompletionsChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
+        ProviderExtras extras = new ProviderExtras().put(List.of("function", "strict"), true);
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather",
-                new JsonSchemaBuilder().setType("object").build());
-        tool.getExtras().put(List.of("function", "strict"), true);
+                new JsonSchemaBuilder().setType("object").build(), null, extras);
         request.getTools().add(new ManualTool(tool));
 
         client.chat(request);
@@ -817,8 +817,7 @@ class OpenAiCompletionsChatClientTest {
 
         ChatRequest request = requestWithModel();
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather",
-                new JsonSchemaBuilder().setType("object").build());
-        tool.setStrict(true);
+                new JsonSchemaBuilder().setType("object").build(), true, null);
         request.getTools().add(new ManualTool(tool));
 
         client.chat(request);

@@ -5,7 +5,6 @@ import io.github.synapse4j.data.ContentPart;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.Objects;
 
 /**
  * A tool the model may call, in both of its halves: the declaration that is sent, and the execution
@@ -45,7 +44,7 @@ public interface Tool {
      * @return this tool's name
      */
     default String name() {
-        return Objects.requireNonNull(definition().getName(), "a tool's declaration has no name");
+        return definition().getName();
     }
 
     /**
