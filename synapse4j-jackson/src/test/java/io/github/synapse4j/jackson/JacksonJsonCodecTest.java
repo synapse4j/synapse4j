@@ -23,6 +23,7 @@ import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.BooleanJsonSchema;
 import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 import io.github.synapse4j.json.JsonWriter;
 import lombok.Data;
 import org.junit.jupiter.api.Test;
@@ -171,6 +172,17 @@ class JacksonJsonCodecTest {
         JsonSchema decoded = codec.decode(json, JsonSchema.class);
 
         assertEquals(schema, decoded);
+    }
+
+    @Test
+    void aKeywordWhoseValueIsNullSurvivesTheRoundTrip() {
+        JsonSchema schema = new JsonSchemaBuilder().put("additionalProperties", null).build();
+
+        JsonSchema decoded = codec.decode(codec.encode(schema), JsonSchema.class);
+
+        assertEquals(schema, decoded);
+        assertTrue(decoded.keys().contains("additionalProperties"));
+        assertNull(decoded.get("additionalProperties"));
     }
 
     @Test

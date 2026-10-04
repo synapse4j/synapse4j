@@ -25,7 +25,8 @@ import tools.jackson.databind.ValueDeserializer;
  * sub-schemas, and in which form, is {@link JsonSchemas#shapesOf(String)}. A keyword this library has
  * not modelled is carried as the JSON data it is; a keyword it has modelled, but whose value is in
  * none of its forms, is refused — a string where a schema was due is a document this library does not
- * understand, not one to carry along.
+ * understand, not one to carry along. An explicit null is carried as it is, whichever keyword holds it,
+ * because writing produces such documents and what this library writes it reads back.
  */
 class JsonSchemaDeserializer extends ValueDeserializer<JsonSchema> {
 
@@ -56,6 +57,9 @@ class JsonSchemaDeserializer extends ValueDeserializer<JsonSchema> {
      * method was reached from.
      */
     private static @Nullable Object readValue(JsonParser p, DeserializationContext ctxt, String keyword) {
+        if (p.currentToken() == JsonToken.VALUE_NULL) {
+            return null;
+        }
         Set<JsonSchemas.Shape> shapes = JsonSchemas.shapesOf(keyword);
         if (shapes == null) {
             return ctxt.readValue(p, Object.class);
