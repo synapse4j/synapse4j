@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeSet;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -25,6 +26,7 @@ import io.github.synapse4j.json.BooleanJsonSchema;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonSchemaBuilder;
 import io.github.synapse4j.json.JsonWriter;
+import io.github.synapse4j.tool.MethodTool;
 import lombok.Data;
 import org.junit.jupiter.api.Test;
 import tools.jackson.core.type.TypeReference;
@@ -216,6 +218,36 @@ class JacksonJsonCodecTest {
         assertEquals(List.of("array"), schema.getProperties().get("items").getType());
         assertEquals(List.of("string"),
                 schema.getProperties().get("items").get("items", JsonSchema.class).getType());
+    }
+
+    @Test
+    void aMethodToolRequiresAPlainParameter() throws Exception {
+        MethodTool tool = methodTool("takes", String.class);
+
+        assertEquals(List.of("text"), tool.definition().getInputSchema().getRequired());
+    }
+
+    @Test
+    void aMethodToolLeavesAnOptionalParameterOutOfRequired() throws Exception {
+        MethodTool tool = methodTool("maybe", Optional.class);
+
+        assertNull(tool.definition().getInputSchema().getRequired());
+    }
+
+    private MethodTool methodTool(String name, Class<?>... parameterTypes) throws Exception {
+        return MethodTool.of(name, "does things", Target.class.getDeclaredMethod(name, parameterTypes), null, codec);
+    }
+
+    /** The methods a method tool's declaration is read from. */
+    static class Target {
+
+        static String takes(String text) {
+            return text;
+        }
+
+        static String maybe(Optional<String> note) {
+            return note.orElse("none");
+        }
     }
 
     @Test

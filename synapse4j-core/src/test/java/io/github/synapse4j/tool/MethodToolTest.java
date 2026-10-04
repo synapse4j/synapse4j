@@ -34,9 +34,10 @@ class MethodToolTest {
 
     @BeforeEach
     void codecAnswersAPlainSchema() {
-        // What the codec answers is the test's to choose; MethodTool only reacts to it. This default is
-        // a plain object that admits no null, so a parameter is required unless the test says otherwise.
-        when(codec.generateDecodeSchema(any())).thenReturn(new JsonSchemaBuilder().setType("object").build());
+        // What the codec answers is the test's to choose; MethodTool only reacts to it. This default
+        // lists the value as required, so a parameter is required unless the test says otherwise.
+        when(codec.generateDecodeSchema(any()))
+                .thenReturn(new JsonSchemaBuilder().setType("object").setRequired(List.of("value")).build());
     }
 
     // ===== factories and construction =====
@@ -271,32 +272,25 @@ class MethodToolTest {
     // ===== required =====
 
     @Test
-    void nullableSchemaIsNotRequired() {
-        when(codec.generateDecodeSchema(any())).thenReturn(nullableObjectSchema());
+    void aTypeTheCodecDoesNotRequireIsLeftOut() {
+        when(codec.generateDecodeSchema(any())).thenReturn(new JsonSchemaBuilder().setType("object").build());
         MethodTool tool = MethodTool.of("take", "Takes a string", method("take", String.class), null, codec);
 
-        // the schema is the only thing asked; a null branch in it is what takes a property out of required
+        // the codec's answer is the only thing asked; a value it does not list as required leaves the
+        // parameter out of the envelope's own required list
         assertNull(tool.definition().getInputSchema().getRequired());
     }
 
     @Test
-    void writtenWordOverridesTheSchema() {
-        when(codec.generateDecodeSchema(Nully.class)).thenReturn(nullableObjectSchema());
+    void writtenWordOverridesTheCodec() {
         Tool tool = new MethodTools(codec).from(new Written()).get(0);
 
-        // the plain schema demands both properties; the word on one takes it back, and the word on
-        // a type the schema would leave out puts it back
+        // the codec demands every property; the word on one takes it back, the word on another keeps
+        // it required
         assertEquals(List.of("plain", "forced"), tool.definition().getInputSchema().getRequired());
     }
 
     // ===== harness =====
-
-    private static JsonSchema nullableObjectSchema() {
-        return new JsonSchemaBuilder()
-                .put("anyOf", List.of(new JsonSchemaBuilder().setType("object").build(),
-                        new JsonSchemaBuilder().setType("null").build()))
-                .build();
-    }
 
     private static Method method(String name, Class<?>... parameterTypes) {
         try {
@@ -392,13 +386,9 @@ class MethodToolTest {
 
         @ToolMethod(name = "written")
         public String run(String plain, @ToolParam(required = "false") String loosened,
-                @ToolParam(required = "true") Nully forced) {
+                @ToolParam(required = "true") String forced) {
             return "ok";
         }
-    }
-
-    /** A type the codec is told to describe as optional, so only the annotation's word can require it. */
-    public static class Nully {
     }
 
     /** The application type a subclass keeps off the wire. */

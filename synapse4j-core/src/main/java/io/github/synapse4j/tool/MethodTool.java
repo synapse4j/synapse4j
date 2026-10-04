@@ -3,6 +3,7 @@ package io.github.synapse4j.tool;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -155,7 +156,7 @@ public class MethodTool implements SpecTool, StagedTool {
                 schema = JsonSchemaBuilder.from(schema).setDescription(entry.getDescription()).build();
             }
             properties.put(entry.getName(), schema);
-            if (isRequired(entry, schema)) {
+            if (isRequired(entry)) {
                 required.add(entry.getName());
             }
         }
@@ -170,27 +171,16 @@ public class MethodTool implements SpecTool, StagedTool {
 
     /**
      * Whether the model has to produce this argument. The annotation's word wins when it gave one;
-     * otherwise the parameter's own schema decides — a value the type makes optional (a nullable schema,
-     * an {@link java.util.Optional}, say) is not required, and anything else is.
+     * otherwise the codec decides, asked through a {@link RequiredProbe}: the value is placed in a
+     * property's position so a type the codec makes optional (an {@link java.util.Optional}, say) is
+     * not required, and anything else is.
      */
-    private static boolean isRequired(ToolParameterSpec entry, JsonSchema schema) {
+    private boolean isRequired(ToolParameterSpec entry) {
         if (!entry.getRequired().isBlank()) {
             return !"false".equals(entry.getRequired());
         }
-        return !allowsNull(schema);
-    }
-
-    /**
-     * Whether a schema admits null: a union with a branch whose type is {@code null}. That is the shape a
-     * type made optional is described in — an {@code Optional} arrives as {@code anyOf} of its value
-     * schema and a null one.
-     */
-    private static boolean allowsNull(JsonSchema schema) {
-        if (!(schema.get("anyOf") instanceof List<?> branches)) {
-            return false;
-        }
-        return branches.stream().anyMatch(branch -> branch instanceof JsonSchema sub
-                && sub.getType() != null && sub.getType().contains("null"));
+        Type valueType = entry.getParameter().getParameterizedType();
+        return RequiredProbe.isRequired(codec.generateDecodeSchema(RequiredProbe.wrapping(valueType)));
     }
 
     /**

@@ -2,9 +2,11 @@ package io.github.synapse4j.tool;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.List;
 
 import org.jspecify.annotations.Nullable;
 
+import io.github.synapse4j.json.JsonSchema;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
@@ -58,6 +60,19 @@ class RequiredProbe<T> {
             }
 
         };
+    }
+
+    /**
+     * Whether the codec requires a value of the probed type, read off the schema it answered for a
+     * probe: the value is required when the codec listed the {@code value} property among the
+     * object's {@code required} ones.
+     *
+     * @param probeSchema the schema the codec generated for a probe type; must not be {@code null}
+     * @return {@code true} when a value of the probed type is required as a property
+     */
+    static boolean isRequired(@NonNull JsonSchema probeSchema) {
+        List<String> required = probeSchema.getRequired();
+        return required != null && required.contains("value");
     }
 
 }
