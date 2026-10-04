@@ -38,10 +38,13 @@ import lombok.RequiredArgsConstructor;
  * unspecified.
  *
  * <p>
- * The reader holds configuration, not conversations: set the factory and add the customizers before
- * asking for tools, and it is safe to share afterwards. It does not validate what it produced —
- * {@link ToolMethodSpec#validate} is a service for whoever completes a tool, and what counts as usable
- * is the completing tool's decision, not this reader's.
+ * The reader holds configuration, not conversations. It is not safe to share while that configuration
+ * is still changing: {@link #specToolFactory(SpecToolFactory)} and {@link #addCustomizer} write its
+ * fields, so calling either while another thread asks for tools is not safe. Once configuration has
+ * stopped, an instance is safe to share — its fields are only read from then on, and
+ * {@link #from(Object)} and {@link #from(Class)} may be called from any thread. It does not validate
+ * what it produced — {@link ToolMethodSpec#validate} is a service for whoever completes a tool, and what
+ * counts as usable is the completing tool's decision, not this reader's.
  */
 @RequiredArgsConstructor
 public class MethodTools {
@@ -113,9 +116,6 @@ public class MethodTools {
         List<Tool> tools = new ArrayList<>();
         Map<String, Method> named = new LinkedHashMap<>();
         for (Method method : runnableMethods(type)) {
-            if (method.isSynthetic() || method.isBridge()) {
-                continue;
-            }
             ToolMethod annotation = method.getAnnotation(ToolMethod.class);
             if (annotation == null) {
                 continue;
