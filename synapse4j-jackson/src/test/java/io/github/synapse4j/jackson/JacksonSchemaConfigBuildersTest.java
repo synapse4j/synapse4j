@@ -27,7 +27,7 @@ import com.github.victools.jsonschema.generator.SchemaGenerator;
 import io.github.synapse4j.jackson.SchemaFixtures.Nested;
 import io.github.synapse4j.jackson.SchemaFixtures.Settable;
 import io.github.synapse4j.json.JsonSchema;
-import io.github.synapse4j.json.JsonSchemas;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -89,7 +89,7 @@ class JacksonSchemaConfigBuildersTest {
 
     private final JsonMapper jsonMapper = SchemaFixtures.MAPPER;
 
-    private final JacksonJsonCodec codec = new JacksonJsonCodec(jsonMapper);
+    private final JacksonJsonCodec codec = new JacksonJsonCodec(jsonMapper.rebuild());
 
     @Test
     void theDecodeSchemaRequiresEveryPropertyTheTypeDoesNotMakeOptional() {
@@ -139,7 +139,7 @@ class JacksonSchemaConfigBuildersTest {
         JsonSchema map = codec.generateDecodeSchema(MAP_OF_STRING);
 
         assertEquals(List.of("object"), map.getType());
-        assertEquals(Map.of("type", "string"), JsonSchemas.toDocument(map.getAdditionalProperties()));
+        assertEquals(new JsonSchemaBuilder().setType("string").build(), map.getAdditionalProperties());
         assertEquals(Map.of("k", "v"), codec.decode("{\"k\":\"v\"}", MAP_OF_STRING));
 
         JsonSchema open = codec.generateDecodeSchema(MAP_OF_OBJECT);
@@ -214,14 +214,14 @@ class JacksonSchemaConfigBuildersTest {
         // The container values are described as they are in the read direction: an optional value made
         // nullable, a map's value type under additionalProperties.
         assertTrue(allowsNull(schema, schema.getProperties().get("optional")));
-        assertEquals(Map.of("type", "string"),
-                JsonSchemas.toDocument(schema.getProperties().get("map").getAdditionalProperties()));
+        assertEquals(new JsonSchemaBuilder().setType("string").build(),
+                schema.getProperties().get("map").getAdditionalProperties());
     }
 
     @Test
     void thePromiseHoldsUnderOtherMapperSettings() {
         for (JsonMapper mapper : otherMappers()) {
-            JacksonJsonCodec other = new JacksonJsonCodec(mapper);
+            JacksonJsonCodec other = new JacksonJsonCodec(mapper.rebuild());
 
             assertEquals(sampleKitchen(), other.decode(EVERYTHING, Kitchen.class), mapper.toString());
 
@@ -233,8 +233,7 @@ class JacksonSchemaConfigBuildersTest {
 
         // An inclusion setting that may leave a value out takes that property out of required.
         JacksonJsonCodec omittingNulls = new JacksonJsonCodec(JsonMapper.builder()
-                .changeDefaultPropertyInclusion(incl -> incl.withValueInclusion(JsonInclude.Include.NON_NULL))
-                .build());
+                .changeDefaultPropertyInclusion(incl -> incl.withValueInclusion(JsonInclude.Include.NON_NULL)));
         assertFalse(omittingNulls.generateEncodeSchema(Kitchen.class).getRequired().contains("optional"));
     }
 
@@ -294,7 +293,7 @@ class JacksonSchemaConfigBuildersTest {
 
     /** A codec over the given choices, so a test can see what turning one off changes. */
     private JacksonJsonCodec codecWith(JacksonSchemaSettings settings) {
-        return new JacksonJsonCodec(jsonMapper,
+        return new JacksonJsonCodec(jsonMapper.rebuild(),
                 new SchemaGenerator(
                         JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(jsonMapper, settings).build()),
                 new SchemaGenerator(

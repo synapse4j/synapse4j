@@ -16,8 +16,8 @@ import org.jspecify.annotations.Nullable;
  * <p>
  * A subclass implements the tokens and the one thing only the JSON library can supply: serializing a
  * value none of the shapes above covers. {@link #writeValue(Object)} is then how a value of any shape
- * reaches the document — the shapes a JSON document is made of are written token by token, the types
- * this library owns as the documents they describe, and anything else is handed to the library.
+ * reaches the document — the shapes a JSON document is made of are written token by token, a
+ * {@link ProviderExtras} as the object it nests, and anything else is handed to the library.
  * Extending this class is a convenience, not a requirement: implementing {@link JsonWriter} directly
  * is equally valid — writing values is then the implementer's to do, and getting it wrong fails
  * silently rather than loudly, which is why this class exists.
@@ -68,9 +68,6 @@ public abstract class AbstractJsonWriter implements JsonWriter {
                 writeValue(element);
             }
             return writeEndArray();
-        }
-        if (value instanceof JsonSchema schema) {
-            return writeValue(JsonSchemas.toDocument(schema));
         }
         if (value instanceof ProviderExtras extras) {
             return writeValue(extras.nestedMap());

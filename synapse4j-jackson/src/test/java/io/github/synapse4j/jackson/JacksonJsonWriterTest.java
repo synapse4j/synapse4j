@@ -22,7 +22,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 class JacksonJsonWriterTest {
 
-    private final JacksonJsonCodec codec = new JacksonJsonCodec(JsonMapper.builder().build());
+    private final JacksonJsonCodec codec = new JacksonJsonCodec(JsonMapper.builder());
 
     @Test
     void writesANestedDocumentAsItsExactText() {

@@ -10,7 +10,6 @@ import java.util.Map;
 import io.github.synapse4j.json.BooleanJsonSchema;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonSchemaBuilder;
-import io.github.synapse4j.json.JsonSchemas;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.exc.MismatchedInputException;
 import tools.jackson.databind.json.JsonMapper;
@@ -21,11 +20,13 @@ class Synapse4jJacksonModuleTest {
 
     @Test
     void aSchemaIsWrittenAsTheDocumentItDescribes() {
-        JsonSchema schema = objectSchema();
-
         // The schema's own document, not the shape of its class: without the module the mapper would
         // write its getters instead — type as an array, every other keyword as null.
-        assertEquals(mapper.writeValueAsString(JsonSchemas.toDocument(schema)), mapper.writeValueAsString(schema));
+        Map<?, ?> written = mapper.readValue(mapper.writeValueAsString(objectSchema()), Map.class);
+        Map<?, ?> document = mapper.readValue(
+                "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}}}", Map.class);
+
+        assertEquals(document, written);
     }
 
     @Test
@@ -36,8 +37,8 @@ class Synapse4jJacksonModuleTest {
 
         assertTrue(json.contains("\"schema\":{\"type\":\"object\""), json);
         Carries back = mapper.readValue(json, Carries.class);
-        assertEquals(JsonSchemas.toDocument(original.schema()), JsonSchemas.toDocument(back.schema()));
-        assertEquals(JsonSchemas.toDocument(original.more().get(0)), JsonSchemas.toDocument(back.more().get(0)));
+        assertEquals(original.schema(), back.schema());
+        assertEquals(original.more().get(0), back.more().get(0));
     }
 
     @Test

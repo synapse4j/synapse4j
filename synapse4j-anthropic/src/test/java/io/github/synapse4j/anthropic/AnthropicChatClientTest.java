@@ -103,7 +103,7 @@ class AnthropicChatClientTest {
     @BeforeEach
     void setUp() {
         stub = new StubHttpClient();
-        codec = new JacksonJsonCodec(JsonMapper.builder().build());
+        codec = new JacksonJsonCodec(JsonMapper.builder());
         config = new AnthropicConfig();
         config.setApiKey("sk-ant-test");
         client = new AnthropicChatClient(stub, codec, config);

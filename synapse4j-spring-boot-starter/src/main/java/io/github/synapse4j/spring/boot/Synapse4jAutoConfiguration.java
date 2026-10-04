@@ -125,7 +125,7 @@ public class Synapse4jAutoConfiguration {
             encodeBuilder.with(module);
             decodeBuilder.with(module);
         });
-        return new JacksonJsonCodec(mapper, new SchemaGenerator(encodeBuilder.build()),
+        return new JacksonJsonCodec(mapper.rebuild(), new SchemaGenerator(encodeBuilder.build()),
                 new SchemaGenerator(decodeBuilder.build()));
     }
 

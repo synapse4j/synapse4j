@@ -27,7 +27,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 class JacksonJsonReaderTest {
 
-    private final JacksonJsonCodec codec = new JacksonJsonCodec(JsonMapper.builder().build());
+    private final JacksonJsonCodec codec = new JacksonJsonCodec(JsonMapper.builder());
 
     @Test
     void walksADocumentTokenByToken() {

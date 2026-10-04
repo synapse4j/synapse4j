@@ -104,7 +104,7 @@ class OpenAiCompletionsChatClientTest {
     @BeforeEach
     void setUp() {
         stub = new StubHttpClient();
-        codec = new JacksonJsonCodec(JsonMapper.builder().build());
+        codec = new JacksonJsonCodec(JsonMapper.builder());
         config = new OpenAiConfig();
         config.setApiKey("sk-test");
         client = new OpenAiCompletionsChatClient(stub, codec, config);

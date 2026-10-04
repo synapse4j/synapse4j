@@ -3,7 +3,6 @@ package io.github.synapse4j.jackson;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
-import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
 
@@ -12,12 +11,10 @@ import com.github.victools.jsonschema.generator.SchemaGenerator;
 import io.github.synapse4j.json.AbstractJsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
-import io.github.synapse4j.json.JsonSchemas;
 import io.github.synapse4j.json.JsonWriter;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.core.StreamWriteFeature;
 import tools.jackson.core.json.JsonFactory;
-import tools.jackson.databind.JavaType;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -36,7 +33,7 @@ import lombok.NonNull;
  * <p>
  * What a schema should say beyond that is decided in {@link JacksonSchemaConfigBuilders}, so a caller who
  * wants other choices builds their own generators and passes them to
- * {@link #JacksonJsonCodec(JsonMapper, SchemaGenerator, SchemaGenerator)}.
+ * {@link #JacksonJsonCodec(JsonMapper.Builder, SchemaGenerator, SchemaGenerator)}.
  *
  * <p>
  * The token-level {@link JsonWriter} and {@link JsonReader} are built on a factory derived from the
@@ -81,39 +78,54 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
      * mapper to one of the other constructors to change that, and both schemas follow.
      */
     public JacksonJsonCodec() {
-        this(JsonMapper.builder().build());
+        this(JsonMapper.builder());
     }
 
     /**
-     * Creates a codec with the given mapper and generators over it.
+     * Creates a codec with generators over the mapper the given builder builds.
      *
-     * @param jsonMapper the mapper to bind values with; must not be {@code null}
+     * @param builder the builder the mapper is built from; must not be {@code null}
      */
-    public JacksonJsonCodec(JsonMapper jsonMapper) {
-        this(jsonMapper,
-                new SchemaGenerator(
-                        JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(jsonMapper, new JacksonSchemaSettings())
-                                .build()),
-                new SchemaGenerator(
-                        JacksonSchemaConfigBuilders.decodeSchemaConfigBuilder(jsonMapper, new JacksonSchemaSettings())
-                                .build()));
+    public JacksonJsonCodec(@NonNull JsonMapper.Builder builder) {
+        JsonMapper mapper = withModule(builder);
+        this.jsonMapper = mapper;
+        this.encodeSchemaGenerator = new SchemaGenerator(
+                JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(mapper, new JacksonSchemaSettings()).build());
+        this.decodeSchemaGenerator = new SchemaGenerator(
+                JacksonSchemaConfigBuilders.decodeSchemaConfigBuilder(mapper, new JacksonSchemaSettings()).build());
+        this.tokenStreamFactory = tokenStreamFactory(mapper);
     }
 
     /**
-     * Creates a codec with the given mapper and schema generators.
+     * Creates a codec with the given schema generators over the mapper the given builder builds.
      *
-     * @param jsonMapper            the mapper to bind values with; must not be {@code null}
+     * @param builder               the builder the mapper is built from; must not be {@code null}
      * @param encodeSchemaGenerator the generator for the schema of what this codec writes; must not
      *                                  be {@code null}
      * @param decodeSchemaGenerator the generator for the schema of what this codec reads; must not be
      *                                  {@code null}
      */
-    public JacksonJsonCodec(@NonNull JsonMapper jsonMapper, @NonNull SchemaGenerator encodeSchemaGenerator,
+    public JacksonJsonCodec(@NonNull JsonMapper.Builder builder, @NonNull SchemaGenerator encodeSchemaGenerator,
             @NonNull SchemaGenerator decodeSchemaGenerator) {
-        this.jsonMapper = jsonMapper;
+        this.jsonMapper = withModule(builder);
         this.encodeSchemaGenerator = encodeSchemaGenerator;
         this.decodeSchemaGenerator = decodeSchemaGenerator;
-        this.tokenStreamFactory = jsonMapper.tokenStreamFactory()
+        this.tokenStreamFactory = tokenStreamFactory(this.jsonMapper);
+    }
+
+    /**
+     * Builds the mapper, with the module that reads and writes this library's own types added first.
+     *
+     * <p>
+     * A mapper is immutable once built, so the builder is the last chance to register the module — and
+     * the codec needs it: a schema that sits inside a value the mapper binds is written and read by it.
+     */
+    private static JsonMapper withModule(JsonMapper.Builder builder) {
+        return builder.addModule(new Synapse4jJacksonModule()).build();
+    }
+
+    private static JsonFactory tokenStreamFactory(JsonMapper mapper) {
+        return mapper.tokenStreamFactory()
                 .rebuild()
                 .disable(StreamReadFeature.AUTO_CLOSE_SOURCE)
                 .disable(StreamWriteFeature.AUTO_CLOSE_TARGET)
@@ -150,22 +162,16 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
         return jsonMapper.readValue(json, jsonMapper.getTypeFactory().constructType(type));
     }
 
+    /**
+     * Converted directly: one pass over the value, with no text in between.
+     */
     @Override
     public <T> @Nullable T convert(Object value, Type type) {
-        // This library's own types are not the shape of their class: a JsonSchema is the document it
-        // describes, which the mapper knows nothing about, so it goes the way decode reads one
-        // rather than through the mapper's direct conversion. Everything else takes the fast path —
-        // one pass over the decoded value, with no text written out and read back.
-        if (type instanceof Class<?> asked && JsonSchema.class.isAssignableFrom(asked)) {
-            return decode(encode(value), type);
-        }
         return jsonMapper.convertValue(value, jsonMapper.getTypeFactory().constructType(type));
     }
 
     private JsonSchema schema(SchemaGenerator schemaGenerator, Type type) {
-        ObjectNode schemaNode = generateSchema(schemaGenerator, type);
-        JavaType mapType = jsonMapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class);
-        return JsonSchemas.fromDocument(jsonMapper.convertValue(schemaNode, mapType));
+        return jsonMapper.convertValue(generateSchema(schemaGenerator, type), JsonSchema.class);
     }
 
     /**

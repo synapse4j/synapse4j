@@ -90,7 +90,7 @@ class OpenAiResponsesChatClientTest {
     @BeforeEach
     void setUp() {
         stub = new StubHttpClient();
-        codec = new JacksonJsonCodec(JsonMapper.builder().build());
+        codec = new JacksonJsonCodec(JsonMapper.builder());
         OpenAiConfig config = new OpenAiConfig();
         config.setApiKey("sk-test");
         client = new OpenAiResponsesChatClient(stub, codec, config);

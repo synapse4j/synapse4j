@@ -23,12 +23,10 @@ import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.BooleanJsonSchema;
 import io.github.synapse4j.json.JsonSchema;
-import io.github.synapse4j.json.JsonSchemas;
 import io.github.synapse4j.json.JsonWriter;
 import lombok.Data;
 import org.junit.jupiter.api.Test;
 import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.JavaType;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -36,7 +34,7 @@ class JacksonJsonCodecTest {
 
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
-    private final JacksonJsonCodec codec = new JacksonJsonCodec(jsonMapper);
+    private final JacksonJsonCodec codec = new JacksonJsonCodec(jsonMapper.rebuild());
 
     @Test
     void theEncodeSchemaNamesExactlyWhatWritingProduces() {
@@ -83,7 +81,7 @@ class JacksonJsonCodecTest {
     @Test
     void theConfiguredNamingStrategyDecidesTheNames() {
         JacksonJsonCodec snakeCaseCodec = new JacksonJsonCodec(
-                JsonMapper.builder().propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE).build());
+                JsonMapper.builder().propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE));
 
         List<String> properties = properties(snakeCaseCodec.generateEncodeSchema(Order.class));
 
@@ -105,7 +103,7 @@ class JacksonJsonCodecTest {
                 new JacksonSchemaSettings());
         titledBuilder.forFields().withTitleResolver(field -> field.getDeclaredName());
         SchemaGenerator titledGenerator = new SchemaGenerator(titledBuilder.build());
-        JacksonJsonCodec customizedCodec = new JacksonJsonCodec(jsonMapper, titledGenerator,
+        JacksonJsonCodec customizedCodec = new JacksonJsonCodec(jsonMapper.rebuild(), titledGenerator,
                 new SchemaGenerator(JacksonSchemaConfigBuilders.decodeSchemaConfigBuilder(jsonMapper,
                         new JacksonSchemaSettings()).build()));
 
@@ -119,8 +117,7 @@ class JacksonJsonCodecTest {
                 new JacksonSchemaSettings());
         SchemaGenerator fromBuilder = new SchemaGenerator(configBuilder.build());
 
-        assertEquals(JsonSchemas.toDocument(codec.generateEncodeSchema(Order.class)),
-                JsonSchemas.toDocument(readSchema(fromBuilder, Order.class)));
+        assertEquals(codec.generateEncodeSchema(Order.class), readSchema(fromBuilder, Order.class));
     }
 
     @Test
@@ -173,20 +170,19 @@ class JacksonJsonCodecTest {
         String json = codec.encode(schema);
         JsonSchema decoded = codec.decode(json, JsonSchema.class);
 
-        assertEquals(codec.encode(JsonSchemas.toDocument(schema)), json);
-        assertEquals(JsonSchemas.toDocument(schema), JsonSchemas.toDocument(decoded));
+        assertEquals(schema, decoded);
     }
 
     @Test
-    void convertReadsASchemaThroughTheDocumentItDescribes() {
+    void convertReadsASchemaThroughTheModule() {
         JsonSchema schema = codec.generateEncodeSchema(Order.class);
         Object decoded = codec.decode(codec.encode(schema), Map.class);
 
         // The fast conversion path must not skip the library's own types: a decoded document
-        // converts to a JsonSchema through the schema it describes, exactly as decode reads one.
+        // converts to a JsonSchema through the module, exactly as decode reads one.
         JsonSchema converted = codec.convert(decoded, JsonSchema.class);
 
-        assertEquals(JsonSchemas.toDocument(schema), JsonSchemas.toDocument(converted));
+        assertEquals(schema, converted);
     }
 
     @Test
@@ -241,8 +237,7 @@ class JacksonJsonCodecTest {
     }
 
     private JsonSchema readSchema(SchemaGenerator schemaGenerator, Class<?> type) {
-        JavaType mapType = jsonMapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class);
-        return JsonSchemas.fromDocument(jsonMapper.convertValue(schemaGenerator.generateSchema(type), mapType));
+        return codec.convert(schemaGenerator.generateSchema(type), JsonSchema.class);
     }
 
     private static Order sampleOrder() {

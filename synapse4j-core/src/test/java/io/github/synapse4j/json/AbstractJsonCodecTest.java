@@ -1,59 +1,15 @@
 package io.github.synapse4j.json;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
 class AbstractJsonCodecTest {
-
-    @Test
-    void writesASchemaAsTheDocumentItDescribes() {
-        Map<String, JsonSchema> properties = new LinkedHashMap<>();
-        properties.put("name", subSchema("string"));
-        JsonSchema schema = new JsonSchemaBuilder()
-                .setType("object")
-                .setProperties(properties)
-                .put("$schema", "https://json-schema.org/draft/2020-12/schema")
-                .build();
-
-        StubCodec codec = new StubCodec();
-
-        assertEquals("stub", codec.encode(schema));
-        assertEquals(JsonSchemas.toDocument(schema), codec.encoded);
-        assertTrue(codec.encoded instanceof Map);
-    }
-
-    @Test
-    void readsASchemaFromTheDocumentItDescribes() {
-        StubCodec codec = new StubCodec();
-        codec.decoded = Map.of("type", "object", "properties", Map.of("name", Map.of("type", "string")));
-
-        JsonSchema schema = codec.decode("{\"type\":\"object\"}", JsonSchema.class);
-
-        // The document is read as Object: a schema document may be a boolean, which a Map type cannot carry.
-        assertEquals(Object.class, codec.decodedType);
-        assertEquals(List.of("object"), schema.getType());
-        assertEquals(List.of("string"), schema.getProperties().get("name").getType());
-    }
-
-    @Test
-    void readsASchemaAskedForAsASubclassTheSameWay() {
-        StubCodec codec = new StubCodec();
-        codec.decoded = Map.of("type", "string");
-
-        JsonSchema schema = codec.decode("{}", ExtendedSchema.class);
-
-        assertEquals(Object.class, codec.decodedType);
-        assertEquals(List.of("string"), schema.getType());
-    }
 
     @Test
     void handsEverythingElseToTheSubclass() {
@@ -71,20 +27,13 @@ class AbstractJsonCodecTest {
         StubCodec codec = new InterceptingCodec();
 
         assertEquals("intercepted", codec.encode("value"));
+        // Anything the subclass does not intercept reaches the hook as the value it was given.
         assertEquals("stub", codec.encode(new JsonSchemaBuilder().build()));
-        assertEquals(Map.of(), codec.encoded);
+        assertEquals(new JsonSchemaBuilder().build(), codec.encoded);
     }
 
     private static JsonSchema subSchema(String type) {
         return new JsonSchemaBuilder().setType(type).build();
-    }
-
-    /** Providers extend the schema model; decoding must treat a subclass like the base type. */
-    private static class ExtendedSchema extends ObjectJsonSchema {
-
-        ExtendedSchema() {
-            super(Map.of());
-        }
     }
 
     private static class StubCodec extends AbstractJsonCodec {
@@ -119,7 +68,7 @@ class AbstractJsonCodecTest {
         }
 
         // The streaming side is the library's business, not this class's: a codec over a JSON library
-        // supplies it, and these tests are about the special cases above.
+        // supplies it, and these tests are about the encode and decode hooks.
 
         @Override
         public JsonWriter writer(OutputStream out) {

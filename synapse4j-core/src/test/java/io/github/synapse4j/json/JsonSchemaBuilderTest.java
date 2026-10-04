@@ -27,7 +27,7 @@ class JsonSchemaBuilderTest {
 
         assertNotSame(source, copy);
         assertEquals(Set.of("type", "required", "format"), copy.keys());
-        assertEquals(JsonSchemas.toDocument(source), JsonSchemas.toDocument(copy));
+        assertEquals(source, copy);
     }
 
     @Test
