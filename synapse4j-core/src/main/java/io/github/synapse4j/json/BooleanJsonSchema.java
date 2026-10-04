@@ -69,11 +69,6 @@ public class BooleanJsonSchema implements JsonSchema {
     }
 
     @Override
-    public @Nullable JsonSchema getItems() {
-        return null;
-    }
-
-    @Override
     public @Nullable JsonSchema getAdditionalProperties() {
         return null;
     }

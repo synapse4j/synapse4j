@@ -92,14 +92,6 @@ public interface JsonSchema {
     List<String> getRequired();
 
     /**
-     * The schema of an array's elements.
-     *
-     * @return the element schema, or {@code null} if this node does not say
-     */
-    @Nullable
-    JsonSchema getItems();
-
-    /**
      * What the object does about properties beyond {@link #getProperties()}.
      *
      * <p>

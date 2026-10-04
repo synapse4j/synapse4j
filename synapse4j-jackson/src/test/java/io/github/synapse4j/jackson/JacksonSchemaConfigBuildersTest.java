@@ -128,7 +128,7 @@ class JacksonSchemaConfigBuildersTest {
 
         assertTrue(allowsNull(root, root));
         assertTrue(allowsNull(kitchen, kitchen.getProperties().get("optional")));
-        assertTrue(allowsNull(list, list.getItems()));
+        assertTrue(allowsNull(list, list.get("items", JsonSchema.class)));
         // A map's value schema travels in the open part rather than as a field, so that position is
         // pinned by what reading it does instead.
         assertEquals(Map.of("k", Optional.empty()), codec.decode("{\"k\":null}", MAP_OF_OPTIONAL_STRING));

@@ -27,7 +27,6 @@ class ObjectJsonSchemaTest {
         assertNull(schema.getDescription());
         assertNull(schema.getProperties());
         assertNull(schema.getRequired());
-        assertNull(schema.getItems());
         assertNull(schema.getAdditionalProperties());
         assertNull(schema.getRef());
         assertNull(schema.getDefs());
@@ -57,7 +56,7 @@ class ObjectJsonSchemaTest {
         schema.getProperties();
         schema.getRequired();
         schema.getDefs();
-        schema.getItems();
+        schema.get("items", JsonSchema.class);
 
         assertTrue(schema.keys().isEmpty());
     }
@@ -101,7 +100,7 @@ class ObjectJsonSchemaTest {
                 .build();
 
         assertEquals(typed("string"), schema.getProperties().get("name"));
-        assertEquals(typed("number"), schema.getItems());
+        assertEquals(typed("number"), schema.get("items", JsonSchema.class));
         assertEquals(typed("boolean"), schema.getDefs().get("D"));
         assertEquals(BooleanJsonSchema.FALSE, schema.getAdditionalProperties());
     }
@@ -173,12 +172,12 @@ class ObjectJsonSchemaTest {
     @Test
     void anItemsListIsWalked() {
         // 2020-12 makes "items" a single schema; draft-07 allowed an array. The array is read and
-        // walked as a list of schemas, even though the interface only models the single one.
+        // walked as a list of schemas, which a typed read as a single schema does not answer.
         JsonSchema schema = new JsonSchemaBuilder()
                 .put("items", List.of(typed("string"), typed("number")))
                 .build();
 
-        assertNull(schema.getItems());
+        assertNull(schema.get("items", JsonSchema.class));
 
         List<JsonSchema> visited = new ArrayList<>();
         schema.visit(visited::add);

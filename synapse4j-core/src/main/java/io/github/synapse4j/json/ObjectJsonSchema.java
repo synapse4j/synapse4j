@@ -103,11 +103,6 @@ public class ObjectJsonSchema implements JsonSchema {
     }
 
     @Override
-    public @Nullable JsonSchema getItems() {
-        return get(ITEMS, JsonSchema.class);
-    }
-
-    @Override
     public @Nullable JsonSchema getAdditionalProperties() {
         return get(ADDITIONAL_PROPERTIES, JsonSchema.class);
     }
