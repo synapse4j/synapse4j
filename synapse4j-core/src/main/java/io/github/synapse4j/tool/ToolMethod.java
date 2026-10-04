@@ -11,9 +11,10 @@ import java.lang.annotation.Target;
  * become the arguments, and the return becomes the result.
  *
  * <p>
- * Every attribute is optional and holds the text exactly as written; empty means nothing was written.
- * What an empty value becomes is not decided here — that belongs to whatever turns this annotation
- * into a tool, which may also supply a value from somewhere else, such as configuration.
+ * Every attribute holds text, not a value, and deliberately so: the text is read by whoever completes
+ * the tool, which may resolve it rather than take it literally — a value looked up in configuration, or
+ * an expression such as a SpEL one. An empty string is the one form that means nothing was written;
+ * what an empty value becomes is the completion step's to decide, not this annotation's.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
