@@ -256,6 +256,31 @@ class ProviderExtrasTest {
     }
 
     @Test
+    void freezeReturnsAReadOnlyCopy() {
+        ProviderExtras frozen = new ProviderExtras().put("temperature", 0.5).freeze();
+
+        assertEquals(0.5, frozen.get("temperature"));
+        assertSame(frozen, frozen.freeze());
+        assertThrows(UnsupportedOperationException.class, () -> frozen.put("top_p", 1.0));
+        assertThrows(UnsupportedOperationException.class, () -> frozen.putRaw("raw", 1));
+        assertThrows(UnsupportedOperationException.class, () -> frozen.remove("temperature"));
+        assertThrows(UnsupportedOperationException.class,
+                () -> frozen.putAll(new ProviderExtras().put("top_p", 1.0)));
+    }
+
+    @Test
+    void aFrozenCopyIsIndependentAndEqualByContent() {
+        ProviderExtras extras = new ProviderExtras().put("temperature", 0.5);
+
+        ProviderExtras frozen = extras.freeze();
+        extras.put("top_p", 1.0);
+
+        assertFalse(frozen.contains("top_p"));
+        assertNotEquals(frozen, extras);
+        assertEquals(new ProviderExtras().put("temperature", 0.5), frozen);
+    }
+
+    @Test
     void toStringShowsTheRawEntries() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
 

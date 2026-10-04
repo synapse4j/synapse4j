@@ -60,6 +60,11 @@ import lombok.NonNull;
  * copying ({@link #putAll(ProviderExtras)}). Instances are not thread-safe.
  *
  * <p>
+ * {@link #freeze()} turns an assembled bag into a value: a copy whose entries cannot change, which
+ * may be shared where a mutable one may not. The copy is shallow, because a value is arbitrary
+ * application data — see the method.
+ *
+ * <p>
  * Values are kept by reference and are never copied when stored: mutating a stored value (a
  * collection, say) afterwards is visible to whoever reads the bag back, including the
  * serialization path.
@@ -69,16 +74,59 @@ import lombok.NonNull;
  * to that provider under the same name, and what another provider would make of it is the
  * application's decision.
  */
-@EqualsAndHashCode
+@EqualsAndHashCode(of = "values")
 public class ProviderExtras {
 
     private static final char SEPARATOR = '.';
     private static final char ESCAPE = '\\';
 
     /**
-     * Flat storage, keyed by the assembled path. Handed out read-only through {@link #rawMap()}.
+     * Flat storage, keyed by the assembled path. Handed out read-only through {@link #rawMap()};
+     * read-only outright on a frozen instance.
      */
-    private final Map<String, Object> values = new LinkedHashMap<>();
+    private final Map<String, Object> values;
+
+    /**
+     * Whether this instance is frozen. Not part of equality: a frozen bag and a mutable one holding
+     * the same entries are equal.
+     */
+    private final boolean frozen;
+
+    /**
+     * Creates an empty, mutable bag.
+     */
+    public ProviderExtras() {
+        this.values = new LinkedHashMap<>();
+        this.frozen = false;
+    }
+
+    /**
+     * The frozen form: the given entries wrapped read-only, so every mutator refuses on its own.
+     */
+    private ProviderExtras(Map<String, Object> frozenValues) {
+        this.values = Collections.unmodifiableMap(frozenValues);
+        this.frozen = true;
+    }
+
+    /**
+     * Returns a frozen copy of this bag: a new instance whose entries cannot be changed, safe to
+     * share where a mutable one is not.
+     *
+     * <p>
+     * The copy is shallow. The entries are copied, so a path set on this instance afterwards is
+     * absent from the copy; the values in it are the ones stored, by reference, so a value the
+     * caller still holds and later changes is seen through the copy too. A value is arbitrary
+     * application data, so a deep copy is not offered — the same holds for every bag in this
+     * library.
+     *
+     * <p>
+     * Freezing an instance that is already frozen returns it as it is.
+     *
+     * @return a frozen copy; never {@code null}
+     */
+    public ProviderExtras freeze() {
+        return frozen ? this : new ProviderExtras(new LinkedHashMap<>(values));
+    }
 
     /**
      * Returns the number of set paths.
