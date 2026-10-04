@@ -11,7 +11,7 @@ import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.exception.SynapseException;
-import io.github.synapse4j.json.AbstractJsonCodec;
+import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonWriter;
@@ -184,7 +184,7 @@ class FunctionToolTest {
      * A codec that answers what a test sets up: one decoded value, type-aware schema shapes —
      * String is a scalar so the factory's object check has something to refuse.
      */
-    private static class FakeCodec extends AbstractJsonCodec {
+    private static class FakeCodec implements JsonCodec {
 
         /** What every decode answers, whatever type is asked. */
         private Object decoded;
@@ -221,14 +221,14 @@ class FunctionToolTest {
         }
 
         @Override
-        protected String encodeValue(Object value) {
+        public String encode(Object value) {
             encoded.add(value);
             return "encoded";
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        protected <T> T decodeValue(String json, Type type) {
+        public <T> T decode(String json, Type type) {
             decodedFor.add(type);
             decodedFrom.add(json);
             return (T) decoded;

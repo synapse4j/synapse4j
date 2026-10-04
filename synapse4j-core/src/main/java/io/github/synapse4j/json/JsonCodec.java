@@ -65,8 +65,7 @@ import org.jspecify.annotations.Nullable;
  * <p>
  * {@link JsonSchema} is a value like any other here: {@link #encode(Object)} writes one as the JSON
  * document it describes rather than as the fields of its class, and
- * {@code decode(json, JsonSchema.class)} reads one back. {@link AbstractJsonCodec} takes care of that
- * for an implementation; an implementation that does not extend it carries the same obligation.
+ * {@code decode(json, JsonSchema.class)} reads one back. Every implementation carries that obligation.
  */
 public interface JsonCodec {
 

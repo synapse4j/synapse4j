@@ -10,7 +10,6 @@ import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.exception.SynapseException;
-import io.github.synapse4j.json.AbstractJsonCodec;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
@@ -418,7 +417,7 @@ class MethodToolTest {
      * A codec that moves what a test sets up: the arguments map for the model's text, and a value
      * per type for the binding fallback.
      */
-    private static class FakeCodec extends AbstractJsonCodec {
+    private static class FakeCodec implements JsonCodec {
 
         /** What {@code decode(argumentsText, Map.class)} answers; the text itself is ignored. */
         private Map<String, Object> arguments;
@@ -447,14 +446,14 @@ class MethodToolTest {
         }
 
         @Override
-        protected String encodeValue(Object value) {
+        public String encode(Object value) {
             encoded.add(value);
             return "encoded";
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        protected <T> T decodeValue(String json, Type type) {
+        public <T> T decode(String json, Type type) {
             if (type == Map.class) {
                 return (T) arguments;
             }

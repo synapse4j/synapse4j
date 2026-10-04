@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.exception.SynapseException;
-import io.github.synapse4j.json.AbstractJsonCodec;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
@@ -256,7 +255,7 @@ class MethodToolsTest {
     }
 
     /** A codec nothing reaches: a capturing tool never asks one anything. */
-    private static class IdleCodec extends AbstractJsonCodec {
+    private static class IdleCodec implements JsonCodec {
 
         @Override
         public JsonSchema generateEncodeSchema(Type type) {
@@ -269,12 +268,12 @@ class MethodToolsTest {
         }
 
         @Override
-        protected String encodeValue(Object value) {
+        public String encode(Object value) {
             throw new AssertionError("nothing encodes here");
         }
 
         @Override
-        protected <T> T decodeValue(String json, Type type) {
+        public <T> T decode(String json, Type type) {
             throw new AssertionError("nothing decodes here");
         }
 

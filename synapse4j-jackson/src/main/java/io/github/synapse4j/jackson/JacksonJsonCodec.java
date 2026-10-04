@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
 import com.github.victools.jsonschema.generator.SchemaGenerator;
 
 import io.github.synapse4j.exception.SynapseException;
-import io.github.synapse4j.json.AbstractJsonCodec;
+import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonWriter;
@@ -50,7 +50,7 @@ import lombok.NonNull;
  * state of their own and are shareable between threads — the mapper and the generators are guarded
  * where they are not.
  */
-public class JacksonJsonCodec extends AbstractJsonCodec {
+public class JacksonJsonCodec implements JsonCodec {
 
     private final JsonMapper jsonMapper;
 
@@ -155,7 +155,7 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
     }
 
     @Override
-    protected String encodeValue(@Nullable Object value) {
+    public String encode(@Nullable Object value) {
         try {
             return jsonMapper.writeValueAsString(value);
         } catch (JacksonException failure) {
@@ -164,7 +164,7 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
     }
 
     @Override
-    protected <T> @Nullable T decodeValue(String json, Type type) {
+    public <T> @Nullable T decode(String json, Type type) {
         try {
             return jsonMapper.readValue(json, jsonMapper.getTypeFactory().constructType(type));
         } catch (JacksonException failure) {
