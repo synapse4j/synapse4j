@@ -1,5 +1,6 @@
 package io.github.synapse4j.tool;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -292,6 +293,34 @@ class MethodToolTest {
         assertTrue(schema.getProperties().containsKey("extra"));
     }
 
+    @Test
+    void aParameterDescriptionFromItsAnnotationReachesThePropertySchema() {
+        Tool tool = new MethodTools(codec).from(new Described()).get(0);
+
+        JsonSchema property = tool.definition().getInputSchema().getProperties().get("message");
+        assertEquals("What it means", property.getDescription());
+    }
+
+    @Test
+    void anEmptyDescriptionBecomesNoDescriptionAtAll() {
+        MethodTool tool = MethodTool.of("noop", "", method("noop"), null, codec);
+
+        assertNull(tool.definition().getDescription());
+    }
+
+    @Test
+    void anArrayParameterIsDescribedAndBound() throws Exception {
+        codec.arguments = Map.of("items", List.of("a", "b"));
+        codec.decodedByType.put(String[].class, new String[] { "a", "b" });
+        MethodTool tool = MethodTool.of("join", "Joins items", method("join", String[].class), null, codec);
+
+        assertTrue(tool.definition().getInputSchema().getProperties().containsKey("items"));
+        assertTrue(codec.generatedFor.contains(String[].class));
+
+        Object[] values = tool.resolveArguments("{\"items\":[\"a\",\"b\"]}", null);
+        assertArrayEquals(new String[] { "a", "b" }, (String[]) values[0]);
+    }
+
     // ===== harness =====
 
     private static Method method(String name, Class<?>... parameterTypes) {
@@ -321,6 +350,10 @@ class MethodToolTest {
 
         public static String take(String message) {
             return message;
+        }
+
+        public static String join(String[] items) {
+            return String.join(",", items);
         }
 
         public static int twice(int n) {
@@ -366,6 +399,15 @@ class MethodToolTest {
             return "secret!";
         }
 
+    }
+
+    /** A tool method whose parameter carries its meaning in the annotation. */
+    public static class Described {
+
+        @ToolMethod(name = "take")
+        public String take(@ToolParam(description = "What it means") String message) {
+            return message;
+        }
     }
 
     /** The application type a subclass keeps off the wire. */

@@ -1,6 +1,8 @@
 package io.github.synapse4j.tool;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -110,6 +112,28 @@ class MethodToolsTest {
         assertEquals(Set.of("shared"), resolvedNames());
     }
 
+    @Test
+    void aBridgeMethodIsNotReadAsASecondTool() {
+        reader.from(new Narrowed());
+
+        assertEquals(Set.of("echo"), resolvedNames());
+    }
+
+    @Test
+    void aStaticMethodCarriesNoTargetEvenWhenReadFromAnObject() {
+        Object instance = new Bean();
+        reader.from(instance);
+
+        assertSame(instance, toolOf("defaulted").spec().getTarget());
+        assertNull(toolOf("fixed").spec().getTarget());
+    }
+
+    @Test
+    void aClassWithoutAnnotatedMethodsYieldsNoTools() {
+        assertTrue(reader.from(Plain.class).isEmpty());
+        assertTrue(reader.from(new Plain()).isEmpty());
+    }
+
     private Set<String> resolvedNames() {
         return built.stream().map(tool -> tool.spec().getName()).collect(Collectors.toSet());
     }
@@ -217,6 +241,36 @@ class MethodToolsTest {
     }
 
     public static class Implementing implements Shared {
+    }
+
+    /** A generic superclass whose method a subclass narrows to one type. */
+    public static class GenericBase<T> {
+
+        public String echo(T value) {
+            return String.valueOf(value);
+        }
+    }
+
+    /** The narrowing override: the compiler adds a bridge that carries the copied annotation. */
+    public static class Narrowed extends GenericBase<String> {
+
+        @Override
+        @ToolMethod(name = "echo")
+        public String echo(String value) {
+            return value;
+        }
+    }
+
+    /** Methods, none of them a tool. */
+    public static class Plain {
+
+        public String plain(String value) {
+            return value;
+        }
+
+        public static String plainStatic() {
+            return "";
+        }
     }
 
     /** The tool the reader hands back, keeping the name it was asked for and the resolution it got. */
