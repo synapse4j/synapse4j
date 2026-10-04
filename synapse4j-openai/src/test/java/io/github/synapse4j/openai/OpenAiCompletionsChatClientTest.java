@@ -606,7 +606,7 @@ class OpenAiCompletionsChatClientTest {
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setName("answer");
         format.setDescription("The answer, as JSON");
-        format.setSchema("{\"type\":\"object\"}");
+        format.setSchema(new JsonSchemaBuilder().setType("object").build());
         client.chat(request);
 
         Map<String, Object> wire = parseCaptured();
@@ -796,7 +796,7 @@ class OpenAiCompletionsChatClientTest {
         ChatRequest request = requestWithModel();
         ChatResponseFormat format = request.getOptions().getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
-        format.setSchema("{\"type\":\"object\"}");
+        format.setSchema(new JsonSchemaBuilder().setType("object").build());
         format.setStrict(true);
 
         client.chat(request);
@@ -839,7 +839,7 @@ class OpenAiCompletionsChatClientTest {
         ChatRequest request = requestWithModel();
         ChatResponseFormat format = request.getOptions().getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
-        format.setSchema("{\"type\":\"object\"}");
+        format.setSchema(new JsonSchemaBuilder().setType("object").build());
         ToolDefinition tool = new ToolDefinition("get_weather", "Fetches weather",
                 new JsonSchemaBuilder().setType("object").build());
         request.getTools().add(new ManualTool(tool));
@@ -914,7 +914,7 @@ class OpenAiCompletionsChatClientTest {
         ChatResponseFormat format = request.getOptions().getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setName("answer");
-        format.setSchema("{\"type\":\"object\"}");
+        format.setSchema(new JsonSchemaBuilder().setType("object").build());
         format.getExtras().put(List.of("json_schema", "strict"), true);
 
         client.chat(request);

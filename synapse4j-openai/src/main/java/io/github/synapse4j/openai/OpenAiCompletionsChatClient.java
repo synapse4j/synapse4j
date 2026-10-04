@@ -55,7 +55,7 @@ public class OpenAiCompletionsChatClient extends AbstractOpenAiChatClient {
 
     @Override
     protected void write(ChatRequest request, JsonWriter writer, OpenAiConfig config, boolean streaming) {
-        CompletionsWriter document = new CompletionsWriter(codec, config);
+        CompletionsWriter document = new CompletionsWriter(config);
         if (streaming) {
             document.writeStreaming(request, writer);
         } else {

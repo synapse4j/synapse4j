@@ -19,7 +19,7 @@ import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
-import io.github.synapse4j.json.JsonCodec;
+import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonWriter;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolDefinition;
@@ -32,9 +32,9 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Writes the shared chat model as the Responses wire document. Stateless; one instance writes one
- * exchange, and it holds what the whole exchange writes by — the application's codec, for embedding
- * schema strings as parsed maps. The document being written is the opposite case and stays an
- * argument of each call: it is the thing that varies.
+ * exchange, and it holds what the whole exchange writes by — the endpoint's conventions, for the
+ * members whose name varies between servers. The document being written is the opposite case and
+ * stays an argument of each call: it is the thing that varies.
  *
  * <p>
  * A request is assembled as the object it goes out as — one map per node, the members this module
@@ -85,8 +85,6 @@ class ResponsesWriter {
      * in — one name, spelled once for both sides.
      */
     static final String STORE = "store";
-
-    private final JsonCodec codec;
 
     /** The endpoint's conventions, as they were when this exchange began. */
     @NonNull
@@ -550,7 +548,7 @@ class ResponsesWriter {
             entry.put("name", format.getName() != null ? format.getName() : "response");
             putIfSet(entry, "description", format.getDescription());
             putIfSet(entry, "strict", format.getStrict());
-            Map<String, Object> schema = parseSchema(format.getSchema());
+            JsonSchema schema = format.getSchema();
             if (schema != null) {
                 entry.put("schema", schema);
             }
@@ -565,17 +563,6 @@ class ResponsesWriter {
     private static void putIfSet(Map<String, Object> members, String name, @Nullable Object value) {
         if (value != null) {
             members.put(name, value);
-        }
-    }
-
-    private @Nullable Map<String, Object> parseSchema(@Nullable String schema) {
-        if (schema == null) {
-            return null;
-        }
-        try {
-            return codec.decode(schema, Map.class);
-        } catch (RuntimeException e) {
-            throw new SynapseException("tool input schema is not valid JSON", e);
         }
     }
 

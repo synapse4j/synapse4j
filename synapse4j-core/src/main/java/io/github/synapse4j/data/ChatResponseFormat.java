@@ -1,5 +1,6 @@
 package io.github.synapse4j.data;
 
+import io.github.synapse4j.json.JsonSchema;
 import org.jspecify.annotations.Nullable;
 
 import lombok.Getter;
@@ -15,8 +16,9 @@ import lombok.ToString;
  * requirement: a request either asks for a shape or it does not.
  *
  * <p>
- * The schema is JSON Schema text: this library does not bind a JSON library, so the schema is
- * produced by the codec the application chose.
+ * The schema is a {@link JsonSchema}, like a tool's argument schema: the codec the application chose
+ * produces one, and a protocol that has to reshape it for the wire can read and rewrite it rather
+ * than parse a string first.
  *
  * <p>
  * A protocol that cannot express a mode has to fail loudly. Answering in prose when a shape was
@@ -56,8 +58,8 @@ public class ChatResponseFormat {
     /** What the schema describes, for the model to read. */
     private @Nullable String description;
 
-    /** The schema, as JSON Schema text. */
-    private @Nullable String schema;
+    /** The schema. */
+    private @Nullable JsonSchema schema;
 
     /**
      * Whether the provider has to enforce the schema rather than merely aim at it; {@code null}

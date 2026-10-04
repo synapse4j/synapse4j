@@ -298,7 +298,7 @@ class OpenAiResponsesChatClientTest {
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         format.setName("answer");
         format.setDescription("The answer, as JSON");
-        format.setSchema("{\"type\":\"object\"}");
+        format.setSchema(new JsonSchemaBuilder().setType("object").build());
         format.setStrict(true);
 
         client.chat(request);

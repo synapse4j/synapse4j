@@ -330,12 +330,12 @@ class Synapse4jAutoConfigurationTest {
                     // The keys are the starter's public contract, like every other key bound here:
                     // a renamed one silently drops the default an application configured.
                     ChatOptions options = context.getBean(Synapse4jProperties.class)
-                            .getChat().getOptions().toChatOptions();
+                            .getChat().getOptions().toChatOptions(new JacksonJsonCodec());
                     assertThat(options.getModel()).isEqualTo("gpt-4o");
                     assertThat(options.getTemperature()).isEqualTo(0.3);
                     assertThat(options.getReasoningEffort()).isEqualTo("high");
                     assertThat(options.getResponseFormat().getType()).isEqualTo("json_schema");
-                    assertThat(options.getResponseFormat().getSchema()).isEqualTo("{\"type\":\"object\"}");
+                    assertThat(options.getResponseFormat().getSchema().getType()).containsExactly("object");
                     assertThat(options.getHeaders()).containsEntry("openai-beta", "responses=v1");
                     assertThat(options.getExtras().get("service_tier")).isEqualTo("flex");
                 });

@@ -386,7 +386,7 @@ class AnthropicChatClientTest {
         request.getOptions().setReasoningEffort("high");
         ChatResponseFormat format = request.getOptions().getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
-        format.setSchema("{\"type\":\"object\"}");
+        format.setSchema(new JsonSchemaBuilder().setType("object").build());
 
         client.chat(request);
 
@@ -420,7 +420,7 @@ class AnthropicChatClientTest {
         ChatRequest described = requestWithModel();
         ChatResponseFormat format = described.getOptions().getResponseFormat();
         format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
-        format.setSchema("{\"type\":\"object\"}");
+        format.setSchema(new JsonSchemaBuilder().setType("object").build());
         format.setName("person");
         format.setDescription("The answer, as JSON");
         format.setStrict(false);

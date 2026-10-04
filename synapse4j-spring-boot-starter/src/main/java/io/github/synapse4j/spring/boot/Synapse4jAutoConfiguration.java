@@ -264,7 +264,7 @@ public class Synapse4jAutoConfiguration {
         if (chat.isAutoToolCalling()) {
             client = new ToolCallingChatClient(client);
         }
-        return assemble(client, properties, chatCustomizers, clientCustomizers);
+        return assemble(client, properties, codec, chatCustomizers, clientCustomizers);
     }
 
     /**
@@ -296,10 +296,10 @@ public class Synapse4jAutoConfiguration {
      * it is handed. Applied here rather than through a constructor because the clients' own
      * constructors are the library's API and take no options.
      */
-    private static ChatClient assemble(ChatClient client, Synapse4jProperties properties,
+    private static ChatClient assemble(ChatClient client, Synapse4jProperties properties, JsonCodec codec,
             ObjectProvider<ChatCustomizer> chatCustomizers,
             ObjectProvider<ChatClientCustomizer> clientCustomizers) {
-        client.setDefaultOptions(properties.getChat().getOptions().toChatOptions());
+        client.setDefaultOptions(properties.getChat().getOptions().toChatOptions(codec));
         chatCustomizers.orderedStream().forEach(client::addChatCustomizer);
         clientCustomizers.orderedStream().forEach(customizer -> customizer.customize(client));
         return client;

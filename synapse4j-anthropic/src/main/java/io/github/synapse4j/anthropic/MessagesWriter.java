@@ -534,7 +534,7 @@ class MessagesWriter {
         String type = format.getType();
         if (ChatResponseFormat.TYPE_JSON_SCHEMA.equals(type)) {
             entry.put("type", "json_schema");
-            putIfSet(entry, "schema", parseSchema(format.getSchema()));
+            putIfSet(entry, "schema", format.getSchema());
         } else if (type != null && !ChatResponseFormat.TYPE_TEXT.equals(type)) {
             throw new SynapseException(
                     "unsupported response format type for Anthropic Messages: " + type);
@@ -570,17 +570,6 @@ class MessagesWriter {
     private static void putIfSet(Map<String, Object> members, String name, @Nullable Object value) {
         if (value != null) {
             members.put(name, value);
-        }
-    }
-
-    private @Nullable Map<String, Object> parseSchema(@Nullable String schema) {
-        if (schema == null) {
-            return null;
-        }
-        try {
-            return codec.decode(schema, Map.class);
-        } catch (RuntimeException e) {
-            throw new SynapseException("tool input schema is not valid JSON", e);
         }
     }
 

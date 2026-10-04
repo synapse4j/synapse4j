@@ -2,9 +2,12 @@ package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 import org.junit.jupiter.api.Test;
 
 class ChatOptionsTest {
@@ -22,7 +25,8 @@ class ChatOptionsTest {
         defaults.getHeaders().put("x-shared", "default");
         defaults.getHeaders().put("x-default", "1");
         defaults.getExtras().put("service_tier", "flex");
-        defaults.getResponseFormat().setSchema("{\"type\":\"object\"}");
+        JsonSchema schema = new JsonSchemaBuilder().setType("object").build();
+        defaults.getResponseFormat().setSchema(schema);
 
         ChatOptions effective = ChatOptions.effective(call, defaults);
 
@@ -34,7 +38,7 @@ class ChatOptionsTest {
         assertEquals("flex", effective.getExtras().get("service_tier"));
         // The nested format merges the same way: the call's mode, the default's schema.
         assertEquals(ChatResponseFormat.TYPE_JSON_SCHEMA, effective.getResponseFormat().getType());
-        assertEquals("{\"type\":\"object\"}", effective.getResponseFormat().getSchema());
+        assertSame(schema, effective.getResponseFormat().getSchema());
         // The merge answers a new instance; neither side is changed.
         assertNull(call.getModel());
         assertEquals(Double.valueOf(1.0), defaults.getTemperature());

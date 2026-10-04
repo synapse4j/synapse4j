@@ -118,7 +118,7 @@ public class OpenAiResponsesChatClient extends AbstractOpenAiChatClient {
 
     @Override
     protected void write(ChatRequest request, JsonWriter writer, OpenAiConfig config, boolean streaming) {
-        ResponsesWriter document = new ResponsesWriter(codec, config);
+        ResponsesWriter document = new ResponsesWriter(config);
         if (streaming) {
             document.writeStreaming(request, writer);
         } else {
