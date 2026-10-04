@@ -185,7 +185,13 @@ public class JacksonJsonCodec extends AbstractJsonCodec {
     }
 
     private JsonSchema schema(SchemaGenerator schemaGenerator, Type type) {
-        return jsonMapper.convertValue(generateSchema(schemaGenerator, type), JsonSchema.class);
+        try {
+            return jsonMapper.convertValue(generateSchema(schemaGenerator, type), JsonSchema.class);
+        } catch (SynapseException alreadyReported) {
+            throw alreadyReported;
+        } catch (RuntimeException failure) {
+            throw new SynapseException("Generating the schema for " + type.getTypeName() + " failed", failure);
+        }
     }
 
     /**
