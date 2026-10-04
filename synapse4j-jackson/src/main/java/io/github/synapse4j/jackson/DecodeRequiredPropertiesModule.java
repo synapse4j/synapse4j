@@ -28,9 +28,13 @@ import tools.jackson.databind.json.JsonMapper;
  * another.
  *
  * <p>
- * A mapper set to refuse a creator property the JSON leaves out is the one setting that overrides the
- * type: the binder would reject a document this schema allowed, so every property is demanded instead,
- * and an optional one is still nullable, which is what that binder wants in its place.
+ * A decode schema demands every property, and a mapper set to refuse a creator property the JSON leaves
+ * out is the one setting consulted beyond the type: it widens the demand to the optional properties too,
+ * which stay nullable in their place. That setting is what keeps the demand no stricter than binding for
+ * a property that arrives on a creator — the binder already refuses the document, so the schema asks for
+ * nothing the reading would not. For a property that does not arrive on a creator, a setter-only bean's
+ * say, the binder refuses nothing, and the demand is the schema's deliberate strictness over a reading
+ * that would accept the absence.
  *
  * <p>
  * What this class cannot know is the wrappers an application has of its own: {@link #isOptionalType}

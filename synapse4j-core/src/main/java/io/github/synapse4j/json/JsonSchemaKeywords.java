@@ -31,6 +31,7 @@ public final class JsonSchemaKeywords {
     public static final String UNEVALUATED_ITEMS = "unevaluatedItems";
     public static final String UNEVALUATED_PROPERTIES = "unevaluatedProperties";
     public static final String CONTENT_SCHEMA = "contentSchema";
+    public static final String CONTENT_ENCODING = "contentEncoding";
     public static final String ALL_OF = "allOf";
     public static final String ANY_OF = "anyOf";
     public static final String ONE_OF = "oneOf";

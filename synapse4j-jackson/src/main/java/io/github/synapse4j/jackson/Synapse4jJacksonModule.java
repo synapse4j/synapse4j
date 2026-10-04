@@ -19,11 +19,13 @@ import tools.jackson.databind.module.SimpleModule;
  * its object and boolean forms, and by any implementation of it.
  *
  * <p>
- * The name it is built with doubles as its registration id, so adding it to a mapper that already
- * carries one replaces that instance rather than registering a second — adding it is idempotent, and a
- * mapper an application has already taught about {@link JsonSchema} is safe to hand in. The name is
- * therefore load-bearing: an unnamed {@code SimpleModule} would be given a fresh id per instance and
- * would register twice.
+ * The name it is built with doubles as its registration id: Jackson keys modules by that id and, when
+ * one is added again, removes the earlier instance before appending this one, so adding this module
+ * twice leaves a single registration. A module of the application's own that registers a serializer for
+ * {@link JsonSchema} carries a different id and stays in the mapper's module list, but this module is
+ * appended after it and its registration wins, silently overriding the application's. The name is
+ * load-bearing: an unnamed {@code SimpleModule} would be given a fresh id per instance and would
+ * register twice.
  */
 public class Synapse4jJacksonModule extends SimpleModule {
 

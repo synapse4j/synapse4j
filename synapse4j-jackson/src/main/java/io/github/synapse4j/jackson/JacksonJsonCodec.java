@@ -116,11 +116,13 @@ public class JacksonJsonCodec implements JsonCodec {
     }
 
     /**
-     * Builds the mapper, with the module that reads and writes this library's own types added first.
+     * Builds the mapper, with the module that reads and writes this library's own types added last.
      *
      * <p>
      * A mapper is immutable once built, so the builder is the last chance to register the module — and
      * the codec needs it: a schema that sits inside a value the mapper binds is written and read by it.
+     * The module is appended after whatever the builder already carries, so where the application
+     * registered a serializer for {@link JsonSchema} of its own, this module's registration wins.
      */
     private static JsonMapper withModule(JsonMapper.Builder builder) {
         return builder.addModule(new Synapse4jJacksonModule()).build();

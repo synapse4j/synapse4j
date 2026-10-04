@@ -220,7 +220,7 @@
               <waitUntil>validated</waitUntil>
               <waitMaxTime>1800</waitMaxTime>
               <!-- Central counts every file in the bundle against a monthly limit, and the default
-                   "all" writes four checksums per artifact — two thirds of the whole deployment.
+                   "all" writes four checksums per artifact — one third of the whole deployment.
                    MD5 and SHA1 are the pair Central has always carried, and a client that wants
                    SHA-256 or SHA-512 falls back to SHA1 when they are absent. -->
               <checksums>required</checksums>

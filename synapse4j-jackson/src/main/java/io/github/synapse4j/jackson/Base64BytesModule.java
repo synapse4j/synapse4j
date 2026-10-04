@@ -5,6 +5,8 @@ import com.github.victools.jsonschema.generator.Module;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 import com.github.victools.jsonschema.generator.SchemaKeyword;
 
+import io.github.synapse4j.json.JsonSchemaKeywords;
+
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -35,7 +37,7 @@ public class Base64BytesModule implements Module {
             definition.put(context.getKeyword(SchemaKeyword.TAG_TYPE),
                     context.getKeyword(SchemaKeyword.TAG_TYPE_STRING));
             // An annotation, not an assertion: a validator need not act on it, but it documents the string.
-            definition.put("contentEncoding", "base64");
+            definition.put(JsonSchemaKeywords.CONTENT_ENCODING, "base64");
             return new CustomDefinition(definition, CustomDefinition.DefinitionType.INLINE,
                     CustomDefinition.AttributeInclusion.NO);
         });
