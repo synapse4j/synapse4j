@@ -22,7 +22,10 @@ jobs:
   release:
     runs-on: ubuntu-latest
     environment: release
-    timeout-minutes: 60
+    # Bounded by the deploy's own wait (up to 30 min, the plugin's floor) plus this job's polling for
+    # Central's queue (up to 30 min), plus checkout and the release build — 60 would cancel a job whose
+    # artifacts Central has already accepted, leaving neither a release nor a draft.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
 

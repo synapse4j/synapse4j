@@ -110,6 +110,14 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
+    void aRenamedKeyFailsTheContextRatherThanBeingIgnored() {
+        // This key moved under synapse4j.chat.* in 0.0.2. An application still carrying the old
+        // spelling must not come up with the switch silently dropped.
+        runner.withPropertyValues("synapse4j.auto-tool-calling=false")
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
     void selectsTheAnthropicClientFromItsProperty() {
         // The value is part of the same contract as the key: a rename silently falls every
         // application that asked for Anthropic back to the default client.

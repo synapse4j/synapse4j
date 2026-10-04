@@ -40,8 +40,10 @@ import io.github.synapse4j.openai.OpenAiConfig;
  * deliberately not restated either. They live under {@code spring.http.client.*} and reach a
  * {@code RestClient}-backed transport like any other Boot application's HTTP calls.
  */
+// A key that no longer binds — one renamed between versions, say — must fail loudly at startup rather
+// than be silently accepted and change behaviour, so unknown fields are refused.
 @Data
-@ConfigurationProperties(prefix = "synapse4j")
+@ConfigurationProperties(prefix = "synapse4j", ignoreUnknownFields = false)
 public class Synapse4jProperties {
 
     /**
