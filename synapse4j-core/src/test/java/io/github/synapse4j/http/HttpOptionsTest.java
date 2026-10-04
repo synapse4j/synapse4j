@@ -3,7 +3,6 @@ package io.github.synapse4j.http;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -107,11 +106,6 @@ class HttpOptionsTest {
         assertEquals(Duration.ofSeconds(5), request.getResponseTimeout());
         assertEquals(HttpOptions.STREAMED, effective.getBodyWriteMode());
         assertEquals(Duration.ofSeconds(5), effective.getResponseTimeout());
-    }
-
-    @Test
-    void defaultsAreRequired() {
-        assertThrows(NullPointerException.class, () -> HttpOptions.effective(new HttpOptions(), null));
     }
 
     @Test

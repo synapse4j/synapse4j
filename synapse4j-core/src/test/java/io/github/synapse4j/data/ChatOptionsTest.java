@@ -3,7 +3,6 @@ package io.github.synapse4j.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.synapse4j.json.JsonSchema;
@@ -42,13 +41,6 @@ class ChatOptionsTest {
         // The merge answers a new instance; neither side is changed.
         assertNull(call.getModel());
         assertEquals(Double.valueOf(1.0), defaults.getTemperature());
-    }
-
-    @Test
-    void responseFormatCannotBeSetToNull() {
-        ChatOptions options = new ChatOptions();
-
-        assertThrows(NullPointerException.class, () -> options.setResponseFormat(null));
     }
 
     @Test

@@ -5,34 +5,32 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
-import io.github.synapse4j.data.ChatContext;
-import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
-import io.github.synapse4j.json.JsonReader;
-import io.github.synapse4j.json.JsonSchema;
-import io.github.synapse4j.json.JsonWriter;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class MethodToolsTest {
 
     /** Every tool the reader built, in the order it asked the factory for one. */
-    private final List<CapturingTool> built = new ArrayList<>();
+    private final List<SpecTool> built = new ArrayList<>();
 
-    /** The reader under test: its factory hands back tools that keep what they were completed from. */
-    private final MethodTools reader = new MethodTools(new IdleCodec()).specToolFactory(type -> {
-        CapturingTool tool = new CapturingTool(type);
+    /** The type each of those tools was asked for, in the same order. */
+    private final List<String> askedFor = new ArrayList<>();
+
+    /** The reader under test: its factory hands back a mock the test can read the resolution from. */
+    private final MethodTools reader = new MethodTools(mock(JsonCodec.class)).specToolFactory(type -> {
+        SpecTool tool = mock(SpecTool.class);
         built.add(tool);
+        askedFor.add(type);
         return tool;
     });
 
@@ -40,23 +38,23 @@ class MethodToolsTest {
     void onlyWhatWasWrittenLandsOnTheSpec() {
         reader.from(new Bean());
 
-        ToolMethodSpec written = toolOf("renamed").spec();
+        ToolMethodSpec written = specOf("renamed");
         assertEquals("What it does", written.getDescription());
         assertEquals("some.Tool", written.getType());
         ToolParameterSpec told = written.getParameters().get(0);
         assertEquals("arg", told.getName());
         assertEquals("What it means", told.getDescription());
         assertEquals("false", told.getRequired());
-        assertEquals("some.Tool", toolOf("renamed").askedFor());
+        assertEquals("some.Tool", askedFor("renamed"));
 
-        ToolMethodSpec blank = toolOf("defaulted").spec();
+        ToolMethodSpec blank = specOf("defaulted");
         assertEquals("", blank.getDescription());
         assertEquals("", blank.getType());
         ToolParameterSpec untold = blank.getParameters().get(0);
         assertEquals("value", untold.getName());
         assertEquals("", untold.getDescription());
         assertEquals("", untold.getRequired());
-        assertEquals("", toolOf("defaulted").askedFor());
+        assertEquals("", askedFor("defaulted"));
     }
 
     @Test
@@ -64,7 +62,7 @@ class MethodToolsTest {
         reader.from(new Bean());
         assertEquals(Set.of("defaulted", "renamed", "fixed"), resolvedNames());
 
-        built.clear();
+        reset();
         reader.from(Bean.class);
         assertEquals(Set.of("fixed"), resolvedNames());
     }
@@ -93,7 +91,7 @@ class MethodToolsTest {
         reader.from(new Child());
         assertEquals(Set.of("own", "inherited"), resolvedNames());
 
-        built.clear();
+        reset();
         reader.from(new Hidden());
         assertEquals(Set.of("hidden"), resolvedNames());
     }
@@ -124,8 +122,8 @@ class MethodToolsTest {
         Object instance = new Bean();
         reader.from(instance);
 
-        assertSame(instance, toolOf("defaulted").spec().getTarget());
-        assertNull(toolOf("fixed").spec().getTarget());
+        assertSame(instance, specOf("defaulted").getTarget());
+        assertNull(specOf("fixed").getTarget());
     }
 
     @Test
@@ -134,15 +132,41 @@ class MethodToolsTest {
         assertTrue(reader.from(new Plain()).isEmpty());
     }
 
-    private Set<String> resolvedNames() {
-        return built.stream().map(tool -> tool.spec().getName()).collect(Collectors.toSet());
+    private void reset() {
+        built.clear();
+        askedFor.clear();
     }
 
-    private CapturingTool toolOf(String name) {
-        return built.stream()
-                .filter(tool -> tool.spec().getName().equals(name))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("no tool resolved under '" + name + "': " + resolvedNames()));
+    private Set<String> resolvedNames() {
+        Set<String> names = new LinkedHashSet<>();
+        for (int index = 0; index < built.size(); index++) {
+            names.add(specAt(index).getName());
+        }
+        return names;
+    }
+
+    private ToolMethodSpec specOf(String name) {
+        for (int index = 0; index < built.size(); index++) {
+            if (name.equals(specAt(index).getName())) {
+                return specAt(index);
+            }
+        }
+        throw new AssertionError("no tool resolved under '" + name + "': " + resolvedNames());
+    }
+
+    private String askedFor(String name) {
+        for (int index = 0; index < built.size(); index++) {
+            if (name.equals(specAt(index).getName())) {
+                return askedFor.get(index);
+            }
+        }
+        throw new AssertionError("no tool resolved under '" + name + "': " + resolvedNames());
+    }
+
+    private ToolMethodSpec specAt(int index) {
+        ArgumentCaptor<ToolMethodSpec> captor = ArgumentCaptor.forClass(ToolMethodSpec.class);
+        verify(built.get(index)).initialize(captor.capture(), any());
+        return captor.getValue();
     }
 
     /** A method that wrote nothing, a method that wrote everything, and a static one. */
@@ -273,72 +297,4 @@ class MethodToolsTest {
         }
     }
 
-    /** The tool the reader hands back, keeping the name it was asked for and the resolution it got. */
-    private static class CapturingTool implements SpecTool {
-
-        private final String askedFor;
-
-        private @Nullable ToolMethodSpec spec;
-
-        CapturingTool(String askedFor) {
-            this.askedFor = askedFor;
-        }
-
-        String askedFor() {
-            return askedFor;
-        }
-
-        ToolMethodSpec spec() {
-            return Objects.requireNonNull(spec, "this tool was never initialized");
-        }
-
-        @Override
-        public void initialize(ToolMethodSpec spec, JsonCodec codec) {
-            this.spec = spec;
-        }
-
-        @Override
-        public ToolDefinition definition() {
-            throw new AssertionError("these tests never ask a tool for its declaration");
-        }
-
-        @Override
-        public List<ContentPart> execute(@Nullable String arguments, @Nullable ChatContext context) {
-            throw new AssertionError("these tests never call a tool");
-        }
-    }
-
-    /** A codec nothing reaches: a capturing tool never asks one anything. */
-    private static class IdleCodec implements JsonCodec {
-
-        @Override
-        public JsonSchema generateEncodeSchema(Type type) {
-            throw new AssertionError("nothing encodes here");
-        }
-
-        @Override
-        public JsonSchema generateDecodeSchema(Type type) {
-            throw new AssertionError("nothing decodes here");
-        }
-
-        @Override
-        public String encode(Object value) {
-            throw new AssertionError("nothing encodes here");
-        }
-
-        @Override
-        public <T> T decode(String json, Type type) {
-            throw new AssertionError("nothing decodes here");
-        }
-
-        @Override
-        public JsonWriter writer(OutputStream out) {
-            throw new AssertionError("nothing writes here");
-        }
-
-        @Override
-        public JsonReader reader(InputStream in) {
-            throw new AssertionError("nothing reads here");
-        }
-    }
 }

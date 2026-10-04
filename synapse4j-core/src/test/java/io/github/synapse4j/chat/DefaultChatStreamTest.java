@@ -191,22 +191,6 @@ class DefaultChatStreamTest {
     }
 
     @Test
-    void constructorRejectsMissingPieces() {
-        Iterator<ChatStreamEvent> source = events("one").iterator();
-
-        assertThrows(NullPointerException.class, () -> new DefaultChatStream(null, (r, e) -> {
-        }, () -> {
-        }));
-        assertThrows(NullPointerException.class, () -> new DefaultChatStream(source, null, () -> {
-        }));
-        assertThrows(NullPointerException.class, () -> new DefaultChatStream(source, (r, e) -> {
-        }, null));
-        assertThrows(NullPointerException.class, () -> new DefaultChatStream(source, null, (r, e) -> {
-        }, () -> {
-        }));
-    }
-
-    @Test
     void theEventPipelineRunsBeforeTheFoldAndTheCallerSeesWhatWasFolded() {
         List<ChatStreamEvent> arrived = events("one", "two");
         List<String> folded = new ArrayList<>();

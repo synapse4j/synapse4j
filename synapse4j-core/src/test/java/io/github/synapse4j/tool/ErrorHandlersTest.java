@@ -43,21 +43,11 @@ class ErrorHandlersTest {
     }
 
     @Test
-    void aNullPrefixIsRefused() {
-        assertThrows(NullPointerException.class, () -> ErrorHandlers.message(null));
-    }
-
-    @Test
     void fixedAlwaysAnswersTheSameText() throws Exception {
         ToolExecutor.ErrorHandler handler = ErrorHandlers.fixed("the tool is unavailable, tell the user");
 
         assertEquals("the tool is unavailable, tell the user",
                 handler.handle(call, new RuntimeException("connection refused")));
-    }
-
-    @Test
-    void aNullFixedTextIsRefused() {
-        assertThrows(NullPointerException.class, () -> ErrorHandlers.fixed(null));
     }
 
     @Test

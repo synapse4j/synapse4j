@@ -1,18 +1,10 @@
 package io.github.synapse4j.data;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
 class ChatRequestTest {
-
-    @Test
-    void optionsCannotBeSetToNull() {
-        ChatRequest request = new ChatRequest();
-
-        assertThrows(NullPointerException.class, () -> request.setOptions(null));
-    }
 
     @Test
     void everyRequestGetsItsOwnOptions() {

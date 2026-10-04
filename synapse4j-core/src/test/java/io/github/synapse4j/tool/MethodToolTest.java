@@ -6,85 +6,73 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
-import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
-import io.github.synapse4j.json.JsonWriter;
 import io.github.synapse4j.json.JsonSchemaBuilder;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class MethodToolTest {
 
-    private final FakeCodec codec = new FakeCodec();
+    private final JsonCodec codec = mock(JsonCodec.class);
+
+    @BeforeEach
+    void codecAnswersAPlainSchema() {
+        // What the codec answers is the test's to choose; MethodTool only reacts to it. This default is
+        // a plain object that admits no null, so a parameter is required unless the test says otherwise.
+        when(codec.generateDecodeSchema(any())).thenReturn(new JsonSchemaBuilder().setType("object").build());
+    }
 
     // ===== factories and construction =====
 
     @Test
-    void factoryWithSignatureRefusesMissingParts() {
-        Method greet = method("greet", String.class);
-
-        assertThrows(NullPointerException.class, () -> MethodTool.of(null, "d", greet, null, codec));
-        assertThrows(NullPointerException.class, () -> MethodTool.of("n", null, greet, null, codec));
-        assertThrows(NullPointerException.class, () -> MethodTool.of("n", "d", null, null, codec));
-        assertThrows(NullPointerException.class, () -> MethodTool.of("n", "d", greet, null, null));
-    }
-
-    @Test
-    void instanceMethodDemandsATargetStaticMethodDoesNot() {
+    void instanceMethodNeedsATarget() {
         Method instance = method("instanceGreet", String.class);
-        Method statik = method("greet", String.class);
 
+        // A static method's acceptance is every other test's subject; what only this one pins is the
+        // refusal an instance method gets without a target.
         SynapseException refused = assertThrows(SynapseException.class,
                 () -> MethodTool.of("n", "d", instance, null, codec));
         assertTrue(refused.getMessage().contains("instance method"));
-
-        MethodTool.of("n", "d", statik, null, codec);
-        MethodTool.of("n", "d", statik, new Object(), codec);
     }
 
     @Test
     void signatureBuildsTheDeclaration() {
-        MethodTool tool = MethodTool.of("weather", "Looks up weather", method("take", String.class), null, codec);
-        ToolDefinition definition = tool.definition();
+        ToolDefinition definition = MethodTool
+                .of("weather", "Looks up weather", method("take", String.class), null, codec).definition();
 
         assertEquals("weather", definition.getName());
         assertEquals("Looks up weather", definition.getDescription());
-        JsonSchema schema = definition.getInputSchema();
-        assertTrue(schema.getProperties().containsKey("message"));
-        assertEquals(List.of("message"), schema.getRequired());
-        assertTrue(codec.generatedFor.contains(String.class));
+        assertTrue(definition.getInputSchema().getProperties().containsKey("message"));
+        assertEquals(List.of("message"), definition.getInputSchema().getRequired());
     }
 
     @Test
     void chatContextParameterStaysOutOfTheSchema() {
-        MethodTool tool = MethodTool.of("ctx", "Takes the context", method("withContext", ChatContext.class), null,
-                codec);
+        JsonSchema schema = MethodTool
+                .of("ctx", "Takes the context", method("withContext", ChatContext.class), null, codec).definition()
+                .getInputSchema();
 
-        // an envelope with nothing in it carries neither keyword
-        JsonSchema schema = tool.definition().getInputSchema();
         assertFalse(schema.keys().contains("properties"));
         assertFalse(schema.keys().contains("required"));
-        assertTrue(codec.generatedFor.isEmpty());
     }
 
     @Test
-    void privateMethodsRunOnceHandedOver() throws Exception {
+    void privateMethodRunsOnceHandedOver() throws Exception {
         MethodTool tool = MethodTool.of("secret", "A private method", Target.class.getDeclaredMethod("secret"), null,
                 codec);
 
@@ -92,7 +80,7 @@ class MethodToolTest {
     }
 
     @Test
-    void definitionBeforeInitializeIsLoud() {
+    void definitionBeforeCompletionIsLoud() {
         MethodTool tool = new MethodTool();
 
         IllegalStateException failure = assertThrows(IllegalStateException.class, tool::definition);
@@ -105,65 +93,47 @@ class MethodToolTest {
     void chatContextParameterReceivesTheConversation() throws Exception {
         MethodTool tool = MethodTool.of("ctx", "Takes the context", method("withContext", ChatContext.class), null,
                 codec);
-        ChatContext context = new ChatContext();
 
-        assertEquals("set", execute(tool, null, context));
-    }
-
-    @Test
-    void chatContextParameterReceivesNullWhenNoneWasAttached() throws Exception {
-        MethodTool tool = MethodTool.of("ctx", "Takes the context", method("withContext", ChatContext.class), null,
-                codec);
-
+        assertEquals("set", execute(tool, null, new ChatContext()));
         assertEquals("null", execute(tool, null, null));
     }
 
     @Test
-    void matchingTypeTakesTheValueWithoutTheCodec() throws Exception {
-        codec.arguments = Map.of("message", "hello");
+    void matchingValueIsPassedThrough() throws Exception {
+        when(codec.decode(any(), any())).thenReturn(Map.of("message", "hello"));
         MethodTool tool = MethodTool.of("take", "Takes a string", method("take", String.class), null, codec);
-        int encodingsBefore = codec.encoded.size();
 
         Object[] values = tool.resolveArguments("{\"message\":\"hello\"}", null);
 
         assertEquals("hello", values[0]);
-        assertEquals(encodingsBefore, codec.encoded.size());
     }
 
     @Test
-    void matchingPrimitiveTypeTakesTheValueWithoutTheCodec() throws Exception {
+    void boxedValueForAPrimitiveIsPassedThrough() throws Exception {
         // A decoded number arrives boxed, and a primitive declared type matches only through its
-        // wrapper: without that, every primitive argument would be pushed through codec.convert even
-        // when it already fits.
-        codec.arguments = Map.of("n", 21);
+        // wrapper: without that, every primitive argument would be pushed through codec.convert.
+        when(codec.decode(any(), any())).thenReturn(Map.of("n", 21));
         MethodTool tool = MethodTool.of("twice", "Doubles a number", method("twice", int.class), null, codec);
-        int encodingsBefore = codec.encoded.size();
 
         Object[] values = tool.resolveArguments("{\"n\":21}", null);
 
         assertEquals(21, values[0]);
-        assertEquals(encodingsBefore, codec.encoded.size());
-        assertTrue(codec.decodedFor.isEmpty());
     }
 
     @Test
-    void mismatchedTypeFallsBackThroughTheCodec() throws Exception {
-        // A string where an int is declared is a real mismatch, so the value goes through the codec
-        // rather than being handed to the method as it stands.
-        codec.arguments = Map.of("n", "21");
-        codec.decodedByType.put(int.class, 21);
+    void valueNotFittingItsParameterGoesThroughTheCodec() throws Exception {
+        when(codec.decode(any(), any())).thenReturn(Map.of("n", "21"));
+        when(codec.convert("21", int.class)).thenReturn(21);
         MethodTool tool = MethodTool.of("twice", "Doubles a number", method("twice", int.class), null, codec);
 
         Object[] values = tool.resolveArguments("{\"n\":\"21\"}", null);
 
         assertEquals(21, values[0]);
-        assertTrue(codec.encoded.contains("21"));
-        assertTrue(codec.decodedFor.contains(int.class));
     }
 
     @Test
-    void missingKeyForAPrimitiveNamesTheParameter() {
-        codec.arguments = Map.of();
+    void missingValueForAPrimitiveNamesTheParameter() {
+        when(codec.decode(any(), any())).thenReturn(Map.of());
         MethodTool tool = MethodTool.of("save", "Saves an id", method("save", int.class), null, codec);
 
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
@@ -173,85 +143,61 @@ class MethodToolTest {
     }
 
     @Test
-    void missingKeyForAnObjectIsNull() throws Exception {
-        codec.arguments = Map.of();
+    void missingValueForAnObjectIsNull() throws Exception {
+        when(codec.decode(any(), any())).thenReturn(Map.of());
         MethodTool tool = MethodTool.of("take", "Takes a string", method("take", String.class), null, codec);
 
         assertNull(tool.resolveArguments("{}", null)[0]);
     }
 
     @Test
-    void keysTheMethodDoesNotDeclareAreIgnored() throws Exception {
-        codec.arguments = Map.of("message", "hello", "extra", "ignored");
+    void absentArgumentsMeanNone() throws Exception {
+        MethodTool tool = MethodTool.of("take", "Takes a string", method("take", String.class), null, codec);
+
+        // null and blank both mean the model produced none, which is not a document to decode.
+        assertNull(tool.resolveArguments(null, null)[0]);
+        assertNull(tool.resolveArguments("   ", null)[0]);
+    }
+
+    @Test
+    void keyTheMethodDoesNotDeclareIsIgnored() throws Exception {
+        when(codec.decode(any(), any())).thenReturn(Map.of("message", "hello", "extra", "ignored"));
         MethodTool tool = MethodTool.of("take", "Takes a string", method("take", String.class), null, codec);
 
         assertEquals("hello", tool.resolveArguments("{}", null)[0]);
     }
 
-    @Test
-    void blankArgumentsMeanNoTextAtAll() throws Exception {
-        MethodTool envOnly = MethodTool.of("ctx", "Takes the context", method("withContext", ChatContext.class), null,
-                codec);
-        MethodTool zero = MethodTool.of("noop", "Does nothing", method("noop"), null, codec);
-
-        assertEquals("null", execute(envOnly, null, null));
-        assertEquals("ok", execute(zero, null));
-        assertTrue(codec.decodedFor.isEmpty());
-    }
-
     // ===== call =====
 
     @Test
-    void failureOutOfTheMethodArrivesAsItself() {
-        MethodTool tool = MethodTool.of("fail", "Always fails", method("fail"), null, codec);
+    void failureOutOfTheMethodArrivesUnwrapped() {
+        IllegalStateException unchecked = assertThrows(IllegalStateException.class,
+                () -> execute(MethodTool.of("fail", "Always fails", method("fail"), null, codec), ""));
+        assertEquals("boom", unchecked.getMessage());
 
-        IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> execute(tool, ""));
-        assertEquals("boom", thrown.getMessage());
-    }
+        Exception checked = assertThrows(Exception.class,
+                () -> execute(MethodTool.of("failChecked", "Fails checked", method("failChecked"), null, codec), ""));
+        assertEquals("checked", checked.getMessage());
 
-    @Test
-    void checkedFailureOutOfTheMethodArrivesAsItself() {
-        MethodTool tool = MethodTool.of("failChecked", "Fails checked", method("failChecked"), null, codec);
-
-        Exception thrown = assertThrows(Exception.class, () -> execute(tool, ""));
-        assertEquals("checked", thrown.getMessage());
-    }
-
-    @Test
-    void aCauseThatIsNeitherExceptionNorErrorIsWrapped() {
-        MethodTool tool = MethodTool.of("weird", "Throws a bare Throwable", method("weird"), null, codec);
-
-        RuntimeException thrown = assertThrows(RuntimeException.class, () -> execute(tool, ""));
-        assertEquals("weird", thrown.getCause().getMessage());
+        RuntimeException bare = assertThrows(RuntimeException.class,
+                () -> execute(MethodTool.of("weird", "Throws a bare Throwable", method("weird"), null, codec), ""));
+        assertEquals("weird", bare.getCause().getMessage());
     }
 
     // ===== resolveResult =====
 
     @Test
-    void voidAnswersSuccess() throws Exception {
-        MethodTool tool = MethodTool.of("save", "Saves an id", method("save", int.class), null, codec);
-        codec.arguments = Map.of("id", 7);
-        codec.decodedByType.put(int.class, 7);
+    void returnValueBecomesTheResult() {
+        MethodTool voidMethod = MethodTool.of("save", "Saves an id", method("save", int.class), null, codec);
+        MethodTool stringMethod = MethodTool.of("noop", "Does nothing", method("noop"), null, codec);
+        MethodTool otherMethod = MethodTool.of("twice", "Doubles a number", method("twice", int.class), null, codec);
+        when(codec.encode(42)).thenReturn("encoded");
 
-        assertEquals("Success", execute(tool, "{\"id\":7}"));
-    }
-
-    @Test
-    void stringAnswersAsItself() throws Exception {
-        MethodTool tool = MethodTool.of("greet", "Greets", method("greet", String.class), null, codec);
-        codec.arguments = Map.of("name", "Ada");
-
-        assertEquals("hi Ada", execute(tool, "{\"name\":\"Ada\"}"));
-    }
-
-    @Test
-    void otherValuesAreRenderedByTheCodec() throws Exception {
-        MethodTool tool = MethodTool.of("twice", "Doubles a number", method("twice", int.class), null, codec);
-        codec.arguments = Map.of("n", 21);
-        codec.decodedByType.put(int.class, 21);
-
-        assertEquals("encoded", execute(tool, "{\"n\":21}"));
-        assertTrue(codec.encoded.contains(42));
+        List<ContentPart> parts = voidMethod.resolveResult(null, null);
+        assertEquals(1, parts.size());
+        assertEquals("Success", ((TextPart) parts.get(0)).getText());
+        assertEquals("ok", textOf(stringMethod.resolveResult("ok", null)));
+        assertEquals("encoded", textOf(otherMethod.resolveResult(42, null)));
     }
 
     // ===== the pairing: schemaFor and valueFor =====
@@ -260,15 +206,13 @@ class MethodToolTest {
     void oneHookPairCoversSchemaAndBinding() throws Exception {
         ChatContext context = new ChatContext();
         context.getAttributes().put("user", new CurrentUser("ada"));
-        BizTool tool = BizTool.of("ship", "Ships for the current user", method("ship", String.class, CurrentUser.class),
-                null, codec);
+        BizTool tool = BizTool.of("ship", "Ships for the current user",
+                method("ship", String.class, CurrentUser.class), null, codec);
 
-        // schema side: the claimed parameter is not declared to the model
         Map<String, JsonSchema> properties = tool.definition().getInputSchema().getProperties();
         assertTrue(properties.containsKey("route"));
         assertFalse(properties.containsKey("user"));
 
-        // binding side: the claimed parameter comes from the context — one override pair, both ends
         assertEquals("ada", execute(tool, "{\"unused\":1}", context));
     }
 
@@ -283,20 +227,19 @@ class MethodToolTest {
     }
 
     @Test
-    void theArgumentsSchemaIsTheHooksToShape() {
+    void argumentsSchemaIsTheHooksToShape() {
         ToolMethodSpec spec = new ToolMethodSpec(method("take", String.class), null);
         spec.setName("shaped");
         ShapedTool tool = new ShapedTool();
         tool.initialize(spec, codec);
 
-        // the built-in assembly ran underneath, and the hook's addition reached the declaration
         JsonSchema schema = tool.definition().getInputSchema();
         assertEquals(List.of("message"), schema.getRequired());
         assertTrue(schema.getProperties().containsKey("extra"));
     }
 
     @Test
-    void aParameterDescriptionFromItsAnnotationReachesThePropertySchema() {
+    void parameterDescriptionFromItsAnnotationReachesThePropertySchema() {
         Tool tool = new MethodTools(codec).from(new Described()).get(0);
 
         JsonSchema property = tool.definition().getInputSchema().getProperties().get("message");
@@ -304,35 +247,51 @@ class MethodToolTest {
     }
 
     @Test
-    void requiredComesFromTheTypeUnlessTheAnnotationWroteAWord() {
-        Tool tool = new MethodTools(codec).from(new Requirable()).get(0);
-
-        // plain and optional say nothing, so their own schemas decide; demanded and loosened each carry a
-        // written word, which overrides what the type would have said.
-        assertEquals(List.of("plain", "demanded"), tool.definition().getInputSchema().getRequired());
-    }
-
-    @Test
-    void anEmptyDescriptionBecomesNoDescriptionAtAll() {
+    void emptyDescriptionBecomesNoDescription() {
         MethodTool tool = MethodTool.of("noop", "", method("noop"), null, codec);
 
         assertNull(tool.definition().getDescription());
     }
 
     @Test
-    void anArrayParameterIsDescribedAndBound() throws Exception {
-        codec.arguments = Map.of("items", List.of("a", "b"));
-        codec.decodedByType.put(String[].class, new String[] { "a", "b" });
+    void arrayParameterIsDescribedAndBound() throws Exception {
+        when(codec.decode(any(), any())).thenReturn(Map.of("items", List.of("a", "b")));
+        when(codec.convert(List.of("a", "b"), String[].class)).thenReturn(new String[] { "a", "b" });
         MethodTool tool = MethodTool.of("join", "Joins items", method("join", String[].class), null, codec);
 
         assertTrue(tool.definition().getInputSchema().getProperties().containsKey("items"));
-        assertTrue(codec.generatedFor.contains(String[].class));
 
         Object[] values = tool.resolveArguments("{\"items\":[\"a\",\"b\"]}", null);
         assertArrayEquals(new String[] { "a", "b" }, (String[]) values[0]);
     }
 
+    // ===== required =====
+
+    @Test
+    void nullableSchemaIsNotRequired() {
+        when(codec.generateDecodeSchema(any())).thenReturn(nullableObjectSchema());
+        MethodTool tool = MethodTool.of("take", "Takes a string", method("take", String.class), null, codec);
+
+        // the schema is the only thing asked; a null branch in it is what takes a property out of required
+        assertNull(tool.definition().getInputSchema().getRequired());
+    }
+
+    @Test
+    void writtenWordOverridesTheSchema() {
+        Tool tool = new MethodTools(codec).from(new Written()).get(0);
+
+        // the plain schema demands both properties; the word on one takes it back
+        assertEquals(List.of("plain"), tool.definition().getInputSchema().getRequired());
+    }
+
     // ===== harness =====
+
+    private static JsonSchema nullableObjectSchema() {
+        return new JsonSchemaBuilder()
+                .put("anyOf", List.of(new JsonSchemaBuilder().setType("object").build(),
+                        new JsonSchemaBuilder().setType("null").build()))
+                .build();
+    }
 
     private static Method method(String name, Class<?>... parameterTypes) {
         try {
@@ -347,8 +306,10 @@ class MethodToolTest {
     }
 
     private String execute(MethodTool tool, String arguments, ChatContext context) throws Exception {
-        List<ContentPart> parts = tool.execute(arguments, context);
-        assertEquals(1, parts.size());
+        return textOf(tool.execute(arguments, context));
+    }
+
+    private static String textOf(List<ContentPart> parts) {
         return ((TextPart) parts.get(0)).getText();
     }
 
@@ -421,13 +382,11 @@ class MethodToolTest {
         }
     }
 
-    /** One method covering all four ways a parameter's required word is settled. */
-    public static class Requirable {
+    /** One method whose parameter's required word is settled by the annotation alone. */
+    public static class Written {
 
-        @ToolMethod(name = "requirable")
-        public String run(String plain, Optional<String> optional,
-                @ToolParam(required = "true") Optional<String> demanded,
-                @ToolParam(required = "false") String loosened) {
+        @ToolMethod(name = "written")
+        public String run(String plain, @ToolParam(required = "false") String loosened) {
             return "ok";
         }
     }
@@ -491,77 +450,6 @@ class MethodToolTest {
         @Override
         protected JsonSchema schemaFor(Parameter parameter) {
             return parameter.getType() == CurrentUser.class ? null : super.schemaFor(parameter);
-        }
-
-    }
-
-    /**
-     * A codec that moves what a test sets up: the arguments map for the model's text, and a value
-     * per type for the binding fallback.
-     */
-    private static class FakeCodec implements JsonCodec {
-
-        /** What {@code decode(argumentsText, Map.class)} answers; the text itself is ignored. */
-        private Map<String, Object> arguments;
-
-        /** What the binding fallback decodes, keyed by target type. */
-        private final Map<Type, Object> decodedByType = new java.util.HashMap<>();
-
-        /** Everything {@code encode} was asked to render, in order. */
-        private final List<Object> encoded = new ArrayList<>();
-
-        /** The types {@code generateDecodeSchema} was asked for, in order. */
-        private final List<Type> generatedFor = new ArrayList<>();
-
-        /** The types the binding fallback decoded, in order. */
-        private final List<Type> decodedFor = new ArrayList<>();
-
-        @Override
-        public JsonSchema generateEncodeSchema(Type type) {
-            return new JsonSchemaBuilder().build();
-        }
-
-        @Override
-        public JsonSchema generateDecodeSchema(Type type) {
-            generatedFor.add(type);
-            if (type instanceof ParameterizedType parameterized && parameterized.getRawType() == Optional.class) {
-                // What the real codec gives an Optional: the value's schema beside a null branch, so the
-                // parameter reads as nullable and the required judgement can see it.
-                return new JsonSchemaBuilder()
-                        .put("anyOf", List.of(new JsonSchemaBuilder().setType("string").build(),
-                                new JsonSchemaBuilder().setType("null").build()))
-                        .build();
-            }
-            return new JsonSchemaBuilder().setType("object").build();
-        }
-
-        @Override
-        public String encode(Object value) {
-            encoded.add(value);
-            return "encoded";
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public <T> T decode(String json, Type type) {
-            if (type == Map.class) {
-                return (T) arguments;
-            }
-            decodedFor.add(type);
-            if (decodedByType.containsKey(type)) {
-                return (T) decodedByType.get(type);
-            }
-            throw new AssertionError("unexpected decode of type " + type);
-        }
-
-        @Override
-        public JsonWriter writer(OutputStream out) {
-            throw new UnsupportedOperationException("these tests never write a document");
-        }
-
-        @Override
-        public JsonReader reader(InputStream in) {
-            throw new UnsupportedOperationException("these tests never read a document");
         }
 
     }

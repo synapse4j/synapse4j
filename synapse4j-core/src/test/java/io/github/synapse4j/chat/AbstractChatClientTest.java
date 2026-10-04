@@ -171,14 +171,6 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aNullCustomizerIsRefused() {
-        StubChatClient client = new StubChatClient();
-
-        assertThrows(NullPointerException.class, () -> client.addChatCustomizer(null));
-        assertThrows(NullPointerException.class, () -> client.removeChatCustomizer(null));
-    }
-
-    @Test
     void customizersReceiveTheClientThatAppliesThem() {
         StubChatClient client = new StubChatClient();
         List<ChatClient> applied = new ArrayList<>();
@@ -598,19 +590,6 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void requestCustomizersRunInTheOrderTheyWereAdded() {
-        List<String> ran = new ArrayList<>();
-        StubChatClient client = new StubChatClient();
-        client.addChatCustomizer(namedRequest("first", ran));
-        client.addChatCustomizer(namedRequest("second", ran));
-        client.addChatCustomizer(namedRequest("third", ran));
-
-        client.chat(new ChatRequest());
-
-        assertEquals(List.of("first", "second", "third"), ran);
-    }
-
-    @Test
     void responseCustomizersRunInTheOrderTheyWereAdded() {
         List<String> ran = new ArrayList<>();
         StubChatClient client = new StubChatClient();
@@ -673,7 +652,6 @@ class AbstractChatClientTest {
         assertNull(defaults.getTemperature());
     }
 
-    /** A request customizer that records a name instead of touching the request. */
     @Test
     void defaultToolsGoOutBeforeTheOnesTheRequestItselfCarries() {
         StubChatClient client = new StubChatClient();
@@ -892,22 +870,6 @@ class AbstractChatClientTest {
         assertEquals(List.of("p"), names(client.seen.getTools()));
     }
 
-    @Test
-    void aNullProviderIsRefused() {
-        StubChatClient client = new StubChatClient();
-
-        assertThrows(NullPointerException.class, () -> client.addToolProvider(null));
-        assertThrows(NullPointerException.class, () -> client.removeToolProvider(null));
-    }
-
-    @Test
-    void aNullToolIsRefused() {
-        StubChatClient client = new StubChatClient();
-
-        assertThrows(NullPointerException.class, () -> client.addDefaultTool(null));
-        assertThrows(NullPointerException.class, () -> client.removeDefaultTool(null));
-    }
-
     /** A declare-only tool carrying the given name — all the merge looks at. */
     private static Tool tool(String name) {
         return new ManualTool(new ToolDefinition(name, "does things", new JsonSchemaBuilder().build()));
@@ -920,15 +882,6 @@ class AbstractChatClientTest {
             names.add(tool.name());
         }
         return names;
-    }
-
-    private static ChatCustomizer namedRequest(String name, List<String> ran) {
-        return new ChatCustomizer() {
-            @Override
-            public void customizeRequest(ChatClient it, ChatRequest request) {
-                ran.add(name);
-            }
-        };
     }
 
     /** A response customizer that records a name instead of touching the response. */

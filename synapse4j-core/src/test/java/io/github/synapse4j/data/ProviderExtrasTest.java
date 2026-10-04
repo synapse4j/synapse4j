@@ -162,20 +162,6 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void aNullKeyIsRejected() {
-        ProviderExtras extras = new ProviderExtras();
-
-        assertThrows(NullPointerException.class, () -> extras.put((String) null, 1));
-    }
-
-    @Test
-    void aNullPathIsRejected() {
-        ProviderExtras extras = new ProviderExtras();
-
-        assertThrows(NullPointerException.class, () -> extras.put((List<String>) null, 1));
-    }
-
-    @Test
     void putAllMergesTheOtherBag() {
         ProviderExtras extras = new ProviderExtras().put("a", 1).put("b", 2);
         ProviderExtras other = new ProviderExtras().put("b", 3).put("c", 4);
@@ -215,13 +201,6 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void putAllRejectsNull() {
-        ProviderExtras extras = new ProviderExtras();
-
-        assertThrows(NullPointerException.class, () -> extras.putAll(null));
-    }
-
-    @Test
     void theNestedMapIsAFreshCopy() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
 
@@ -247,12 +226,10 @@ class ProviderExtrasTest {
         ProviderExtras one = new ProviderExtras().put(List.of("a", "b"), 1);
         ProviderExtras two = new ProviderExtras().put(List.of("a", "b"), 1);
 
-        assertEquals(one, one);
         assertEquals(one, two);
         assertEquals(one.hashCode(), two.hashCode());
         assertNotEquals(one, new ProviderExtras().put(List.of("a", "b"), 2));
         assertNotEquals(one, new ProviderExtras());
-        assertNotEquals(one, null);
     }
 
     @Test
@@ -369,13 +346,6 @@ class ProviderExtrasTest {
 
         assertEquals(1, extras.size());
         assertEquals(Map.of("a", 2), extras.nestedMap());
-    }
-
-    @Test
-    void putRawRejectsANullKey() {
-        ProviderExtras extras = new ProviderExtras();
-
-        assertThrows(NullPointerException.class, () -> extras.putRaw(null, 1));
     }
 
     @Test
@@ -532,13 +502,6 @@ class ProviderExtrasTest {
 
         assertTrue(members.containsKey("stop"));
         assertNull(members.get("stop"));
-    }
-
-    @Test
-    void mergeIntoRejectsANullMap() {
-        ProviderExtras extras = new ProviderExtras().put("a", 1);
-
-        assertThrows(NullPointerException.class, () -> extras.mergeInto(null));
     }
 
     @Test

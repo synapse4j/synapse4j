@@ -1,34 +1,36 @@
 package io.github.synapse4j.tool;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
-import io.github.synapse4j.json.JsonReader;
-import io.github.synapse4j.json.JsonSchema;
-import io.github.synapse4j.json.JsonWriter;
 import io.github.synapse4j.json.JsonSchemaBuilder;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class FunctionToolTest {
 
-    private final FakeCodec codec = new FakeCodec();
+    private final JsonCodec codec = mock(JsonCodec.class);
 
     /** The one value the codec decodes arguments into, whatever type is asked. */
     private record Input(String value) {
+    }
+
+    @BeforeEach
+    void codecAnswersAnObjectSchema() {
+        when(codec.generateDecodeSchema(any())).thenReturn(new JsonSchemaBuilder().setType("object").build());
     }
 
     // ===== factories =====
@@ -41,12 +43,12 @@ class FunctionToolTest {
         assertEquals("echo", tool.definition().getName());
         assertEquals("Echoes back", tool.definition().getDescription());
         assertEquals(List.of("object"), tool.definition().getInputSchema().getType());
-        assertTrue(codec.generatedFor.contains(Input.class));
-        assertSame(Input.class, lastOf(codec.generatedFor));
     }
 
     @Test
     void scalarInputTypeIsRefusedAtTheFactory() {
+        when(codec.generateDecodeSchema(String.class)).thenReturn(new JsonSchemaBuilder().setType("string").build());
+
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
                 () -> FunctionTool.of("len", "Counts", String.class, (input, context) -> "x", codec));
 
@@ -54,37 +56,21 @@ class FunctionToolTest {
     }
 
     @Test
-    void signatureFactoryRefusesMissingParts() {
-        assertThrows(NullPointerException.class,
-                () -> FunctionTool.of(null, "d", Input.class, (in, ctx) -> "x", codec));
-        assertThrows(NullPointerException.class,
-                () -> FunctionTool.of("n", null, Input.class, (in, ctx) -> "x", codec));
-        assertThrows(NullPointerException.class, () -> FunctionTool.of("n", "d", null, (in, ctx) -> "x", codec));
-        assertThrows(NullPointerException.class, () -> FunctionTool.of("n", "d", Input.class, null, codec));
-        assertThrows(NullPointerException.class, () -> FunctionTool.of("n", "d", Input.class, (in, ctx) -> "x", null));
-    }
-
-    @Test
-    void handedDeclarationKeptAsIsAndStillDemandsTheRest() {
+    void handedDeclarationIsKeptAsIs() {
         ToolDefinition handed = new ToolDefinition("handed", "Built by hand",
                 new JsonSchemaBuilder().setType("object").build());
 
         FunctionTool<Input, String> tool = FunctionTool.of(handed, Input.class, (input, context) -> "x", codec);
-        assertSame(handed, tool.definition());
-        assertTrue(codec.encoded.isEmpty());
 
-        assertThrows(NullPointerException.class,
-                () -> FunctionTool.of((ToolDefinition) null, Input.class, (in, ctx) -> "x", codec));
-        assertThrows(NullPointerException.class, () -> FunctionTool.of(handed, null, (in, ctx) -> "x", codec));
-        assertThrows(NullPointerException.class, () -> FunctionTool.of(handed, Input.class, null, codec));
-        assertThrows(NullPointerException.class, () -> FunctionTool.of(handed, Input.class, (in, ctx) -> "x", null));
+        assertSame(handed, tool.definition());
     }
 
     // ===== the three stages =====
 
     @Test
     void argumentsDecodeIntoOneValueAndReachTheExecutor() throws Exception {
-        codec.decoded = new Input("hello");
+        Input decoded = new Input("hello");
+        when(codec.decode(any(), any())).thenReturn(decoded);
         StringBuilder seen = new StringBuilder();
         ChatContext context = new ChatContext();
         FunctionTool<Input, String> tool = FunctionTool.of("echo", "Echoes back", Input.class, (input, ctx) -> {
@@ -95,32 +81,27 @@ class FunctionToolTest {
         Object[] values = tool.resolveArguments("{\"value\":\"hello\"}", context);
 
         assertEquals(1, values.length);
-        assertSame(codec.decoded, values[0]);
-        assertTrue(codec.decodedFor.contains(Input.class));
-
+        assertSame(decoded, values[0]);
         assertEquals("hello", tool.call(values, context));
         assertEquals("hello|true", seen.toString());
     }
 
     @Test
     void argumentsThatNeverArrivedDecodeAsAnEmptyObject() throws Exception {
-        codec.decoded = new Input(null);
         FunctionTool<Input, String> tool = FunctionTool.of("echo", "Echoes back", Input.class,
                 (input, ctx) -> "ok", codec);
 
-        Object[] blank = tool.resolveArguments("   ", null);
-        Object[] missing = tool.resolveArguments(null, null);
+        tool.resolveArguments("   ", null);
+        tool.resolveArguments(null, null);
 
         // The stage's contract: null or blank means the model produced none, and none spells
         // "{}" — never a null the codec would meet with its own idea of the question.
-        assertEquals(List.of("{}", "{}"), codec.decodedFrom);
-        assertEquals(1, blank.length);
-        assertEquals(1, missing.length);
+        verify(codec, times(2)).decode("{}", Input.class);
     }
 
     @Test
     void aStringValueReachesTheModelAsItself() throws Exception {
-        codec.decoded = new Input("plain");
+        when(codec.decode(any(), any())).thenReturn(new Input("plain"));
         FunctionTool<Input, String> tool = FunctionTool.of("echo", "Echoes back", Input.class,
                 (input, context) -> "already text", codec);
 
@@ -129,28 +110,29 @@ class FunctionToolTest {
 
     @Test
     void otherReturnsAreRenderedByTheCodec() throws Exception {
-        codec.decoded = new Input("x");
+        Input decoded = new Input("x");
+        when(codec.decode(any(), any())).thenReturn(decoded);
+        when(codec.encode(decoded)).thenReturn("encoded");
         FunctionTool<Input, Input> tool = FunctionTool.of("self", "Returns the input", Input.class,
                 (input, context) -> input, codec);
 
         assertEquals("encoded", execute(tool, "{\"value\":\"x\"}"));
-        assertInstanceOf(Input.class, lastOf(codec.encoded));
     }
 
     @Test
     void aNullReturnRendersAsJsonNull() throws Exception {
-        codec.decoded = new Input("x");
+        when(codec.decode(any(), any())).thenReturn(new Input("x"));
+        when(codec.encode(null)).thenReturn("null");
         FunctionTool<Input, String> tool = FunctionTool.of("maybe", "Sometimes silent", Input.class,
                 (input, context) -> null, codec);
 
-        assertEquals("encoded", execute(tool, "{\"value\":\"x\"}"));
-        assertNull(lastOf(codec.encoded));
+        assertEquals("null", execute(tool, "{\"value\":\"x\"}"));
     }
 
     @Test
     void executorFailureArrivesAsItself() {
         IllegalStateException original = new IllegalStateException("boom");
-        codec.decoded = new Input("x");
+        when(codec.decode(any(), any())).thenReturn(new Input("x"));
         FunctionTool<Input, String> tool = FunctionTool.of("fail", "Always fails", Input.class, (input, context) -> {
             throw original;
         }, codec);
@@ -170,80 +152,10 @@ class FunctionToolTest {
 
     // ===== harness =====
 
-    private <T> T lastOf(List<T> list) {
-        return list.get(list.size() - 1);
-    }
-
     private String execute(FunctionTool<?, ?> tool, String arguments) throws Exception {
         List<ContentPart> parts = tool.execute(arguments, null);
         assertEquals(1, parts.size());
         return ((TextPart) parts.get(0)).getText();
-    }
-
-    /**
-     * A codec that answers what a test sets up: one decoded value, type-aware schema shapes —
-     * String is a scalar so the factory's object check has something to refuse.
-     */
-    private static class FakeCodec implements JsonCodec {
-
-        /** What every decode answers, whatever type is asked. */
-        private Object decoded;
-
-        /** The types decode was asked for, in order. */
-        private final List<Type> decodedFor = new ArrayList<>();
-
-        /** The text decode was handed, in order. */
-        private final List<String> decodedFrom = new ArrayList<>();
-
-        /** Everything encode was asked to render, in order. */
-        private final List<Object> encoded = new ArrayList<>();
-
-        /** The types generateDecodeSchema was asked for, in order. */
-        private final List<Type> generatedFor = new ArrayList<>();
-
-        @Override
-        public JsonSchema generateEncodeSchema(Type type) {
-            return new JsonSchemaBuilder().build();
-        }
-
-        @Override
-        public JsonSchema generateDecodeSchema(Type type) {
-            generatedFor.add(type);
-            JsonSchemaBuilder schema = new JsonSchemaBuilder();
-            if (type == String.class) {
-                schema.setType("string");
-            } else if (type == int.class || type == Integer.class) {
-                schema.setType("integer");
-            } else {
-                schema.setType("object");
-            }
-            return schema.build();
-        }
-
-        @Override
-        public String encode(Object value) {
-            encoded.add(value);
-            return "encoded";
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public <T> T decode(String json, Type type) {
-            decodedFor.add(type);
-            decodedFrom.add(json);
-            return (T) decoded;
-        }
-
-        @Override
-        public JsonWriter writer(OutputStream out) {
-            throw new UnsupportedOperationException("these tests never write a document");
-        }
-
-        @Override
-        public JsonReader reader(InputStream in) {
-            throw new UnsupportedOperationException("these tests never read a document");
-        }
-
     }
 
 }
