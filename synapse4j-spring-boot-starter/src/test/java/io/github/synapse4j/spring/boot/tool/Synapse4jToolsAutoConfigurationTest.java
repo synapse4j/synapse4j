@@ -25,6 +25,7 @@ class Synapse4jToolsAutoConfigurationTest {
             assertThat(context).hasSingleBean(ToolsProcessor.class);
             assertThat(context).hasSingleBean(ToolsToolMethodSpecCustomizer.class);
             assertThat(context).hasSingleBean(ConfiguredToolMethodSpecCustomizer.class);
+            assertThat(context).hasSingleBean(AutowiredToolMethodSpecCustomizer.class);
             assertThat(context).doesNotHaveBean(SpelToolMethodSpecCustomizer.class);
         });
     }

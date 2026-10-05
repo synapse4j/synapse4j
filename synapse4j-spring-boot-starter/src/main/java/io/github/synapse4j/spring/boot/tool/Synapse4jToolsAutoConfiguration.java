@@ -2,6 +2,7 @@ package io.github.synapse4j.spring.boot.tool;
 
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -22,11 +23,10 @@ import io.github.synapse4j.tool.ToolMethodSpecCustomizer;
  * {@link Tools} onto the chat clients.
  *
  * <p>
- * The customizers this starter ships are beans of their own, ordered so that what a step reads is what
- * the step before it wrote: the class's prefix is written first, the application's configuration applied
- * next, and expressions resolved last — so a value written in configuration may itself be an expression.
- * An application extends the chain by declaring a {@link ToolMethodSpecCustomizer} of its own, ordered
- * to land where it wants; a {@link SpecToolFactory} of its own is what the reader builds tools with.
+ * The customizers this starter ships are beans of their own, and the reader runs every
+ * {@link ToolMethodSpecCustomizer} bean in its order, so an application extends the chain by declaring
+ * one, ordered to land where it wants; a {@link SpecToolFactory} of its own is what the reader builds
+ * tools with.
  *
  * <p>
  * Every bean backs off the moment the application declares one of the same type, so any piece — the
@@ -55,6 +55,14 @@ public class Synapse4jToolsAutoConfiguration {
     @ConditionalOnMissingBean
     ConfiguredToolMethodSpecCustomizer configuredToolMethodSpecCustomizer(ToolsProperties tools) {
         return new ConfiguredToolMethodSpecCustomizer(tools);
+    }
+
+    /** The step that fills a parameter marked {@code @Autowired} or {@code @Qualifier} from the beans. */
+    @Bean
+    @Order(150)
+    @ConditionalOnMissingBean
+    AutowiredToolMethodSpecCustomizer autowiredToolMethodSpecCustomizer(AutowireCapableBeanFactory beanFactory) {
+        return new AutowiredToolMethodSpecCustomizer(beanFactory);
     }
 
     /**
