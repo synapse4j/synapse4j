@@ -19,8 +19,8 @@ ChatClient client = new OpenAiCompletionsChatClient(http, codec, config);
 ## 生成的 schema
 
 codec 为工具的入参和结构化回答生成 JSON Schema，来源是 Java 类型，以及绑定 JSON 用的同一个
-`JsonMapper`。要用 Jackson 模块推荐的哪些选择，由一个 `JacksonSchemaSettings` 决定——每个选择是
-一个开关或一个集合，默认就是推荐值。关掉某个选择，就是「不应用它」；这也正是替换它的办法：关掉，再
+`JsonMapper`。要应用 Jackson 模块推荐的哪些选择，由 `JacksonSchemaSettings` 决定——每个选择对应一个
+开关或一组设置，默认值就是推荐的做法。关掉某个选择，就是「不应用它」；这也正是替换它的办法：关掉，再
 挂上你自己的 victools `Module`。
 
 ```java
@@ -50,7 +50,7 @@ client.setDefaultOptions(defaults);
 ```
 
 默认值补上调用没有声明的东西：调用留作 `null` 的字段取默认值，两个 extras 映射合并，调用的条目按键
-胜出。设置属于配置，应在客户端被共享之前完成。
+胜出。设置属于配置动作，应在共享客户端之前完成。
 
 工具也可以常驻客户端——注册的工具，以及每次调用都会问的 `ToolProvider`：
 
@@ -86,7 +86,7 @@ client.addChatCustomizer(new ChatCustomizer() {
 client.addChatCustomizer(new DefaultSystemMessageCustomizer("用一句话回答。"));
 ```
 
-自带系统消息的请求保持原样——这个标准配置只填空缺。Spring Boot starter 会从
+自带系统消息的请求保持原样——常驻的那条只填空缺。Spring Boot starter 会从
 `synapse4j.chat.system-message` 装配一个。
 
 ## 每次调用的 HTTP 设置
@@ -102,8 +102,8 @@ options.setHttpOptions(http);
 options.getHeaders().put("X-Request-Id", id);
 ```
 
-`HttpOptions` 承载本次调用的 HTTP 层设置：等待响应头的超时（它不限制读取正文）、写出的正文如何到达
-一个无法边写边收的传输层，以及一个 server-sent event 帧的预算。字段名与取值以该类的 Javadoc 为准；
-其中正文写出模式是字符串 `"streamed"` 或 `"buffered"`，不是枚举。
+`HttpOptions` 承载本次调用的 HTTP 层设置：等待响应头的超时（它不限制读取正文）、写出的正文如何交给
+一个无法直接接收流式正文的传输层，以及一个 server-sent event 帧的预算。字段名与取值以该类的 Javadoc
+为准；其中正文写出模式是字符串 `"streamed"` 或 `"buffered"`，不是枚举。
 
 请求的设置与实现自身的设置合并，方式和调用选项一样。

@@ -15,12 +15,13 @@
 </dependency>
 ```
 
-starter 需要 Spring Boot 4.1 或更新版本——这是它构建与测试所针对的版本线。Boot 4.0.x 不在构建覆盖范围
-内，能不能用不一定：JSON 模块需要 Jackson 3.1，而 Boot 4.0.4 是第一个管理它的版本。
+starter 需要 Spring Boot 4.1 或更新版本——这是它构建与测试所依据的版本。Boot 4.0.x 不在构建覆盖范围
+内，能不能用没有保证：JSON 模块需要 Jackson 3.1，而 Boot 4.0.4 是第一个把 Jackson 3.1 纳入依赖管理
+的版本。
 
 ## 它接了什么
 
-默认接线是三个 bean，你自己声明同类型 bean 时各自退让：
+默认接线是三个 bean，你自己声明同类型 bean 时各自让位：
 
 - **`JsonCodec`**——一个 `JacksonJsonCodec`。存在 Boot 自动配置的 `JsonMapper` 时就用它，因此
   `spring.jackson.*` 和每个 `JsonMapperBuilderCustomizer` 都作用于发给模型的 schema，以及模型发回
@@ -50,16 +51,16 @@ synapse4j:
       temperature: 0.2
 ```
 
-`synapse4j.*` 的键按配置的内容分组。厂商族的设置——`synapse4j.openai.*` 绑定 `OpenAiConfig`，
+`synapse4j.*` 的键按配置的内容分组。各厂商的设置——`synapse4j.openai.*` 绑定 `OpenAiConfig`，
 `synapse4j.anthropic.*` 绑定 `AnthropicConfig`——和传输层的设置——`synapse4j.http-options.*` 绑定
-`HttpOptions`——放在根上，因为各能力共用它们。JSON 实现自己的设置放在它自己的键下——
-`synapse4j.jackson.*` 绑定 `JacksonSchemaSettings`，即 schema 生成器的各项选择——这样将来换一个
+`HttpOptions`——放在根上，因为同一项能力在各家之间共用这些设置。JSON 实现自己的设置放在它自己的键下
+——`synapse4j.jackson.*` 绑定 `JacksonSchemaSettings`，即 schema 生成器的各项选择——这样将来换一个
 实现就有一组自己的键。只有 chat 调用才有的东西收在 `synapse4j.chat.*`
 下面：`synapse4j.chat.client`、`synapse4j.chat.auto-tool-calling`、`synapse4j.chat.system-message`，
 以及 `synapse4j.chat.options.*`，它绑定 `ChatOptionsProperties`，即 starter 里 `ChatOptions` 的镜像，
 由 `toChatOptions()` 转成库里的类型——库里的类型本身无法绑定。每个键都是它绑定的那个类型上的一个
 字段，含义在该类型上有文档；options 这个镜像只重述 Spring 能绑定的字段。
-`synapse4j.chat.options.extras` 按原始键绑定：键写的就是协议里的字段名，点分键指向嵌套成员。
+`synapse4j.chat.options.extras` 按原始键绑定：键用的就是提供商的协议字段名，点分键指向嵌套成员。
 非字符串的值需要 YAML——`.properties` 文件会把每个值都变成字符串。
 
 每个 `synapse4j.*` 键都有配置元数据，因此 IDE 会补全它们。`synapse4j.enabled` 会关掉整个自动配置。
@@ -125,7 +126,7 @@ class GatewaySettings {
 
 ## 定制 schema
 
-`synapse4j.jackson.*` 绑定 Jackson 模块的 schema 各项选择——每个选择是一个开关或一个集合，默认就是
+`synapse4j.jackson.*` 绑定 Jackson 模块的 schema 各项选择——每个选择是一个开关或一组设置，默认就是
 推荐值；你自己写的 victools `Module` bean 会在这些选择之后，挂到 codec 用的两个生成器上。把某个选择
 关掉、再挂一个模块进去，就是替换推荐规则的做法；这些选择和模块分别是什么，见
 [定制](customizing.md#生成的-schema)。
@@ -143,9 +144,9 @@ Module optionalAsItsValue() {
 
 ## 声明你自己的 bean
 
-starter 定义的每个 bean 在你声明同类型 bean 时退让。声明你自己的 `ChatClient` bean，就完全手写接线；
-starter 的默认随之整个让位，你也因此直接持有那个具体客户端和它自己的接口，`setConfig` 就在其中。
-`JsonCodec` 与 `HttpClient` 同理。
+starter 定义的每个 bean 在你声明同类型 bean 时退让。声明你自己的 `ChatClient` bean，客户端就完全由
+你手工接线；starter 的默认随之整个让位，你也因此直接持有那个具体客户端和它自己的完整接口，
+`setConfig` 就在其中。`JsonCodec` 与 `HttpClient` 同理。
 
 ## API key 从哪里来
 

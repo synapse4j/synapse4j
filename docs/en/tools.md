@@ -33,10 +33,10 @@ Tool weather = FunctionTool.of(
 
 The input type has to describe an object, because the protocol's arguments are an object.
 
-**`MethodTool`** — an existing Java method. Its signature becomes the declaration: each parameter
-the model provides becomes a required property of the argument schema. A `ChatContext` parameter is
-filled with the conversation instead of being sent to the model. `MethodTools` is what turns a method
-into one — named here, or read off the annotations below:
+**`MethodTool`** — an existing Java method. Its signature becomes the declaration: each parameter the
+model provides becomes a property of the argument schema. A `ChatContext` parameter is filled with the
+conversation instead of being sent to the model. `MethodTools` is what turns a method into one — named
+here, or read off the annotations below:
 
 ```java
 Tool weather = new MethodTools(codec).of("get_weather", "Get the weather", method, service);
@@ -68,10 +68,22 @@ ones a class can supply. Visibility makes no difference, and neither does where 
 and private ones are read, so are the ones the class only inherits, and an override stands in for what
 it overrides. Two methods that would resolve to one tool name are refused, not left to collide.
 
-Every attribute is optional, and what is left out is left alone: the tool name falls back to the
-method's name, and a parameter keeps the name the compiler recorded for it. That last one is worth a
-`-parameters` flag in your build — without it the compiler records no names, and the argument schema
-grows properties called `arg0`.
+Every attribute is optional, and what is left out is left alone:
+
+- `@ToolMethod.name` falls back to the method's name, `description` to no description, and `type` to
+  the implementation the reading uses by default.
+- `@ToolParam.name` keeps the name the compiler recorded for it — worth a `-parameters` flag in your
+  build, since without it the compiler records none and the argument schema grows properties called
+  `arg0`. `description` falls to no description.
+- `required` and `fromModel` are judged from the parameter itself: a value the codec makes optional (an
+  `Optional`, say) is not required, and a `ChatContext` parameter is filled from the conversation
+  rather than produced by the model. Write either to override the judgement.
+- `schema`, on a parameter or on the method, is the schema to use instead of the one derived from the
+  type — one property's, or the whole envelope's. It is the schema the codec has to bind, so it is a
+  contract, not a hint.
+- `strict` is the provider-side flag that asks the schema to be enforced rather than aimed at. Blank
+  leaves it unsent, which is not the same as asking for no enforcement: the protocol's own default
+  stands.
 
 Attributes carry text, not decisions: a name or a description from your configuration arrives through a
 `ToolMethodSpecCustomizer`, which runs over each method's resolution after the annotations and before
@@ -83,14 +95,17 @@ new MethodTools(codec)
         .from(service);
 ```
 
-`@ToolMethod.type` names the class that builds the tool, for what a `MethodTool` cannot cover — a
-parameter filled from the conversation rather than from the model's arguments, say. A blank one is a
-`MethodTool`, and `specToolFactory(...)` replaces the default, so a name means whatever your application
-says it means. What comes back is an ordinary `Tool`: register it, or put it on the request.
+A customizer that already holds a value rather than text writes it directly — a parameter's
+`resolvedSchema`, the tool's `resolvedSchema`, its `extras` — and skips the round trip through a
+document. That is also how a parameter the model does not produce gets its value: write the parameter's
+`valueProvider`, and no subclass is needed to fill it. A `ChatContext` parameter needs none — the
+conversation is what a blank one falls back to.
 
-Whichever way a tool is built, the class that builds it is constructed from the method's resolution
-and the codec: `MethodTool(ToolMethodSpec, JsonCodec)` is all `SpecToolFactory` asks of a named
-implementation, and the tool it hands back is finished — there is no step after it that completes it.
+`@ToolMethod.type` names the class that builds the tool, for what the built-in one cannot cover. A
+blank one is a `MethodTool`, and `specToolFactory(...)` replaces the default, so a name means whatever
+your application says it means. The factory is handed the whole resolution and the codec, and returns a
+finished tool: `MethodTool(ToolMethodSpec, JsonCodec)` is what a class has to offer to be named, and
+nothing after it completes what it built.
 
 ## Running the calls
 

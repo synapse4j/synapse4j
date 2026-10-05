@@ -21,8 +21,8 @@ ChatResponse second = client.chat(request);
 ```
 
 `continueWith(request, answer)` 做两件事：把本次调用发出的消息（`pendingMessages`）归档进当前对话
-（`historyMessages`），并追加助手的回答。每收到一个答案就调用一次。工具调用循环会为它消费掉的答案调用
-它；最后一个答案由你折入。
+（`historyMessages`），并追加助手的回答。每收到一个答案就调用一次。工具调用循环每消费一个答案就会调用
+它一次；最后一个答案由你折入。
 
 ## 历史、待发消息与系统消息
 
@@ -30,7 +30,7 @@ ChatResponse second = client.chat(request);
 
 - `historyMessages`——当前对话，一段往来已经覆盖的全部内容；
 - `pendingMessages`——本次调用新增的消息，它们都会发出；
-- `systemMessage` 槽位——框架性指令，是替换而非累积。
+- `systemMessage` 槽位——定调的内容，是替换而不是累积。
 
 库从不裁剪这两个列表。为了塞进上下文窗口而丢掉旧消息，是你刻意的行为，而不是库背着你做的。
 

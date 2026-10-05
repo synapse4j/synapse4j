@@ -2,11 +2,11 @@
 
 [English](README.md) | **中文**
 
-一个用来调用 LLM 提供商的轻量级 Java 库。你只写一次调用，它就能对着你指定的任意提供商工作；JSON
-库、HTTP 客户端和提供商都由你来选，库别的什么都不管。
+一个用来调用 LLM 提供商的轻量级 Java 库。调用只写一次，指向哪家提供商都能用；JSON 库、HTTP 客户端和
+提供商都由你挑，其余的事库一概不管。
 
-它涵盖 JSON Schema 生成与 JSON 序列化、一套与提供商无关的聊天模型（阻塞与流式兼具），以及端到端的
-工具调用。提供商模块单独发布。
+它涵盖 JSON Schema 生成与 JSON 序列化、一套与提供商无关的聊天模型（阻塞和流式都支持），以及从头到尾
+的工具调用。提供商模块单独发布。
 
 ## 模块
 
@@ -20,12 +20,12 @@
 | `synapse4j-openai` | OpenAI Chat Completions 与 Responses 协议 |
 | `synapse4j-anthropic` | Anthropic Messages 协议 |
 | `synapse4j-spring-boot-starter` | Spring Boot 自动配置 |
-| `synapse4j-bom` | 供使用方对齐版本的 BOM |
+| `synapse4j-bom` | 供使用方统一各模块版本的 BOM |
 
 ## 文档
 
-- [入门](docs/zh-CN/getting-started.md)——组装客户端、发起调用、流式接收、运行工具、要求结构化
-  输出。无需任何框架。
+- [入门](docs/zh-CN/getting-started.md)——把客户端组装起来、发起调用、流式接收、运行工具、要求结构化
+  输出。不需要任何框架。
 - [设计与取舍](docs/zh-CN/design.md)——库为什么设计成这个样子。
 - [完整文档索引](docs/zh-CN/index.md)
 
@@ -35,8 +35,8 @@ English docs: [docs/en](docs/en/index.md).
 
 - Java 21 或更新版本
 - Maven 3.6.3 或更新版本（没有 Maven Wrapper，直接运行 `mvn`）
-- 使用 starter 需要 Spring Boot 4.1 或更新版本——这是它构建与测试所针对的版本线（Boot 4.0.x 不在构建
-  覆盖范围内；它需要 Jackson 3.1，而 Boot 4.0.4 是第一个管理它的版本）
+- 使用 starter 需要 Spring Boot 4.1 或更新版本——这是它构建与测试所依据的版本（Boot 4.0.x 不在构建
+  覆盖范围内；它需要 Jackson 3.1，而 Boot 4.0.4 是第一个把 Jackson 3.1 纳入依赖管理的版本）
 
 ## 构建
 
@@ -44,7 +44,7 @@ English docs: [docs/en](docs/en/index.md).
 mvn verify    # 编译、强制格式检查、运行测试、校验空值契约
 ```
 
-请在仓库根目录运行 Maven：Spotless 相对运行 Maven 时的目录解析其配置文件。
+请在仓库根目录运行 Maven：Spotless 以运行 Maven 时所在的目录为基准解析配置文件。
 
 ## 许可证
 

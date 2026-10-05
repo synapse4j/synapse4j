@@ -2,12 +2,12 @@
 
 [English](../en/getting-started.md) | **中文**
 
-这篇教程从一个空项目走到一次可用的调用，再加上流式、工具与结构化输出。它用的是 JDK HTTP 客户端、
-Jackson 和 OpenAI——每一个都可以换成别的模块，其余部分不用动。
+这篇教程从空项目开始，做到一次能用的调用，再逐步加上流式、工具和结构化输出。它用的是 JDK HTTP 客户
+端、Jackson 和 OpenAI——每一个都能换成别的模块，其余部分不用动。
 
 ## 1. 加入依赖
 
-先导入 BOM 对齐版本，再声明用到的模块。
+先导入一次 BOM 统一各模块版本，再声明你要用的模块。
 
 ```xml
 <dependencyManagement>
@@ -59,7 +59,7 @@ dependencies {
 ## 2. 构建一个客户端
 
 一个客户端由三部分协作而成：一个把值变成 JSON 的 JSON 编解码器，一个发送字节的 HTTP 客户端，以及一个
-会说某个具体协议的客户端。你逐个构建，再交给下一个。
+会说某一种协议的提供商客户端。你逐个构建，再交给下一个。
 
 ```java
 import io.github.synapse4j.chat.ChatClient;
@@ -109,11 +109,11 @@ System.out.println(response.getText());
 ```
 
 答案里助手的这一轮就是一个 `ChatMessage`——和构建请求用的是同一个类。`getText()` 把它读回来：按顺序
-拼接消息里的文本部分，reasoning 和其他种类不参与，得到的就是答案的文字本身。
+拼接消息里的文本部分，推理部分和其他种类不参与，得到的就是答案的文字本身。
 
 ## 5. 继续对话
 
-库不保存历史。历史由你保存：持有那个请求，每收到一个答案就用 `continueWith` 折回去：
+库不保存历史，历史由你保存：一直拿着那个请求，每收到一个答案就用 `continueWith` 把它折回去：
 
 ```java
 ChatRequest request = new ChatRequest()
@@ -157,7 +157,7 @@ try (ChatStream stream = client.stream(request)) {
 ## 7. 让模型调用工具
 
 一个工具是它的声明加上声明背后的代码。`FunctionTool` 从一个类型和一个 lambda 同时构建两者：模型的
-参数被解码成你定义的 `record`，lambda 运行，返回值再被渲染回去。
+参数被解码成你定义的 `record`，lambda 运行，返回的结果再渲染回去。
 
 ```java
 import io.github.synapse4j.chat.ToolCallingChatClient;
@@ -183,8 +183,8 @@ System.out.println(answer.getText());
 ```
 
 `ToolCallingChatClient` 包装任意客户端：它跑完模型发起的各轮工具调用，直到模型不再要求调用，并在
-此过程中把调用与结果追加进请求。未包装的客户端不运行工具——它把调用交给你，由你驱动；当默认
-循环不是你想要的循环时，这就是合适的选择。
+此过程中把调用与结果追加进请求。裸客户端不运行工具——它把调用交给你，由你驱动；当默认循环不是你想要
+的循环时，这就是合适的选择。
 
 ## 8. 要求结构化输出
 
