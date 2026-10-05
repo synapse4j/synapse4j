@@ -216,7 +216,7 @@ class MessagesStream extends DefaultChatStream {
                     // part, however many deltas follow, and a later block never merges into an
                     // earlier one even when the two are of the same kind. The part is the answer's own,
                     // copied from the frame's, so a frame an application kept does not grow under it.
-                    ContentPart owned = copyOf(part);
+                    ContentPart owned = part.copy();
                     message.getParts().add(owned);
                     if (index != null) {
                         openBlocks.put(index, owned);
@@ -252,35 +252,11 @@ class MessagesStream extends DefaultChatStream {
             }
             // No opening frame was seen for this index — the fragment opens its own part, and the
             // frames that follow find it here. The part is the answer's own, as above.
-            ContentPart owned = copyOf(fragment);
+            ContentPart owned = fragment.copy();
             message.getParts().add(owned);
             if (index != null) {
                 openBlocks.put(index, owned);
             }
-        }
-
-        /**
-         * A part the answer owns, so the fold never mutates a part a frame handed out: the answer
-         * grows by merging later fragments into the part it took, and that part has to be the
-         * answer's own, or an application that kept the event would watch its text change under it.
-         */
-        private static ContentPart copyOf(ContentPart part) {
-            ContentPart copy;
-            if (part instanceof TextPart text) {
-                copy = new TextPart(text.getText());
-            } else if (part instanceof ReasoningPart reasoning) {
-                copy = new ReasoningPart(reasoning.getText());
-            } else if (part instanceof ToolCallPart call) {
-                copy = new ToolCallPart(call.getCallId(), call.getName(), call.getArgumentsJson());
-            } else if (part instanceof RawContentBlock block) {
-                copy = new RawContentBlock(block.getMembers());
-            } else {
-                return part;
-            }
-            if (part.getExtras() != null) {
-                copy.getOrCreateExtras().putAll(part.getExtras());
-            }
-            return copy;
         }
 
         /** Closes the block its index names: the part is done, and the input it spelled is written. */
@@ -359,7 +335,7 @@ class MessagesStream extends DefaultChatStream {
                     reasoning.getOrCreateExtras().putAll(fragmentExtras);
                 }
             } else {
-                message.getParts().add(copyOf(fragment));
+                message.getParts().add(fragment.copy());
             }
         }
     }

@@ -25,10 +25,10 @@ import org.jspecify.annotations.Nullable;
  * <p>
  * An event's parts and usage are its own: the fold never mutates what a frame handed out, so an
  * event an application keeps does not change as later frames arrive. The answer's parts are the
- * fold's own, but the copy is shallow — as everywhere in this library, the values inside a
- * {@link ProviderExtras} bag are held by reference. A part of a type this library does not model at
- * all is carried onto the answer as it is, since it cannot be copied generically; a subclass of one
- * it does model is copied to that base type, so fields the subclass added do not reach the answer.
+ * fold's own, each made by asking the part to {@link ContentPart#copy()} itself — so a type the
+ * library does not model copies itself too, and a subclass that adds fields keeps them by overriding
+ * that method. The copy is shallow: as everywhere in this library, the values inside a
+ * {@link ProviderExtras} bag are held by reference.
  */
 @Getter
 @Setter
