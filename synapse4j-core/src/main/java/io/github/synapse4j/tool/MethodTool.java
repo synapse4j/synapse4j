@@ -3,10 +3,7 @@ package io.github.synapse4j.tool;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,7 +16,6 @@ import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
-import io.github.synapse4j.json.JsonSchemaBuilder;
 import lombok.NonNull;
 
 /**
@@ -52,14 +48,8 @@ public class MethodTool implements StagedTool {
     /** The resolution this tool was built from; the run reads its method and its names from here. */
     private final ToolMethodSpec spec;
 
-    /**
-     * The codec reading arguments and rendering results, and the one {@link #schemaFor} reads while
-     * this object is still being constructed.
-     */
+    /** The codec the arguments are bound with and the result rendered by. */
     private final JsonCodec codec;
-
-    /** Per parameter: {@code true} when the model produces its value — see {@link #schemaFor}. */
-    private final boolean[] fromModel;
 
     /** Whether the method returns void — asked once for the result stage. */
     private final boolean returnsVoid;
@@ -68,101 +58,31 @@ public class MethodTool implements StagedTool {
     private final ToolDefinition definition;
 
     /**
-     * Builds this tool from the method's resolution: reads the signature, settles which parameters
-     * the model produces, then builds the declaration — the name and description the spec carries,
-     * and the arguments schema {@link #argumentsSchema} puts together.
+     * Builds this tool from a settled resolution: the declaration is the one the spec carries, and
+     * every call binds the arguments the model produces and takes the rest from the parameter's own
+     * {@link ToolParameterValueProvider}.
      *
      * <p>
-     * The spec is validated first, so every way of building a tool starts from a resolution that is
-     * complete and consistent; a blank description still means none.
+     * There is nothing to settle here. The spec is the conclusion — {@link MethodTools} reads a method
+     * into one, the customizers rewrite it, {@link FinalToolMethodSpecCustomizer} fills what is left
+     * blank, and what arrives is finished. A spec that still has blanks in it is one this constructor
+     * refuses, rather than one it quietly completes.
      *
-     * <p>
-     * The declaration is built here, in the constructor, which means {@link #schemaFor} and
-     * {@link #argumentsSchema} are called while a subclass of this class is still being
-     * constructed. An override therefore cannot read the subclass's own fields — they are not
-     * initialized yet — and must stand on what the parameters handed to it carry.
-     *
-     * @param spec  the resolution of the method this tool is built from; never {@code null}, and it
-     *                  has to name the tool and every one of its parameters
-     * @param codec the codec that generates the declaration and binds arguments; never {@code null}
-     * @throws SynapseException if the spec names no tool, or leaves a parameter unnamed, or names
-     *                              two of them under one name
+     * @param spec  the resolution of the method this tool is built from; never {@code null}, and it has
+     *                  to name the tool, name every one of its parameters, and carry an input schema
+     * @param codec the codec that binds arguments and renders results; never {@code null}
+     * @throws SynapseException if the spec names no tool, leaves a parameter unnamed, names two of them
+     *                              under one name, or carries no input schema
      */
     public MethodTool(@NonNull ToolMethodSpec spec, @NonNull JsonCodec codec) {
         validate(spec);
         this.spec = spec;
         this.codec = codec;
         makeAccessible(spec.getMethod());
-        List<ToolParameterSpec> entries = spec.getParameters();
-        boolean[] fromModel = new boolean[entries.size()];
-        for (int i = 0; i < entries.size(); i++) {
-            fromModel[i] = schemaFor(entries.get(i).getParameter()) != null;
-        }
-        this.fromModel = fromModel;
         this.returnsVoid = spec.getMethod().getReturnType() == void.class;
         String description = spec.getDescription();
         this.definition = new ToolDefinition(spec.getName(), description.isBlank() ? null : description,
-                argumentsSchema(spec));
-    }
-
-    /**
-     * The schema the model is given for this tool's arguments: an object with one property per
-     * parameter {@link #schemaFor} keeps on the wire, named by the spec's entry, described and
-     * required as that entry says.
-     *
-     * <p>
-     * Called while the declaration is defined, once, never on a call. Override to shape the envelope
-     * itself — its type, keywords the per-parameter schemas never carry, or another arrangement of
-     * them; take {@code super} to keep the built-in one and add to it. Binding is not this method's
-     * to change: it follows what {@link #schemaFor} answered, so a declaration shaped away from
-     * those properties is a mismatch the tool will not repair.
-     *
-     * <p>
-     * The built-in implementation asks {@link #schemaFor} once more for every parameter it lists —
-     * that answer was already needed, to settle the binding — so an override of {@code schemaFor}
-     * has to answer the same thing both times.
-     *
-     * @param spec the resolution this tool was completed from; never {@code null}
-     * @return the arguments schema to send; never {@code null}
-     */
-    protected JsonSchema argumentsSchema(ToolMethodSpec spec) {
-        JsonSchemaBuilder envelope = new JsonSchemaBuilder().setType("object");
-        Map<String, JsonSchema> properties = new LinkedHashMap<>();
-        List<String> required = new ArrayList<>();
-        for (ToolParameterSpec entry : spec.getParameters()) {
-            JsonSchema schema = schemaFor(entry.getParameter());
-            if (schema == null) {
-                continue;
-            }
-            if (schema.asBoolean() == null && !entry.getDescription().isBlank()) {
-                schema = JsonSchemaBuilder.from(schema).setDescription(entry.getDescription()).build();
-            }
-            properties.put(entry.getName(), schema);
-            if (isRequired(entry)) {
-                required.add(entry.getName());
-            }
-        }
-        if (!properties.isEmpty()) {
-            envelope.setProperties(properties);
-        }
-        if (!required.isEmpty()) {
-            envelope.setRequired(required);
-        }
-        return envelope.build();
-    }
-
-    /**
-     * Whether the model has to produce this argument. The annotation's word wins when it gave one;
-     * otherwise the codec decides, asked through a {@link RequiredProbe}: the value is placed in a
-     * property's position so a type the codec makes optional (an {@link java.util.Optional}, say) is
-     * not required, and anything else is.
-     */
-    private boolean isRequired(ToolParameterSpec entry) {
-        if (!entry.getRequired().isBlank()) {
-            return !"false".equals(entry.getRequired());
-        }
-        Type valueType = entry.getParameter().getParameterizedType();
-        return RequiredProbe.isRequired(codec.generateDecodeSchema(RequiredProbe.wrapping(valueType)));
+                inputSchema(spec));
     }
 
     /**
@@ -213,48 +133,44 @@ public class MethodTool implements StagedTool {
     }
 
     /**
-     * What this parameter is declared as to the model — the one place that decides both what
-     * the schema contains and where the value comes from: a schema here means the model
-     * produces the value and binding reads it from the arguments; {@code null} means the
-     * parameter never reaches the model, so its value can only come from {@link #valueFor}.
+     * The input schema the reader settled for this tool; a resolution without one is one this tool
+     * refuses, since the declaration has to show the model something.
      *
-     * <p>
-     * Called while the declaration is defined, never per call. Override to keep further types
-     * off the wire or to shape what a parameter is declared as; call {@code super} to keep the
-     * built-in split.
-     *
-     * @param parameter the declared parameter
-     * @return the schema to send, or {@code null} to leave the parameter off the wire
+     * @param spec the resolution this tool is being built from; never {@code null}
+     * @return the input schema the declaration carries; never {@code null}
+     * @throws SynapseException if nothing settled one
      */
-    protected @Nullable JsonSchema schemaFor(Parameter parameter) {
-        if (ChatContext.class.isAssignableFrom(parameter.getType())) {
-            return null;
+    private static JsonSchema inputSchema(ToolMethodSpec spec) {
+        JsonSchema schema = spec.getResolvedSchema();
+        if (schema == null) {
+            throw new SynapseException("no input schema settled for the tool resolved from " + spec.getMethod());
         }
-        return codec.generateDecodeSchema(parameter.getParameterizedType());
+        return schema;
     }
 
     /**
-     * The value of a parameter {@link #schemaFor} left off the wire — the environment's side of
-     * the split.
+     * The value of a parameter the model does not produce: what the parameter's own
+     * {@link ToolParameterValueProvider} answers. The built-in one is settled by
+     * {@link FinalToolMethodSpecCustomizer}, which is also where an application's own arrives from.
      *
      * <p>
-     * The default provides a {@link ChatContext}-typed parameter with the conversation itself,
-     * {@code null} included, and refuses any other claimed type loudly rather than letting the
-     * mismatch surface as an invoke failure: override this alongside {@link #schemaFor}.
+     * A parameter off the wire with nothing to fill it is refused loudly here rather than letting the
+     * mismatch surface as an invoke failure — a null for a primitive, or an argument the method cannot
+     * use.
      *
-     * @param parameter the declared parameter
-     * @param context   the conversation this call belongs to; {@code null} when none was attached
+     * @param entry   the parameter to fill; never {@code null}
+     * @param context the conversation this call belongs to; {@code null} when none was attached
      * @return the value to pass; {@code null} when there is none
-     * @throws IllegalStateException if the parameter is off the wire but no value is provided
-     *                                   for its type — override this method for it
+     * @throws IllegalStateException if the parameter is off the wire and nothing supplies its value
      */
-    protected @Nullable Object valueFor(Parameter parameter, @Nullable ChatContext context) {
-        if (ChatContext.class.isAssignableFrom(parameter.getType())) {
-            return context;
+    private @Nullable Object valueFor(ToolParameterSpec entry, @Nullable ChatContext context) {
+        ToolParameterValueProvider provider = entry.getValueProvider();
+        if (provider == null) {
+            throw new IllegalStateException("parameter '" + entry.getName() + "' of type "
+                    + entry.getParameter().getType().getName()
+                    + " is off the wire but no value is provided for it; write one with a customizer");
         }
-        throw new IllegalStateException("parameter '" + parameter.getName() + "' of type "
-                + parameter.getType().getName()
-                + " is off the wire but no value is provided for it; override valueFor()");
+        return provider.get(spec, entry, context);
     }
 
     /**
@@ -268,9 +184,9 @@ public class MethodTool implements StagedTool {
     }
 
     /**
-     * One value per declared parameter: the model's for {@link #schemaFor} non-null parameters,
-     * {@link #valueFor}'s for the rest. Keys the method does not declare are ignored; a missing
-     * key for a primitive is an error rather than a null.
+     * One value per declared parameter: the model's for the parameters it produces, the parameter's
+     * own {@link ToolParameterValueProvider}'s for the rest. Keys the method does not declare are
+     * ignored; a missing key for a primitive is an error rather than a null.
      *
      * @param arguments the arguments the model produced, as JSON text; {@code null} or blank
      *                      means the model produced none
@@ -288,8 +204,8 @@ public class MethodTool implements StagedTool {
         Map<String, Object> args = null;
         for (int i = 0; i < entries.size(); i++) {
             ToolParameterSpec entry = entries.get(i);
-            if (!fromModel[i]) {
-                values[i] = valueFor(entry.getParameter(), context);
+            if (!entry.fromModel()) {
+                values[i] = valueFor(entry, context);
                 continue;
             }
             if (args == null) {

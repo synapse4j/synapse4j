@@ -20,7 +20,8 @@ import java.lang.annotation.Target;
  * <ul>
  * <li>{@code name} blank becomes the method's own name;</li>
  * <li>{@code description} blank becomes no description;</li>
- * <li>{@code type} blank becomes the implementation the reading uses by default.</li>
+ * <li>{@code type} blank becomes the implementation the reading uses by default;</li>
+ * <li>{@code schema} blank is the envelope put together from what each parameter settled on.</li>
  * </ul>
  */
 @Retention(RetentionPolicy.RUNTIME)
@@ -33,6 +34,15 @@ public @interface ToolMethod {
 
     /** What the tool does. */
     String description() default "";
+
+    /**
+     * The whole input schema as a JSON document, instead of the one put together from the parameters.
+     *
+     * <p>
+     * It is {@link ToolParam#schema()} raised to the whole tool, and blank falls to the same rule: the
+     * envelope is assembled from what each parameter settled on.
+     */
+    String schema() default "";
 
     /**
      * Which implementation builds this tool, where building one from the method alone would not do —

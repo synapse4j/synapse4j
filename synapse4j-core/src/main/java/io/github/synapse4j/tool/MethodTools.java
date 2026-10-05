@@ -14,7 +14,6 @@ import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 
 /**
  * How a Java method becomes a tool: the annotated ones a class declares through {@link #from(Object)}
@@ -46,15 +45,32 @@ import lombok.RequiredArgsConstructor;
  * stopped, an instance is safe to share — its fields are only read from then on, and every method
  * here may be called from any thread.
  */
-@RequiredArgsConstructor
+
 public class MethodTools {
 
     /** The codec every tool is completed with; never {@code null}. */
     @NonNull
     private final JsonCodec codec;
 
+    /**
+     * The step every resolution ends with, which settles whatever the annotations and the customizers
+     * left blank. It runs after {@link #customizers} rather than among them, so an application cannot
+     * add a step behind it: what is blank when it runs is what nobody wrote.
+     */
+    private final FinalToolMethodSpecCustomizer finalCustomizer;
+
     /** The steps every resolution goes through, in the order they were added. */
     private final List<ToolMethodSpecCustomizer> customizers = new ArrayList<>();
+
+    /**
+     * Builds a reader over the given codec, with the settling step every resolution ends in.
+     *
+     * @param codec the codec every tool is completed with; never {@code null}
+     */
+    public MethodTools(@NonNull JsonCodec codec) {
+        this.codec = codec;
+        this.finalCustomizer = new FinalToolMethodSpecCustomizer(codec);
+    }
 
     /**
      * Where a tool method's {@code type} is resolved: by default the name is a class, and a blank one
@@ -102,7 +118,7 @@ public class MethodTools {
         spec.setName(name);
         spec.setDescription(description);
         customize(spec);
-        applyDefaults(spec);
+        finalCustomizer.customize(spec);
         return new MethodTool(spec, codec);
     }
 
@@ -158,7 +174,7 @@ public class MethodTools {
             }
             readParameters(method, spec);
             customize(spec);
-            applyDefaults(spec);
+            finalCustomizer.customize(spec);
             Method earlier = named.putIfAbsent(spec.getName(), method);
             if (earlier != null) {
                 throw new SynapseException("two tool methods of " + type.getName() + " declare the name '"
@@ -220,22 +236,6 @@ public class MethodTools {
     private void customize(ToolMethodSpec spec) {
         for (ToolMethodSpecCustomizer customizer : customizers) {
             customizer.customize(spec);
-        }
-    }
-
-    /**
-     * Fills the names nothing supplied with the ones the signature stands for: the tool is named
-     * after its method, and a parameter after the Java parameter it was declared as. What was
-     * written is left as it was written.
-     */
-    private static void applyDefaults(ToolMethodSpec spec) {
-        if (spec.getName().isBlank()) {
-            spec.setName(spec.getMethod().getName());
-        }
-        for (ToolParameterSpec entry : spec.getParameters()) {
-            if (entry.getName().isBlank()) {
-                entry.setName(entry.getParameter().getName());
-            }
         }
     }
 

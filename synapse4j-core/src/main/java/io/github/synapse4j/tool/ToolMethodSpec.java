@@ -3,6 +3,8 @@ package io.github.synapse4j.tool;
 import java.lang.reflect.Method;
 import java.util.List;
 
+import io.github.synapse4j.json.JsonSchema;
+
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,12 @@ import org.jspecify.annotations.Nullable;
  * it runs on, and one entry per declared parameter, in signature order. The strings are written and
  * rewritten — the annotations write them, the customizers rewrite them, and the reader applies
  * whatever defaults are left over.
+ *
+ * <p>
+ * The input schema is the same split as on a {@link ToolParameterSpec}: {@link #schema} is the
+ * configuration surface, text written by an annotation or a customizer, and {@link #resolvedSchema} is
+ * the conclusion — the envelope put together out of the parameters' own answers. {@link MethodTools}
+ * writes it, and {@link MethodTool} reads it to build the declaration.
  */
 @Getter
 @Setter
@@ -56,4 +64,15 @@ public class ToolMethodSpec {
     /** One entry per declared parameter, in signature order; whatever the reader found. */
     @NonNull
     private final List<ToolParameterSpec> parameters;
+
+    /** The whole input schema as a JSON document, instead of the one put together from the parameters. */
+    @NonNull
+    private String schema = "";
+
+    /**
+     * The declaration's input schema as it stands: {@code null} while nothing has settled it, and
+     * everything the model is shown of this tool's arguments in one value. {@link MethodTools} writes
+     * it, {@link MethodTool} reads it.
+     */
+    private @Nullable JsonSchema resolvedSchema;
 }

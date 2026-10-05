@@ -13,9 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -210,14 +208,19 @@ class MethodToolTest {
         assertEquals("encoded", textOf(otherMethod.resolveResult(42, null)));
     }
 
-    // ===== the pairing: schemaFor and valueFor =====
+    // ===== a parameter off the wire =====
 
     @Test
-    void oneHookPairCoversSchemaAndBinding() throws Exception {
+    void aParameterOffTheWireTakesItsValueFromTheProvider() throws Exception {
         ChatContext context = new ChatContext();
         context.getAttributes().put("user", new CurrentUser("ada"));
-        BizTool tool = BizTool.of("ship", "Ships for the current user",
-                method("ship", String.class, CurrentUser.class), null, codec);
+
+        ToolMethodSpec spec = resolutionOf(method("ship", String.class, CurrentUser.class), null);
+        spec.setName("ship");
+        ToolParameterSpec user = spec.getParameters().get(1);
+        user.setFromModel("false");
+        user.setValueProvider((tool, parameter, conversation) -> conversation.getAttributes().get("user"));
+        MethodTool tool = new MethodTool(settled(spec), codec);
 
         Map<String, JsonSchema> properties = tool.definition().getInputSchema().getProperties();
         assertTrue(properties.containsKey("route"));
@@ -227,24 +230,25 @@ class MethodToolTest {
     }
 
     @Test
-    void claimingWithoutProvidingFailsLoudly() {
-        ClaimOnlyTool tool = ClaimOnlyTool.of("ship", "Claims but does not provide",
-                method("ship", String.class, CurrentUser.class), null, codec);
+    void aParameterOffTheWireWithNothingToFillItIsRefused() {
+        ToolMethodSpec spec = resolutionOf(method("ship", String.class, CurrentUser.class), null);
+        spec.setName("ship");
+        spec.getParameters().get(1).setFromModel("false");
+        MethodTool tool = new MethodTool(settled(spec), codec);
 
         IllegalStateException failure = assertThrows(IllegalStateException.class,
                 () -> tool.resolveArguments("{}", new ChatContext()));
-        assertTrue(failure.getMessage().contains("valueFor"));
+        assertTrue(failure.getMessage().contains("customizer"));
     }
 
     @Test
-    void argumentsSchemaIsTheHooksToShape() {
-        ToolMethodSpec spec = resolutionOf(method("take", String.class), null);
-        spec.setName("shaped");
-        ShapedTool tool = new ShapedTool(spec, codec);
+    void aResolvedInputSchemaIsWhatTheDeclarationCarries() {
+        ToolMethodSpec spec = settled(resolutionOf(method("take", String.class), null));
+        JsonSchema shaped = new JsonSchemaBuilder().setType("object")
+                .setProperties(Map.of("extra", new JsonSchemaBuilder().build())).build();
+        spec.setResolvedSchema(shaped);
 
-        JsonSchema schema = tool.definition().getInputSchema();
-        assertEquals(List.of("message"), schema.getRequired());
-        assertTrue(schema.getProperties().containsKey("extra"));
+        assertEquals(shaped, new MethodTool(spec, codec).definition().getInputSchema());
     }
 
     @Test
@@ -306,14 +310,20 @@ class MethodToolTest {
     }
 
     /**
-     * The resolution a tool is completed from, carrying the method's signature with every parameter
-     * named after the Java parameter it stands for — what {@link MethodTools} hands over once its
-     * customizers and defaults have run.
+     * The resolution of a method before anything is settled: the signature and nothing else, which is
+     * where {@link MethodTools} starts one too.
      */
     private static ToolMethodSpec resolutionOf(Method method, Object target) {
-        ToolMethodSpec spec = new ToolMethodSpec(method, target,
+        return new ToolMethodSpec(method, target,
                 Arrays.stream(method.getParameters()).map(ToolParameterSpec::new).toList());
-        spec.getParameters().forEach(entry -> entry.setName(entry.getParameter().getName()));
+    }
+
+    /**
+     * The resolution the reader hands over: whatever the test wrote is left alone, and everything
+     * still blank is settled by the same step {@link MethodTools} ends every resolution with.
+     */
+    private ToolMethodSpec settled(ToolMethodSpec spec) {
+        new FinalToolMethodSpecCustomizer(codec).customize(spec);
         return spec;
     }
 
@@ -408,75 +418,8 @@ class MethodToolTest {
         }
     }
 
-    /** The application type a subclass keeps off the wire. */
+    /** The application type a parameter off the wire carries. */
     public record CurrentUser(String name) {
-    }
-
-    /** A tool that shapes the arguments schema itself, on top of what the built-in assembly says. */
-    private static class ShapedTool extends MethodTool {
-
-        ShapedTool(ToolMethodSpec spec, JsonCodec codec) {
-            super(spec, codec);
-        }
-
-        @Override
-        protected JsonSchema argumentsSchema(ToolMethodSpec spec) {
-            JsonSchema base = super.argumentsSchema(spec);
-            Map<String, JsonSchema> properties = new LinkedHashMap<>(base.getProperties());
-            properties.put("extra", new JsonSchemaBuilder().build());
-            return JsonSchemaBuilder.from(base).setProperties(properties).build();
-        }
-    }
-
-    /** The extension the hooks exist for: one claim pair, schema and binding together. */
-    private static class BizTool extends MethodTool {
-
-        public BizTool(ToolMethodSpec spec, JsonCodec codec) {
-            super(spec, codec);
-        }
-
-        public static BizTool of(String name, String description, Method method, Object target, JsonCodec codec) {
-            ToolMethodSpec spec = resolutionOf(method, target);
-            spec.setName(name);
-            spec.setDescription(description);
-            return new BizTool(spec, codec);
-        }
-
-        @Override
-        protected JsonSchema schemaFor(Parameter parameter) {
-            return parameter.getType() == CurrentUser.class ? null : super.schemaFor(parameter);
-        }
-
-        @Override
-        protected Object valueFor(Parameter parameter, ChatContext context) {
-            if (parameter.getType() == CurrentUser.class) {
-                return context.getAttributes().get("user");
-            }
-            return super.valueFor(parameter, context);
-        }
-
-    }
-
-    /** Claims a type but never learns to provide it — the default valueFor must refuse. */
-    private static class ClaimOnlyTool extends MethodTool {
-
-        public ClaimOnlyTool(ToolMethodSpec spec, JsonCodec codec) {
-            super(spec, codec);
-        }
-
-        public static ClaimOnlyTool of(String name, String description, Method method, Object target,
-                JsonCodec codec) {
-            ToolMethodSpec spec = resolutionOf(method, target);
-            spec.setName(name);
-            spec.setDescription(description);
-            return new ClaimOnlyTool(spec, codec);
-        }
-
-        @Override
-        protected JsonSchema schemaFor(Parameter parameter) {
-            return parameter.getType() == CurrentUser.class ? null : super.schemaFor(parameter);
-        }
-
     }
 
 }

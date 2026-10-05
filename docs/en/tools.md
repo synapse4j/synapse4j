@@ -88,6 +88,10 @@ parameter filled from the conversation rather than from the model's arguments, s
 `MethodTool`, and `specToolFactory(...)` replaces the default, so a name means whatever your application
 says it means. What comes back is an ordinary `Tool`: register it, or put it on the request.
 
+Whichever way a tool is built, the class that builds it is constructed from the method's resolution
+and the codec: `MethodTool(ToolMethodSpec, JsonCodec)` is all `SpecToolFactory` asks of a named
+implementation, and the tool it hands back is finished — there is no step after it that completes it.
+
 ## Running the calls
 
 A bare client hands you the tool calls in the response and lets you drive them. When you want the

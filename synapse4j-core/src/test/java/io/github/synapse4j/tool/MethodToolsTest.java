@@ -5,14 +5,18 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class MethodToolsTest {
@@ -23,13 +27,21 @@ class MethodToolsTest {
     /** The tool each of those resolutions produced, in the same order. */
     private final List<Tool> tools = new ArrayList<>();
 
+    /** The codec the reader settles schemas with; what it answers does not matter to these tests. */
+    private final JsonCodec codec = mock(JsonCodec.class);
+
     /** The reader under test: its factory records what it was handed and hands back a mock. */
-    private final MethodTools reader = new MethodTools(mock(JsonCodec.class)).specToolFactory((spec, codec) -> {
+    private final MethodTools reader = new MethodTools(codec).specToolFactory((spec, json) -> {
         built.add(spec);
         Tool tool = mock(Tool.class);
         tools.add(tool);
         return tool;
     });
+
+    @BeforeEach
+    void codecAnswersASchema() {
+        when(codec.generateDecodeSchema(any())).thenReturn(new JsonSchemaBuilder().setType("string").build());
+    }
 
     @Test
     void whatTheAnnotationsWroteLandsOnTheSpec() {

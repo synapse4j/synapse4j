@@ -78,6 +78,10 @@ new MethodTools(codec)
 对话而不是模型的 arguments。留空就是 `MethodTool`，`specToolFactory(...)` 可以换掉默认实现，于是这个
 名字的含义由你的应用说了算。拿到的就是普通的 `Tool`：注册到客户端上，或者放到请求里。
 
+不管工具是怎么建出来的，那个"负责建它的类"都是拿方法的解析结果和 codec 构造出来的：
+`MethodTool(ToolMethodSpec, JsonCodec)` 就是 `SpecToolFactory` 对一个被指名的实现所要求的全部，
+而它交回来的工具是成品——后面没有任何步骤再去完成它。
+
 ## 运行调用
 
 裸客户端把响应里的工具调用交给你，由你驱动。想让库来运行，就包装客户端：
