@@ -29,11 +29,6 @@ import lombok.NonNull;
  * which is the same as nobody having supplied it, and the field falls to the default rule it would
  * have had. Blank text is not resolved at all. A result that is not a string is read as its own text,
  * so an expression is expected to answer text — a schema as its JSON document, say.
- *
- * <p>
- * Where it is placed among the {@link ToolMethodSpecCustomizer}s decides what it sees: before the
- * reader's own fallback, so the fallback sees resolved text, and after a step that writes text of its
- * own, so that text is resolved too.
  */
 public class SpelToolMethodSpecCustomizer implements ToolMethodSpecCustomizer {
 

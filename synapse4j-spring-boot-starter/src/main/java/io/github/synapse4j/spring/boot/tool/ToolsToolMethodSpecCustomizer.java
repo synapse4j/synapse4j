@@ -15,8 +15,6 @@ import lombok.NonNull;
  * <p>
  * The prefix is literal text and lands on every tool of the class, whether the annotation named it or it
  * falls back to the method's name; a blank prefix, and a class no {@link Tools} marks, change nothing.
- * It runs before the configuration is looked up, so the name it settles is the one the configuration is
- * found under.
  *
  * <p>
  * The annotation is read through Spring's own support, so the prefix written as {@code @Tools("weather_")}

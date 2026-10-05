@@ -39,10 +39,6 @@ import lombok.extern.apachecommons.CommonsLog;
  * and the tools it declared at debug. The lines go through commons-logging — the API Spring itself
  * logs with, bridged to whatever backend the application configured — so they surface wherever the
  * application's own logging does.
- *
- * <p>
- * It is not part of the auto-configuration: an application that marks its tool classes with
- * {@link Tools} adds one, handing it the reader its tools should be built with.
  */
 @CommonsLog
 @RequiredArgsConstructor

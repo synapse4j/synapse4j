@@ -14,21 +14,14 @@ import lombok.RequiredArgsConstructor;
  * written into the spec, over what the annotations supplied.
  *
  * <p>
- * A tool is found under the name it carries when this step runs — what its annotation named it, or, when
- * it named none, the method's own name, as an earlier step may have rewritten it. A tool still unnamed
- * when the configuration has been applied takes that name, and a name the configuration writes does not
- * move the entry it came from.
+ * A tool is found under the name it carries when this step runs, and one carrying none takes the
+ * method's own name. A name the configuration writes does not move the entry it came from.
  *
  * <p>
  * Every value is text and is written the way an annotation would carry it: a schema is a JSON document,
  * and the extras are merged under their raw keys. A value left out leaves the annotation's own standing;
  * one written, an empty one included, takes its place. {@link ToolsProperties#getStrict()} is the
  * fallback for a tool that states none of its own.
- *
- * <p>
- * It is not part of the auto-configuration: an application adds one to the
- * {@link io.github.synapse4j.tool.MethodTools} it reads its tools with, before the reader's own final
- * step.
  */
 @RequiredArgsConstructor
 public class ConfiguredToolMethodSpecCustomizer implements ToolMethodSpecCustomizer {

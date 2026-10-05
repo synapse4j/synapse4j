@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import lombok.Data;
 
@@ -29,6 +30,7 @@ import lombok.Data;
  * from, so a tool is always found under the name it had going in.
  */
 @Data
+@ConfigurationProperties(prefix = "synapse4j.tools")
 public class ToolsProperties {
 
     /**
