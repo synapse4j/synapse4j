@@ -1,4 +1,4 @@
-package io.github.synapse4j.spring.boot;
+package io.github.synapse4j.spring.boot.tool;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -10,6 +10,7 @@ import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.jackson.JacksonSchemaSettings;
 import io.github.synapse4j.openai.OpenAiConfig;
+import io.github.synapse4j.spring.boot.tool.ToolsProperties;
 
 /**
  * The {@code synapse4j.*} settings this starter binds.
@@ -23,7 +24,9 @@ import io.github.synapse4j.openai.OpenAiConfig;
  * {@code synapse4j.jackson.*} on a {@link JacksonSchemaSettings} — so a second implementation gets a
  * group of its own. What only a chat call has sits together under {@code synapse4j.chat.*}, on
  * a {@link ChatProperties}, so a second capability adds a group of its own rather than keys a reader
- * cannot tell from the chat ones. Spring's binder calls a setter only for a key the environment
+ * cannot tell from the chat ones. The tool settings sit under {@code synapse4j.tools.*}, on a
+ * {@link ToolsProperties}: how the starter reads the tools an application declares, and what each one
+ * is configured to be. Spring's binder calls a setter only for a key the environment
  * actually carries, so every property a user does not set keeps the default the library's own
  * instance carries — and there is no second copy of these fields here that could drift from them.
  *
@@ -62,6 +65,15 @@ public class Synapse4jProperties {
     // configuration metadata.
     @NestedConfigurationProperty
     private final ChatProperties chat = new ChatProperties();
+
+    /**
+     * The tool settings: how the starter reads the tools an application declares, and what each one is
+     * configured to be.
+     */
+    // Same reason for the marker as on chat: without it every synapse4j.tools.* key would silently
+    // vanish from the configuration metadata.
+    @NestedConfigurationProperty
+    private final ToolsProperties tools = new ToolsProperties();
 
     /** OpenAI family configuration: where the API lives and how the call authenticates. */
     // The marker earns its place: without it the metadata processor stops at the field, because a

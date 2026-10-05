@@ -1,4 +1,4 @@
-package io.github.synapse4j.spring.boot;
+package io.github.synapse4j.spring.boot.tool;
 
 import org.springframework.beans.factory.config.BeanExpressionContext;
 import org.springframework.beans.factory.config.BeanExpressionResolver;
