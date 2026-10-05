@@ -34,9 +34,6 @@ import lombok.NonNull;
  * <p>
  * An instance is not thread-safe while it is being assembled. Once {@link #build()} has run, the built
  * schema is immutable and shareable.
- *
- * <p>
- * The class is open, not final: a provider or an application may extend it.
  */
 public class JsonSchemaBuilder {
 

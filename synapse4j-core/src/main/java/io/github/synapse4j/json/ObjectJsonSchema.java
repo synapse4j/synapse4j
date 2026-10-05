@@ -48,13 +48,11 @@ import lombok.NonNull;
  * business: {@link JsonSchemas} reads one into a schema and writes one back.
  *
  * <p>
- * The class is open, not final: a provider or an application may extend it. The constructor freezes
- * what it is given, so a subclass inherits the immutable contract. A rewrite —
- * {@link #map(UnaryOperator)} or {@link JsonSchemas#inline} — answers a plain
- * {@code ObjectJsonSchema}, so a subclass's own behaviour is not carried through one.
+ * This class is final: {@link #map(UnaryOperator)} answers a rewritten node with a new
+ * {@code ObjectJsonSchema}, so a subclass could not survive its own rewrite.
  */
 @EqualsAndHashCode
-public class ObjectJsonSchema implements JsonSchema {
+public final class ObjectJsonSchema implements JsonSchema {
 
     /** Every keyword a node carries, keyed by JSON name: frozen, never changed after construction. */
     private final Map<String, Object> values;
@@ -65,7 +63,7 @@ public class ObjectJsonSchema implements JsonSchema {
      *
      * @param values the keywords; must not be {@code null}
      */
-    protected ObjectJsonSchema(Map<String, Object> values) {
+    ObjectJsonSchema(Map<String, Object> values) {
         this.values = freeze(values);
     }
 
