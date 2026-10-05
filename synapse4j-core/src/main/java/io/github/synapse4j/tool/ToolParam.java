@@ -22,6 +22,14 @@ import java.lang.annotation.Target;
  * <li>{@code required} blank is judged from the parameter itself: a value the type makes optional (an
  * {@code Optional}, say) is not required, and anything else is. A written value overrides that — the
  * built-in completion reads the argument as optional only when it is exactly {@code "false"}.</li>
+ * <li>{@code fromModel} blank is judged from the parameter itself: a {@link
+ * io.github.synapse4j.data.ChatContext}-typed parameter is filled from the conversation rather than
+ * produced by the model, and anything else is declared to the model. A written value overrides
+ * that — the built-in completion reads the parameter as off the wire only when it is exactly
+ * {@code "false"}.</li>
+ * <li>{@code schema} blank is whatever the codec derives from the parameter's own type. A written
+ * value is the schema of this one property instead, as the JSON document a codec reads — a contract
+ * the codec has to be able to bind, since the declaration is what the model is held to.</li>
  * </ul>
  */
 @Retention(RetentionPolicy.RUNTIME)
@@ -37,4 +45,10 @@ public @interface ToolParam {
 
     /** Whether the model has to produce it. */
     String required() default "";
+
+    /** Whether the model produces it, as against its value coming from somewhere else. */
+    String fromModel() default "";
+
+    /** The schema of this one property, as a JSON document, instead of the one derived from the type. */
+    String schema() default "";
 }

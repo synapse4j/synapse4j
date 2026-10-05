@@ -37,4 +37,12 @@ public class ToolParameterSpec {
     /** Whether the model has to produce it; blank when nothing supplied it. */
     @NonNull
     private String required = "";
+
+    /** Whether the model produces it, as against its value coming from somewhere else. */
+    @NonNull
+    private String fromModel = "";
+
+    /** The schema of this one property; blank when the codec derives it from the declared type. */
+    @NonNull
+    private String schema = "";
 }

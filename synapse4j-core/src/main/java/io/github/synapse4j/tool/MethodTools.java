@@ -211,6 +211,12 @@ public class MethodTools {
             if (!annotation.required().isBlank()) {
                 entry.setRequired(annotation.required());
             }
+            if (!annotation.fromModel().isBlank()) {
+                entry.setFromModel(annotation.fromModel());
+            }
+            if (!annotation.schema().isBlank()) {
+                entry.setSchema(annotation.schema());
+            }
         }
     }
 
