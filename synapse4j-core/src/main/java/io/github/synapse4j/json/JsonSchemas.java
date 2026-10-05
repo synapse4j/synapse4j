@@ -46,8 +46,16 @@ public final class JsonSchemas {
     }
 
     /**
-     * Every keyword whose value carries sub-schemas, and the forms that value may take. This is what
-     * {@link #shapesOf(String)} answers from.
+     * The keywords this library reads as carrying sub-schemas, and the forms their value may take.
+     * This is what {@link #shapesOf(String)} answers from.
+     *
+     * <p>
+     * The table is written out rather than derived, because a value does not say on its own whether it
+     * is a sub-schema: {@code true} as the value of {@code additionalProperties} is a boolean schema,
+     * while {@code true} as the value of {@code uniqueItems} is a boolean — only the keyword tells them
+     * apart. Which keywords carry sub-schemas is the specification's to say, not something to infer
+     * from a value, so the library carries the knowledge, and the table grows when the specification
+     * does.
      */
     private static final Map<String, Set<Shape>> SCHEMA_KEYWORDS = Map.ofEntries(
             Map.entry(PROPERTIES, Set.of(Shape.SCHEMA_MAP)),
