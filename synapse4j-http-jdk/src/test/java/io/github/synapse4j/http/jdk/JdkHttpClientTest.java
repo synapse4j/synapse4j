@@ -137,37 +137,6 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void aBodyThatCanOnlyBeWrittenIsStreamed() throws Exception {
-        AtomicReference<byte[]> seenBody = new AtomicReference<>();
-        AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
-        server.createContext("/streamed", exchange -> {
-            seenBody.set(exchange.getRequestBody().readAllBytes());
-            seenHeaders.set(new LinkedHashMap<>(exchange.getRequestHeaders()));
-            exchange.sendResponseHeaders(200, -1);
-            exchange.close();
-        });
-
-        // Asked for by name: the default gathers on this transport, so streaming is the explicit choice.
-        HttpOptions options = HttpOptions.defaults();
-        options.setBodyWriteMode(BodyWriteMode.STREAMED.value());
-        HttpRequest request = new HttpRequest(baseUrl + "/streamed");
-        request.setMethod(HttpRequest.POST);
-        request.setOptions(options);
-        request.setBody(out -> {
-            out.write("pi".getBytes(UTF_8));
-            out.write("ng".getBytes(UTF_8));
-        });
-
-        try (HttpResponse response = client.send(request)) {
-            assertEquals(200, response.getStatusCode());
-        }
-
-        assertEquals("ping", new String(seenBody.get(), UTF_8));
-        // Nobody knows how long it is until it has been written, so it goes out chunked.
-        assertEquals(List.of("chunked"), seenHeaders.get().get("Transfer-encoding"));
-    }
-
-    @Test
     void aWrittenBodyIsGatheredUnderTheDefaultMode() throws Exception {
         AtomicReference<byte[]> seenBody = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
@@ -197,7 +166,7 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void aBodyWriteModeThisImplementationDoesNotKnowIsRefused() {
+    void aBodyWriteModeThisTransportDoesNotTakeIsRefused() {
         HttpOptions options = HttpOptions.defaults();
         options.setBodyWriteMode("spooled");
         HttpRequest request = new HttpRequest(baseUrl + "/nowhere");
@@ -207,12 +176,16 @@ class JdkHttpClientTest {
 
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
                 () -> client.send(request));
-
         assertTrue(thrown.getMessage().contains("spooled"), thrown::toString);
+
+        // A mode the library defines but this transport does not take is refused the same way: every
+        // written body is gathered, so streaming is not on offer.
+        options.setBodyWriteMode(BodyWriteMode.STREAMED.value());
+        assertThrows(IllegalArgumentException.class, () -> client.send(request));
     }
 
     @Test
-    void aStreamedBodyFailureReachesTheCallerWhateverItThrew() {
+    void aWrittenBodyFailureReachesTheCallerWhateverItThrew() {
         server.createContext("/failing", exchange -> {
             exchange.getRequestBody().readAllBytes();
             exchange.sendResponseHeaders(200, -1);

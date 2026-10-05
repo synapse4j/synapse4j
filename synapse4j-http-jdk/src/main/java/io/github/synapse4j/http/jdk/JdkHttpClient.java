@@ -3,19 +3,14 @@ package io.github.synapse4j.http.jdk;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 import java.net.http.HttpRequest.BodyPublisher;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.Flow;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.LockSupport;
-import java.util.concurrent.locks.ReentrantLock;
 
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.BodyWriteMode;
@@ -39,11 +34,10 @@ import org.jspecify.annotations.Nullable;
  * <li>The body is the live response stream, to be read on the caller's thread. Closing the response
  * releases the connection and cancels a body still in flight.</li>
  * <li>A request body is handed over the way {@link HttpBody} describes it: bytes the body already holds
- * go out without being written, a body that can only be written is streamed from a thread of its own so
- * that the JDK's I/O thread never waits for it, and {@link BodyWriteMode#BUFFERED} trades that thread for
- * one copy of the body in memory. {@link BodyWriteMode#AUTO}, the default, takes the buffered route,
- * because the JDK pulls the body through a thread of its own and the streamed route would add a second
- * one around it.</li>
+ * go out without being written, and a body that can only be written is gathered into memory and sent
+ * with its length. The JDK pulls the body through a thread of its own, so this transport does not stream
+ * a written one: {@link BodyWriteMode#STREAMED} is refused, and {@link BodyWriteMode#AUTO}, the default,
+ * gathers.</li>
  * <li>A {@link HttpOptions#getResponseTimeout() response timeout}, whether the request set it or this
  * client's own options carry it, maps to the JDK request builder's {@code timeout}, which — verified
  * empirically — bounds only the wait for the response headers to start arriving, never the reading of
@@ -160,14 +154,15 @@ public class JdkHttpClient implements HttpClient {
     }
 
     /**
-     * The JDK's publisher for one request body, by the cheapest way that body can be handed over.
+     * The JDK's publisher for one request body, by the cheapest way that body can be handed over: bytes
+     * it already holds go out without being written, and a body that has to be written is gathered.
      *
      * <p>
-     * A body that holds its bytes is never written; a body that has to be written is streamed, or
-     * gathered first when {@link BodyWriteMode#BUFFERED} is the resolved mode.
+     * {@link #requireMode} refuses a mode this transport does not take before the body is looked at, so a
+     * request that asked for one thing is not quietly sent another way.
      */
     private static BodyPublisher bodyPublisher(HttpRequest request, @Nullable String mode) {
-        BodyWriteMode resolved = resolveMode(mode);
+        requireMode(mode);
         HttpBody body = request.getBody();
         if (body == null) {
             return BodyPublishers.noBody();
@@ -176,22 +171,22 @@ public class JdkHttpClient implements HttpClient {
         if (buffer != null) {
             return readyBytes(buffer);
         }
-        if (resolved == BodyWriteMode.BUFFERED) {
-            return gathered(request, body);
-        }
-        return BodyPublishers.fromPublisher(new StreamingBodyPublisher(body));
+        return gathered(request, body);
     }
 
     /**
-     * The mode this implementation will use: the one the string names, {@link BodyWriteMode#from}
-     * refusing a value this library does not define, with {@link BodyWriteMode#AUTO} taken as
-     * {@link BodyWriteMode#BUFFERED} — the mode this implementation does best, since the JDK pulls the
-     * body through a thread of its own and a written one would add a thread of ours and a lock around
-     * it, while gathering spends only memory.
+     * Refuses a mode this transport does not take: the one the string names, {@link BodyWriteMode#from}
+     * refusing a value this library does not define, and {@link BodyWriteMode#STREAMED} refused because
+     * this transport gathers every written body rather than streaming it — the JDK pulls the body through
+     * a thread of its own, so streaming would add a thread of ours and a lock around it.
+     * {@link BodyWriteMode#AUTO} and {@link BodyWriteMode#BUFFERED} both take the gathered route.
      */
-    private static BodyWriteMode resolveMode(@Nullable String mode) {
+    private static void requireMode(@Nullable String mode) {
         BodyWriteMode known = BodyWriteMode.from(mode);
-        return known == BodyWriteMode.AUTO ? BodyWriteMode.BUFFERED : known;
+        if (known == BodyWriteMode.STREAMED) {
+            throw new IllegalArgumentException("unsupported bodyWriteMode '" + mode
+                    + "': this transport gathers the request body");
+        }
     }
 
     /**
@@ -215,8 +210,8 @@ public class JdkHttpClient implements HttpClient {
     /**
      * A body written out first, so that the JDK can send bytes it already has: one copy of the body in
      * memory in exchange for a request that goes out with a {@code Content-Length} and no thread of
-     * ours. This is what {@link BodyWriteMode#BUFFERED} asks for, and the only failure it can meet before
-     * the call goes out is the body's own.
+     * ours. It is the route {@link BodyWriteMode#BUFFERED} asks for and {@link BodyWriteMode#AUTO} takes,
+     * and the only failure it can meet before the call goes out is the body's own.
      */
     private static BodyPublisher gathered(HttpRequest request, HttpBody body) {
         ByteArrayOutputStream gathered = new ByteArrayOutputStream();
@@ -269,149 +264,6 @@ public class JdkHttpClient implements HttpClient {
                     sent = true;
                 }
             });
-        }
-    }
-
-    /**
-     * A body written on a thread of its own, handed to the JDK a chunk at a time as it asks for them.
-     *
-     * <p>
-     * The JDK pulls — every one of its own publishers is something to read — and this library's bodies
-     * are written, so the two ends are joined by a thread: the body is written on a virtual thread, and
-     * each write waits until the JDK has asked for more before it becomes a chunk. So nothing is held
-     * beyond the chunk in hand, the JDK's I/O thread never waits for the body and never runs it, and a
-     * body that is slow to produce — a media part read from somewhere slow, say — costs this thread and
-     * nothing else.
-     *
-     * <p>
-     * Each subscription gets its own run, since a request may be sent again: {@link HttpBody} promises
-     * that a second write produces the same bytes, and a run is one write. The runs take turns, though:
-     * this publisher's lock is held for the whole of one run's write, so a run started for a retry or a
-     * redirect waits for the run before it to leave the body — {@link HttpBody} promises its calls are
-     * sequential, and two runs inside it at once would be two interleaved writes. The premise is the
-     * Flow contract's own: the run being replaced is cancelled before the next exchange begins. The
-     * cancellation is seen where this publisher can see it — the run's next chunk write, which then
-     * fails and releases the lock. A body blocked inside its own {@link HttpBody#writeTo} — reading a
-     * media part from a source slow to answer, say — cannot be reached by a cancellation and holds the
-     * lock until it next writes; a source that can block indefinitely is the caller's to buffer, or to
-     * hand over through {@link HttpBody#buffer()}.
-     */
-    static final class StreamingBodyPublisher implements Flow.Publisher<ByteBuffer> {
-
-        private final HttpBody body;
-
-        /** Held across one run's whole write, so the runs of this body never overlap. */
-        private final ReentrantLock writeLock = new ReentrantLock();
-
-        StreamingBodyPublisher(HttpBody body) {
-            this.body = body;
-        }
-
-        @Override
-        public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
-            new BodyRun(body, writeLock, subscriber).start();
-        }
-
-        /** One subscription's worth of state: a body written once, one chunk at a time, on request. */
-        private static final class BodyRun implements Flow.Subscription {
-
-            private final HttpBody body;
-
-            private final ReentrantLock writeLock;
-
-            private final Flow.Subscriber<? super ByteBuffer> subscriber;
-
-            /** How many chunks have been asked for and not handed over yet. */
-            private final AtomicLong demand = new AtomicLong();
-
-            private final OutputStream chunkSink = new OutputStream() {
-
-                @Override
-                public void write(int b) throws IOException {
-                    write(new byte[] { (byte) b }, 0, 1);
-                }
-
-                @Override
-                public void write(byte[] bytes, int offset, int length) throws IOException {
-                    awaitDemand();
-                    // The array belongs to the writer and is reused, so the chunk is a copy of it —
-                    // the one copy this path makes, and the reason nothing is held beyond one chunk.
-                    subscriber.onNext(ByteBuffer.wrap(Arrays.copyOfRange(bytes, offset, offset + length)));
-                }
-            };
-
-            private volatile @Nullable Thread producer;
-
-            private volatile boolean cancelled;
-
-            BodyRun(HttpBody body, ReentrantLock writeLock, Flow.Subscriber<? super ByteBuffer> subscriber) {
-                this.body = body;
-                this.writeLock = writeLock;
-                this.subscriber = subscriber;
-            }
-
-            void start() {
-                subscriber.onSubscribe(this);
-                producer = Thread.ofVirtual().name("synapse4j-request-body").start(this::produce);
-            }
-
-            @Override
-            public void request(long n) {
-                if (n <= 0) {
-                    // The error goes out, and the producer is released with it: parked in
-                    // awaitDemand for a demand that will now never come, it would otherwise
-                    // outlive the subscription on a thread of its own. The cancelled flag keeps
-                    // its way out quiet — the subscriber has already been told.
-                    cancelled = true;
-                    LockSupport.unpark(producer);
-                    subscriber.onError(new IllegalArgumentException("a request must be positive: " + n));
-                    return;
-                }
-                demand.updateAndGet(current -> current > Long.MAX_VALUE - n ? Long.MAX_VALUE : current + n);
-                LockSupport.unpark(producer);
-            }
-
-            @Override
-            public void cancel() {
-                cancelled = true;
-                LockSupport.unpark(producer);
-            }
-
-            private void produce() {
-                // Set before the first wait, so a request that arrives while this thread is starting
-                // still finds someone to wake: unparking a thread that has not parked yet is remembered.
-                producer = Thread.currentThread();
-                // The whole write runs under the publisher's lock, so a second run — a retry, a
-                // redirect — waits here for the run before it to leave the body rather than entering
-                // it at the same time. A cancelled run leaves at its next chunk and releases the lock
-                // on the way out; one blocked inside its own write is not interrupted, and leaves
-                // when it next writes.
-                writeLock.lock();
-                try {
-                    body.writeTo(chunkSink);
-                    subscriber.onComplete();
-                } catch (Throwable failure) {
-                    // Whatever the body throws has to reach the subscriber, down to an Error: this
-                    // thread exists to give the subscriber an answer, and a producer that dies quietly
-                    // would leave the request waiting for a chunk that never comes.
-                    if (!cancelled) {
-                        subscriber.onError(failure);
-                    }
-                } finally {
-                    writeLock.unlock();
-                }
-            }
-
-            /** Waits until the subscriber has asked for another chunk, or until the run is over. */
-            private void awaitDemand() throws IOException {
-                while (demand.get() <= 0) {
-                    if (cancelled) {
-                        throw new IOException("the request body was cancelled");
-                    }
-                    LockSupport.park();
-                }
-                demand.decrementAndGet();
-            }
         }
     }
 
