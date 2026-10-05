@@ -44,9 +44,11 @@ import io.github.synapse4j.http.restclient.RestClientHttpClient;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 import io.github.synapse4j.openai.OpenAiCompletionsChatClient;
 import io.github.synapse4j.openai.OpenAiConfig;
 import io.github.synapse4j.openai.OpenAiResponsesChatClient;
+import tools.jackson.databind.json.JsonMapper;
 
 class Synapse4jAutoConfigurationTest {
 
@@ -386,6 +388,23 @@ class Synapse4jAutoConfigurationTest {
 
     /** A type the model is asked to fill in, named the way the application names it. */
     record Payload(String userName) {
+    }
+
+    @Test
+    void theApplicationsOwnMapperBindsASchemaAsItsDocument() {
+        // The module is a bean, so Boot puts it on the auto-configured JsonMapper — the mapper the
+        // codec is built over and the one an application injects. Without it the mapper writes a
+        // schema as the fields of its class, and cannot read one back at all.
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(Synapse4jAutoConfiguration.class,
+                        JacksonAutoConfiguration.class))
+                .run(context -> {
+                    JsonMapper mapper = context.getBean(JsonMapper.class);
+                    JsonSchema schema = new JsonSchemaBuilder().setType("object").build();
+
+                    assertThat(mapper.readValue(mapper.writeValueAsString(schema), JsonSchema.class))
+                            .isEqualTo(schema);
+                });
     }
 
     @Test

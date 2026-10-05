@@ -36,6 +36,7 @@ import io.github.synapse4j.http.restclient.RestClientHttpClient;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.jackson.JacksonSchemaConfigBuilders;
 import io.github.synapse4j.jackson.JacksonSchemaSettings;
+import io.github.synapse4j.jackson.Synapse4jJacksonModule;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.openai.OpenAiCompletionsChatClient;
 import io.github.synapse4j.openai.OpenAiResponsesChatClient;
@@ -88,6 +89,19 @@ public class Synapse4jAutoConfiguration {
      * of its own before or after them deliberately — a higher order runs later.
      */
     private static final int ORDER = 0;
+
+    /**
+     * The module that teaches a mapper to read and write this library's own
+     * {@link io.github.synapse4j.json.JsonSchema} as the document it describes rather than as the
+     * fields of its class. Published as a bean so Boot applies it to the auto-configured
+     * {@code JsonMapper} — the mapper the codec is built over, and the one an application injects —
+     * which is what lets an application serialize a schema itself and get the schema.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public Synapse4jJacksonModule synapse4jJacksonModule() {
+        return new Synapse4jJacksonModule();
+    }
 
     /**
      * The codec the whole stack serializes through, over the application's own {@code JsonMapper}
