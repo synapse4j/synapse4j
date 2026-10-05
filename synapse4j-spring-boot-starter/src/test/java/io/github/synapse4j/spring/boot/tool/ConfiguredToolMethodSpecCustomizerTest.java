@@ -48,28 +48,6 @@ class ConfiguredToolMethodSpecCustomizerTest {
         new ConfiguredToolMethodSpecCustomizer(tools).customize(spec);
 
         assertThat(spec.getName()).isEqualTo("greeting");
-
-        tools.setClassNamePrefix(true);
-        ToolMethodProperties prefixed = new ToolMethodProperties();
-        prefixed.setDescription("configured");
-        tools.getMethods().put("Fixture_greet", prefixed);
-
-        ToolMethodSpec unnamed = specOf();
-        new ConfiguredToolMethodSpecCustomizer(tools).customize(unnamed);
-
-        assertThat(unnamed.getName()).isEqualTo("Fixture_greet");
-        assertThat(unnamed.getDescription()).isEqualTo("configured");
-    }
-
-    @Test
-    void theClassNameSwitchNamesAToolTheConfigurationNeverMentions() {
-        ToolsProperties tools = new ToolsProperties();
-        tools.setClassNamePrefix(true);
-
-        ToolMethodSpec spec = specOf();
-        new ConfiguredToolMethodSpecCustomizer(tools).customize(spec);
-
-        assertThat(spec.getName()).isEqualTo("Fixture_greet");
     }
 
     @Test

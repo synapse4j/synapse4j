@@ -1,7 +1,5 @@
 package io.github.synapse4j.spring.boot.tool;
 
-import java.lang.reflect.Method;
-
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.tool.ToolMethodSpec;
 import io.github.synapse4j.tool.ToolMethodSpecCustomizer;
@@ -16,11 +14,10 @@ import lombok.RequiredArgsConstructor;
  * written into the spec, over what the annotations supplied.
  *
  * <p>
- * A tool is found under the name it carries before this step runs: the name its annotation gave it, or,
- * when the annotation named none, the method's own name — with the class that declares it in front when
- * {@link ToolsProperties#isClassNamePrefix()} is on. A tool still unnamed when the configuration has
- * been applied takes that name, which is how the switch names one, and a name the configuration writes
- * does not move the entry it came from.
+ * A tool is found under the name it carries when this step runs — what its annotation named it, or, when
+ * it named none, the method's own name, as an earlier step may have rewritten it. A tool still unnamed
+ * when the configuration has been applied takes that name, and a name the configuration writes does not
+ * move the entry it came from.
  *
  * <p>
  * Every value is text and is written the way an annotation would carry it: a schema is a JSON document,
@@ -55,20 +52,9 @@ public class ConfiguredToolMethodSpecCustomizer implements ToolMethodSpecCustomi
         }
     }
 
-    /**
-     * The name the tool is found under: what its annotation named it, or the name it falls back to —
-     * the method's own, with the class that declares it in front when the switch asks for it.
-     */
+    /** The name the tool is found under: what it carries now, or the method's own name when it has none. */
     private String nameBeforeConfiguration(ToolMethodSpec spec) {
-        if (!spec.getName().isBlank()) {
-            return spec.getName();
-        }
-        Method method = spec.getMethod();
-        // `_` because a tool name reaches the model, and the providers accept only letters, digits,
-        // `_` and `-` in one.
-        return tools.isClassNamePrefix()
-                ? method.getDeclaringClass().getSimpleName() + "_" + method.getName()
-                : method.getName();
+        return spec.getName().isBlank() ? spec.getMethod().getName() : spec.getName();
     }
 
     private void apply(ToolMethodProperties configured, ToolMethodSpec spec) {
