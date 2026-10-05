@@ -234,6 +234,13 @@ class JacksonJsonCodecTest {
         assertNull(tool.definition().getInputSchema().getRequired());
     }
 
+    @Test
+    void aMethodToolFillsAnAbsentOptionalWithEmpty() throws Exception {
+        MethodTool tool = methodTool("maybe", Optional.class);
+
+        assertEquals(Optional.empty(), tool.resolveArguments("{}", null)[0]);
+    }
+
     private MethodTool methodTool(String name, Class<?>... parameterTypes) throws Exception {
         return MethodTool.of(name, "does things", Target.class.getDeclaredMethod(name, parameterTypes), null, codec);
     }

@@ -196,7 +196,7 @@ public class JacksonJsonCodec implements JsonCodec {
      * Converted directly: one pass over the value, with no text in between.
      */
     @Override
-    public <T> @Nullable T convert(Object value, Type type) {
+    public <T> @Nullable T convert(@Nullable Object value, Type type) {
         try {
             return jsonMapper.convertValue(value, jsonMapper.getTypeFactory().constructType(type));
         } catch (JacksonException failure) {

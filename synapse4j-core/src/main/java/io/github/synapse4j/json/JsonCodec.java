@@ -130,12 +130,17 @@ public interface JsonCodec {
      * An implementation whose library converts a decoded value directly should say so here
      * instead: one pass over the value, with no text in between.
      *
+     * <p>
+     * A {@code null} value means the value is absent, and what absence becomes is the type's to
+     * settle: {@code null} for a type that cannot spell it, the empty value for one that can — an
+     * {@link java.util.Optional}, say. The implementation answers, so a caller never has to guess.
+     *
      * @param <T>   the type of the value
-     * @param value the decoded value to read as the given type; must not be {@code null}
+     * @param value the decoded value to read as the given type; may be {@code null}, meaning absent
      * @param type  the type to read it as, type arguments included; must not be {@code null}
      * @return the value; may be {@code null}
      */
-    default <T> @Nullable T convert(Object value, Type type) {
+    default <T> @Nullable T convert(@Nullable Object value, Type type) {
         return decode(encode(value), type);
     }
 

@@ -38,6 +38,9 @@ class MethodToolTest {
         // lists the value as required, so a parameter is required unless the test says otherwise.
         when(codec.generateDecodeSchema(any()))
                 .thenReturn(new JsonSchemaBuilder().setType("object").setRequired(List.of("value")).build());
+        // Every model-supplied value goes through the codec, so the identity answer stands in for a
+        // codec that hands a fitting value back; a test only stubs convert where it wants another.
+        when(codec.convert(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     // ===== factories and construction =====
@@ -109,18 +112,6 @@ class MethodToolTest {
         Object[] values = tool.resolveArguments("{\"message\":\"hello\"}", null);
 
         assertEquals("hello", values[0]);
-    }
-
-    @Test
-    void boxedValueForAPrimitiveIsPassedThrough() throws Exception {
-        // A decoded number arrives boxed, and a primitive declared type matches only through its
-        // wrapper: without that, every primitive argument would be pushed through codec.convert.
-        when(codec.decode(any(), any())).thenReturn(Map.of("n", 21));
-        MethodTool tool = MethodTool.of("twice", "Doubles a number", method("twice", int.class), null, codec);
-
-        Object[] values = tool.resolveArguments("{\"n\":21}", null);
-
-        assertEquals(21, values[0]);
     }
 
     @Test
