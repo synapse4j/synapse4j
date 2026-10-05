@@ -43,6 +43,15 @@ public class RawContentBlock extends ContentPart {
         this.members = copy;
     }
 
+    @Override
+    public RawContentBlock copy() {
+        RawContentBlock copy = new RawContentBlock(members);
+        if (getExtras() != null) {
+            copy.getOrCreateExtras().putAll(getExtras());
+        }
+        return copy;
+    }
+
     /**
      * The block printed by its kind rather than its content — the content can be a whole search
      * result, and a printout of it would be the answer rather than a line about it.

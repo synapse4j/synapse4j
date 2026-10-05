@@ -1762,6 +1762,11 @@ class OpenAiCompletionsChatClientTest {
 
     /** A part type this module has no wire shape for: the model is open, the protocol is not. */
     static class UnmodelledPart extends ContentPart {
+
+        @Override
+        public UnmodelledPart copy() {
+            return new UnmodelledPart();
+        }
     }
 
     /** A value only the JSON library behind the codec can turn into JSON. */

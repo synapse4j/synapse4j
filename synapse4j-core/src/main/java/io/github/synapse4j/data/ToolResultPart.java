@@ -76,6 +76,18 @@ public class ToolResultPart extends ContentPart {
         return addPart(new TextPart(text));
     }
 
+    @Override
+    public ToolResultPart copy() {
+        ToolResultPart copy = new ToolResultPart(callId, name, error);
+        for (ContentPart part : parts) {
+            copy.getParts().add(part.copy());
+        }
+        if (getExtras() != null) {
+            copy.getOrCreateExtras().putAll(getExtras());
+        }
+        return copy;
+    }
+
     /**
      * The parts are counted rather than printed: they carry the tool's answer, and a printout that
      * carried it would be as long as the result.

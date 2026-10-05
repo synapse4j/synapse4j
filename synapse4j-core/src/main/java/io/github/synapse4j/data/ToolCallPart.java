@@ -31,4 +31,13 @@ public class ToolCallPart extends ContentPart {
     /** The arguments as JSON text, exactly as they arrived from the provider. */
     private @Nullable String argumentsJson;
 
+    @Override
+    public ToolCallPart copy() {
+        ToolCallPart copy = new ToolCallPart(callId, name, argumentsJson);
+        if (getExtras() != null) {
+            copy.getOrCreateExtras().putAll(getExtras());
+        }
+        return copy;
+    }
+
 }

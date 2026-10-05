@@ -43,4 +43,13 @@ public class MediaPart extends ContentPart {
     /** File name, when the payload has one. */
     private @Nullable String name;
 
+    @Override
+    public MediaPart copy() {
+        MediaPart copy = new MediaPart(mediaType, uri, source, name);
+        if (getExtras() != null) {
+            copy.getOrCreateExtras().putAll(getExtras());
+        }
+        return copy;
+    }
+
 }

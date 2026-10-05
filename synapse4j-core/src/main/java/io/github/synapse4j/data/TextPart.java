@@ -26,4 +26,13 @@ public class TextPart extends ContentPart {
     /** The text itself. */
     private @Nullable String text;
 
+    @Override
+    public TextPart copy() {
+        TextPart copy = new TextPart(text);
+        if (getExtras() != null) {
+            copy.getOrCreateExtras().putAll(getExtras());
+        }
+        return copy;
+    }
+
 }

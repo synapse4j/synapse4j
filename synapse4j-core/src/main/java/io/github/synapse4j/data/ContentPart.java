@@ -50,4 +50,16 @@ public abstract class ContentPart {
         return extras;
     }
 
+    /**
+     * An independent copy of this part: its own fields, the parts it holds, and the entries of its
+     * extras bag — the entries' values held by reference, as everywhere in this library.
+     *
+     * <p>
+     * Each part type builds its own copy, so a subclass that adds fields must override this to copy
+     * them too.
+     *
+     * @return a copy of this part; never {@code null}
+     */
+    public abstract ContentPart copy();
+
 }

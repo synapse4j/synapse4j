@@ -31,4 +31,13 @@ public class ReasoningPart extends ContentPart {
     /** The reasoning text. */
     private @Nullable String text;
 
+    @Override
+    public ReasoningPart copy() {
+        ReasoningPart copy = new ReasoningPart(text);
+        if (getExtras() != null) {
+            copy.getOrCreateExtras().putAll(getExtras());
+        }
+        return copy;
+    }
+
 }
