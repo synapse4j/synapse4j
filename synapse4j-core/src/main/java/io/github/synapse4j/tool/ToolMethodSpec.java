@@ -97,16 +97,29 @@ public class ToolMethodSpec {
      * and {@code strict} left to the protocol when nobody asked either way.
      *
      * <p>
-     * A resolution that cannot become one is refused here rather than turned into a declaration with
-     * holes in it: no name for the tool, a parameter left unnamed, two parameters under one name, or
-     * nothing settled as the input schema. Only the strings can be wrong, since the Java side is what
-     * the reader settled, and a blank description or type is an ordinary resolution rather than a
-     * failure.
+     * The resolution is checked first, so one that cannot become a declaration is refused rather than
+     * turned into one with holes in it.
      *
      * @return this tool as the model sees it; never {@code null}
      * @throws SynapseException if the resolution cannot become a declaration
      */
     public ToolDefinition definition() {
+        validate();
+        return new ToolDefinition(name, description.isBlank() ? null : description, resolvedSchema, strict(), extras);
+    }
+
+    /**
+     * Refuses a resolution that cannot become a declaration: no name for the tool, a parameter left
+     * unnamed, two parameters under one name, nothing settled as the input schema, or a parameter the
+     * model does not produce with nothing to fill it.
+     *
+     * <p>
+     * Only the strings can be wrong, since the Java side is what the reader settled, and a blank
+     * description or type is an ordinary resolution rather than a failure.
+     *
+     * @throws SynapseException if the resolution cannot become a declaration
+     */
+    private void validate() {
         if (name.isBlank()) {
             throw new SynapseException("no name for the tool resolved from " + method);
         }
@@ -118,11 +131,15 @@ public class ToolMethodSpec {
             if (!names.add(entry.getName())) {
                 throw new SynapseException("'" + entry.getName() + "' names two parameters of " + method);
             }
+            if (!entry.fromModel() && entry.getValueProvider() == null) {
+                throw new SynapseException("parameter '" + entry.getName() + "' of type "
+                        + entry.getParameter().getType().getName()
+                        + " is off the wire but no value is provided for it; write one with a customizer");
+            }
         }
         if (resolvedSchema == null) {
             throw new SynapseException("no input schema settled for the tool resolved from " + method);
         }
-        return new ToolDefinition(name, description.isBlank() ? null : description, resolvedSchema, strict(), extras);
     }
 
     /**

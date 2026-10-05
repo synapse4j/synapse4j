@@ -5,6 +5,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.jspecify.annotations.Nullable;
 
@@ -98,23 +99,14 @@ public class MethodTool implements StagedTool {
      * {@link ToolParameterValueProvider} answers. The built-in one is settled by
      * {@link FinalToolMethodSpecCustomizer}, which is also where an application's own arrives from.
      *
-     * <p>
-     * A parameter off the wire with nothing to fill it is refused loudly here rather than letting the
-     * mismatch surface as an invoke failure — a null for a primitive, or an argument the method cannot
-     * use.
-     *
      * @param entry   the parameter to fill; never {@code null}
      * @param context the conversation this call belongs to; {@code null} when none was attached
      * @return the value to pass; {@code null} when there is none
-     * @throws IllegalStateException if the parameter is off the wire and nothing supplies its value
      */
     private @Nullable Object valueFor(ToolParameterSpec entry, @Nullable ChatContext context) {
-        ToolParameterValueProvider provider = entry.getValueProvider();
-        if (provider == null) {
-            throw new IllegalStateException("parameter '" + entry.getName() + "' of type "
-                    + entry.getParameter().getType().getName()
-                    + " is off the wire but no value is provided for it; write one with a customizer");
-        }
+        // Never null here: a parameter off the wire with nothing to fill it is refused while the
+        // declaration is built, so a tool that exists has a provider for every such parameter.
+        ToolParameterValueProvider provider = Objects.requireNonNull(entry.getValueProvider());
         return provider.get(spec, entry, context);
     }
 

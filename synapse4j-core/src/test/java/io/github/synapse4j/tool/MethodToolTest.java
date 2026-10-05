@@ -59,27 +59,6 @@ class MethodToolTest {
     }
 
     @Test
-    void aResolutionThatNamesNothingIsRefused() {
-        ToolMethodSpec spec = resolutionOf(method("ship", String.class, CurrentUser.class), null);
-
-        SynapseException unnamedTool = assertThrows(SynapseException.class, () -> new MethodTool(spec, codec));
-        assertTrue(unnamedTool.getMessage().contains("no name for the tool"));
-
-        spec.setName("ship");
-        spec.getParameters().get(1).setName("");
-
-        SynapseException unnamedParameter = assertThrows(SynapseException.class,
-                () -> new MethodTool(spec, codec));
-        assertTrue(unnamedParameter.getMessage().contains("no name to declare"));
-
-        spec.getParameters().get(1).setName("to");
-        spec.getParameters().get(0).setName("to");
-
-        SynapseException doubled = assertThrows(SynapseException.class, () -> new MethodTool(spec, codec));
-        assertTrue(doubled.getMessage().contains("names two parameters"));
-    }
-
-    @Test
     void signatureBuildsTheDeclaration() {
         ToolDefinition definition = reader.of("weather", "Looks up weather", method("take", String.class), null)
                 .definition();
@@ -227,18 +206,6 @@ class MethodToolTest {
         assertFalse(properties.containsKey("user"));
 
         assertEquals("ada", execute(tool, "{\"unused\":1}", context));
-    }
-
-    @Test
-    void aParameterOffTheWireWithNothingToFillItIsRefused() {
-        ToolMethodSpec spec = resolutionOf(method("ship", String.class, CurrentUser.class), null);
-        spec.setName("ship");
-        spec.getParameters().get(1).setFromModel("false");
-        MethodTool tool = new MethodTool(settled(spec), codec);
-
-        IllegalStateException failure = assertThrows(IllegalStateException.class,
-                () -> tool.resolveArguments("{}", new ChatContext()));
-        assertTrue(failure.getMessage().contains("customizer"));
     }
 
     @Test

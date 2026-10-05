@@ -50,6 +50,7 @@ class MethodToolsTest {
         ToolMethodSpec written = specOf("renamed");
         assertEquals("What it does", written.getDescription());
         assertEquals("some.Tool", written.getType());
+        assertEquals("true", written.getStrict());
         ToolParameterSpec told = written.getParameters().get(0);
         assertEquals("arg", told.getName());
         assertEquals("What it means", told.getDescription());
@@ -185,7 +186,7 @@ class MethodToolsTest {
             return value;
         }
 
-        @ToolMethod(name = "renamed", description = "What it does", type = "some.Tool")
+        @ToolMethod(name = "renamed", description = "What it does", type = "some.Tool", strict = "true")
         public String written(
                 @ToolParam(name = "arg", description = "What it means", required = "false") String value) {
             return value;
