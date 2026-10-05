@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -858,8 +859,9 @@ class AbstractChatClientTest {
 
     /** Pull a stream to its end, which is what runs its response pass. */
     private static void drain(ChatStream stream) {
-        for (ChatStreamEvent ignored : stream) {
-            // the iteration is the point
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        while (events.hasNext()) {
+            events.next();
         }
     }
 
