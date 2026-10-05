@@ -22,11 +22,10 @@ import org.jspecify.annotations.Nullable;
  * annotations wrote.
  *
  * <p>
- * This is a container and nothing more — it reads no signature, fills no default, and refuses
- * nothing. {@link MethodTools} builds one and decides what goes into it, a
- * {@link ToolMethodSpecCustomizer} rewrites the strings, and {@link MethodTool} is what refuses a
- * resolution it could not be built from. Nothing is filled in along the way: a blank string is one
- * nobody supplied, which is what a customizer needs to tell from a value somebody wrote.
+ * It reads no signature and fills no default: {@link MethodTools} builds one and decides what goes
+ * into it, and a {@link ToolMethodSpecCustomizer} rewrites the strings. Nothing is filled in along the
+ * way, so a blank string is one nobody supplied — which is what a customizer needs to tell from a value
+ * somebody wrote.
  *
  * <p>
  * The Java side is what the reader settled and does not change afterwards: the method, the instance
@@ -35,10 +34,11 @@ import org.jspecify.annotations.Nullable;
  * whatever defaults are left over.
  *
  * <p>
- * The input schema is the same split as on a {@link ToolParameterSpec}: {@link #schema} is the
- * configuration surface, text written by an annotation or a customizer, and {@link #resolvedSchema} is
- * the conclusion — the envelope put together out of the parameters' own answers. {@link MethodTools}
- * writes it, and {@link MethodTool} reads it to build the declaration.
+ * {@link #definition()} is where all of it is read back: it refuses a resolution that cannot become a
+ * declaration, and turns one that can into the {@link ToolDefinition} the model is shown. The input
+ * schema is the same split as on a {@link ToolParameterSpec} — {@link #schema} is the configuration
+ * surface, text written by an annotation or a customizer, and {@link #resolvedSchema} is the
+ * conclusion, the envelope put together out of the parameters' own answers.
  */
 @Getter
 @Setter
