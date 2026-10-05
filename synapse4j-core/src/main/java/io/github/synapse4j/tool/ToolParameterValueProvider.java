@@ -11,8 +11,7 @@ import org.jspecify.annotations.Nullable;
  * A tool method parameter is declared to the model or it is not, and this is the answer for the ones
  * that are not: a {@link ChatContext}-typed parameter takes the conversation itself, and anything
  * else — a security principal, a locale, a Spring bean — has to come from somewhere the library does
- * not know about. That somewhere is one of these, written onto the
- * {@link ToolParameterSpec#setValueProvider(ToolParameterValueProvider) parameter's own entry} by a
+ * not know about. That somewhere is one of these, written onto a parameter's own entry by a
  * {@link ToolMethodSpecCustomizer}, which is how an application fills an argument without subclassing
  * {@link MethodTool}.
  *

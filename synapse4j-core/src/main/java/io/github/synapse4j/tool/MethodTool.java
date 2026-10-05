@@ -19,34 +19,29 @@ import io.github.synapse4j.json.JsonSchema;
 import lombok.NonNull;
 
 /**
- * A {@link StagedTool} backed by a Java method: the signature becomes the declaration, the
- * model's text becomes the arguments, and the return becomes the result — with this class
- * holding the one act in the middle, the invoke.
+ * A {@link StagedTool} backed by a Java method: the declaration the resolution settled becomes what the
+ * model sees, the model's text becomes the arguments, and the return becomes the result — with this
+ * class holding the one act in the middle, the invoke.
  *
  * <p>
- * An instance is complete the moment {@code new} returns: the constructor reads the method's
- * resolution, settles which parameters the model produces, and builds the declaration. What a
- * subclass has to know about that is that the declaration is built <em>inside</em> its constructor,
- * so {@link #schemaFor} and {@link #argumentsSchema} run while the subclass's own fields are not
- * initialized yet and an override cannot read them. An override stands on what the parameters
- * handed to it carry, and on what this class has already set.
+ * There is nothing to decide here. {@link MethodTools} reads a method into a {@link ToolMethodSpec}, the
+ * customizers rewrite it, {@link FinalToolMethodSpecCustomizer} fills what is left blank, and this class
+ * takes the result as it stands: the declaration it carries, and, per parameter, whether the model
+ * produces the value or the parameter's own {@link ToolParameterValueProvider} does. A resolution still
+ * carrying blanks is refused rather than quietly completed.
  *
  * <p>
- * The spec is the one carrier of everything about the method — its signature, its parameters, and
- * the names the declaration uses. Renaming a parameter is a spec customizer's job, not this
- * class's. What the tool adds is the one thing the run cannot read off the spec: whether the model
- * produces each parameter's value, one {@code boolean} per parameter, decided by
- * {@link #schemaFor}.
- *
- * <p>
- * Every field is final and set in the constructor, so an instance is immutable once it exists and
- * its methods may be called from any thread. The target, if it has state, is the application's to
- * make thread-safe.
+ * Every field is final and set in the constructor, so an instance is immutable once it exists and its
+ * methods may be called from any thread. The target, if it has state, is the application's to make
+ * thread-safe.
  */
 public class MethodTool implements StagedTool {
 
     /** The resolution this tool was built from; the run reads its method and its names from here. */
     private final ToolMethodSpec spec;
+
+    /** The method to run; what the run reflects over, and what its failures name. */
+    private final Method method;
 
     /** The codec the arguments are bound with and the result rendered by. */
     private final JsonCodec codec;
@@ -75,30 +70,30 @@ public class MethodTool implements StagedTool {
      *                              under one name, or carries no input schema
      */
     public MethodTool(@NonNull ToolMethodSpec spec, @NonNull JsonCodec codec) {
-        validate(spec);
         this.spec = spec;
+        this.method = spec.getMethod();
         this.codec = codec;
-        makeAccessible(spec.getMethod());
-        this.returnsVoid = spec.getMethod().getReturnType() == void.class;
-        String description = spec.getDescription();
-        this.definition = new ToolDefinition(spec.getName(), description.isBlank() ? null : description,
-                inputSchema(spec));
+        makeAccessible(method);
+        this.returnsVoid = method.getReturnType() == void.class;
+        this.definition = definitionOf(spec);
     }
 
     /**
-     * Refuses a resolution this tool cannot be built from: no name for the tool, a parameter left
-     * unnamed, or two parameters under one name.
+     * The declaration a resolution this tool can be built from carries, refusing one it cannot: no name
+     * for the tool, a parameter left unnamed, two under one name, or nothing settled as the input
+     * schema.
      *
      * <p>
-     * The refusal lives here rather than on the resolution because this is where it bites — every
-     * way of completing a tool goes through {@link #initialize}, and the spec itself only carries
-     * values. Only the strings can be wrong, since the Java side is what the reader settled, and a
-     * blank description or type is an ordinary resolution rather than a failure.
+     * The refusals live here rather than on the resolution because this is where they bite — every way
+     * of building a tool goes through the constructor — and the spec itself only carries values. Only
+     * the strings can be wrong, since the Java side is what the reader settled, and a blank description
+     * or type is an ordinary resolution rather than a failure.
      *
-     * @param spec the resolution this tool is being completed from; never {@code null}
-     * @throws SynapseException if the tool is unnamed, a parameter is unnamed, or two share a name
+     * @param spec the resolution this tool is being built from; never {@code null}
+     * @return the declaration to carry; never {@code null}
+     * @throws SynapseException if the resolution cannot become a declaration
      */
-    private static void validate(ToolMethodSpec spec) {
+    private static ToolDefinition definitionOf(ToolMethodSpec spec) {
         if (spec.getName().isBlank()) {
             throw new SynapseException("no name for the tool resolved from " + spec.getMethod());
         }
@@ -112,6 +107,12 @@ public class MethodTool implements StagedTool {
                         "'" + entry.getName() + "' names two parameters of " + spec.getMethod());
             }
         }
+        JsonSchema inputSchema = spec.getResolvedSchema();
+        if (inputSchema == null) {
+            throw new SynapseException("no input schema settled for the tool resolved from " + spec.getMethod());
+        }
+        String description = spec.getDescription();
+        return new ToolDefinition(spec.getName(), description.isBlank() ? null : description, inputSchema);
     }
 
     /**
@@ -130,22 +131,6 @@ public class MethodTool implements StagedTool {
                     + method.getDeclaringClass().getPackageName()
                     + " to this library, for example with --add-opens", failure);
         }
-    }
-
-    /**
-     * The input schema the reader settled for this tool; a resolution without one is one this tool
-     * refuses, since the declaration has to show the model something.
-     *
-     * @param spec the resolution this tool is being built from; never {@code null}
-     * @return the input schema the declaration carries; never {@code null}
-     * @throws SynapseException if nothing settled one
-     */
-    private static JsonSchema inputSchema(ToolMethodSpec spec) {
-        JsonSchema schema = spec.getResolvedSchema();
-        if (schema == null) {
-            throw new SynapseException("no input schema settled for the tool resolved from " + spec.getMethod());
-        }
-        return schema;
     }
 
     /**
@@ -230,7 +215,7 @@ public class MethodTool implements StagedTool {
     @Override
     public @Nullable Object call(@Nullable Object[] values, @Nullable ChatContext context) throws Exception {
         try {
-            return spec.getMethod().invoke(spec.getTarget(), values);
+            return method.invoke(spec.getTarget(), values);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             if (cause instanceof Exception exception) {
@@ -275,7 +260,6 @@ public class MethodTool implements StagedTool {
     private @Nullable Object bind(ToolParameterSpec entry, @Nullable Object raw) {
         Parameter parameter = entry.getParameter();
         if (raw == null && parameter.getType().isPrimitive()) {
-            Method method = spec.getMethod();
             throw new IllegalArgumentException("parameter '" + entry.getName() + "' of "
                     + method.getDeclaringClass().getSimpleName() + "." + method.getName()
                     + " is required, but the model produced no value for it");
