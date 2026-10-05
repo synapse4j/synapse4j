@@ -35,7 +35,7 @@ class MethodToolsTest {
     });
 
     @Test
-    void onlyWhatWasWrittenLandsOnTheSpec() {
+    void whatTheAnnotationsWroteLandsOnTheSpec() {
         reader.from(new Bean());
 
         ToolMethodSpec written = specOf("renamed");
@@ -46,14 +46,29 @@ class MethodToolsTest {
         assertEquals("What it means", told.getDescription());
         assertEquals("false", told.getRequired());
         assertEquals("some.Tool", askedFor("renamed"));
+    }
 
-        ToolMethodSpec blank = specOf("defaulted");
-        assertEquals("", blank.getDescription());
-        assertEquals("", blank.getType());
-        ToolParameterSpec untold = blank.getParameters().get(0);
-        assertEquals("value", untold.getName());
-        assertEquals("", untold.getDescription());
-        assertEquals("", untold.getRequired());
+    @Test
+    void blanksReachTheCustomizersAndTheDefaultsFillThem() {
+        List<String> names = new ArrayList<>();
+        List<String> parameters = new ArrayList<>();
+        reader.addCustomizer(spec -> {
+            if (spec.getMethod().getName().equals("defaulted")) {
+                names.add(spec.getName());
+                parameters.add(spec.getParameters().get(0).getName());
+            }
+        });
+
+        reader.from(new Bean());
+
+        assertEquals(List.of(""), names);
+        assertEquals(List.of(""), parameters);
+
+        ToolMethodSpec built = specOf("defaulted");
+        assertEquals("defaulted", built.getName());
+        assertEquals("value", built.getParameters().get(0).getName());
+        assertEquals("", built.getDescription());
+        assertEquals("", built.getType());
         assertEquals("", askedFor("defaulted"));
     }
 

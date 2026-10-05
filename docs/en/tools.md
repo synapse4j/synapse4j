@@ -35,10 +35,11 @@ The input type has to describe an object, because the protocol's arguments are a
 
 **`MethodTool`** — an existing Java method. Its signature becomes the declaration: each parameter
 the model provides becomes a required property of the argument schema. A `ChatContext` parameter is
-filled with the conversation instead of being sent to the model:
+filled with the conversation instead of being sent to the model. `MethodTools` is what turns a method
+into one — named here, or read off the annotations below:
 
 ```java
-Tool weather = MethodTool.of("get_weather", "Get the weather", method, service, codec);
+Tool weather = new MethodTools(codec).of("get_weather", "Get the weather", method, service);
 ```
 
 **`ManualTool`** — declaration only. Use it when you run the model's calls yourself: it carries the

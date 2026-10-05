@@ -27,6 +27,7 @@ import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonSchemaBuilder;
 import io.github.synapse4j.json.JsonWriter;
 import io.github.synapse4j.tool.MethodTool;
+import io.github.synapse4j.tool.MethodTools;
 import lombok.Data;
 import org.junit.jupiter.api.Test;
 import tools.jackson.core.type.TypeReference;
@@ -242,7 +243,8 @@ class JacksonJsonCodecTest {
     }
 
     private MethodTool methodTool(String name, Class<?>... parameterTypes) throws Exception {
-        return MethodTool.of(name, "does things", Target.class.getDeclaredMethod(name, parameterTypes), null, codec);
+        return new MethodTools(codec)
+                .of(name, "does things", Target.class.getDeclaredMethod(name, parameterTypes), null);
     }
 
     /** The methods a method tool's declaration is read from. */

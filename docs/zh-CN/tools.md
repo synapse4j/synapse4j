@@ -32,10 +32,11 @@ Tool weather = FunctionTool.of(
 输入类型必须描述一个对象，因为协议的参数就是一个对象。
 
 **`MethodTool`**——一个现成的 Java 方法。它的签名成为声明：模型提供的每个参数成为参数 schema 里的
-一个必填属性。类型为 `ChatContext` 的参数由对话填充，不会发给模型：
+一个必填属性。类型为 `ChatContext` 的参数由对话填充，不会发给模型。把一个方法变成 `MethodTool`
+的是 `MethodTools`——在这里给它起名，或者交给下面那些注解去读：
 
 ```java
-Tool weather = MethodTool.of("get_weather", "查询天气", method, service, codec);
+Tool weather = new MethodTools(codec).of("get_weather", "查询天气", method, service);
 ```
 
 **`ManualTool`**——只有声明。当你要自己运行模型的调用时用它：它携带声明，并拒绝执行。

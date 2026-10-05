@@ -5,9 +5,11 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.jspecify.annotations.Nullable;
 
@@ -105,13 +107,15 @@ public class MethodTool implements SpecTool, StagedTool {
      * is complete and consistent; a blank description still means none.
      *
      * @param spec  the resolution of the method this tool was built from; never {@code null}, and
-     *                  it must pass {@link ToolMethodSpec#validate()}
+     *                  it has to name the tool and every one of its parameters
      * @param codec the codec that generates the declaration and binds arguments; never
      *                  {@code null}
-     * @throws SynapseException if the spec does not validate
+     * @throws SynapseException if the spec names no tool, or leaves a parameter unnamed, or names
+     *                              two of them under one name
      */
     @Override
     public void initialize(@NonNull ToolMethodSpec spec, @NonNull JsonCodec codec) {
+        validate(spec);
         boolean[] fromModel = readSignature(spec, codec);
         List<ToolParameterSpec> entries = spec.getParameters();
         for (int i = 0; i < entries.size(); i++) {
@@ -184,37 +188,42 @@ public class MethodTool implements SpecTool, StagedTool {
     }
 
     /**
-     * A tool whose declaration comes from the method's signature, under the given name and
-     * description: one property per parameter the model provides, each carrying the schema of
-     * its declared type, all of them required.
+     * Refuses a resolution this tool cannot be built from: no name for the tool, a parameter left
+     * unnamed, or two parameters under one name.
      *
-     * @param name        the name the model calls the tool by; never {@code null}
-     * @param description what the tool does; never {@code null}
-     * @param method      the method to run; never {@code null}
-     * @param target      the instance for an instance method, {@code null} for a static one
-     * @param codec       the codec reading arguments and rendering results; never {@code null}
-     * @return the assembled tool, initialized and ready
+     * <p>
+     * The refusal lives here rather than on the resolution because this is where it bites — every
+     * way of completing a tool goes through {@link #initialize}, and the spec itself only carries
+     * values. Only the strings can be wrong, since the Java side is what the reader settled, and a
+     * blank description or type is an ordinary resolution rather than a failure.
+     *
+     * @param spec the resolution this tool is being completed from; never {@code null}
+     * @throws SynapseException if the tool is unnamed, a parameter is unnamed, or two share a name
      */
-    public static MethodTool of(String name, String description, Method method, @Nullable Object target,
-            JsonCodec codec) {
-        ToolMethodSpec spec = new ToolMethodSpec(method, target);
-        spec.setName(name);
-        spec.setDescription(description);
-        MethodTool tool = new MethodTool();
-        tool.initialize(spec, codec);
-        return tool;
+    private static void validate(ToolMethodSpec spec) {
+        if (spec.getName().isBlank()) {
+            throw new SynapseException("no name for the tool resolved from " + spec.getMethod());
+        }
+        Set<String> names = new HashSet<>();
+        for (ToolParameterSpec entry : spec.getParameters()) {
+            if (entry.getName().isBlank()) {
+                throw new SynapseException("no name to declare " + entry.getParameter() + " under");
+            }
+            if (!names.add(entry.getName())) {
+                throw new SynapseException(
+                        "'" + entry.getName() + "' names two parameters of " + spec.getMethod());
+            }
+        }
     }
 
     /**
-     * Validates the spec once, so the stages that follow read it without rechecking; makes the
-     * method accessible so a private one the application hands over runs like any other; and holds
-     * the codec where {@link #schemaFor} reads it while completion runs, before the state that
-     * carries the spec is published.
+     * Makes the method accessible so a private one the application hands over runs like any other;
+     * and holds the codec where {@link #schemaFor} reads it while completion runs, before the state
+     * that carries the spec is published.
      *
      * @return one slot per parameter, all {@code false} until {@link #initialize} settles them
      */
     private boolean[] readSignature(ToolMethodSpec spec, JsonCodec codec) {
-        spec.validate();
         this.codec = codec;
         Method method = spec.getMethod();
         try {

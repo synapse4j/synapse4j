@@ -6,6 +6,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,16 +17,17 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 /**
- * The tools a class declares: every method it has that carries {@link ToolMethod}, read into a
+ * How a Java method becomes a tool: the annotated ones a class declares through {@link #from(Object)}
+ * and {@link #from(Class)}, and one named by hand through {@link #of}. Each is read into a
  * {@link ToolMethodSpec}, customized, and built into a tool.
  *
  * <p>
  * One method becomes one tool. The signature gives the structure; the annotations write the strings
  * they carry; the customizers this reader holds rewrite what they like afterwards, which is where a
- * name or a description from configuration enters. A blank attribute is left as it was — what a blank
- * becomes is settled between the {@link ToolMethodSpec} constructor, the annotations that did write,
- * and the customizers, and the one default this class states is the tool's name: a method that names
- * no tool is known by its own name.
+ * name or a description from configuration enters. Nothing is filled in before them — a blank stays
+ * blank, so a customizer can tell a value somebody wrote from one nobody did — and what is still
+ * blank when they are done is filled afterwards: a method that names no tool is known by its own
+ * name, a parameter by the Java parameter it was declared as.
  *
  * <p>
  * {@link #from(Object)} reads every annotated method the object has — the instance ones it runs on
@@ -41,10 +43,8 @@ import lombok.RequiredArgsConstructor;
  * The reader holds configuration, not conversations. It is not safe to share while that configuration
  * is still changing: {@link #specToolFactory(SpecToolFactory)} and {@link #addCustomizer} write its
  * fields, so calling either while another thread asks for tools is not safe. Once configuration has
- * stopped, an instance is safe to share — its fields are only read from then on, and
- * {@link #from(Object)} and {@link #from(Class)} may be called from any thread. It does not validate
- * what it produced — {@link ToolMethodSpec#validate} is a service for whoever completes a tool, and what
- * counts as usable is the completing tool's decision, not this reader's.
+ * stopped, an instance is safe to share — its fields are only read from then on, and every method
+ * here may be called from any thread.
  */
 @RequiredArgsConstructor
 public class MethodTools {
@@ -82,6 +82,30 @@ public class MethodTools {
     public MethodTools addCustomizer(@NonNull ToolMethodSpecCustomizer customizer) {
         customizers.add(customizer);
         return this;
+    }
+
+    /**
+     * The tool {@code method} becomes under the given name and description: the same reading, the
+     * same customizers and the same defaults as an annotated method, with the two strings supplied
+     * here instead of read off an annotation.
+     *
+     * @param name        the name the model calls the tool by; never {@code null}
+     * @param description what the tool does; never {@code null}
+     * @param method      the method to run; never {@code null}
+     * @param target      the instance an instance method runs on, {@code null} for a static one
+     * @return the assembled tool, initialized and ready; never {@code null}
+     * @throws SynapseException if the method is an instance method and no target is given
+     */
+    public MethodTool of(@NonNull String name, @NonNull String description, @NonNull Method method,
+            @Nullable Object target) {
+        ToolMethodSpec spec = specOf(method, target);
+        spec.setName(name);
+        spec.setDescription(description);
+        customize(spec);
+        applyDefaults(spec);
+        MethodTool tool = new MethodTool();
+        tool.initialize(spec, codec);
+        return tool;
     }
 
     /**
@@ -124,8 +148,10 @@ public class MethodTools {
             if (!statik && target == null) {
                 continue;
             }
-            ToolMethodSpec spec = new ToolMethodSpec(method, statik ? null : target);
-            spec.setName(annotation.name().isBlank() ? method.getName() : annotation.name());
+            ToolMethodSpec spec = specOf(method, statik ? null : target);
+            if (!annotation.name().isBlank()) {
+                spec.setName(annotation.name());
+            }
             if (!annotation.description().isBlank()) {
                 spec.setDescription(annotation.description());
             }
@@ -133,21 +159,38 @@ public class MethodTools {
                 spec.setType(annotation.type());
             }
             readParameters(method, spec);
-            for (ToolMethodSpecCustomizer customizer : customizers) {
-                customizer.customize(spec);
-            }
-            if (!spec.getName().isBlank()) {
-                Method earlier = named.putIfAbsent(spec.getName(), method);
-                if (earlier != null) {
-                    throw new SynapseException("two tool methods of " + type.getName() + " declare the name '"
-                            + spec.getName() + "': " + earlier + " and " + method);
-                }
+            customize(spec);
+            applyDefaults(spec);
+            Method earlier = named.putIfAbsent(spec.getName(), method);
+            if (earlier != null) {
+                throw new SynapseException("two tool methods of " + type.getName() + " declare the name '"
+                        + spec.getName() + "': " + earlier + " and " + method);
             }
             SpecTool tool = specToolFactory.create(spec.getType());
             tool.initialize(spec, codec);
             tools.add(tool);
         }
         return tools;
+    }
+
+    /**
+     * The resolution of one method before anything is written into it: its signature, the instance it
+     * runs on, and nothing else. Which parameters exist and which Java parameter each one stands for
+     * is settled here and cannot drift afterwards; an instance method needs the instance it runs on,
+     * and that pairing is this reader's business — the spec is handed two unrelated objects.
+     *
+     * @param method the method to read; never {@code null}
+     * @param target the instance an instance method runs on, {@code null} for a static one
+     * @return the empty resolution; never {@code null}
+     * @throws SynapseException if the method is an instance method and no target is given
+     */
+    private ToolMethodSpec specOf(Method method, @Nullable Object target) {
+        if (!Modifier.isStatic(method.getModifiers()) && target == null) {
+            throw new SynapseException("no target for " + method + ", which is an instance method");
+        }
+        List<ToolParameterSpec> parameters = Arrays.stream(method.getParameters())
+                .map(ToolParameterSpec::new).toList();
+        return new ToolMethodSpec(method, target, parameters);
     }
 
     /** Writes onto the spec whatever each parameter's {@link ToolParam} actually said. */
@@ -167,6 +210,29 @@ public class MethodTools {
             }
             if (!annotation.required().isBlank()) {
                 entry.setRequired(annotation.required());
+            }
+        }
+    }
+
+    /** Runs every customizer this reader holds, in the order they were added. */
+    private void customize(ToolMethodSpec spec) {
+        for (ToolMethodSpecCustomizer customizer : customizers) {
+            customizer.customize(spec);
+        }
+    }
+
+    /**
+     * Fills the names nothing supplied with the ones the signature stands for: the tool is named
+     * after its method, and a parameter after the Java parameter it was declared as. What was
+     * written is left as it was written.
+     */
+    private static void applyDefaults(ToolMethodSpec spec) {
+        if (spec.getName().isBlank()) {
+            spec.setName(spec.getMethod().getName());
+        }
+        for (ToolParameterSpec entry : spec.getParameters()) {
+            if (entry.getName().isBlank()) {
+                entry.setName(entry.getParameter().getName());
             }
         }
     }

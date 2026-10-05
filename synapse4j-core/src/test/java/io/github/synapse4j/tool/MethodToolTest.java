@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,9 @@ import org.junit.jupiter.api.Test;
 class MethodToolTest {
 
     private final JsonCodec codec = mock(JsonCodec.class);
+
+    /** The reader that turns a method into a tool when the application names it by hand. */
+    private final MethodTools reader = new MethodTools(codec);
 
     @BeforeEach
     void codecAnswersAPlainSchema() {
@@ -52,14 +56,35 @@ class MethodToolTest {
         // A static method's acceptance is every other test's subject; what only this one pins is the
         // refusal an instance method gets without a target.
         SynapseException refused = assertThrows(SynapseException.class,
-                () -> MethodTool.of("n", "d", instance, null, codec));
+                () -> reader.of("n", "d", instance, null));
         assertTrue(refused.getMessage().contains("instance method"));
     }
 
     @Test
+    void aResolutionThatNamesNothingIsRefused() {
+        ToolMethodSpec spec = resolutionOf(method("ship", String.class, CurrentUser.class), null);
+        MethodTool tool = new MethodTool();
+
+        SynapseException unnamedTool = assertThrows(SynapseException.class, () -> tool.initialize(spec, codec));
+        assertTrue(unnamedTool.getMessage().contains("no name for the tool"));
+
+        spec.setName("ship");
+        spec.getParameters().get(1).setName("");
+
+        SynapseException unnamedParameter = assertThrows(SynapseException.class, () -> tool.initialize(spec, codec));
+        assertTrue(unnamedParameter.getMessage().contains("no name to declare"));
+
+        spec.getParameters().get(1).setName("to");
+        spec.getParameters().get(0).setName("to");
+
+        SynapseException doubled = assertThrows(SynapseException.class, () -> tool.initialize(spec, codec));
+        assertTrue(doubled.getMessage().contains("names two parameters"));
+    }
+
+    @Test
     void signatureBuildsTheDeclaration() {
-        ToolDefinition definition = MethodTool
-                .of("weather", "Looks up weather", method("take", String.class), null, codec).definition();
+        ToolDefinition definition = reader.of("weather", "Looks up weather", method("take", String.class), null)
+                .definition();
 
         assertEquals("weather", definition.getName());
         assertEquals("Looks up weather", definition.getDescription());
@@ -69,8 +94,8 @@ class MethodToolTest {
 
     @Test
     void chatContextParameterStaysOutOfTheSchema() {
-        JsonSchema schema = MethodTool
-                .of("ctx", "Takes the context", method("withContext", ChatContext.class), null, codec).definition()
+        JsonSchema schema = reader.of("ctx", "Takes the context", method("withContext", ChatContext.class), null)
+                .definition()
                 .getInputSchema();
 
         assertFalse(schema.keys().contains("properties"));
@@ -79,8 +104,7 @@ class MethodToolTest {
 
     @Test
     void privateMethodRunsOnceHandedOver() throws Exception {
-        MethodTool tool = MethodTool.of("secret", "A private method", Target.class.getDeclaredMethod("secret"), null,
-                codec);
+        MethodTool tool = reader.of("secret", "A private method", Target.class.getDeclaredMethod("secret"), null);
 
         assertEquals("secret!", execute(tool, ""));
     }
@@ -97,8 +121,7 @@ class MethodToolTest {
 
     @Test
     void chatContextParameterReceivesTheConversation() throws Exception {
-        MethodTool tool = MethodTool.of("ctx", "Takes the context", method("withContext", ChatContext.class), null,
-                codec);
+        MethodTool tool = reader.of("ctx", "Takes the context", method("withContext", ChatContext.class), null);
 
         assertEquals("set", execute(tool, null, new ChatContext()));
         assertEquals("null", execute(tool, null, null));
@@ -107,7 +130,7 @@ class MethodToolTest {
     @Test
     void matchingValueIsPassedThrough() throws Exception {
         when(codec.decode(any(), any())).thenReturn(Map.of("message", "hello"));
-        MethodTool tool = MethodTool.of("take", "Takes a string", method("take", String.class), null, codec);
+        MethodTool tool = reader.of("take", "Takes a string", method("take", String.class), null);
 
         Object[] values = tool.resolveArguments("{\"message\":\"hello\"}", null);
 
@@ -118,7 +141,7 @@ class MethodToolTest {
     void valueNotFittingItsParameterGoesThroughTheCodec() throws Exception {
         when(codec.decode(any(), any())).thenReturn(Map.of("n", "21"));
         when(codec.convert("21", int.class)).thenReturn(21);
-        MethodTool tool = MethodTool.of("twice", "Doubles a number", method("twice", int.class), null, codec);
+        MethodTool tool = reader.of("twice", "Doubles a number", method("twice", int.class), null);
 
         Object[] values = tool.resolveArguments("{\"n\":\"21\"}", null);
 
@@ -128,7 +151,7 @@ class MethodToolTest {
     @Test
     void missingValueForAPrimitiveNamesTheParameter() {
         when(codec.decode(any(), any())).thenReturn(Map.of());
-        MethodTool tool = MethodTool.of("save", "Saves an id", method("save", int.class), null, codec);
+        MethodTool tool = reader.of("save", "Saves an id", method("save", int.class), null);
 
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
                 () -> tool.resolveArguments("{}", null));
@@ -139,14 +162,14 @@ class MethodToolTest {
     @Test
     void missingValueForAnObjectIsNull() throws Exception {
         when(codec.decode(any(), any())).thenReturn(Map.of());
-        MethodTool tool = MethodTool.of("take", "Takes a string", method("take", String.class), null, codec);
+        MethodTool tool = reader.of("take", "Takes a string", method("take", String.class), null);
 
         assertNull(tool.resolveArguments("{}", null)[0]);
     }
 
     @Test
     void absentArgumentsMeanNone() throws Exception {
-        MethodTool tool = MethodTool.of("take", "Takes a string", method("take", String.class), null, codec);
+        MethodTool tool = reader.of("take", "Takes a string", method("take", String.class), null);
 
         // null and blank both mean the model produced none, which is not a document to decode.
         assertNull(tool.resolveArguments(null, null)[0]);
@@ -157,7 +180,7 @@ class MethodToolTest {
     @Test
     void keyTheMethodDoesNotDeclareIsIgnored() throws Exception {
         when(codec.decode(any(), any())).thenReturn(Map.of("message", "hello", "extra", "ignored"));
-        MethodTool tool = MethodTool.of("take", "Takes a string", method("take", String.class), null, codec);
+        MethodTool tool = reader.of("take", "Takes a string", method("take", String.class), null);
 
         assertEquals("hello", tool.resolveArguments("{}", null)[0]);
     }
@@ -167,15 +190,15 @@ class MethodToolTest {
     @Test
     void failureOutOfTheMethodArrivesUnwrapped() {
         IllegalStateException unchecked = assertThrows(IllegalStateException.class,
-                () -> execute(MethodTool.of("fail", "Always fails", method("fail"), null, codec), ""));
+                () -> execute(reader.of("fail", "Always fails", method("fail"), null), ""));
         assertEquals("boom", unchecked.getMessage());
 
         Exception checked = assertThrows(Exception.class,
-                () -> execute(MethodTool.of("failChecked", "Fails checked", method("failChecked"), null, codec), ""));
+                () -> execute(reader.of("failChecked", "Fails checked", method("failChecked"), null), ""));
         assertEquals("checked", checked.getMessage());
 
         RuntimeException bare = assertThrows(RuntimeException.class,
-                () -> execute(MethodTool.of("weird", "Throws a bare Throwable", method("weird"), null, codec), ""));
+                () -> execute(reader.of("weird", "Throws a bare Throwable", method("weird"), null), ""));
         assertEquals("weird", bare.getCause().getMessage());
     }
 
@@ -183,9 +206,9 @@ class MethodToolTest {
 
     @Test
     void returnValueBecomesTheResult() {
-        MethodTool voidMethod = MethodTool.of("save", "Saves an id", method("save", int.class), null, codec);
-        MethodTool stringMethod = MethodTool.of("noop", "Does nothing", method("noop"), null, codec);
-        MethodTool otherMethod = MethodTool.of("twice", "Doubles a number", method("twice", int.class), null, codec);
+        MethodTool voidMethod = reader.of("save", "Saves an id", method("save", int.class), null);
+        MethodTool stringMethod = reader.of("noop", "Does nothing", method("noop"), null);
+        MethodTool otherMethod = reader.of("twice", "Doubles a number", method("twice", int.class), null);
         when(codec.encode(42)).thenReturn("encoded");
 
         List<ContentPart> parts = voidMethod.resolveResult(null, null);
@@ -223,7 +246,7 @@ class MethodToolTest {
 
     @Test
     void argumentsSchemaIsTheHooksToShape() {
-        ToolMethodSpec spec = new ToolMethodSpec(method("take", String.class), null);
+        ToolMethodSpec spec = resolutionOf(method("take", String.class), null);
         spec.setName("shaped");
         ShapedTool tool = new ShapedTool();
         tool.initialize(spec, codec);
@@ -243,7 +266,7 @@ class MethodToolTest {
 
     @Test
     void emptyDescriptionBecomesNoDescription() {
-        MethodTool tool = MethodTool.of("noop", "", method("noop"), null, codec);
+        MethodTool tool = reader.of("noop", "", method("noop"), null);
 
         assertNull(tool.definition().getDescription());
     }
@@ -252,7 +275,7 @@ class MethodToolTest {
     void arrayParameterIsDescribedAndBound() throws Exception {
         when(codec.decode(any(), any())).thenReturn(Map.of("items", List.of("a", "b")));
         when(codec.convert(List.of("a", "b"), String[].class)).thenReturn(new String[] { "a", "b" });
-        MethodTool tool = MethodTool.of("join", "Joins items", method("join", String[].class), null, codec);
+        MethodTool tool = reader.of("join", "Joins items", method("join", String[].class), null);
 
         assertTrue(tool.definition().getInputSchema().getProperties().containsKey("items"));
 
@@ -265,7 +288,7 @@ class MethodToolTest {
     @Test
     void aTypeTheCodecDoesNotRequireIsLeftOut() {
         when(codec.generateDecodeSchema(any())).thenReturn(new JsonSchemaBuilder().setType("object").build());
-        MethodTool tool = MethodTool.of("take", "Takes a string", method("take", String.class), null, codec);
+        MethodTool tool = reader.of("take", "Takes a string", method("take", String.class), null);
 
         // the codec's answer is the only thing asked; a value it does not list as required leaves the
         // parameter out of the envelope's own required list
@@ -289,6 +312,18 @@ class MethodToolTest {
         } catch (NoSuchMethodException e) {
             throw new AssertionError(e);
         }
+    }
+
+    /**
+     * The resolution a tool is completed from, carrying the method's signature with every parameter
+     * named after the Java parameter it stands for — what {@link MethodTools} hands over once its
+     * customizers and defaults have run.
+     */
+    private static ToolMethodSpec resolutionOf(Method method, Object target) {
+        ToolMethodSpec spec = new ToolMethodSpec(method, target,
+                Arrays.stream(method.getParameters()).map(ToolParameterSpec::new).toList());
+        spec.getParameters().forEach(entry -> entry.setName(entry.getParameter().getName()));
+        return spec;
     }
 
     private String execute(MethodTool tool, String arguments) throws Exception {
@@ -402,7 +437,7 @@ class MethodToolTest {
     private static class BizTool extends MethodTool {
 
         public static BizTool of(String name, String description, Method method, Object target, JsonCodec codec) {
-            ToolMethodSpec spec = new ToolMethodSpec(method, target);
+            ToolMethodSpec spec = resolutionOf(method, target);
             spec.setName(name);
             spec.setDescription(description);
             BizTool tool = new BizTool();
@@ -430,7 +465,7 @@ class MethodToolTest {
 
         public static ClaimOnlyTool of(String name, String description, Method method, Object target,
                 JsonCodec codec) {
-            ToolMethodSpec spec = new ToolMethodSpec(method, target);
+            ToolMethodSpec spec = resolutionOf(method, target);
             spec.setName(name);
             spec.setDescription(description);
             ClaimOnlyTool tool = new ClaimOnlyTool();
