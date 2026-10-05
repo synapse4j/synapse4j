@@ -17,6 +17,11 @@ version becomes the body of the GitHub Release created when that version's tag i
 - A `JsonSchema` is bound natively in the Jackson module — `Synapse4jJacksonModule` registers a serializer and a deserializer for it, with `JsonSchemas.shapesOf` naming the shape each keyword takes — and the document form is gone: `JsonSchemas.toDocument`/`fromDocument` are removed, and a schema travels as a `JsonSchema` end to end
 - A schema compares by value and prints as its own value: `ObjectJsonSchema` and `BooleanJsonSchema` implement `equals`/`hashCode`, and `toString` renders the schema's own JSON rather than a class name glued to a value
 - `JacksonJsonCodec` is built from a `JsonMapper.Builder` and the two schema generators, binding its module itself, and the Spring starter rebuilds the application's mapper rather than registering a second one
+- The Spring starter reads tools off annotated beans: `@Tools` marks a class — component scanning registers it, its `prefix` (also `value`) goes in front of every tool name the class declares, and its `client` picks the chat client — and `ToolsProcessor` registers those tools on the chat clients at the end of startup, failing when a class names a client no bean answers to
+- `synapse4j.tools.*` binds the tool settings — `spel`, `strict`, and per-tool `methods` overrides keyed by the name a tool carries before configuration applies — and drives the starter's customizers in order: the class prefix, the configuration, a parameter marked `@Autowired`, `@Qualifier` or `@Value` filled from the container, and, with `synapse4j.tools.spel=true`, `#{...}` and `${...}` resolution in the annotation text
+- `ChatClient` answers its configuration as well as taking it: `chatCustomizers()`, `defaultTools()`, `toolProviders()` and `defaultOptions()`
+- `MethodTools.from(Class, Object)` reads the annotated methods off a given class and runs them on a given instance, so a bean the container wrapped in a proxy still yields its tools while the proxy stays what a call runs on
+- `Synapse4jProperties` no longer sets `ignoreUnknownFields=false`, so an unknown `synapse4j.*` key is ignored rather than failing the context
 
 ## [0.0.2] - 2026-10-01
 

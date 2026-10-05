@@ -49,6 +49,15 @@ synapse4j:
     options:
       model: gpt-4o-mini
       temperature: 0.2
+  tools:
+    spel: false
+    strict: true
+    methods:
+      get_weather:
+        description: 查询某个城市的当前天气
+        parameters:
+          city:
+            description: 要查询的城市
 ```
 
 `synapse4j.*` 的键按配置的内容分组。各厂商的设置——`synapse4j.openai.*` 绑定 `OpenAiConfig`，
@@ -57,13 +66,16 @@ synapse4j:
 ——`synapse4j.jackson.*` 绑定 `JacksonSchemaSettings`，即 schema 生成器的各项选择——这样将来换一个
 实现就有一组自己的键。只有 chat 调用才有的东西收在 `synapse4j.chat.*`
 下面：`synapse4j.chat.client`、`synapse4j.chat.auto-tool-calling`、`synapse4j.chat.system-message`，
-以及 `synapse4j.chat.options.*`，它绑定 `ChatOptionsProperties`，即 starter 里 `ChatOptions` 的镜像，
-由 `toChatOptions()` 转成库里的类型——库里的类型本身无法绑定。每个键都是它绑定的那个类型上的一个
-字段，含义在该类型上有文档；options 这个镜像只重述 Spring 能绑定的字段。
+以及 `synapse4j.chat.options.*`。每个键都是它绑定的那个类型上的一个字段，含义在该类型上有文档；
+options 这一组只重述 Spring 能绑定的字段。
 `synapse4j.chat.options.extras` 按原始键绑定：键用的就是提供商的协议字段名，点分键指向嵌套成员。
 非字符串的值需要 YAML——`.properties` 文件会把每个值都变成字符串。
 
+工具支持有自己的一组键，`synapse4j.tools.*`，绑定 `ToolsProperties`；每个键的作用见
+[工具](#工具)一节。
+
 每个 `synapse4j.*` 键都有配置元数据，因此 IDE 会补全它们。`synapse4j.enabled` 会关掉整个自动配置。
+`synapse4j.*` 里没见过的键会被忽略，不会让上下文启动失败。
 
 `synapse4j.chat.system-message` 会为每个没有自带系统消息的调用补上一条内容为该文本的系统消息；
 自带系统消息的调用保持原样。
@@ -85,6 +97,39 @@ class Assistant {
     }
 }
 ```
+
+## 工具
+
+starter 从标了 `@Tools` 的类里读应用的工具。这个注解自带 `@Component`，组件扫描会把这个类注册成 bean
+——不必另外扫描——它上面的 `@ToolMethod` 方法就成了聊天客户端的工具。
+
+```java
+@Tools(prefix = "weather_")
+class WeatherTools {
+
+    @ToolMethod(description = "查询某个城市的当前天气")
+    String forecast(@ToolParam(name = "city") String city) {
+        ...
+    }
+}
+```
+
+`prefix`（也可以写成 `value`，所以 `@Tools("weather_")` 同样有效）写在类声明的每个工具名前面，两个类
+因此可以各自声明一个同名方法而不冲突。它是字面文本，想加分隔符就把它写进去；留空（默认）什么都不加。
+`client` 指定这些工具属于哪个聊天客户端 bean；留空（默认）就是每个聊天客户端都有。类指定的客户端没有
+任何 bean 对应时，启动会失败。
+
+标了 `@Autowired`、`@Qualifier` 或 `@Value` 的参数不从模型来，而是从容器里取：解析方式和 Spring 解析
+任何注入点一样，所以限定符能选中 bean，属性也能读到。
+
+`synapse4j.tools.*` 绑定这些设置。`spel` 默认关闭；打开后，注解文本里的 `#{...}` SpEL 和 `${...}`
+占位符会被解析，配置里写的值也算在内。`strict` 是应用为所有工具统一设置的那一项：某个工具既没在注解
+里、也没在 `methods` 下自己的条目里说明时，就落到这个值。`methods` 存放每个工具的覆盖项，键是配置生效
+之前这个工具所带的名称——注解给它起的名字，或者注解没起名时方法自己的名字再加上类的 prefix。条目里写的
+名字不会挪动它原来所在的键。
+
+starter 自带的步骤都是排好序的 bean；声明一个自己的 `ToolMethodSpecCustomizer` 并标上 `@Order`，就能插进
+它们之间。
 
 ## 定制客户端
 
@@ -110,9 +155,7 @@ ChatClientCustomizer tenantHeader(String tenant) {
 
 customizer 改不了提供商配置——base URL、API key、协议字段的拼写。`setConfig` 不在 `ChatClient`
 接口上，而且 `synapse4j.chat.auto-tool-calling` 打开时（默认如此），customizer 拿到的是
-`ToolCallingChatClient` 包装，它不暴露任何可以穿透的委托对象。要改就改绑定进来的配置：starter
-交给每个提供商客户端的是 `Synapse4jProperties` bean 持有的那个 `OpenAiConfig` 或 `AnthropicConfig`
-实例，而客户端每次往来都会重新读取自己的配置，所以改动那个实例会在下一次调用生效：
+`ToolCallingChatClient` 包装，它不暴露任何可以穿透的委托对象。要改就改绑定进来的配置：
 
 ```java
 @Component
@@ -166,7 +209,6 @@ starter 自己不读取任何密钥。API key 和其他属性一样进来：`syn
 按请求的超时；改用 `spring.http.client.read-timeout`。
 
 选择 `apache` 会使用 Apache HttpClient 5，starter 不会把它放进你的 classpath——要不要再引入一套 HTTP
-栈是应用自己的决定。你需要自己声明 `httpclient5`。Apache 相关的 bean 只在对应的类存在时才生效，默认
-接线根本不会碰到它们；选了 `apache` 却没带这个库时，上下文会失败，并告诉你加入
-`org.apache.httpcomponents.client5:httpclient5`。这个失败只在 starter 需要自己构建传输层时发生：
-声明了自己的 `HttpClient` 的应用已经手工接好线，选择项对它不起作用。
+栈是应用自己的决定。你需要自己声明 `httpclient5`。选了 `apache` 却没带这个库时，上下文会失败，并告诉
+你加入 `org.apache.httpcomponents.client5:httpclient5`。这个失败只在 starter 需要自己构建传输层时
+发生：声明了自己的 `HttpClient` 的应用已经手工接好线，选择项对它不起作用。

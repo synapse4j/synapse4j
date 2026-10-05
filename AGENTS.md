@@ -226,7 +226,9 @@ behavior, or say in the test's name why it stands.
 - Write for a developer who knows LLM APIs, JSON, HTTP and build tools but nothing about this
   library. Do not explain or analogize the basics; do not open with this library's types or design
   vocabulary — name a thing only once the prose around it has made clear what it is. Plain, direct
-  sentences, no essay flourishes.
+  sentences, no essay flourishes. Say how to use a feature and how to extend it, not how it is built
+  inside — an internal class a user never names, and why a step runs when it does, are not the docs'
+  business.
 - Every language's docs read as that language: the prose is native, and a foreign word appears only
   for code identifiers and genuine terms (HTTP, JSON, schema, JDK, class names, Java keywords,
   product names). Write each tree; do not translate another tree's text word for word — a literal

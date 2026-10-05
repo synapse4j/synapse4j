@@ -107,6 +107,10 @@ your application says it means. The factory is handed the whole resolution and t
 finished tool: `MethodTool(ToolMethodSpec, JsonCodec)` is what a class has to offer to be named, and
 nothing after it completes what it built.
 
+A Spring Boot application can take this path without calling `from` itself: `@Tools` marks the
+class, component scanning registers it as a bean, and the starter puts its tools on the chat clients
+at startup — see [Spring Boot](spring-boot.md#tools).
+
 ## Running the calls
 
 A bare client hands you the tool calls in the response and lets you drive them. When you want the

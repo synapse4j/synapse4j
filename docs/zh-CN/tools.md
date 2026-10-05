@@ -92,6 +92,9 @@ new MethodTools(codec)
 和 codec，交回来的就是成品：`MethodTool(ToolMethodSpec, JsonCodec)` 是一个类被指名时所要提供的东西，
 之后没有别的步骤再来补完它。
 
+Spring Boot 应用不必自己调用 `from` 也能走这条路：`@Tools` 标在类上，组件扫描把它注册成 bean，
+starter 在启动时把它的工具放到聊天客户端上，见 [Spring Boot](spring-boot.md#工具)。
+
 ## 运行调用
 
 裸客户端把响应里的工具调用交给你，由你驱动。想让库来运行，就包装客户端：

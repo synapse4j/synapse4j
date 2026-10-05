@@ -65,6 +65,5 @@ returned, and a connection that drops mid-answer fails while iterating.
 
 ## Streaming with tools
 
-`ToolCallingChatClient.stream` splices the rounds' streams into one sequence: the loop advances
-inside the pull, executing a round's tool batch and opening the next round before the next event
-arrives. The boundary between rounds is the protocol's own; no marker is synthesized.
+`ToolCallingChatClient.stream` splices the rounds' streams into one sequence of events. The
+boundary between rounds is the protocol's own; no marker is synthesized.

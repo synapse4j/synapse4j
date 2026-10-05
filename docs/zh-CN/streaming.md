@@ -57,5 +57,5 @@ ChatResponse response = stream.aggregatedResponse();
 
 ## 带工具的流式
 
-`ToolCallingChatClient.stream` 把各轮的流拼接成一个序列：循环在拉取内部推进，执行某一轮的工具批，
-并在下一个事件到达前打开下一轮。轮与轮之间的边界是协议自己的，不合成任何标记。
+`ToolCallingChatClient.stream` 把各轮的流拼接成一个事件序列。轮与轮之间的边界是协议自己的，不合成
+任何标记。

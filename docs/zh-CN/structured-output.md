@@ -57,13 +57,7 @@ Person person = codec.decode(response.getText(), Person.class);
 
 ## 各提供商的支持
 
-每个提供商模块都把这项要求翻译成自己的协议：
-
-| 模块 | 落在哪里 |
-|---|---|
-| `synapse4j-openai`（Completions） | `response_format` |
-| `synapse4j-openai`（Responses） | `text.format` |
-| `synapse4j-anthropic` | `output_config.format` |
+每个提供商模块都把这项要求翻译成自己的协议。
 
 协议无法表达所要求的答案形状时，调用会失败，而不是以普通文本作答——一个看上去像成功的答案，是代价最高
 的一种出错方式。例如 Anthropic 协议没有承载 schema 名字或描述的成员，也无法关掉对 schema 的强制，

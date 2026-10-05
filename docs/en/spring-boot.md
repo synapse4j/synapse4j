@@ -49,6 +49,15 @@ synapse4j:
     options:
       model: gpt-4o-mini
       temperature: 0.2
+  tools:
+    spel: false
+    strict: true
+    methods:
+      get_weather:
+        description: Get the current weather for a city
+        parameters:
+          city:
+            description: The city to look up
 ```
 
 The `synapse4j.*` keys group by what they configure. The family settings — `synapse4j.openai.*`
@@ -57,16 +66,19 @@ binds `OpenAiConfig`, `synapse4j.anthropic.*` binds `AnthropicConfig` — and th
 The JSON implementation's settings sit under their own key — `synapse4j.jackson.*` binds
 `JacksonSchemaSettings`, the schema generator's choices — so a second implementation gets a group of
 its own. Everything only a chat call has sits together under `synapse4j.chat.*`: `synapse4j.chat.client`,
-`synapse4j.chat.auto-tool-calling`, `synapse4j.chat.system-message`, and `synapse4j.chat.options.*`,
-which binds `ChatOptionsProperties`, the starter's mirror of `ChatOptions` that `toChatOptions()`
-turns into the library type — the library type itself cannot be bound. Each key is a field on the
-type it binds, documented there; the options mirror restates only the fields Spring can bind.
+`synapse4j.chat.auto-tool-calling`, `synapse4j.chat.system-message`, and `synapse4j.chat.options.*`.
+Each key is a field on the type it binds, documented there; the options group restates only the
+fields Spring can bind.
 `synapse4j.chat.options.extras` binds raw keys: a key is the provider's own wire name, and a dotted
 key addresses a nested member. A non-string value needs YAML — a `.properties` file yields a string
 for every value.
 
+The tool support has its own group, `synapse4j.tools.*`, on a `ToolsProperties`; the [Tools](#tools)
+section says what each key does.
+
 Every `synapse4j.*` key has configuration metadata, so your IDE completes them. `synapse4j.enabled`
-turns the whole auto-configuration off.
+turns the whole auto-configuration off. An unknown `synapse4j.*` key is ignored rather than failing
+the context.
 
 `synapse4j.chat.system-message` gives every call that carries no system message of its own one
 saying that text; a call that states its own keeps it.
@@ -88,6 +100,44 @@ class Assistant {
     }
 }
 ```
+
+## Tools
+
+The starter reads an application's tools from classes marked `@Tools`. The annotation carries
+`@Component`, so component scanning registers the class as a bean — no scan of its own — and its
+`@ToolMethod` methods become tools on the chat clients.
+
+```java
+@Tools(prefix = "weather_")
+class WeatherTools {
+
+    @ToolMethod(description = "Get the current weather for a city")
+    String forecast(@ToolParam(name = "city") String city) {
+        ...
+    }
+}
+```
+
+`prefix` — spelled `value` too, so `@Tools("weather_")` works — is written in front of every tool
+name the class declares, which is how two classes may declare a method of one name without
+colliding. It is literal text, so a separator is part of it; blank, the default, writes nothing.
+`client` names the chat-client bean these tools belong to; blank, the default, puts them on every
+chat client. A class naming a client no bean answers to fails startup.
+
+A parameter marked `@Autowired`, `@Qualifier` or `@Value` is taken off the wire and filled from the
+container instead of by the model, resolved the way Spring resolves any injection point — so a
+qualifier picks the bean and a property is read.
+
+`synapse4j.tools.*` binds the settings. `spel` is off by default; turning it on resolves `#{...}`
+SpEL and `${...}` placeholders in the annotation text, including values written in configuration.
+`strict` is the one attribute an application sets once for every tool: the value a tool falls to
+when neither its annotation nor its entry under `methods` states one. `methods` holds per-tool
+overrides keyed by the name the tool carries before configuration applies — the name its annotation
+gave it, or, when the annotation named none, the method's own name with the class's prefix in front.
+A name written in an entry does not move the entry it came from.
+
+The starter's own steps are ordered beans; declare a `ToolMethodSpecCustomizer` of your own,
+`@Order`ed, to slot in among them.
 
 ## Customizing the client
 
@@ -116,10 +166,7 @@ A customizer cannot change provider configuration — the base URL, the API key,
 spellings. `setConfig` is not on the `ChatClient` interface, and with
 `synapse4j.chat.auto-tool-calling` on (the default) the customizer receives the
 `ToolCallingChatClient` wrapper, which exposes no delegate to reach through. Change the bound
-configuration instead. The starter hands each provider client the
-`OpenAiConfig` or `AnthropicConfig` instance held by the `Synapse4jProperties` bean, and a client
-reads its configuration afresh on every exchange, so changing that instance takes effect on the
-next call:
+configuration instead:
 
 ```java
 @Component
@@ -179,9 +226,8 @@ settings configured for the rest of the application apply to LLM calls too.
 `RestClient` has no per-request timeout; use `spring.http.client.read-timeout` instead.
 
 Selecting `apache` uses Apache HttpClient 5, which the starter does not put on your classpath —
-another HTTP stack is your application's choice to make. Declare `httpclient5` yourself. The Apache
-beans sit behind a class condition, so the default wiring never touches them; selecting `apache`
-without the library fails the context with a message telling you to add
+another HTTP stack is your application's choice to make. Declare `httpclient5` yourself. Selecting
+`apache` without the library fails the context with a message telling you to add
 `org.apache.httpcomponents.client5:httpclient5`. That failure fires only when the starter would
 build the transport itself: an application that declares its own `HttpClient` has wired one by
 hand, and the selector is inert for it.

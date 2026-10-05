@@ -60,13 +60,7 @@ Person person = codec.decode(response.getText(), Person.class);
 
 ## Per-provider support
 
-Every provider module translates the requirement to its own protocol:
-
-| Module | Where it lands |
-|---|---|
-| `synapse4j-openai` (Completions) | `response_format` |
-| `synapse4j-openai` (Responses) | `text.format` |
-| `synapse4j-anthropic` | `output_config.format` |
+Every provider module translates the requirement to its own protocol.
 
 A protocol that cannot express the shape the caller asked the answer to take fails the call rather
 than answering in prose — an answer that looks like success is the most expensive way to be wrong.
