@@ -33,7 +33,8 @@ public class ToolMethodProperties {
     private @Nullable String schema;
 
     /**
-     * Whether the provider must enforce the schema; {@code @ToolMethod#strict()}. Unset, it falls to
+     * Whether the provider must enforce the schema; {@code @ToolMethod#strict()}. Written, it replaces
+     * the annotation's; unset, the annotation's stands, and where that too states none it falls to
      * {@link ToolsProperties#getStrict()} and then to the protocol.
      */
     private @Nullable String strict;
