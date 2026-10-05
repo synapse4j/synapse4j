@@ -136,12 +136,17 @@ ChatResponse second = client.chat(request);
 ```
 
 `continueWith` archives the round that just went out and appends the assistant's answer, so the
-next `chat` sends the whole exchange. This is the one line you would write differently on a server
-that remembers conversations for you; a client whose protocol does that overrides it, and the call
-site stays the same.
+next `chat` sends the whole exchange. One protocol keeps the conversation on its side instead:
+the OpenAI Responses API stores each answer, and `OpenAiResponsesChatClient` overrides
+`continueWith` to name the stored previous response rather than archive the transcript for
+resending. Your code reads the same either way; [Conversations](conversations.md) covers both
+shapes.
 
-If you persist the conversation yourself, implement a `ChatCustomizer` and write the request and
-response out when its hook fires. The library never reaches for your storage.
+If you persist the conversation yourself, implement a `ChatCustomizer` — a hook that runs around
+each call, handed the request before it goes out and the answer on the way back — and write the
+pair out from it. Register it with `client.addChatCustomizer(...)`;
+[Conversations](conversations.md#persisting-a-conversation) shows the shape. The library never
+reaches for your storage.
 
 ## 6. Stream an answer
 
@@ -169,7 +174,8 @@ try-with-resources closes the connection when you leave early.
 
 A tool is a declaration plus the code behind it. `FunctionTool` builds both from a type and a
 lambda: the model's arguments are decoded into your record, the lambda runs, and its result is
-rendered back.
+rendered back. The lambda's second parameter is the `ChatContext` of the conversation the call
+belongs to — `null` when none is attached — which most tools ignore.
 
 ```java
 import io.github.synapse4j.chat.ToolCallingChatClient;
@@ -231,5 +237,12 @@ JSON your codec reads back — no second library, no hand-written schema.
 
 ## Where to go next
 
+- [The call model](model.md) — the request, the response, messages, parts and options the
+  walkthrough used.
+- [Conversations](conversations.md) — holding history across turns, including the server-side
+  shape section 5 touched.
+- [Streaming](streaming.md) — consuming an answer event by event.
+- [Tools](tools.md) — declaring tools and running the model's tool calls.
+- [Structured output](structured-output.md) — asking for JSON against a schema.
 - [Design and trade-offs](design.md) explains what the library does and does not do, and why.
 - The Javadoc is the reference for every type and method used above.

@@ -19,6 +19,11 @@ The starter needs Spring Boot 4.1 or newer — the line it is built and tested a
 not covered by the build and may or may not work: the JSON module needs Jackson 3.1, which Boot 4.0.4
 was the first to manage.
 
+The artifact carries the library modules the stack needs — the Jackson codec, both transports'
+modules, and the OpenAI and Anthropic provider modules — so every `synapse4j.chat.client` value works
+with no further dependencies. The one library it deliberately leaves off your classpath is Apache
+HttpClient 5 itself; see [Transports](#transports).
+
 ## What it wires
 
 The default wiring is three beans, each backing off if you declare your own:
@@ -166,7 +171,9 @@ A customizer cannot change provider configuration — the base URL, the API key,
 spellings. `setConfig` is not on the `ChatClient` interface, and with
 `synapse4j.chat.auto-tool-calling` on (the default) the customizer receives the
 `ToolCallingChatClient` wrapper, which exposes no delegate to reach through. Change the bound
-configuration instead:
+configuration instead. Every `synapse4j.*` key is bound on a `Synapse4jProperties` bean the starter
+registers, and the clients it builds read their family config from that same instance — so injecting
+the bean and mutating the config it holds is how provider configuration is changed from code:
 
 ```java
 @Component

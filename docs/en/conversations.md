@@ -44,13 +44,33 @@ Some protocols keep the conversation for you. The OpenAI Responses API, for exam
 answer and continue from the previous response id instead of resending the transcript.
 
 This changes what the client sends, not how you write the code: you still call `chat` and
-`continueWith` the same way. A client whose protocol is stateful overrides `continueWith` to record
-what its next call needs — the previous response id — and to decide which list the answer belongs
-in.
+`continueWith` the same way. A client whose protocol is stateful overrides `continueWith` to write
+the previous response id into the request's options extras. That id anchors the chain: once it is
+there, the next `chat` sends only the pending messages plus the id — the history stays in the
+request as your local record, but the server, which already holds it, is not sent it again. The
+override also decides which list each answer belongs in. An answer the server stored is archived
+into the history as usual and moves the id forward; an answer the server did not store, while an id
+is on the request, joins the pending messages instead — archived into the history it would be
+skipped on every later call, since an anchored call suppresses exactly that part of the transcript.
 
-Whether the server stores the answer is a decision for each call. The OpenAI Responses client reads
+The OpenAI Responses client is `OpenAiResponsesChatClient`, built from the same three pieces as in
+[Getting started](getting-started.md#2-build-a-client):
+
+```java
+import io.github.synapse4j.openai.OpenAiResponsesChatClient;
+
+OpenAiConfig config = new OpenAiConfig();
+config.setApiKey(System.getenv("OPENAI_API_KEY"));
+config.setStoreResponses(true);
+
+ChatClient client = new OpenAiResponsesChatClient(http, codec, config);
+```
+
+Whether the server stores the answer is a decision for each call. The Responses client reads
 it from the `storeResponses` option on `OpenAiConfig`, and a call can also set the `store` member
-itself through its options extras; left unset either way, the endpoint's own default stands.
+itself through its options extras — a `store` path there lands as the top-level `store` member of
+the request and overrides `storeResponses` for that call; left unset either way, the endpoint's
+own default stands.
 
 ## Persisting a conversation
 
@@ -72,9 +92,11 @@ client.addChatCustomizer(new ChatCustomizer() {
 ```
 
 A customizer has one hook per step — `customizeRequest`, `customizeResponse`,
-`customizeStreamEvent` — and does nothing at the ones you leave alone. Each hook is handed the
-value the client already holds and changes it in place. Register one on an inner client to see
-every round of a tool-calling loop.
+`customizeStreamEvent` (one call per `ChatStreamEvent` of a streamed answer) — and does nothing at
+the ones you leave alone. Each hook is handed the value the client already holds and changes it in
+place. Register it on a [`ToolCallingChatClient`](tools.md#running-the-calls) to see every round of
+a tool-calling loop: the registration is handed to the client it wraps, so each hook runs once per
+round.
 
 ## Moving between providers
 

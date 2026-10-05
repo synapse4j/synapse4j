@@ -97,15 +97,42 @@ new MethodTools(codec)
 
 A customizer that already holds a value rather than text writes it directly — a parameter's
 `resolvedSchema`, the tool's `resolvedSchema`, its `extras` — and skips the round trip through a
-document. That is also how a parameter the model does not produce gets its value: write the parameter's
-`valueProvider`, and no subclass is needed to fill it. A `ChatContext` parameter needs none — the
-conversation is what a blank one falls back to.
+document. That is also how a parameter the model does not produce gets its value: mark the parameter
+as not the model's (`fromModel`) and write its `valueProvider` — a
+`ToolParameterValueProvider`, a function of the tool's resolution, the parameter's own entry, and
+the call's `ChatContext` (`null` when the call carries none), answering the value to pass. A value
+from configuration fills in without subclassing anything:
 
-`@ToolMethod.type` names the class that builds the tool, for what the built-in one cannot cover. A
-blank one is a `MethodTool`, and `specToolFactory(...)` replaces the default, so a name means whatever
-your application says it means. The factory is handed the whole resolution and the codec, and returns a
-finished tool: `MethodTool(ToolMethodSpec, JsonCodec)` is what a class has to offer to be named, and
-nothing after it completes what it built.
+```java
+new MethodTools(codec)
+        .addCustomizer(spec -> spec.getParameters().forEach(p -> {
+            if (p.getParameter().getType() == Locale.class) {
+                p.setFromModel("false");
+                p.setValueProvider((tool, parameter, context) -> configuredLocale);
+            }
+        }))
+        .from(service);
+```
+
+A `ChatContext` parameter needs none — the conversation is what a blank one falls back to.
+
+`@ToolMethod.type` names the class that builds the tool, for what the built-in one cannot cover.
+By default the name is a fully-qualified class name: the class is loaded, has to implement
+`Tool`, and has to declare a constructor taking the method's resolution and your codec —
+`(ToolMethodSpec, JsonCodec)` is the shape, and `MethodTool` itself fits it. What that
+constructor returns is the tool, used as it stands: nothing afterwards completes or adjusts it,
+so a class named this way hands back a tool that is ready to run.
+
+To resolve the names your own way — a container-managed instance, say — replace the default
+with a factory of your own on the `MethodTools` reader, via `specToolFactory(...)`. The factory
+receives the method's full resolution and the codec, and answers the finished tool:
+
+```java
+List<Tool> tools = new MethodTools(codec)
+        .specToolFactory((spec, c) -> spec.getType().isBlank() ? new MethodTool(spec, c)
+                : toolBeans.get(spec.getType()))
+        .from(service);
+```
 
 A Spring Boot application can take this path without calling `from` itself: `@Tools` marks the
 class, component scanning registers it as a bean, and the starter puts its tools on the chat clients
@@ -122,7 +149,8 @@ ChatClient client = new ToolCallingChatClient(new OpenAiCompletionsChatClient(ht
 
 `ToolCallingChatClient` runs the model's tool-call rounds until the model stops asking, appending
 the calls and their results to the request as it goes. The last answer is left for you to
-`continueWith`.
+`continueWith`. The same loop runs over `stream` — see
+[Streaming](streaming.md#streaming-with-tools).
 
 ## The execution policy
 
@@ -153,8 +181,12 @@ try (ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor()) {
   ready-made ones. Where a protocol has no member for the failure — both OpenAI protocols — the text
   is the only signal the model gets, so `.fixed(text)` and a handler of your own should say in it
   that the call failed; `.message(prefix)` does;
-- a `maxTurns` cap — decline a batch once the round has run that long, ending the loop where it
-  stands.
+- a `maxTurns` cap — bound how long the loop may run. Once the round has reached that turn count,
+  the batch is declined whole: no call in it runs, nothing is appended, and the loop ends where
+  it stands. What `chat` returns then is the response that asked for the calls, its tool calls
+  still in the message, unanswered — and that is also the signal: a round that ended because the
+  model finished asks for no calls at all. Driving the remaining calls yourself picks up from
+  that response.
 
 A call naming no available tool fails with `ToolNotFoundException`, and travels the same path as
 any other failure.
@@ -168,18 +200,27 @@ client.addDefaultTool(weather);
 ```
 
 A `ToolProvider` is the dynamic counterpart: it is asked on every call, so the tool set can change
-behind the client:
+behind the client. It is asked with the client whose call it is — one provider registered on
+several clients can tell them apart — and the request about to go out, whose context names the
+conversation:
 
 ```java
-client.addToolProvider((c, request) -> List.of(weather));
+client.addToolProvider((asking, request) -> request.getContext() != null
+        && "admin".equals(request.getContext().getSessionId())
+        ? List.of(weather, adminTools)
+        : List.of(weather));
 ```
 
 ## Letting the model choose
 
 `ChatOptions.toolChoice` says whether the model may call a tool — `auto`, `none`, `required`, or
-`tool` for one named tool:
+one named tool:
 
 ```java
 ChatOptions options = new ChatOptions();
 options.setToolChoice(ChatOptions.TOOL_CHOICE_REQUIRED);
+
+// or exactly one tool, and no other:
+options.setToolChoice(ChatOptions.TOOL_CHOICE_TOOL);
+options.setToolChoiceName("get_weather");
 ```

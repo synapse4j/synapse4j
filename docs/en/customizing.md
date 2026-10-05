@@ -22,12 +22,18 @@ covered by the Javadoc on `JsonCodec` and `HttpClient`.
 ## The generated schema
 
 The codec generates the JSON Schema for a tool's arguments and for a structured answer, from the
-Java type and the same `JsonMapper` that binds the JSON. Which of the Jackson module's recommended
-choices to apply is a `JacksonSchemaSettings` — one flag or set per choice, defaulting to the
-recommendation. A choice turned off is simply not applied, which is how you replace it: turn it off
-and add a victools `Module` of your own in its place.
+Java type and the same `JsonMapper` that binds the JSON. The machinery underneath is the victools
+jsonschema-generator library — a dependency of the Jackson module, so its types are on your
+classpath the moment `synapse4j-jackson` is. `SchemaGenerator`, `SchemaGeneratorConfigBuilder` and
+`Module` are all victools types, from the `com.github.victools.jsonschema.generator` package.
+
+Which of the Jackson module's recommended choices to apply is a `JacksonSchemaSettings` — one flag
+or set per choice, defaulting to the recommendation. A choice turned off is simply not applied,
+which is how you replace it: turn it off and add a victools `Module` of your own in its place.
 
 ```java
+JsonMapper mapper = JsonMapper.builder().build();
+
 JacksonSchemaSettings settings = new JacksonSchemaSettings();
 settings.setFlattenOptionals(false);            // leave the recommended choice out
 
@@ -35,7 +41,7 @@ SchemaGeneratorConfigBuilder builder =
         JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(mapper, settings);
 builder.with(myOptionalModule);                 // put your own rule in its place
 
-JsonCodec codec = new JacksonJsonCodec(mapper, new SchemaGenerator(builder.build()),
+JsonCodec codec = new JacksonJsonCodec(mapper.rebuild(), new SchemaGenerator(builder.build()),
         new SchemaGenerator(JacksonSchemaConfigBuilders.decodeSchemaConfigBuilder(mapper, settings).build()));
 ```
 
@@ -113,4 +119,8 @@ bound reading the body), how a written body reaches a transport that cannot take
 and a server-sent event frame budget. The class's Javadoc names the fields and the values they take
 — the body-write mode, in particular, is the string `"streamed"` or `"buffered"`, not an enum.
 
-A request's settings merge with the implementation's own the same way the call options do.
+Each implementation carries its own `HttpOptions` too, passed as the second constructor argument —
+`new JdkHttpClient(delegate, options)` and its counterparts in the other HTTP modules. The request's
+settings merge with the implementation's by the same fill-in-what-is-null rule as the call options:
+a field the request leaves unset takes the implementation's value, and one the implementation never
+set falls back to `HttpOptions.defaults()`.
