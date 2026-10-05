@@ -18,6 +18,7 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.http.BodyWriteMode;
 import io.github.synapse4j.http.DefaultHttpResponse;
 import io.github.synapse4j.http.HttpBody;
 import io.github.synapse4j.http.HttpClient;
@@ -39,8 +40,10 @@ import org.jspecify.annotations.Nullable;
  * releases the connection and cancels a body still in flight.</li>
  * <li>A request body is handed over the way {@link HttpBody} describes it: bytes the body already holds
  * go out without being written, a body that can only be written is streamed from a thread of its own so
- * that the JDK's I/O thread never waits for it, and {@link HttpOptions#BUFFERED} trades that thread for
- * one copy of the body in memory.</li>
+ * that the JDK's I/O thread never waits for it, and {@link BodyWriteMode#BUFFERED} trades that thread for
+ * one copy of the body in memory. {@link BodyWriteMode#AUTO}, the default, takes the buffered route,
+ * because the JDK pulls the body through a thread of its own and the streamed route would add a second
+ * one around it.</li>
  * <li>A {@link HttpOptions#getResponseTimeout() response timeout}, whether the request set it or this
  * client's own options carry it, maps to the JDK request builder's {@code timeout}, which — verified
  * empirically — bounds only the wait for the response headers to start arriving, never the reading of
@@ -161,12 +164,10 @@ public class JdkHttpClient implements HttpClient {
      *
      * <p>
      * A body that holds its bytes is never written; a body that has to be written is streamed, or
-     * gathered first when {@link HttpOptions#BUFFERED} asks for that. A mode this implementation does not
-     * know is refused rather than taken for the default: a caller who asked for one thing must not
-     * silently get another.
+     * gathered first when {@link BodyWriteMode#BUFFERED} is the resolved mode.
      */
     private static BodyPublisher bodyPublisher(HttpRequest request, @Nullable String mode) {
-        requireKnown(mode);
+        BodyWriteMode resolved = resolveMode(mode);
         HttpBody body = request.getBody();
         if (body == null) {
             return BodyPublishers.noBody();
@@ -175,22 +176,22 @@ public class JdkHttpClient implements HttpClient {
         if (buffer != null) {
             return readyBytes(buffer);
         }
-        if (HttpOptions.BUFFERED.equals(mode)) {
+        if (resolved == BodyWriteMode.BUFFERED) {
             return gathered(request, body);
         }
         return BodyPublishers.fromPublisher(new StreamingBodyPublisher(body));
     }
 
     /**
-     * Refuses a mode this implementation does not know rather than taking it for the default: a caller
-     * who asked for one thing must not silently get another. It is checked before the body is looked at,
-     * so a mode that is wrong is wrong whatever the body happens to be.
+     * The mode this implementation will use: the one the string names, {@link BodyWriteMode#from}
+     * refusing a value this library does not define, with {@link BodyWriteMode#AUTO} taken as
+     * {@link BodyWriteMode#BUFFERED} — the mode this implementation does best, since the JDK pulls the
+     * body through a thread of its own and a written one would add a thread of ours and a lock around
+     * it, while gathering spends only memory.
      */
-    private static void requireKnown(@Nullable String mode) {
-        if (!HttpOptions.STREAMED.equals(mode) && !HttpOptions.BUFFERED.equals(mode)) {
-            throw new IllegalArgumentException("unsupported bodyWriteMode '" + mode + "': this implementation "
-                    + "supports " + HttpOptions.STREAMED + " and " + HttpOptions.BUFFERED);
-        }
+    private static BodyWriteMode resolveMode(@Nullable String mode) {
+        BodyWriteMode known = BodyWriteMode.from(mode);
+        return known == BodyWriteMode.AUTO ? BodyWriteMode.BUFFERED : known;
     }
 
     /**
@@ -214,7 +215,7 @@ public class JdkHttpClient implements HttpClient {
     /**
      * A body written out first, so that the JDK can send bytes it already has: one copy of the body in
      * memory in exchange for a request that goes out with a {@code Content-Length} and no thread of
-     * ours. This is what {@link HttpOptions#BUFFERED} asks for, and the only failure it can meet before
+     * ours. This is what {@link BodyWriteMode#BUFFERED} asks for, and the only failure it can meet before
      * the call goes out is the body's own.
      */
     private static BodyPublisher gathered(HttpRequest request, HttpBody body) {

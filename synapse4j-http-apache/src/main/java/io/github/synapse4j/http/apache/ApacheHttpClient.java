@@ -28,6 +28,7 @@ import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.util.Timeout;
 
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.http.BodyWriteMode;
 import io.github.synapse4j.http.DefaultHttpResponse;
 import io.github.synapse4j.http.HttpBody;
 import io.github.synapse4j.http.HttpClient;
@@ -58,7 +59,7 @@ import lombok.NonNull;
  * holds go out with their length and without being written first; a body that can only be written is
  * streamed straight to the connection on the calling thread — no thread of ours, nothing held beyond
  * the write itself, and a chunked framing since the length is unknown until the write finishes; and
- * {@link HttpOptions#BUFFERED} trades that streaming for one copy of the body in memory gathered
+ * {@link BodyWriteMode#BUFFERED} trades that streaming for one copy of the body in memory gathered
  * before the call, which then carries a {@code Content-Length}. Framing is the entity's: a request
  * that carries its own {@code Content-Length} or {@code Transfer-Encoding} header alongside a body is
  * refused by HttpClient 5's protocol layer rather than reconciled here.</li>
@@ -73,7 +74,8 @@ import lombok.NonNull;
  * {@link CloseableHttpClient} handed to a constructor.</li>
  * <li>A {@link HttpOptions#getBodyWriteMode() bodyWriteMode} this implementation does not know is
  * refused before the request is built and before the body is looked at: a caller who asked for one
- * thing must not silently get another.</li>
+ * thing must not silently get another. {@link BodyWriteMode#AUTO}, the default, resolves to
+ * {@link BodyWriteMode#STREAMED}, the route this implementation does best.</li>
  * <li>A transport failure the call could not get an answer through — DNS, connect, TLS, timeout —
  * arrives as {@link SynapseException} with the message {@code "HTTP call failed: <method> <url>"}.
  * A failure the request body throws while being written ends the call too: an {@link IOException}
@@ -147,8 +149,8 @@ public class ApacheHttpClient implements HttpClient {
     @Override
     public HttpResponse send(HttpRequest request) {
         HttpOptions effective = HttpOptions.effective(request.getOptions(), this.options);
-        requireKnown(effective.getBodyWriteMode());
-        ClassicHttpRequest hcRequest = buildRequest(request, effective.getBodyWriteMode());
+        BodyWriteMode mode = resolveMode(effective.getBodyWriteMode());
+        ClassicHttpRequest hcRequest = buildRequest(request, mode);
         CloseableHttpResponse hcResponse;
         try {
             // executeOpen, not execute: it is the overload HttpClient 5 marks for keeping the
@@ -203,7 +205,7 @@ public class ApacheHttpClient implements HttpClient {
     }
 
     /** One HttpClient 5 request, by the cheapest route that fits the body in hand. */
-    private static ClassicHttpRequest buildRequest(HttpRequest request, @Nullable String mode) {
+    private static ClassicHttpRequest buildRequest(HttpRequest request, BodyWriteMode mode) {
         ClassicRequestBuilder builder = ClassicRequestBuilder.create(request.getMethod())
                 .setUri(request.getUrl());
         request.getHeaders()
@@ -219,16 +221,15 @@ public class ApacheHttpClient implements HttpClient {
     /**
      * The HttpClient 5 entity for one request body, by the cheapest way that body can be handed
      * over: bytes already in hand go out with their length, a body that has to be written is
-     * streamed as it comes, or gathered first when {@link HttpOptions#BUFFERED} asks for that. The
-     * mode was checked before this is reached, so every route here is one this implementation
-     * knows.
+     * streamed as it comes, or gathered first when {@link BodyWriteMode#BUFFERED} is the resolved
+     * mode.
      */
-    private static HttpEntity entity(HttpRequest request, HttpBody body, @Nullable String mode) {
+    private static HttpEntity entity(HttpRequest request, HttpBody body, BodyWriteMode mode) {
         ByteBuffer buffer = body.buffer();
         if (buffer != null) {
             return readyBytes(buffer);
         }
-        if (HttpOptions.BUFFERED.equals(mode)) {
+        if (mode == BodyWriteMode.BUFFERED) {
             return new ByteArrayEntity(gathered(request, body), null);
         }
         return new StreamedBodyEntity(body);
@@ -253,7 +254,7 @@ public class ApacheHttpClient implements HttpClient {
     /**
      * A body written out first, so that it can go out with a {@code Content-Length}: one copy of
      * the body in memory in exchange for a request that carries its length. This is what
-     * {@link HttpOptions#BUFFERED} asks for, and the only failure it can meet before the call goes
+     * {@link BodyWriteMode#BUFFERED} asks for, and the only failure it can meet before the call goes
      * out is the body's own.
      */
     private static byte[] gathered(HttpRequest request, HttpBody body) {
@@ -268,15 +269,15 @@ public class ApacheHttpClient implements HttpClient {
     }
 
     /**
-     * Refuses a mode this implementation does not know rather than taking it for the default: a
-     * caller who asked for one thing must not silently get another. It is checked before the body
-     * is looked at, so a mode that is wrong is wrong whatever the body happens to be.
+     * The mode this implementation will use: the one the string names, {@link BodyWriteMode#from}
+     * refusing a value this library does not define, with {@link BodyWriteMode#AUTO} taken as
+     * {@link BodyWriteMode#STREAMED} — the mode this implementation does best, since HttpClient 5 writes
+     * the body on the caller's thread, so streaming costs no thread of ours and holds nothing beyond the
+     * write itself.
      */
-    private static void requireKnown(@Nullable String mode) {
-        if (!HttpOptions.STREAMED.equals(mode) && !HttpOptions.BUFFERED.equals(mode)) {
-            throw new IllegalArgumentException("unsupported bodyWriteMode '" + mode + "': this implementation "
-                    + "supports " + HttpOptions.STREAMED + " and " + HttpOptions.BUFFERED);
-        }
+    private static BodyWriteMode resolveMode(@Nullable String mode) {
+        BodyWriteMode known = BodyWriteMode.from(mode);
+        return known == BodyWriteMode.AUTO ? BodyWriteMode.STREAMED : known;
     }
 
     /**

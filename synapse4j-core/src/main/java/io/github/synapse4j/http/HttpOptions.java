@@ -24,32 +24,16 @@ import lombok.NonNull;
 public class HttpOptions {
 
     /**
-     * The default {@link #bodyWriteMode}: the body is not gathered into memory, and an implementation
-     * that cannot take a written body as it comes converts it on a thread of its own.
-     */
-    public static final String STREAMED = "streamed";
-
-    /**
-     * The other {@link #bodyWriteMode}: an implementation that cannot take a written body as it comes
-     * may hold the whole body in memory instead, which is what a caller picks when they would rather
-     * spend memory than a thread.
-     */
-    public static final String BUFFERED = "buffered";
-
-    /**
-     * How a request body reaches an implementation whose HTTP library cannot take a written body as it
-     * comes.
+     * How a request body reaches the implementation: one of the modes {@link BodyWriteMode} defines, or
+     * a mode an implementation of its own defines.
      *
      * <p>
-     * One of {@link #STREAMED} or {@link #BUFFERED}. An implementation whose library takes the body as
-     * it comes — a synchronous client writing on the caller's thread — has nothing to convert and
-     * ignores the setting: the values are about a conversion that may not be needed.
-     *
-     * <p>
-     * A string rather than a closed type, like every value in this library that can grow: an
-     * implementation may define a mode of its own. One that does not know the mode it is handed must
-     * refuse the request rather than treat it as the default — a caller who asked for one thing must
-     * not silently get another.
+     * A string rather than the enum, like every value in this library that can grow: an implementation
+     * may define a mode of its own, which a closed type could not carry. One that does not know the mode
+     * it is handed must refuse the request rather than treat it as the default — a caller who asked for
+     * one thing must not silently get another. {@link BodyWriteMode#AUTO} is the one every
+     * implementation must take: it asks for the implementation's own choice, so refusing it would refuse
+     * the default.
      */
     private @Nullable String bodyWriteMode;
 
@@ -86,15 +70,13 @@ public class HttpOptions {
 
     /**
      * The defaults every implementation starts from, written down once so that what this library does
-     * when nobody configures anything is the same everywhere: {@link #STREAMED} bodies, no response
-     * timeout of its own — an implementation that sets none leaves that to its HTTP library — and
-     * a 256 KiB frame budget.
+     * when nobody configures anything is the same everywhere.
      *
      * @return a new instance holding those defaults
      */
     public static HttpOptions defaults() {
         HttpOptions defaults = new HttpOptions();
-        defaults.bodyWriteMode = STREAMED;
+        defaults.bodyWriteMode = BodyWriteMode.AUTO.value();
         defaults.maxFrameBytes = DEFAULT_MAX_FRAME_BYTES;
         return defaults;
     }

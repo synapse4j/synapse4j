@@ -16,6 +16,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.http.BodyWriteMode;
 import io.github.synapse4j.http.DefaultHttpResponse;
 import io.github.synapse4j.http.HttpBody;
 import io.github.synapse4j.http.HttpClient;
@@ -49,7 +50,7 @@ import org.jspecify.annotations.Nullable;
  * <li>A request body is handed over the way {@link HttpBody} describes it: bytes the body already
  * holds go out with their length and without being written first, a body that can only be written
  * is streamed as it comes — its length unknown until it has been written — and
- * {@link HttpOptions#BUFFERED} trades that streaming for one copy of the body in memory, gathered
+ * {@link BodyWriteMode#BUFFERED} trades that streaming for one copy of the body in memory, gathered
  * before the request goes out.</li>
  * <li>A {@link HttpOptions#getResponseTimeout() response timeout}, whether the request set it or
  * this client's own options carry it, is not applied — the {@code RestClient} abstraction has no
@@ -58,7 +59,8 @@ import org.jspecify.annotations.Nullable;
  * which bounds the wait for the response headers and never the reading of the body.</li>
  * <li>A {@link HttpOptions#getBodyWriteMode() bodyWriteMode} this implementation does not know is
  * refused before the request is built and before the body is looked at: a caller who asked for one
- * thing must not silently get another.</li>
+ * thing must not silently get another. {@link BodyWriteMode#AUTO}, the default, resolves to
+ * {@link BodyWriteMode#STREAMED}, the route this implementation does best.</li>
  * <li>A transport failure the call could not get an answer through — DNS, connect, TLS, timeout —
  * arrives wrapped by Spring and is rethrown as {@link SynapseException} with the message
  * {@code "HTTP call failed: <method> <url>"}. Any other {@code RuntimeException} passes through
@@ -127,7 +129,7 @@ public class RestClientHttpClient implements HttpClient {
     @Override
     public HttpResponse send(HttpRequest request) {
         HttpOptions effective = HttpOptions.effective(request.getOptions(), this.options);
-        requireKnown(effective.getBodyWriteMode());
+        BodyWriteMode mode = resolveMode(effective.getBodyWriteMode());
         requireNoOwnFraming(request);
         if (effective.getResponseTimeout() != null && responseTimeoutWarned.compareAndSet(false, true)) {
             // Ignoring a setting that cannot be honoured is one thing; saying it again on every call
@@ -139,7 +141,7 @@ public class RestClientHttpClient implements HttpClient {
                 .uri(request.getUrl());
         request.getHeaders()
                 .forEach((name, values) -> values.forEach(value -> spec.header(name, value)));
-        setBody(spec, request, effective.getBodyWriteMode());
+        setBody(spec, request, mode);
         try {
             // close=false keeps the response open on the way out: the body it carries is meant to be
             // read on the caller's thread after send() has returned, so the exchange must not release it.
@@ -176,10 +178,9 @@ public class RestClientHttpClient implements HttpClient {
     /**
      * Hands one request body to the spec by the cheapest route that fits: bytes the body already
      * holds go out with their length, a body that has to be written is streamed as it comes, or
-     * gathered first when {@link HttpOptions#BUFFERED} asks for that. The mode was checked before
-     * this is reached, so every route here is one this implementation knows.
+     * gathered first when {@link BodyWriteMode#BUFFERED} is the resolved mode.
      */
-    private static void setBody(RestClient.RequestBodySpec spec, HttpRequest request, @Nullable String mode) {
+    private static void setBody(RestClient.RequestBodySpec spec, HttpRequest request, BodyWriteMode mode) {
         HttpBody body = request.getBody();
         if (body == null) {
             return;
@@ -187,7 +188,7 @@ public class RestClientHttpClient implements HttpClient {
         ByteBuffer buffer = body.buffer();
         if (buffer != null) {
             sendReadyBytes(spec, buffer);
-        } else if (HttpOptions.BUFFERED.equals(mode)) {
+        } else if (mode == BodyWriteMode.BUFFERED) {
             sendReadyBytes(spec, gathered(request, body));
         } else {
             spec.body(new StreamedBody(body));
@@ -206,7 +207,7 @@ public class RestClientHttpClient implements HttpClient {
     /**
      * A body written out first, so that it can go out with a {@code Content-Length}: one copy of the
      * body in memory in exchange for a request that carries its length. This is what
-     * {@link HttpOptions#BUFFERED} asks for, and the only failure it can meet before the call goes
+     * {@link BodyWriteMode#BUFFERED} asks for, and the only failure it can meet before the call goes
      * out is the body's own.
      */
     private static ByteBuffer gathered(HttpRequest request, HttpBody body) {
@@ -221,15 +222,15 @@ public class RestClientHttpClient implements HttpClient {
     }
 
     /**
-     * Refuses a mode this implementation does not know rather than taking it for the default: a
-     * caller who asked for one thing must not silently get another. It is checked before the body is
-     * looked at, so a mode that is wrong is wrong whatever the body happens to be.
+     * The mode this implementation will use: the one the string names, {@link BodyWriteMode#from}
+     * refusing a value this library does not define, with {@link BodyWriteMode#AUTO} taken as
+     * {@link BodyWriteMode#STREAMED} — the mode this implementation does best, since the
+     * {@code RestClient} writes the body on the caller's thread, so streaming costs no thread of ours and
+     * holds nothing beyond the write itself.
      */
-    private static void requireKnown(@Nullable String mode) {
-        if (!HttpOptions.STREAMED.equals(mode) && !HttpOptions.BUFFERED.equals(mode)) {
-            throw new IllegalArgumentException("unsupported bodyWriteMode '" + mode + "': this implementation "
-                    + "supports " + HttpOptions.STREAMED + " and " + HttpOptions.BUFFERED);
-        }
+    private static BodyWriteMode resolveMode(@Nullable String mode) {
+        BodyWriteMode known = BodyWriteMode.from(mode);
+        return known == BodyWriteMode.AUTO ? BodyWriteMode.STREAMED : known;
     }
 
     /**
@@ -289,7 +290,7 @@ public class RestClientHttpClient implements HttpClient {
     /**
      * A body written straight through to the transport as it comes: nothing is held beyond what the
      * write itself buffers, and the length stays unknown until the write finishes — which is what
-     * {@link HttpOptions#STREAMED} asks for.
+     * {@link BodyWriteMode#STREAMED} asks for.
      */
     private static final class StreamedBody implements StreamingHttpOutputMessage.Body {
 

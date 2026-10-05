@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import com.sun.net.httpserver.HttpServer;
 
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.http.BodyWriteMode;
 import io.github.synapse4j.http.HttpBody;
 import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.http.HttpRequest;
@@ -181,7 +182,7 @@ class ApacheHttpClientTest {
         });
 
         HttpOptions options = HttpOptions.defaults();
-        options.setBodyWriteMode(HttpOptions.BUFFERED);
+        options.setBodyWriteMode(BodyWriteMode.BUFFERED.value());
         HttpRequest request = new HttpRequest(baseUrl + "/buffered");
         request.setMethod(HttpRequest.POST);
         request.setOptions(options);

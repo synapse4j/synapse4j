@@ -14,27 +14,27 @@ class HttpOptionsTest {
     void aRequestWithNoOptionsGetsTheDefaultsAsTheyAre() {
         HttpOptions defaults = new HttpOptions();
         defaults.setResponseTimeout(Duration.ofSeconds(30));
-        defaults.setBodyWriteMode(HttpOptions.BUFFERED);
+        defaults.setBodyWriteMode(BodyWriteMode.BUFFERED.value());
 
         HttpOptions effective = HttpOptions.effective(null, defaults);
 
         assertNotSame(defaults, effective);
         assertEquals(Duration.ofSeconds(30), effective.getResponseTimeout());
-        assertEquals(HttpOptions.BUFFERED, effective.getBodyWriteMode());
+        assertEquals(BodyWriteMode.BUFFERED.value(), effective.getBodyWriteMode());
     }
 
     @Test
     void theAnswerIsACallerOwnedCopyChangingItLeavesBothSidesAlone() {
         HttpOptions defaults = new HttpOptions();
-        defaults.setBodyWriteMode(HttpOptions.STREAMED);
+        defaults.setBodyWriteMode(BodyWriteMode.STREAMED.value());
         HttpOptions request = new HttpOptions();
         request.setResponseTimeout(Duration.ofSeconds(5));
 
         HttpOptions effective = HttpOptions.effective(request, defaults);
-        effective.setBodyWriteMode(HttpOptions.BUFFERED);
+        effective.setBodyWriteMode(BodyWriteMode.BUFFERED.value());
         effective.setResponseTimeout(Duration.ofMinutes(1));
 
-        assertEquals(HttpOptions.STREAMED, defaults.getBodyWriteMode());
+        assertEquals(BodyWriteMode.STREAMED.value(), defaults.getBodyWriteMode());
         assertNull(defaults.getResponseTimeout());
         assertNull(request.getBodyWriteMode());
         assertEquals(Duration.ofSeconds(5), request.getResponseTimeout());
@@ -44,7 +44,7 @@ class HttpOptionsTest {
     void whatTheRequestSetsWinsAndWhatItLeavesOutComesFromTheDefaults() {
         HttpOptions defaults = new HttpOptions();
         defaults.setResponseTimeout(Duration.ofSeconds(30));
-        defaults.setBodyWriteMode(HttpOptions.BUFFERED);
+        defaults.setBodyWriteMode(BodyWriteMode.BUFFERED.value());
         defaults.setMaxFrameBytes(4096);
 
         HttpOptions request = new HttpOptions();
@@ -54,7 +54,7 @@ class HttpOptionsTest {
         HttpOptions effective = HttpOptions.effective(request, defaults);
 
         assertEquals(Duration.ofSeconds(5), effective.getResponseTimeout());
-        assertEquals(HttpOptions.BUFFERED, effective.getBodyWriteMode());
+        assertEquals(BodyWriteMode.BUFFERED.value(), effective.getBodyWriteMode());
         assertEquals(8192, effective.getMaxFrameBytes());
 
         HttpOptions onlyDefaults = HttpOptions.effective(new HttpOptions(), defaults);
@@ -65,7 +65,7 @@ class HttpOptionsTest {
     @Test
     void mergingLeavesBothSidesAsTheyWere() {
         HttpOptions defaults = new HttpOptions();
-        defaults.setBodyWriteMode(HttpOptions.STREAMED);
+        defaults.setBodyWriteMode(BodyWriteMode.STREAMED.value());
         HttpOptions request = new HttpOptions();
         request.setResponseTimeout(Duration.ofSeconds(5));
 
@@ -74,7 +74,7 @@ class HttpOptionsTest {
         assertNull(defaults.getResponseTimeout());
         assertNull(request.getBodyWriteMode());
         assertEquals(Duration.ofSeconds(5), request.getResponseTimeout());
-        assertEquals(HttpOptions.STREAMED, effective.getBodyWriteMode());
+        assertEquals(BodyWriteMode.STREAMED.value(), effective.getBodyWriteMode());
         assertEquals(Duration.ofSeconds(5), effective.getResponseTimeout());
     }
 

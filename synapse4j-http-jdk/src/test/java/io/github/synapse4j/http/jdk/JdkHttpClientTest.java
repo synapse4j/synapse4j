@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import com.sun.net.httpserver.HttpServer;
 
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.http.BodyWriteMode;
 import io.github.synapse4j.http.HttpBody;
 import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.http.HttpRequest;
@@ -146,8 +147,12 @@ class JdkHttpClientTest {
             exchange.close();
         });
 
+        // Asked for by name: the default gathers on this transport, so streaming is the explicit choice.
+        HttpOptions options = HttpOptions.defaults();
+        options.setBodyWriteMode(BodyWriteMode.STREAMED.value());
         HttpRequest request = new HttpRequest(baseUrl + "/streamed");
         request.setMethod(HttpRequest.POST);
+        request.setOptions(options);
         request.setBody(out -> {
             out.write("pi".getBytes(UTF_8));
             out.write("ng".getBytes(UTF_8));
@@ -163,21 +168,21 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void aBufferedBodyIsGatheredBeforeItIsSent() throws Exception {
+    void aWrittenBodyIsGatheredUnderTheDefaultMode() throws Exception {
         AtomicReference<byte[]> seenBody = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
-        server.createContext("/buffered", exchange -> {
+        server.createContext("/gathered", exchange -> {
             seenBody.set(exchange.getRequestBody().readAllBytes());
             seenHeaders.set(new LinkedHashMap<>(exchange.getRequestHeaders()));
             exchange.sendResponseHeaders(200, -1);
             exchange.close();
         });
 
-        HttpOptions options = HttpOptions.defaults();
-        options.setBodyWriteMode(HttpOptions.BUFFERED);
-        HttpRequest request = new HttpRequest(baseUrl + "/buffered");
+        // No mode set: the default is AUTO, which this transport resolves to gathering, so a body that
+        // has to be written goes out with a length rather than chunked — memory spent instead of a
+        // thread, which is the point of the default here.
+        HttpRequest request = new HttpRequest(baseUrl + "/gathered");
         request.setMethod(HttpRequest.POST);
-        request.setOptions(options);
         request.setBody(out -> {
             out.write("pi".getBytes(UTF_8));
             out.write("ng".getBytes(UTF_8));
