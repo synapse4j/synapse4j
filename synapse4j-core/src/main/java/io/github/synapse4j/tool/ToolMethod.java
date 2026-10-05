@@ -21,7 +21,9 @@ import java.lang.annotation.Target;
  * <li>{@code name} blank becomes the method's own name;</li>
  * <li>{@code description} blank becomes no description;</li>
  * <li>{@code type} blank becomes the implementation the reading uses by default;</li>
- * <li>{@code schema} blank is the envelope put together from what each parameter settled on.</li>
+ * <li>{@code schema} blank is the envelope put together from what each parameter settled on;</li>
+ * <li>{@code strict} blank is left to the protocol, which is not the same as asking it not to
+ * enforce: the flag is simply not sent.</li>
  * </ul>
  */
 @Retention(RetentionPolicy.RUNTIME)
@@ -34,6 +36,15 @@ public @interface ToolMethod {
 
     /** What the tool does. */
     String description() default "";
+
+    /**
+     * Whether the provider must enforce the input schema rather than merely aim at it.
+     *
+     * <p>
+     * Blank leaves it to the protocol: {@code strict} is not sent, and whatever the endpoint does by
+     * default stands. A written value that is not exactly {@code "false"} asks for enforcement.
+     */
+    String strict() default "";
 
     /**
      * The whole input schema as a JSON document, instead of the one put together from the parameters.

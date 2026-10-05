@@ -172,6 +172,9 @@ public class MethodTools {
             if (!annotation.type().isBlank()) {
                 spec.setType(annotation.type());
             }
+            if (!annotation.strict().isBlank()) {
+                spec.setStrict(annotation.strict());
+            }
             readParameters(method, spec);
             customize(spec);
             finalCustomizer.customize(spec);

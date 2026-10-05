@@ -3,10 +3,8 @@ package io.github.synapse4j.tool;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.jspecify.annotations.Nullable;
 
@@ -15,7 +13,6 @@ import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
-import io.github.synapse4j.json.JsonSchema;
 import lombok.NonNull;
 
 /**
@@ -75,44 +72,7 @@ public class MethodTool implements StagedTool {
         this.codec = codec;
         makeAccessible(method);
         this.returnsVoid = method.getReturnType() == void.class;
-        this.definition = definitionOf(spec);
-    }
-
-    /**
-     * The declaration a resolution this tool can be built from carries, refusing one it cannot: no name
-     * for the tool, a parameter left unnamed, two under one name, or nothing settled as the input
-     * schema.
-     *
-     * <p>
-     * The refusals live here rather than on the resolution because this is where they bite — every way
-     * of building a tool goes through the constructor — and the spec itself only carries values. Only
-     * the strings can be wrong, since the Java side is what the reader settled, and a blank description
-     * or type is an ordinary resolution rather than a failure.
-     *
-     * @param spec the resolution this tool is being built from; never {@code null}
-     * @return the declaration to carry; never {@code null}
-     * @throws SynapseException if the resolution cannot become a declaration
-     */
-    private static ToolDefinition definitionOf(ToolMethodSpec spec) {
-        if (spec.getName().isBlank()) {
-            throw new SynapseException("no name for the tool resolved from " + spec.getMethod());
-        }
-        Set<String> names = new HashSet<>();
-        for (ToolParameterSpec entry : spec.getParameters()) {
-            if (entry.getName().isBlank()) {
-                throw new SynapseException("no name to declare " + entry.getParameter() + " under");
-            }
-            if (!names.add(entry.getName())) {
-                throw new SynapseException(
-                        "'" + entry.getName() + "' names two parameters of " + spec.getMethod());
-            }
-        }
-        JsonSchema inputSchema = spec.getResolvedSchema();
-        if (inputSchema == null) {
-            throw new SynapseException("no input schema settled for the tool resolved from " + spec.getMethod());
-        }
-        String description = spec.getDescription();
-        return new ToolDefinition(spec.getName(), description.isBlank() ? null : description, inputSchema);
+        this.definition = spec.definition();
     }
 
     /**
