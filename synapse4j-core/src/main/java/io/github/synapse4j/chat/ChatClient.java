@@ -1,11 +1,14 @@
 package io.github.synapse4j.chat;
 
+import java.util.List;
+
 import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.tool.ToolProvider;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The front door for one conversation turn with a model provider: send the whole request, get the
@@ -116,6 +119,15 @@ public interface ChatClient {
     boolean removeChatCustomizer(ChatCustomizer customizer);
 
     /**
+     * Answers the customizers this client runs, in the order they were added. The list is a
+     * snapshot: a customizer added or removed after it is taken joins or leaves no call already
+     * under way.
+     *
+     * @return the customizers, in execution order; never {@code null}
+     */
+    List<ChatCustomizer> chatCustomizers();
+
+    /**
      * Sets the options every call this client sends inherits from, so a standing model, temperature
      * or response format need not be repeated on each request. The defaults fill in what the call
      * leaves unstated: a field the call leaves {@code null} takes the default's value, and the two
@@ -130,6 +142,14 @@ public interface ChatClient {
      * @param options the options to inherit from; never {@code null}
      */
     void setDefaultOptions(ChatOptions options);
+
+    /**
+     * Answers the options every call this client sends inherits from.
+     *
+     * @return the default options, or {@code null} when none were set
+     */
+    @Nullable
+    ChatOptions defaultOptions();
 
     /**
      * Registers a tool this client merges into every request it sends, beside the ones the request
@@ -162,6 +182,14 @@ public interface ChatClient {
     boolean removeDefaultTool(String name);
 
     /**
+     * Answers the tools this client merges into every request, in registration order. The list is
+     * a snapshot, so it never changes under a caller already walking it.
+     *
+     * @return the default tools, in registration order; never {@code null}
+     */
+    List<Tool> defaultTools();
+
+    /**
      * Adds a source whose tools are fetched on every call rather than registered up front —
      * for a tool set that changes behind the client, or one too expensive to build while the
      * client is being assembled.
@@ -189,5 +217,13 @@ public interface ChatClient {
      * @return whether it was registered
      */
     boolean removeToolProvider(ToolProvider provider);
+
+    /**
+     * Answers the tool sources this client asks on every call, in registration order, without
+     * duplicates. The list is a snapshot, so it never changes under a caller already walking it.
+     *
+     * @return the tool providers, in registration order; never {@code null}
+     */
+    List<ToolProvider> toolProviders();
 
 }

@@ -17,6 +17,7 @@ import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolProvider;
+import org.jspecify.annotations.Nullable;
 
 import lombok.NonNull;
 
@@ -89,6 +90,14 @@ public abstract class AbstractChatClient implements ChatClient {
         defaultOptions.set(options);
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public @Nullable ChatOptions defaultOptions() {
+        return defaultOptions.get();
+    }
+
     @Override
     public void addChatCustomizer(@NonNull ChatCustomizer customizer) {
         customizers.add(customizer);
@@ -97,6 +106,14 @@ public abstract class AbstractChatClient implements ChatClient {
     @Override
     public boolean removeChatCustomizer(@NonNull ChatCustomizer customizer) {
         return customizers.removeIf(customizer::equals);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public List<ChatCustomizer> chatCustomizers() {
+        return List.copyOf(customizers);
     }
 
     /**
@@ -162,6 +179,14 @@ public abstract class AbstractChatClient implements ChatClient {
      * {@inheritDoc}
      */
     @Override
+    public List<Tool> defaultTools() {
+        return List.copyOf(defaultTools.get().values());
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public void addToolProvider(@NonNull ToolProvider provider) {
         toolProviders.updateAndGet(registered -> {
             LinkedHashSet<ToolProvider> next = new LinkedHashSet<>(registered);
@@ -190,6 +215,14 @@ public abstract class AbstractChatClient implements ChatClient {
                 return true;
             }
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public List<ToolProvider> toolProviders() {
+        return List.copyOf(toolProviders.get());
     }
 
     /**

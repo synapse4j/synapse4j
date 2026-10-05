@@ -119,6 +119,17 @@ public class ToolCallingChatClient extends AbstractChatClient {
      * {@inheritDoc}
      *
      * <p>
+     * The registrations were handed to the inner client, so the list is answered from there.
+     */
+    @Override
+    public List<ChatCustomizer> chatCustomizers() {
+        return inner.chatCustomizers();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>
      * Handed straight to the inner client: what an answer means for the conversation next is the
      * protocol's business, and every round of the loop went there too, so answering here would
      * leave the decorator's own continuation a step behind the rounds'.

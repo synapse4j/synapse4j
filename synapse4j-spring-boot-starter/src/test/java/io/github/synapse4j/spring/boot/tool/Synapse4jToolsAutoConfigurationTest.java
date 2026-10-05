@@ -6,8 +6,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import io.github.synapse4j.chat.ChatClient;
 import io.github.synapse4j.spring.boot.Synapse4jAutoConfiguration;
 import io.github.synapse4j.tool.MethodTools;
+import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolMethod;
 
 class Synapse4jToolsAutoConfigurationTest {
@@ -34,6 +36,13 @@ class Synapse4jToolsAutoConfigurationTest {
     void turnsOnTheSpelCustomizerFromItsProperty() {
         runner.withPropertyValues("synapse4j.tools.spel=true")
                 .run(context -> assertThat(context).hasSingleBean(SpelToolMethodSpecCustomizer.class));
+    }
+
+    @Test
+    void theMarkedBeansToolsLandOnTheChatClient() {
+        runner.run(context -> assertThat(context.getBean(ChatClient.class).defaultTools())
+                .extracting(Tool::name)
+                .containsExactly("test_greet"));
     }
 
     /** A marked bean the processor has to read, so discovery runs and not only the wiring. */
