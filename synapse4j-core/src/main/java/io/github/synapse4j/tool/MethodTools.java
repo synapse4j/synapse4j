@@ -136,6 +136,21 @@ public class MethodTools {
     }
 
     /**
+     * The tools {@code type} declares, run on {@code target}: instance and static methods alike are
+     * read off the given class rather than off the instance's own, so a bean the container has wrapped
+     * in a proxy still yields its tools while the proxy stays what a call runs on.
+     *
+     * @param type   the class whose annotated methods are read; never {@code null}
+     * @param target the instance instance methods run on; never {@code null}
+     * @return one tool per annotated method; never {@code null}, and empty when there are none
+     * @throws SynapseException if two methods resolve to one name, or a resolution cannot be built
+     *                              into a tool — see {@link #from(Class)}
+     */
+    public List<Tool> from(@NonNull Class<?> type, @NonNull Object target) {
+        return read(type, target);
+    }
+
+    /**
      * The tools {@code type} declares: its annotated static methods. An instance method is not read
      * here — there is no instance to run it on; hand {@link #from(Object)} the instance instead.
      *
