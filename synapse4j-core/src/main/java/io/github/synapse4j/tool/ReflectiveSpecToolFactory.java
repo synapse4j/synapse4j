@@ -1,15 +1,16 @@
 package io.github.synapse4j.tool;
 
-import java.util.function.Supplier;
+import java.util.function.BiFunction;
 
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.json.JsonCodec;
 
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 /**
- * The default {@link SpecToolFactory}: a blank name is built from a supplier handed in, and any other
- * name is a class, loaded by name and constructed with its no-argument constructor.
+ * The default {@link SpecToolFactory}: a blank {@code type} is built from the function handed in, and
+ * any other one names a class, loaded by name and constructed from the resolution.
  *
  * <p>
  * The blank case is the one every tool method meets until it states a {@code type}, and what a tool is
@@ -17,49 +18,55 @@ import lombok.RequiredArgsConstructor;
  * it is handed in here rather than fixed.
  *
  * <p>
- * A name that cannot be loaded, that does not implement {@link SpecTool}, or whose class has no
- * no-argument constructor fails here, naming the class: a mistake in a tool method's {@code type} is
+ * A name that cannot be loaded, that is not a {@link Tool}, or whose class has no constructor taking a
+ * resolution and a codec fails here, naming the class: a mistake in a tool method's {@code type} is
  * worth finding at startup rather than on the first call.
  *
  * <p>
- * It holds nothing but the supplier and is safe to share. An application whose classes this one cannot
+ * It holds nothing but that function and is safe to share. An application whose classes this one cannot
  * reach by name — loaded by a container of its own, say — supplies a factory of its own instead.
  */
 @RequiredArgsConstructor
 public class ReflectiveSpecToolFactory implements SpecToolFactory {
 
-    /** What a blank name is built from; never {@code null}. */
+    /** What a blank type is built from; never {@code null}. */
     @NonNull
-    private final Supplier<SpecTool> defaultTool;
+    private final BiFunction<ToolMethodSpec, JsonCodec, Tool> defaultTool;
 
     /**
-     * Creates the tool the name stands for: the supplier's for a blank name, otherwise a new instance
-     * of the class the name is.
+     * Creates the tool the resolution stands for: the handed-in function's for a blank type, otherwise
+     * a new instance of the class the type names.
      *
-     * @param type the name of the class to construct, empty for the default tool; never {@code null}
-     * @return the constructed tool, not yet initialized; never {@code null}
-     * @throws SynapseException if the class cannot be loaded, does not implement {@link SpecTool}, or
-     *                              has no no-argument constructor
+     * @param spec  the resolution of the annotated method; never {@code null}
+     * @param codec the codec that generates the declaration and binds arguments; never {@code null}
+     * @return the constructed tool, ready to be used; never {@code null}
+     * @throws SynapseException if the class cannot be loaded, is not a {@link Tool}, has no
+     *                              constructor taking a {@link ToolMethodSpec} and a {@link JsonCodec},
+     *                              or could not be constructed
      */
     @Override
-    public SpecTool create(String type) {
-        if (type.isEmpty()) {
-            return defaultTool.get();
+    public Tool create(ToolMethodSpec spec, JsonCodec codec) {
+        if (spec.getType().isEmpty()) {
+            return defaultTool.apply(spec, codec);
         }
+        String type = spec.getType();
         Class<?> toolClass;
         try {
             toolClass = Class.forName(type);
         } catch (ClassNotFoundException e) {
             throw new SynapseException("tool type '" + type + "' was not found", e);
         }
-        if (!SpecTool.class.isAssignableFrom(toolClass)) {
+        if (!Tool.class.isAssignableFrom(toolClass)) {
             throw new SynapseException(
-                    "tool type '" + type + "' does not implement " + SpecTool.class.getName());
+                    "tool type '" + type + "' is not a " + Tool.class.getName());
         }
         try {
-            return (SpecTool) toolClass.getConstructor().newInstance();
+            return (Tool) toolClass.getConstructor(ToolMethodSpec.class, JsonCodec.class)
+                    .newInstance(spec, codec);
         } catch (NoSuchMethodException e) {
-            throw new SynapseException("tool type '" + type + "' has no no-argument constructor", e);
+            throw new SynapseException("tool type '" + type + "' has no constructor taking a "
+                    + ToolMethodSpec.class.getSimpleName() + " and a " + JsonCodec.class.getSimpleName(),
+                    e);
         } catch (ReflectiveOperationException e) {
             throw new SynapseException("tool type '" + type + "' could not be constructed", e);
         }

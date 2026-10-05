@@ -103,9 +103,7 @@ public class MethodTools {
         spec.setDescription(description);
         customize(spec);
         applyDefaults(spec);
-        MethodTool tool = new MethodTool();
-        tool.initialize(spec, codec);
-        return tool;
+        return new MethodTool(spec, codec);
     }
 
     /**
@@ -166,9 +164,7 @@ public class MethodTools {
                 throw new SynapseException("two tool methods of " + type.getName() + " declare the name '"
                         + spec.getName() + "': " + earlier + " and " + method);
             }
-            SpecTool tool = specToolFactory.create(spec.getType());
-            tool.initialize(spec, codec);
-            tools.add(tool);
+            tools.add(specToolFactory.create(spec, codec));
         }
         return tools;
     }

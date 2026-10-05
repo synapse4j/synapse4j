@@ -40,7 +40,7 @@ public @interface ToolMethod {
      * arguments, say.
      *
      * <p>
-     * The value names a {@link SpecTool}, and is a name rather than a class: whoever turns this
+     * The value names a {@link Tool}, and is a name rather than a class: whoever turns this
      * annotation into a tool decides what the name means, and what an empty one means too.
      */
     String type() default "";

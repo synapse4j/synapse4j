@@ -5,9 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
@@ -16,21 +14,20 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 class MethodToolsTest {
 
-    /** Every tool the reader built, in the order it asked the factory for one. */
-    private final List<SpecTool> built = new ArrayList<>();
+    /** Every resolution the reader handed to the factory, in the order it asked for one. */
+    private final List<ToolMethodSpec> built = new ArrayList<>();
 
-    /** The type each of those tools was asked for, in the same order. */
-    private final List<String> askedFor = new ArrayList<>();
+    /** The tool each of those resolutions produced, in the same order. */
+    private final List<Tool> tools = new ArrayList<>();
 
-    /** The reader under test: its factory hands back a mock the test can read the resolution from. */
-    private final MethodTools reader = new MethodTools(mock(JsonCodec.class)).specToolFactory(type -> {
-        SpecTool tool = mock(SpecTool.class);
-        built.add(tool);
-        askedFor.add(type);
+    /** The reader under test: its factory records what it was handed and hands back a mock. */
+    private final MethodTools reader = new MethodTools(mock(JsonCodec.class)).specToolFactory((spec, codec) -> {
+        built.add(spec);
+        Tool tool = mock(Tool.class);
+        tools.add(tool);
         return tool;
     });
 
@@ -45,7 +42,7 @@ class MethodToolsTest {
         assertEquals("arg", told.getName());
         assertEquals("What it means", told.getDescription());
         assertEquals("false", told.getRequired());
-        assertEquals("some.Tool", askedFor("renamed"));
+        assertEquals("some.Tool", specOf("renamed").getType());
     }
 
     @Test
@@ -69,7 +66,6 @@ class MethodToolsTest {
         assertEquals("value", built.getParameters().get(0).getName());
         assertEquals("", built.getDescription());
         assertEquals("", built.getType());
-        assertEquals("", askedFor("defaulted"));
     }
 
     @Test
@@ -149,39 +145,24 @@ class MethodToolsTest {
 
     private void reset() {
         built.clear();
-        askedFor.clear();
+        tools.clear();
     }
 
     private Set<String> resolvedNames() {
         Set<String> names = new LinkedHashSet<>();
-        for (int index = 0; index < built.size(); index++) {
-            names.add(specAt(index).getName());
+        for (ToolMethodSpec spec : built) {
+            names.add(spec.getName());
         }
         return names;
     }
 
     private ToolMethodSpec specOf(String name) {
-        for (int index = 0; index < built.size(); index++) {
-            if (name.equals(specAt(index).getName())) {
-                return specAt(index);
+        for (ToolMethodSpec spec : built) {
+            if (name.equals(spec.getName())) {
+                return spec;
             }
         }
         throw new AssertionError("no tool resolved under '" + name + "': " + resolvedNames());
-    }
-
-    private String askedFor(String name) {
-        for (int index = 0; index < built.size(); index++) {
-            if (name.equals(specAt(index).getName())) {
-                return askedFor.get(index);
-            }
-        }
-        throw new AssertionError("no tool resolved under '" + name + "': " + resolvedNames());
-    }
-
-    private ToolMethodSpec specAt(int index) {
-        ArgumentCaptor<ToolMethodSpec> captor = ArgumentCaptor.forClass(ToolMethodSpec.class);
-        verify(built.get(index)).initialize(captor.capture(), any());
-        return captor.getValue();
     }
 
     /** A method that wrote nothing, a method that wrote everything, and a static one. */

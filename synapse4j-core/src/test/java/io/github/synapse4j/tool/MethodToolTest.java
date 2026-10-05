@@ -63,21 +63,21 @@ class MethodToolTest {
     @Test
     void aResolutionThatNamesNothingIsRefused() {
         ToolMethodSpec spec = resolutionOf(method("ship", String.class, CurrentUser.class), null);
-        MethodTool tool = new MethodTool();
 
-        SynapseException unnamedTool = assertThrows(SynapseException.class, () -> tool.initialize(spec, codec));
+        SynapseException unnamedTool = assertThrows(SynapseException.class, () -> new MethodTool(spec, codec));
         assertTrue(unnamedTool.getMessage().contains("no name for the tool"));
 
         spec.setName("ship");
         spec.getParameters().get(1).setName("");
 
-        SynapseException unnamedParameter = assertThrows(SynapseException.class, () -> tool.initialize(spec, codec));
+        SynapseException unnamedParameter = assertThrows(SynapseException.class,
+                () -> new MethodTool(spec, codec));
         assertTrue(unnamedParameter.getMessage().contains("no name to declare"));
 
         spec.getParameters().get(1).setName("to");
         spec.getParameters().get(0).setName("to");
 
-        SynapseException doubled = assertThrows(SynapseException.class, () -> tool.initialize(spec, codec));
+        SynapseException doubled = assertThrows(SynapseException.class, () -> new MethodTool(spec, codec));
         assertTrue(doubled.getMessage().contains("names two parameters"));
     }
 
@@ -107,14 +107,6 @@ class MethodToolTest {
         MethodTool tool = reader.of("secret", "A private method", Target.class.getDeclaredMethod("secret"), null);
 
         assertEquals("secret!", execute(tool, ""));
-    }
-
-    @Test
-    void definitionBeforeCompletionIsLoud() {
-        MethodTool tool = new MethodTool();
-
-        IllegalStateException failure = assertThrows(IllegalStateException.class, tool::definition);
-        assertTrue(failure.getMessage().contains("initialize"));
     }
 
     // ===== resolveArguments =====
@@ -248,8 +240,7 @@ class MethodToolTest {
     void argumentsSchemaIsTheHooksToShape() {
         ToolMethodSpec spec = resolutionOf(method("take", String.class), null);
         spec.setName("shaped");
-        ShapedTool tool = new ShapedTool();
-        tool.initialize(spec, codec);
+        ShapedTool tool = new ShapedTool(spec, codec);
 
         JsonSchema schema = tool.definition().getInputSchema();
         assertEquals(List.of("message"), schema.getRequired());
@@ -424,6 +415,10 @@ class MethodToolTest {
     /** A tool that shapes the arguments schema itself, on top of what the built-in assembly says. */
     private static class ShapedTool extends MethodTool {
 
+        ShapedTool(ToolMethodSpec spec, JsonCodec codec) {
+            super(spec, codec);
+        }
+
         @Override
         protected JsonSchema argumentsSchema(ToolMethodSpec spec) {
             JsonSchema base = super.argumentsSchema(spec);
@@ -436,13 +431,15 @@ class MethodToolTest {
     /** The extension the hooks exist for: one claim pair, schema and binding together. */
     private static class BizTool extends MethodTool {
 
+        public BizTool(ToolMethodSpec spec, JsonCodec codec) {
+            super(spec, codec);
+        }
+
         public static BizTool of(String name, String description, Method method, Object target, JsonCodec codec) {
             ToolMethodSpec spec = resolutionOf(method, target);
             spec.setName(name);
             spec.setDescription(description);
-            BizTool tool = new BizTool();
-            tool.initialize(spec, codec);
-            return tool;
+            return new BizTool(spec, codec);
         }
 
         @Override
@@ -463,14 +460,16 @@ class MethodToolTest {
     /** Claims a type but never learns to provide it — the default valueFor must refuse. */
     private static class ClaimOnlyTool extends MethodTool {
 
+        public ClaimOnlyTool(ToolMethodSpec spec, JsonCodec codec) {
+            super(spec, codec);
+        }
+
         public static ClaimOnlyTool of(String name, String description, Method method, Object target,
                 JsonCodec codec) {
             ToolMethodSpec spec = resolutionOf(method, target);
             spec.setName(name);
             spec.setDescription(description);
-            ClaimOnlyTool tool = new ClaimOnlyTool();
-            tool.initialize(spec, codec);
-            return tool;
+            return new ClaimOnlyTool(spec, codec);
         }
 
         @Override

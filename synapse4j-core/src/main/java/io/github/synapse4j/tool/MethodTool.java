@@ -21,7 +21,6 @@ import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonSchemaBuilder;
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 
 /**
  * A {@link StagedTool} backed by a Java method: the signature becomes the declaration, the
@@ -29,102 +28,81 @@ import lombok.RequiredArgsConstructor;
  * holding the one act in the middle, the invoke.
  *
  * <p>
- * An instance is constructed empty and completed once, by {@link #initialize} — the
- * {@link SpecTool} contract, which this class's factories follow too: they read the method into a
- * {@link ToolMethodSpec}, construct, and initialize. Completion runs after {@code new} has
- * returned on purpose, because building the declaration asks {@link #schemaFor} about each
- * parameter, and a subclass's hook must never run while the subclass is still being constructed.
+ * An instance is complete the moment {@code new} returns: the constructor reads the method's
+ * resolution, settles which parameters the model produces, and builds the declaration. What a
+ * subclass has to know about that is that the declaration is built <em>inside</em> its constructor,
+ * so {@link #schemaFor} and {@link #argumentsSchema} run while the subclass's own fields are not
+ * initialized yet and an override cannot read them. An override stands on what the parameters
+ * handed to it carry, and on what this class has already set.
  *
  * <p>
  * The spec is the one carrier of everything about the method — its signature, its parameters, and
  * the names the declaration uses. Renaming a parameter is a spec customizer's job, not this
  * class's. What the tool adds is the one thing the run cannot read off the spec: whether the model
  * produces each parameter's value, one {@code boolean} per parameter, decided by
- * {@link #schemaFor} at completion.
+ * {@link #schemaFor}.
  *
  * <p>
- * Once initialized, an instance is immutable and its methods may be called from any thread;
- * completion must precede the handover, which the {@link SpecTool} contract already sequences —
- * {@code initialize} runs before the tool is registered or asked anything. The target, if it has
- * state, is the application's to make thread-safe.
+ * Every field is final and set in the constructor, so an instance is immutable once it exists and
+ * its methods may be called from any thread. The target, if it has state, is the application's to
+ * make thread-safe.
  */
-public class MethodTool implements SpecTool, StagedTool {
+public class MethodTool implements StagedTool {
+
+    /** The resolution this tool was built from; the run reads its method and its names from here. */
+    private final ToolMethodSpec spec;
 
     /**
-     * The codec reading arguments and rendering results. It is written before {@link #state} and
-     * read by {@link #schemaFor} while completion runs, before that state exists, so it is a field
-     * of its own rather than part of the published snapshot.
+     * The codec reading arguments and rendering results, and the one {@link #schemaFor} reads while
+     * this object is still being constructed.
      */
-    private JsonCodec codec;
+    private final JsonCodec codec;
+
+    /** Per parameter: {@code true} when the model produces its value — see {@link #schemaFor}. */
+    private final boolean[] fromModel;
+
+    /** Whether the method returns void — asked once for the result stage. */
+    private final boolean returnsVoid;
+
+    /** The declaration built from the spec. */
+    private final ToolDefinition definition;
 
     /**
-     * The completed tool, published through one volatile reference: a thread that observes it sees
-     * the spec, the per-parameter decision and the declaration together, never a half-built mix.
-     * {@code null} means completion never ran — the contract violation {@link #definition()} answers.
-     */
-    private volatile @Nullable State state;
-
-    // The SpecTool path constructs empty and completes in initialize; the suppression answers
-    // NullAway's "field not initialized" for exactly that window — the codec is the one field
-    // completion fills before it can publish the state. Nothing reads it before initialize runs —
-    // that is the interface's contract, not an accident to recheck.
-    @SuppressWarnings("NullAway.Init")
-    public MethodTool() {
-    }
-
-    /**
-     * What completion produces: the spec it was read from, the per-parameter decision, and the
-     * declaration. Held together so it is published in one volatile write, so a thread that observes
-     * completion sees every part of it rather than a half-built mix.
-     */
-    @RequiredArgsConstructor
-    private static final class State {
-
-        /**
-         * The method this tool runs, read — the resolution it was completed from when a spec drove
-         * the declaration, and the bare signature when the declaration was handed in. The run reads
-         * its parameters and their names from here.
-         */
-        private final ToolMethodSpec spec;
-
-        /** Per parameter: {@code true} when the model produces its value — see {@link #schemaFor}. */
-        private final boolean[] fromModel;
-
-        /** Whether the method returns void — asked once for the result stage. */
-        private final boolean returnsVoid;
-
-        /** The declaration built from the spec. */
-        private final ToolDefinition definition;
-    }
-
-    /**
-     * Completes this tool from the method's resolution: reads the signature, settles which
-     * parameters the model produces, then builds the declaration — the name and description the
-     * spec carries, and the arguments schema {@link #argumentsSchema} puts together.
+     * Builds this tool from the method's resolution: reads the signature, settles which parameters
+     * the model produces, then builds the declaration — the name and description the spec carries,
+     * and the arguments schema {@link #argumentsSchema} puts together.
      *
      * <p>
-     * The spec is validated first, so every way of completing a tool starts from a resolution that
-     * is complete and consistent; a blank description still means none.
+     * The spec is validated first, so every way of building a tool starts from a resolution that is
+     * complete and consistent; a blank description still means none.
      *
-     * @param spec  the resolution of the method this tool was built from; never {@code null}, and
-     *                  it has to name the tool and every one of its parameters
-     * @param codec the codec that generates the declaration and binds arguments; never
-     *                  {@code null}
+     * <p>
+     * The declaration is built here, in the constructor, which means {@link #schemaFor} and
+     * {@link #argumentsSchema} are called while a subclass of this class is still being
+     * constructed. An override therefore cannot read the subclass's own fields — they are not
+     * initialized yet — and must stand on what the parameters handed to it carry.
+     *
+     * @param spec  the resolution of the method this tool is built from; never {@code null}, and it
+     *                  has to name the tool and every one of its parameters
+     * @param codec the codec that generates the declaration and binds arguments; never {@code null}
      * @throws SynapseException if the spec names no tool, or leaves a parameter unnamed, or names
      *                              two of them under one name
      */
-    @Override
-    public void initialize(@NonNull ToolMethodSpec spec, @NonNull JsonCodec codec) {
+    public MethodTool(@NonNull ToolMethodSpec spec, @NonNull JsonCodec codec) {
         validate(spec);
-        boolean[] fromModel = readSignature(spec, codec);
+        this.spec = spec;
+        this.codec = codec;
+        makeAccessible(spec.getMethod());
         List<ToolParameterSpec> entries = spec.getParameters();
+        boolean[] fromModel = new boolean[entries.size()];
         for (int i = 0; i < entries.size(); i++) {
             fromModel[i] = schemaFor(entries.get(i).getParameter()) != null;
         }
+        this.fromModel = fromModel;
+        this.returnsVoid = spec.getMethod().getReturnType() == void.class;
         String description = spec.getDescription();
-        ToolDefinition definition = new ToolDefinition(spec.getName(),
-                description.isBlank() ? null : description, argumentsSchema(spec));
-        this.state = new State(spec, fromModel, spec.getMethod().getReturnType() == void.class, definition);
+        this.definition = new ToolDefinition(spec.getName(), description.isBlank() ? null : description,
+                argumentsSchema(spec));
     }
 
     /**
@@ -217,15 +195,12 @@ public class MethodTool implements SpecTool, StagedTool {
     }
 
     /**
-     * Makes the method accessible so a private one the application hands over runs like any other;
-     * and holds the codec where {@link #schemaFor} reads it while completion runs, before the state
-     * that carries the spec is published.
+     * Makes the method accessible so a private one the application hands over runs like any other.
      *
-     * @return one slot per parameter, all {@code false} until {@link #initialize} settles them
+     * @param method the method the tool will run; never {@code null}
+     * @throws SynapseException if the module path refuses to open it
      */
-    private boolean[] readSignature(ToolMethodSpec spec, JsonCodec codec) {
-        this.codec = codec;
-        Method method = spec.getMethod();
+    private static void makeAccessible(Method method) {
         try {
             method.setAccessible(true);
         } catch (RuntimeException failure) {
@@ -235,7 +210,6 @@ public class MethodTool implements SpecTool, StagedTool {
                     + method.getDeclaringClass().getPackageName()
                     + " to this library, for example with --add-opens", failure);
         }
-        return new boolean[spec.getParameters().size()];
     }
 
     /**
@@ -284,31 +258,13 @@ public class MethodTool implements SpecTool, StagedTool {
     }
 
     /**
-     * The declaration, whether built from the signature or handed in.
+     * The declaration, built from the signature when this tool was constructed.
      *
-     * @return this tool as the model sees it; never {@code null} once the tool is initialized
-     * @throws IllegalStateException if completion never ran — {@link #initialize} or a factory
-     *                                   step is missing
+     * @return this tool as the model sees it; never {@code null}
      */
     @Override
     public ToolDefinition definition() {
-        return completed().definition;
-    }
-
-    /**
-     * The completed tool. Every state the class allows is non-null; this answers the one it does
-     * not — being asked before completion, which the {@link SpecTool} contract forbids.
-     *
-     * @return the state completion published; never {@code null}
-     * @throws IllegalStateException if completion never ran
-     */
-    private State completed() {
-        State current = state;
-        if (current == null) {
-            throw new IllegalStateException(
-                    "no declaration: a MethodTool is completed by initialize(...) or assembled by an of(...) factory, and this one has had neither");
-        }
-        return current;
+        return definition;
     }
 
     /**
@@ -326,14 +282,13 @@ public class MethodTool implements SpecTool, StagedTool {
     @Override
     public @Nullable Object[] resolveArguments(@Nullable String arguments, @Nullable ChatContext context)
             throws Exception {
-        State current = completed();
-        List<ToolParameterSpec> entries = current.spec.getParameters();
+        List<ToolParameterSpec> entries = spec.getParameters();
         @Nullable
         Object[] values = new Object[entries.size()];
         Map<String, Object> args = null;
         for (int i = 0; i < entries.size(); i++) {
             ToolParameterSpec entry = entries.get(i);
-            if (!current.fromModel[i]) {
+            if (!fromModel[i]) {
                 values[i] = valueFor(entry.getParameter(), context);
                 continue;
             }
@@ -358,7 +313,6 @@ public class MethodTool implements SpecTool, StagedTool {
      */
     @Override
     public @Nullable Object call(@Nullable Object[] values, @Nullable ChatContext context) throws Exception {
-        ToolMethodSpec spec = completed().spec;
         try {
             return spec.getMethod().invoke(spec.getTarget(), values);
         } catch (InvocationTargetException e) {
@@ -385,7 +339,7 @@ public class MethodTool implements SpecTool, StagedTool {
      */
     @Override
     public List<ContentPart> resolveResult(@Nullable Object returnValue, @Nullable ChatContext context) {
-        if (completed().returnsVoid) {
+        if (returnsVoid) {
             return List.of(new TextPart("Success"));
         }
         if (returnValue instanceof String text) {
@@ -405,7 +359,7 @@ public class MethodTool implements SpecTool, StagedTool {
     private @Nullable Object bind(ToolParameterSpec entry, @Nullable Object raw) {
         Parameter parameter = entry.getParameter();
         if (raw == null && parameter.getType().isPrimitive()) {
-            Method method = completed().spec.getMethod();
+            Method method = spec.getMethod();
             throw new IllegalArgumentException("parameter '" + entry.getName() + "' of "
                     + method.getDeclaringClass().getSimpleName() + "." + method.getName()
                     + " is required, but the model produced no value for it");
