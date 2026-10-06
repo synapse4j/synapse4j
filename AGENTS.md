@@ -149,6 +149,12 @@ one would block extension by users and providers.
   must be refused — hand-writing it is a defect to fix on sight. Hand-write one only for what Lombok
   cannot say: a `super` call with arguments, a derived value, validation beyond `@NonNull`,
   delegation — never to carry javadoc, which goes on the class or the field.
+- **Logging uses what the module already carries, and the logger is Lombok's to declare.** A module
+  that does not depend on Spring logs through the JDK — `@Log`, over `java.util.logging` — so it adds
+  no dependency; a module that already depends on Spring logs through Commons Logging — `@CommonsLog`,
+  Spring's own facade, which `spring-jcl` already puts on the classpath. The logger is the annotation's
+  to declare, never a hand-written field, as with any other boilerplate. A message reads as a sentence:
+  a capital first letter, and what happened rather than what the code beside it does.
 - Package names are `io.github.synapse4j.*`. Implementation classes live in a `.<vendor>` subpackage
   naming their technology origin (for example `...victools`, `...jackson`).
 - **Group types by concept, not by dependency direction.** `...data` holds the inert call model —

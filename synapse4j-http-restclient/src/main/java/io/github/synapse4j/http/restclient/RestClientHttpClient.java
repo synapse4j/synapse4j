@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import lombok.NonNull;
-import lombok.extern.java.Log;
+import lombok.extern.apachecommons.CommonsLog;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.StreamingHttpOutputMessage;
 import org.springframework.web.client.ResourceAccessException;
@@ -74,9 +74,7 @@ import org.jspecify.annotations.Nullable;
  * apply to every request this class builds. This class holds the delegate and its own
  * {@link HttpOptions} and nothing else, and is safe to share across threads.
  */
-// The JDK's own logger: no dependency of ours at all, and an application bridges JUL into whatever
-// it logs with — spring-boot-starter-logging ships jul-to-slf4j, so Boot apps see this configured.
-@Log
+@CommonsLog
 public class RestClientHttpClient implements HttpClient {
 
     /** The client requests are built on and sent through; the transport beneath it is its own. */
@@ -134,7 +132,7 @@ public class RestClientHttpClient implements HttpClient {
         if (effective.getResponseTimeout() != null && responseTimeoutWarned.compareAndSet(false, true)) {
             // Ignoring a setting that cannot be honoured is one thing; saying it again on every call
             // would be another — the setting is named once, and the fix is named with it.
-            log.warning("responseTimeout is ignored: the RestClient abstraction has no per-request timeout — "
+            log.warn("Ignoring responseTimeout: the RestClient abstraction has no per-request timeout — "
                     + "set it on the request factory instead (e.g. JdkClientHttpRequestFactory.setReadTimeout)");
         }
         RestClient.RequestBodySpec spec = delegate.method(HttpMethod.valueOf(request.getMethod()))
