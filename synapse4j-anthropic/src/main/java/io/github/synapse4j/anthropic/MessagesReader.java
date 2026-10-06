@@ -471,8 +471,8 @@ class MessagesReader {
      * Reads a usage document into the shared model. This endpoint splits what the request sent into
      * three counts — tokens never cached, tokens read from the cache, tokens written to it — and
      * the shared model takes one: every input token, with the cached part as a child bucket of it.
-     * So the three are summed into {@link Usage#setInputTokens}, the cache read becomes
-     * {@link Usage#setCachedInputTokens}, and the cache write — counted in the total but named by
+     * So the three are summed into {@link Usage}'s input tokens, the cache read becomes its
+     * cached-input tokens, and the cache write — counted in the total but named by
      * no field of its own — keeps its original name in the extras, like every other count the model
      * does not carry.
      */

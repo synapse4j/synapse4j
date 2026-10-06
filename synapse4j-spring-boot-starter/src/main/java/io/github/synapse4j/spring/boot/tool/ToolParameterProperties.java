@@ -5,8 +5,8 @@ import org.jspecify.annotations.Nullable;
 import lombok.Data;
 
 /**
- * One parameter's overrides, keyed in {@link ToolMethodProperties#getParameters()} by the name the
- * parameter carries before this configuration applies.
+ * One parameter's overrides, keyed in {@link ToolMethodProperties} by the name the parameter carries
+ * before this configuration applies.
  *
  * <p>
  * Every attribute mirrors the {@code @ToolParam} one it stands for and is read the way

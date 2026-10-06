@@ -20,8 +20,8 @@ import lombok.RequiredArgsConstructor;
  * <p>
  * Every value is text and is written the way an annotation would carry it: a schema is a JSON document,
  * and the extras are merged under their raw keys. A value left out leaves the annotation's own standing;
- * one written, an empty one included, takes its place. {@link ToolsProperties#getStrict()} is the
- * fallback for a tool that states none of its own.
+ * one written, an empty one included, takes its place. The strict setting on {@link ToolsProperties}
+ * is the fallback for a tool that states none of its own.
  */
 @RequiredArgsConstructor
 public class ConfiguredToolMethodSpecCustomizer implements ToolMethodSpecCustomizer {

@@ -3,7 +3,7 @@ package io.github.synapse4j.http;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A {@link HttpOptions#getBodyWriteMode() body-write mode} as a value an implementation can reason
+ * A {@link HttpOptions body-write mode} as a value an implementation can reason
  * about, rather than the string the option carries.
  *
  * <p>
@@ -32,7 +32,7 @@ public enum BodyWriteMode {
     }
 
     /**
-     * The string this mode is carried as in {@link HttpOptions#getBodyWriteMode()}.
+     * The string this mode is carried as in {@link HttpOptions}.
      *
      * @return the mode's string form
      */
@@ -45,7 +45,7 @@ public enum BodyWriteMode {
      * for the default: a caller who asked for one thing must not silently get another. The comparison
      * ignores case.
      *
-     * @param value the mode as {@link HttpOptions#getBodyWriteMode()} carries it
+     * @param value the mode as {@link HttpOptions} carries it
      * @return the mode the text names
      * @throws IllegalArgumentException if the text names no mode this library defines
      */
