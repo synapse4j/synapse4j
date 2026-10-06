@@ -216,12 +216,15 @@ behavior, or say in the test's name why it stands.
 - **A claim that survives a transformation is pinned at its boundary.** Read then fold then replay,
   build then serialize then deserialize, blocking against streaming: one test at the boundary that
   could break it, asserting both directions rather than only the one in use.
+- **A test's name is a pointer, not a description.** The subject and the verdict — what the test
+  exercises and what comes out of it — and nothing about why or how, which the body or the commit
+  carries. No article anywhere in the name: no `a`, `an` or `the` as a camelCase segment. At most
+  five words — counting a segment at each capital, so `IOException` is three — and at most forty
+  characters. A longer name is one nobody reads.
 - **Write it like production code, and keep it self-contained.** No order dependence between tests,
   no shared mutable state, no external world — no network, no real clock, no shared file. Name the
-  class `<Class>Test` after what it tests unless the case is genuinely special; name a method for the
-  behavior it pins in the fewest words, with no article and no sentence around it; keep shared
-  fixtures in a class of their own rather than copying them; keep the test as readable as the code
-  beside it.
+  class `<Class>Test` after what it tests unless the case is genuinely special; keep shared fixtures
+  in a class of their own rather than copying them; keep the test as readable as the code beside it.
 
 ## Documentation
 

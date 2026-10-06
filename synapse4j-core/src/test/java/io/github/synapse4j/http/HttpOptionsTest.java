@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 class HttpOptionsTest {
 
     @Test
-    void aRequestWithNoOptionsGetsTheDefaultsAsTheyAre() {
+    void noOptionsRequestGetsDefaults() {
         HttpOptions defaults = new HttpOptions();
         defaults.setResponseTimeout(Duration.ofSeconds(30));
         defaults.setBodyWriteMode(BodyWriteMode.BUFFERED.value());
@@ -24,7 +24,7 @@ class HttpOptionsTest {
     }
 
     @Test
-    void theAnswerIsACallerOwnedCopyChangingItLeavesBothSidesAlone() {
+    void callerCopyLeavesSourcesIntact() {
         HttpOptions defaults = new HttpOptions();
         defaults.setBodyWriteMode(BodyWriteMode.STREAMED.value());
         HttpOptions request = new HttpOptions();
@@ -41,7 +41,7 @@ class HttpOptionsTest {
     }
 
     @Test
-    void whatTheRequestSetsWinsAndWhatItLeavesOutComesFromTheDefaults() {
+    void requestWinsDefaultsFillGaps() {
         HttpOptions defaults = new HttpOptions();
         defaults.setResponseTimeout(Duration.ofSeconds(30));
         defaults.setBodyWriteMode(BodyWriteMode.BUFFERED.value());
@@ -63,7 +63,7 @@ class HttpOptionsTest {
     }
 
     @Test
-    void mergingLeavesBothSidesAsTheyWere() {
+    void mergeLeavesBothSidesAlone() {
         HttpOptions defaults = new HttpOptions();
         defaults.setBodyWriteMode(BodyWriteMode.STREAMED.value());
         HttpOptions request = new HttpOptions();
@@ -79,7 +79,7 @@ class HttpOptionsTest {
     }
 
     @Test
-    void defaultsCarryTheStandardFrameBudget() {
+    void defaultsCarryFrameBudget() {
         assertEquals(256 * 1024, HttpOptions.defaults().getMaxFrameBytes());
     }
 

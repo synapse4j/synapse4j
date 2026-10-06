@@ -26,7 +26,7 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void anEmptyKeywordIsNotTheSameAsAbsent() {
+    void emptyKeywordDiffersFromAbsent() {
         JsonSchema absent = built();
         JsonSchema empty = new JsonSchemaBuilder()
                 .setRequired(List.of())
@@ -40,7 +40,7 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void readingDoesNotChangeTheSchema() {
+    void readingDoesNotChangeSchema() {
         JsonSchema schema = built();
 
         schema.getType();
@@ -53,7 +53,7 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void theBuiltSchemaIsFrozen() {
+    void builtSchemaFrozen() {
         // Nothing a getter hands out can change the schema: the top map and every collection below it
         // are unmodifiable.
         JsonSchema schema = new JsonSchemaBuilder()
@@ -70,7 +70,7 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void theTypeFormFollowsTheSetterThatWasUsed() {
+    void typeFormFollowsSetter() {
         // Set as a string, stored as a string; set as a list, stored as an array — a one-element
         // list is not folded into the string form, which is why the two schemas are not equal.
         JsonSchema single = new JsonSchemaBuilder().setType("object").build();
@@ -97,7 +97,7 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void extraKeywordsAreReadThroughKeysAndGet() {
+    void extraKeywordsReadThroughKeys() {
         JsonSchema schema = new JsonSchemaBuilder()
                 .setType("object")
                 .put("$schema", "https://json-schema.org/draft/2020-12/schema")
@@ -112,7 +112,7 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void titleAndDescriptionAreNamedKeywords() {
+    void titleDescriptionNamedKeywords() {
         JsonSchema schema = new JsonSchemaBuilder()
                 .setType("object")
                 .setTitle("WeatherQuery")
@@ -126,7 +126,7 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void anExplicitNullIsCarried() {
+    void explicitNullCarried() {
         JsonSchema schema = new JsonSchemaBuilder().put("const", null).build();
 
         assertEquals(Set.of("const"), schema.keys());
@@ -134,7 +134,7 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void everySchemaValuedKeywordIsWalked() {
+    void everySchemaKeywordWalked() {
         JsonSchema schema = new JsonSchemaBuilder()
                 .put("allOf", List.of(typed("string")))
                 .put("not", typed("null"))
@@ -150,7 +150,7 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void booleanValuesAreCarriedAsSchemas() {
+    void booleansCarriedAsSchemas() {
         JsonSchema schema = new JsonSchemaBuilder()
                 .setAdditionalProperties(BooleanJsonSchema.FALSE)
                 .put("not", BooleanJsonSchema.TRUE)
@@ -161,7 +161,7 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void anItemsListIsWalked() {
+    void itemsListWalked() {
         // 2020-12 makes "items" a single schema; draft-07 allowed an array. The array is read and
         // walked as a list of schemas, which a typed read as a single schema does not answer.
         JsonSchema schema = new JsonSchemaBuilder()
@@ -192,7 +192,7 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void mapRebuildsOnlyThePathThatChanged() {
+    void mapRebuildsChangedPath() {
         JsonSchema name = typed("string");
         JsonSchema schema = new JsonSchemaBuilder().setProperties(Map.of("name", name)).build();
 
@@ -205,14 +205,14 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void mapSharesNodesItLeavesAlone() {
+    void mapSharesUntouchedNodes() {
         JsonSchema schema = new JsonSchemaBuilder().setProperties(Map.of("name", typed("string"))).build();
 
         assertSame(schema, schema.map(node -> node));
     }
 
     @Test
-    void toStringRendersTheValueItCarries() {
+    void toStringRendersValue() {
         assertEquals("{type=object}", typed("object").toString());
         // A sub-schema renders as its own value, so a nested schema reads as one document.
         assertEquals("{properties={name={type=string}}}",
@@ -220,13 +220,13 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void toStringRendersTheBooleanValue() {
+    void toStringRendersBoolean() {
         assertEquals("true", BooleanJsonSchema.TRUE.toString());
         assertEquals("false", BooleanJsonSchema.FALSE.toString());
     }
 
     @Test
-    void twoSchemasCarryingTheSameKeywordsAreEqual() {
+    void sameKeywordsEqualSchemas() {
         JsonSchema one = new JsonSchemaBuilder().setType("object")
                 .setProperties(Map.of("name", typed("string"))).build();
         JsonSchema other = new JsonSchemaBuilder().setType("object")
@@ -239,7 +239,7 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void aSubSchemaReachedTwiceIsVisitedAtEachPath() {
+    void sharedSubSchemaVisitedTwice() {
         // A node reached through two paths is walked at each of them.
         JsonSchema shared = typed("string");
         JsonSchema schema = new JsonSchemaBuilder().setProperties(Map.of("first", shared, "second", shared)).build();

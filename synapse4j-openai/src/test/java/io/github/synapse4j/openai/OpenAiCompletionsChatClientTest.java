@@ -113,7 +113,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void textRoundTripsAndWireRequestCarriesNoNulls() throws Exception {
+    void textRoundTripsWithoutNulls() throws Exception {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-1\",\"model\":\"gpt-test\","
                 + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
@@ -164,7 +164,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aBaseUrlWithATrailingSlashDoesNotDoubleThePath() {
+    void trailingSlashPathNotDoubled() {
         stubCompletion();
         config.setBaseUrl("https://example.test/v1/");
 
@@ -174,7 +174,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void theConfiguredTokenLimitMemberIsTheOneThatGoesOut() {
+    void tokenLimitUsesConfiguredName() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-3\",\"model\":\"gpt-test\","
                 + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
@@ -199,7 +199,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aBlankTokenLimitMemberSendsNoLimit() {
+    void blankTokenLimitSendsNothing() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-3\",\"model\":\"gpt-test\","
                 + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
@@ -217,7 +217,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void unknownFieldsAreKeptOnTheNodeTheyCameFrom() {
+    void unknownFieldsStayOnNode() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-2\",\"model\":\"gpt-test\","
                 + "\"created\":1700000000,\"system_fingerprint\":\"fp_1\","
@@ -259,7 +259,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void anUnknownFieldOfAContentPartStaysOnThatPart() {
+    void contentPartKeepsUnknownField() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
                 + "\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"hi\","
@@ -276,7 +276,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void theFirstChoiceIsReadAndAFurtherChoiceIsKept() {
+    void firstChoiceReadFurtherKept() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"id\":\"chatcmpl-3\",\"model\":\"gpt-test\","
                 + "\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
@@ -304,7 +304,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void responseHeadersAreCopiedOntoTheResponse() {
+    void responseHeadersCopiedOntoResponse() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("x-request-id", List.of("req_1"), "Retry-After", List.of("1", "2")));
         stub.canned.setBody(new ByteArrayInputStream(
@@ -321,7 +321,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void streamResponseHeadersAreCopiedOntoTheAggregatedResponse() {
+    void streamHeadersCopiedToAggregate() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream"), "x-request-id",
                 List.of("req_1"), "Retry-After", List.of("1", "2")));
@@ -347,7 +347,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void anUnsupportedContentPartInTheResponseFailsLoudly() {
+    void unsupportedResponsePartFailsLoudly() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
                 + "\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"visible\"},"
@@ -360,7 +360,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aRefusalInTheContentIsKeptAsTheMessageMember() {
+    void refusalKeptAsMessageMember() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
                 + "\"message\":{\"role\":\"assistant\",\"content\":["
@@ -380,7 +380,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void toolDefinitionsGoOutAndToolCallsComeBack() throws Exception {
+    void toolDefinitionsRoundTrip() throws Exception {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,"
                 + "\"finish_reason\":\"tool_calls\",\"message\":{\"role\":\"assistant\",\"content\":null,"
@@ -426,7 +426,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void mixedPartsForceArrayContentForm() throws Exception {
+    void mixedPartsForceArrayContent() throws Exception {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
@@ -455,7 +455,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void imageBytesGoOutInlinedAsADataUrl() {
+    void imageBytesBecomeDataUrl() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
@@ -482,7 +482,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void anImageUriGoesOutAsTheUrlItself() {
+    void imageUriUsedAsUrl() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
@@ -502,7 +502,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void textAndImagePartsBecomeOrderedContentEntries() {
+    void textImagePartsBecomeOrdered() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
@@ -526,7 +526,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void mediaThatIsNotAnImageIsRejected() {
+    void nonImageMediaRejected() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
@@ -542,7 +542,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void mediaWithNeitherAUriNorASourceIsRejected() {
+    void mediaUriOrSourceRequired() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
@@ -558,7 +558,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void inliningAPayloadWithoutAMediaTypeIsRejected() {
+    void inlineWithoutMediaTypeRejected() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
@@ -574,7 +574,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void toolResultMessagesBecomeToolRoleEntries() {
+    void toolResultsBecomeToolRole() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
@@ -597,7 +597,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void jsonSchemaResponseFormatParsesSchemaIntoWire() {
+    void jsonSchemaFormatNestsSchema() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
@@ -623,7 +623,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void errorStatusBuildsMessageFromStructuredErrorBody() {
+    void errorStatusUsesStructuredBody() {
         stub.canned.setStatusCode(429);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"error\":{\"message\":\"Rate limit reached\",\"type\":\"rate_limit_exceeded\","
@@ -641,7 +641,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void nonJsonErrorBodyFallsBackToSnippetWithoutMaskingTheFailure() {
+    void nonJsonBodyUsesSnippet() {
         stub.canned.setStatusCode(502);
         stub.canned.setBody(new ByteArrayInputStream("<html>Bad Gateway</html>".getBytes(UTF_8)));
 
@@ -655,7 +655,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aRefusalOnlyReadsAsMuchOfTheBodyAsItNeeds() {
+    void refusalReadsOnlyNeededBody() {
         ByteArrayInputStream body = new ByteArrayInputStream(new byte[256 * 1024]);
         stub.canned.setStatusCode(500);
         stub.canned.setBody(body);
@@ -671,14 +671,14 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void missingModelIsACallerBug() {
+    void missingModelIsCallerBug() {
         ChatRequest request = requestWithModel();
         request.getOptions().setModel(null);
         assertThrows(IllegalArgumentException.class, () -> client.chat(request));
     }
 
     @Test
-    void anAbsentApiKeySendsNoAuthorizationHeader() {
+    void absentApiKeyOmitsAuthorization() {
         stubCompletion();
         client.setConfig(new OpenAiConfig());
 
@@ -689,7 +689,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void optionsExtrasFlattenIntoTheWireTopLevel() {
+    void optionsExtrasFlattenToWire() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
@@ -709,7 +709,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void extrasGoOutOnTheNodeTheyWereAddedTo() {
+    void extrasStayOnAddedNode() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -735,7 +735,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void anExtraReplacesAModelledMemberOfTheSameName() {
+    void extraOverridesModelledMember() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -749,7 +749,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void anExtraSetOverAWholeModelledObjectReplacesIt() {
+    void extraReplacesWholeModelledObject() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -769,7 +769,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aToolDefinitionCarriesItsFunctionExtras() {
+    void toolDefinitionCarriesFunctionExtras() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -792,7 +792,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aStrictResponseFormatGoesOutInsideTheJsonSchema() {
+    void strictFormatInsideJsonSchema() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -814,7 +814,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aStrictToolGoesOutInsideItsFunction() {
+    void strictToolInsideFunction() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -834,7 +834,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void anUnsetStrictIsNotSent() {
+    void unsetStrictNotSent() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -862,7 +862,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aReplayedToolCallCarriesItsFunctionExtras() {
+    void replayedToolCallKeepsExtras() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -887,7 +887,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aMediaPartCarriesItsImageUrlExtras() {
+    void mediaPartKeepsUrlExtras() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -908,7 +908,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aResponseFormatCarriesItsJsonSchemaExtras() {
+    void responseFormatKeepsSchemaExtras() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -931,7 +931,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aPathUnderAModelledObjectReachesIntoIt() {
+    void pathReachesIntoModelledObject() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -955,7 +955,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aReasoningEffortOfTheEndpointsOwnGoesOutAsItStands() {
+    void unknownReasoningEffortPassedThrough() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -969,7 +969,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aToolChoiceModeGoesOutAsTheProtocolsOwnString() {
+    void toolChoiceModeBareString() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -983,7 +983,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void namingAToolTakesTheObjectForm() {
+    void namedToolTakesObjectForm() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -1001,7 +1001,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aToolChoiceModeThisProtocolCannotSpellIsLeftUnsent() {
+    void unspellableToolChoiceUnsent() {
         stubCompletion();
 
         // A mode the open vocabulary allows and this protocol has no member for is left off the
@@ -1014,7 +1014,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aContradictoryToolChoiceIsRefused() {
+    void contradictoryToolChoiceRefused() {
         // A name beside a mode that names no tool is half a requirement.
         ChatRequest strayName = requestWithModel();
         strayName.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_REQUIRED);
@@ -1028,7 +1028,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aFailedToolResultCarriesNoErrorMarker() {
+    void failedResultNoErrorMarker() {
         // Neither OpenAI protocol has a member for a tool failure, so it is left unsent and the
         // result goes out as an ordinary one. Pinned because Anthropic's is_error has a test and
         // these two would otherwise notice the decision being flipped by nothing at all.
@@ -1051,7 +1051,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aToolResultCarriesItsOwnExtras() {
+    void toolResultCarriesOwnExtras() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -1074,7 +1074,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aToolRoleMessageCarriesItsOwnExtrasOntoEveryEntryItBecomes() {
+    void toolRoleExtrasEveryEntry() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -1097,7 +1097,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void anExtraNoneOfTheShapesCoversGoesOutAsTheCodecWritesIt() {
+    void uncoveredExtraWrittenByCodec() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -1110,7 +1110,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aSchemaInAnExtraGoesOutAsTheDocumentItDescribes() {
+    void extraSchemaBecomesDocument() {
         stubCompletion();
 
         JsonSchema schema = new JsonSchemaBuilder().setType("object").build();
@@ -1124,7 +1124,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void anExtrasBagInsideAnExtraGoesOutAsTheObjectItDescribes() {
+    void nestedExtrasBagBecomesObject() {
         stubCompletion();
 
         ProviderExtras nested = new ProviderExtras().put(List.of("annotations", "title"), "x");
@@ -1138,7 +1138,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void anEmptyTextPartWithExtrasStillGoesOut() {
+    void extrasKeepEmptyTextPart() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -1160,7 +1160,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aToolResultContentPartWithExtrasFailsLoudly() {
+    void toolResultExtrasFailLoudly() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -1187,7 +1187,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void reasoningIsReadApartFromTheAnswer() {
+    void reasoningKeptApartFromAnswer() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
                 + "\"message\":{\"role\":\"assistant\",\"reasoning\":\"weighing it up\","
@@ -1205,7 +1205,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void reasoningUnderAnotherNameStaysInExtras() {
+    void reasoningAliasStaysInExtras() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
                 + "\"message\":{\"role\":\"assistant\",\"reasoning_content\":\"weighing it up\","
@@ -1223,7 +1223,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void streamedReasoningFragmentsFoldIntoOnePart() {
+    void reasoningFragmentsFoldIntoOne() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -1257,7 +1257,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void theConfiguredReasoningMemberCarriesTheTurnReasoning() {
+    void turnReasoningUnderConfiguredName() {
         ChatRequest request = requestWithModel();
         ChatMessage assistant = new ChatMessage(ChatRole.ASSISTANT);
         ReasoningPart reasoning = new ReasoningPart();
@@ -1307,7 +1307,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void theRequestBodyIsStreamedRatherThanMaterialized() throws Exception {
+    void requestBodyStreamedNotBuffered() throws Exception {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
@@ -1329,7 +1329,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aTextStreamBecomesOneEventPerFrameAndAggregatesTheSameTurn() {
+    void textStreamEventPerFrame() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -1406,7 +1406,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void toolCallFragmentsMergeIntoOneCall() {
+    void fragmentsMergeIntoOneCall() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -1450,7 +1450,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void theChunkIndexDoesNotRideBackIntoARequest() {
+    void chunkIndexNotSentBack() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
@@ -1483,7 +1483,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void parallelToolCallFragmentsMergeIntoTheirOwnCalls() {
+    void parallelFragmentsMergeSeparately() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -1530,7 +1530,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aBodyThatStopsWithoutDoneFailsAsTruncated() {
+    void bodyMissingDoneFailsTruncated() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         RecordedInputStream body = new RecordedInputStream(sse(
@@ -1557,7 +1557,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aStreamTheReaderRefusesStillReleasesTheResponse() {
+    void readerRefusalReleasesResponse() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         RecordedInputStream body = new RecordedInputStream("data: {}\n\n".getBytes(UTF_8));
@@ -1578,7 +1578,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void anErrorFrameFailsWhileIterating() {
+    void errorFrameFailsWhileIterating() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -1601,7 +1601,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void aRefusedStreamFailsBeforeAnyEventIsHandedOut() {
+    void refusedStreamFailsBeforeEvents() {
         stub.canned.setStatusCode(429);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"error\":{\"message\":\"Rate limit reached\",\"type\":\"rate_limit_exceeded\","
@@ -1616,7 +1616,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void anAcceptedAnswerThatIsNotAnEventStreamFailsLoudly() {
+    void nonEventStreamAnswerFails() {
         RecordedInputStream body = new RecordedInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
                         + "\"content\":\"an answer, not a stream\"}}]}").getBytes(UTF_8));
@@ -1637,7 +1637,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void closingTheStreamClosesTheResponse() {
+    void streamCloseClosesResponse() {
         RecordedInputStream body = new RecordedInputStream(
                 sse("[DONE]").getBytes(UTF_8));
         stub.canned.setStatusCode(200);
@@ -1654,7 +1654,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void theStreamingRequestAsksForTheUsageFrame() {
+    void streamRequestAsksUsageFrame() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse("[DONE]").getBytes(UTF_8)));
@@ -1670,7 +1670,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void theFrameBudgetResolvesFromTheRequestThenTheTransportThenTheDefault() {
+    void frameBudgetPrecedence() {
         // The request's own budget, when it sets one.
         HttpOptions requestBudget = new HttpOptions();
         requestBudget.setMaxFrameBytes(64);

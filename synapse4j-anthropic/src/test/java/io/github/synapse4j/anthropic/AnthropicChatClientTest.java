@@ -110,7 +110,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void theRequestCarriesTheProtocolSpellingAndNoNulls() {
+    void protocolSpellingOmitsNulls() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(message("\"msg_1\"",
                 "[{\"type\":\"text\",\"text\":\"Hi there\"}]", "end_turn",
@@ -156,7 +156,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aBaseUrlWithATrailingSlashDoesNotDoubleThePath() {
+    void trailingSlashNotDoubled() {
         stubCompletion();
         config.setBaseUrl("https://example.test/");
 
@@ -166,7 +166,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void theSystemMessageGoesOutAsTheTopLevelSystemField() {
+    void systemMessageTopLevelField() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -186,7 +186,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aTokenLimitIsRequiredAndTheExtrasBagCanSupplyIt() {
+    void tokenLimitRequiredViaExtras() {
         stubCompletion();
 
         // The endpoint has no server-side default for the limit, so a call with no opinion on it
@@ -205,7 +205,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void toolChoiceTranslatesOntoTheProtocolShapes() {
+    void toolChoiceMapsToProtocol() {
         stubCompletion();
 
         ChatRequest required = requestWithModel();
@@ -233,7 +233,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aToolChoiceModeThisProtocolCannotSpellIsLeftUnsent() {
+    void unsupportedToolChoiceOmitted() {
         stubCompletion();
 
         // A mode outside the set the protocol fixes is left off the wire, not refused: the call
@@ -246,7 +246,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aContradictoryToolChoiceIsRefused() {
+    void contradictoryToolChoiceRefused() {
         // A name beside a mode that names no tool is half a requirement.
         ChatRequest strayName = requestWithModel();
         strayName.getOptions().setToolChoice(ChatOptions.TOOL_CHOICE_AUTO);
@@ -260,7 +260,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aStrictToolGoesOutWithItsSchemaParsed() {
+    void strictToolSchemaParsed() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -292,7 +292,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aReplayedToolCallGoesOutAsAToolUseBlock() {
+    void replayedCallBecomesToolUse() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -315,7 +315,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void toolResultsBecomeToolResultBlocksInAUserMessage() {
+    void toolResultsBecomeUserMessage() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -379,7 +379,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void effortAndSchemaFormatShareOneOutputConfig() {
+    void effortFormatShareOutputConfig() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -399,7 +399,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aResponseFormatTheProtocolCannotCarryIsRefused() {
+    void jsonResponseFormatRefused() {
         stubCompletion();
 
         // Only a schema-shaped answer has a member here; prose is what the endpoint answers with
@@ -412,7 +412,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aResponseFormatMemberTheProtocolLacksIsLeftUnsent() {
+    void formatMembersLeftUnsent() {
         stubCompletion();
 
         // The protocol's format carries no name, description or enforcement flag; those are left
@@ -434,7 +434,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void anImageGoesOutAsAnImageBlock() {
+    void imageGoesAsImageBlock() {
         stubCompletion();
 
         ChatRequest uriRequest = requestWithModel();
@@ -465,7 +465,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void mediaThisProtocolCannotCarryIsRejected() {
+    void unsupportedMediaRejected() {
         stubCompletion();
 
         ChatRequest audio = requestWithModel();
@@ -503,7 +503,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void stopReasonsMapToTheSharedVocabularyAndTheRestPassesThrough() {
+    void stopReasonsMapOrPass() {
         // The three the shared vocabulary names outright.
         assertEquals(ChatFinishReason.STOP, finishReasonOf("end_turn"));
         assertEquals(ChatFinishReason.LENGTH, finishReasonOf("max_tokens"));
@@ -516,7 +516,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void usageCountsNormalizeToTheSharedShape() {
+    void usageCountsNormalized() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(message("\"msg_3\"",
                 "[{\"type\":\"text\",\"text\":\"ok\"}]", "end_turn",
@@ -544,7 +544,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void unknownFieldsStayOnTheNodeTheyCameFrom() {
+    void unknownFieldsStayOnNode() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(message("\"msg_4\"",
                 "[{\"type\":\"text\",\"text\":\"hi\",\"citations\":"
@@ -568,7 +568,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void anUnmodeledContentBlockIsKeptWhole() {
+    void unmodeledContentBlockKeptWhole() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(message("\"msg_5\"",
                 "[{\"type\":\"text\",\"text\":\"hi\"},"
@@ -592,7 +592,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aServerToolsBlockComesBackOnTheNextTurnAsItArrived() {
+    void serverToolsBlockReplayedWhole() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(message("\"msg_5\"",
                 "[{\"type\":\"text\",\"text\":\"hi\"},"
@@ -618,7 +618,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void toolCallsComeBackAsToolUseBlocks() {
+    void toolCallsBecomeUseBlocks() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(message("\"msg_6\"",
                 "[{\"type\":\"tool_use\",\"id\":\"toolu_1\",\"name\":\"get_weather\","
@@ -639,7 +639,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aTextStreamAggregatesToTheSameTurnAsABlockingCall() {
+    void streamMatchesBlockingCall() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -724,7 +724,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void anUnmodeledDeltaStaysOnTheEventAndOffTheAnswer() {
+    void unmodeledDeltaNotOnAnswer() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -764,7 +764,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void toolInputFragmentsAccumulateIntoOneCall() {
+    void inputFragmentsMergeOneCall() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -828,7 +828,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void serverToolInputDoesNotLeakIntoTheCallBeforeIt() {
+    void serverToolInputOwnBlock() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -885,7 +885,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void twoAdjacentTextBlocksStayTwoParts() {
+    void textBlocksStaySeparate() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -933,7 +933,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aToolCallWhoseInputNeverStreamedIsTheEmptyObjectOnTheWire() {
+    void unstreamedToolInputEmptyObject() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -983,7 +983,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aBodyThatStopsWithoutMessageStopFailsAsTruncated() {
+    void streamWithoutMessageStopTruncated() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         RecordedInputStream body = new RecordedInputStream(sse(
@@ -1021,7 +1021,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aStreamTheReaderRefusesStillReleasesTheResponse() {
+    void refusedStreamReleasesResponse() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         RecordedInputStream body = new RecordedInputStream("data: {}\n\n".getBytes(UTF_8));
@@ -1042,7 +1042,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void anErrorEventFailsWhileIterating() {
+    void errorEventFailsWhileIterating() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -1075,7 +1075,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void errorStatusBuildsMessageFromTheStructuredErrorBody() {
+    void errorStatusBuildsStructuredMessage() {
         stub.canned.setStatusCode(429);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\","
@@ -1092,7 +1092,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void nonJsonErrorBodyFallsBackToSnippetWithoutMaskingTheFailure() {
+    void nonJsonBodyFallbackSnippet() {
         stub.canned.setStatusCode(502);
         stub.canned.setBody(new ByteArrayInputStream("<html>Bad Gateway</html>".getBytes(UTF_8)));
 
@@ -1106,7 +1106,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aRefusedStreamFailsBeforeAnyEventIsHandedOut() {
+    void errorStatusFailsStreamEarly() {
         stub.canned.setStatusCode(429);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\","
@@ -1122,7 +1122,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void anAcceptedAnswerThatIsNotAnEventStreamFailsLoudly() {
+    void nonEventStreamResponseFails() {
         RecordedInputStream body = new RecordedInputStream(
                 ("{\"type\":\"message\",\"content\":[]}").getBytes(UTF_8));
         stub.canned.setStatusCode(200);
@@ -1140,14 +1140,14 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void missingModelIsACallerBug() {
+    void missingModelCallerBug() {
         ChatRequest request = requestWithModel();
         request.getOptions().setModel(null);
         assertThrows(IllegalArgumentException.class, () -> client.chat(request));
     }
 
     @Test
-    void anAbsentApiKeySendsNoApiKeyHeader() {
+    void absentApiKeyNoHeader() {
         stubCompletion();
         client.setConfig(new AnthropicConfig());
 
@@ -1173,7 +1173,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void extrasMergeOverTheModelledMembersOnTheirNode() {
+    void extrasOverrideModelledMembers() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -1206,7 +1206,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void aSystemTextCarryingAFieldTakesTheBlockArray() {
+    void systemTextTakesBlockArray() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -1224,7 +1224,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void closingTheStreamClosesTheResponse() {
+    void streamCloseClosesResponse() {
         RecordedInputStream body = new RecordedInputStream(sse(
                 "message_stop", "{\"type\":\"message_stop\"}").getBytes(UTF_8));
         stub.canned.setStatusCode(200);

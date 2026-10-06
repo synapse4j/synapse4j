@@ -21,7 +21,7 @@ import io.github.synapse4j.exception.SynapseIOException;
 class DefaultChatStreamTest {
 
     @Test
-    void handsOutEventsInOrderAndFoldsEachConsumedOne() {
+    void eventsHandedOrderedAndFolded() {
         List<ChatStreamEvent> arrived = events("one", "two", "three");
         List<String> folded = new ArrayList<>();
         try (ChatStream stream = new DefaultChatStream(arrived.iterator(),
@@ -38,7 +38,7 @@ class DefaultChatStreamTest {
     }
 
     @Test
-    void aggregatedResponseReflectsOnlyWhatWasConsumed() {
+    void aggregatedResponseReflectsConsumed() {
         List<ChatStreamEvent> arrived = events("one", "two", "stop");
         try (ChatStream stream = new DefaultChatStream(arrived.iterator(), DefaultChatStreamTest::foldFinish, () -> {
         })) {
@@ -55,7 +55,7 @@ class DefaultChatStreamTest {
     }
 
     @Test
-    void breakingOutEarlyKeepsThePartialAggregation() {
+    void earlyBreakKeepsPartialAggregation() {
         List<ChatStreamEvent> arrived = events("one", "two", "stop");
         try (ChatStream stream = new DefaultChatStream(arrived.iterator(), DefaultChatStreamTest::foldFinish, () -> {
         })) {
@@ -69,7 +69,7 @@ class DefaultChatStreamTest {
     }
 
     @Test
-    void aSecondIteratorCallFailsBecauseNothingIsBuffered() {
+    void secondIteratorCallFails() {
         try (ChatStream stream = new DefaultChatStream(events("one").iterator(), (response, event) -> {
         }, () -> {
         })) {
@@ -80,7 +80,7 @@ class DefaultChatStreamTest {
     }
 
     @Test
-    void readingPastTheEndFollowsIteratorContract() {
+    void readingPastEndFollowsContract() {
         try (ChatStream stream = new DefaultChatStream(List.<ChatStreamEvent>of().iterator(), (response, event) -> {
         }, () -> {
         })) {
@@ -92,7 +92,7 @@ class DefaultChatStreamTest {
     }
 
     @Test
-    void runningToTheEndReleasesTheSourceByItself() {
+    void runningToEndReleasesSource() {
         AtomicInteger closed = new AtomicInteger();
         try (ChatStream stream = new DefaultChatStream(events("one", "two").iterator(), (response, event) -> {
         }, closed::incrementAndGet)) {
@@ -109,7 +109,7 @@ class DefaultChatStreamTest {
     }
 
     @Test
-    void closingReleasesOnceAndShutsTheIterator() {
+    void closeReleasesOnceShutsIterator() {
         AtomicInteger closed = new AtomicInteger();
         ChatStream stream = new DefaultChatStream(events("one").iterator(), (response, event) -> {
         }, closed::incrementAndGet);
@@ -124,7 +124,7 @@ class DefaultChatStreamTest {
     }
 
     @Test
-    void aFailingSourceReleasesTheConnectionAndKeepsItsFailure() {
+    void failingSourceReleasesAndRethrows() {
         AtomicInteger closed = new AtomicInteger();
         Iterator<ChatStreamEvent> failing = new Iterator<ChatStreamEvent>() {
             @Override
@@ -150,7 +150,7 @@ class DefaultChatStreamTest {
     }
 
     @Test
-    void aSourceFailingAfterPromisingAnEventReleasesTheConnection() {
+    void readAfterPromiseReleasesConnection() {
         AtomicInteger closed = new AtomicInteger();
         Iterator<ChatStreamEvent> failing = new Iterator<ChatStreamEvent>() {
             @Override
@@ -178,7 +178,7 @@ class DefaultChatStreamTest {
     }
 
     @Test
-    void aCloseFailureIsReportedAsTheLibraryOwns() {
+    void closeFailureUsesSynapseException() {
         ChatStream stream = new DefaultChatStream(events("one").iterator(), (response, event) -> {
         }, () -> {
             throw new IOException("socket refused");
@@ -191,7 +191,7 @@ class DefaultChatStreamTest {
     }
 
     @Test
-    void theEventPipelineRunsBeforeTheFoldAndTheCallerSeesWhatWasFolded() {
+    void eventPipelineRunsBeforeFold() {
         List<ChatStreamEvent> arrived = events("one", "two");
         List<String> folded = new ArrayList<>();
         List<String> seen = new ArrayList<>();

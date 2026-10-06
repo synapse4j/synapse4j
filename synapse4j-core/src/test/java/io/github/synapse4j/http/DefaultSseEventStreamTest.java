@@ -26,7 +26,7 @@ import io.github.synapse4j.exception.SynapseIOException;
 class DefaultSseEventStreamTest {
 
     @Test
-    void readsFramesInOrderWithTheirEventNames() {
+    void framesInOrderWithNames() {
         DefaultSseEventStream reader = reader("""
                 event: message_start
                 data: {"type":"message_start"}
@@ -46,7 +46,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void aFrameWithoutAnEventFieldHasNoName() {
+    void eventFieldAbsentNoName() {
         DefaultSseEventStream reader = reader("data: {\"id\":\"chunk\"}\n\n");
 
         SseEvent event = reader.next();
@@ -56,7 +56,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void severalDataLinesArriveJoinedByNewlines() {
+    void dataLinesJoinedByNewlines() {
         DefaultSseEventStream reader = reader("event: multi\ndata: first\ndata: second\ndata: third\n\n");
 
         SseEvent event = reader.next();
@@ -65,7 +65,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void commentsAndUnknownFieldsAreNotEvents() {
+    void commentsUnknownFieldsIgnored() {
         DefaultSseEventStream reader = reader("""
                 : keep-alive
                 id: 42
@@ -83,7 +83,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void aFrameWithNoDataIsNotAnEvent() {
+    void frameWithoutDataNotEvent() {
         DefaultSseEventStream reader = reader("event: empty\n\ndata: real\n\n");
 
         SseEvent event = reader.next();
@@ -93,7 +93,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void handlesCarriageReturnAndCarriageReturnLineFeed() {
+    void handlesCrlfAndCr() {
         DefaultSseEventStream reader = reader("event: crlf\r\ndata: one\r\n\r\nevent: cr\rdata: two\r\r");
 
         List<SseEvent> events = drain(reader);
@@ -106,14 +106,14 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void stripsOnlyOneSpaceAfterTheColon() {
+    void stripsOneSpaceAfterColon() {
         DefaultSseEventStream reader = reader("data:  two spaces\n\n");
 
         assertEquals(" two spaces", reader.next().getData());
     }
 
     @Test
-    void anIncompleteTrailingFrameIsDiscarded() {
+    void incompleteTrailingFrameDiscarded() {
         DefaultSseEventStream reader = reader("data: complete\n\ndata: never dispatched\n");
 
         assertEquals("complete", reader.next().getData());
@@ -121,7 +121,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void readingPastTheEndFollowsIteratorContract() {
+    void nextPastEndThrows() {
         DefaultSseEventStream reader = reader("data: one\n\n");
 
         assertEquals("one", reader.next().getData());
@@ -130,7 +130,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void closingClosesTheBody() throws IOException {
+    void closeClosesBody() throws IOException {
         TrackingStream body = new TrackingStream("data: one\n\n");
         DefaultSseEventStream reader = new DefaultSseEventStream(body, HttpOptions.defaults().getMaxFrameBytes());
 
@@ -141,7 +141,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void closingLeavesTheStreamOverRatherThanFailed() throws IOException {
+    void closeEndsStreamWithoutFailure() throws IOException {
         TrackingStream body = new TrackingStream("data: one\n\ndata: two\n\n");
         DefaultSseEventStream reader = new DefaultSseEventStream(body, HttpOptions.defaults().getMaxFrameBytes());
         assertTrue(reader.hasNext());
@@ -158,7 +158,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void aFailingSourceIsReportedAsTheLibraryOwns() throws IOException {
+    void failingSourceReportsLibraryException() throws IOException {
         InputStream body = new InputStream() {
 
             @Override
@@ -175,7 +175,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void aFrameOverTheBudgetFailsTheRead() {
+    void frameOverBudgetFailsRead() {
         DefaultSseEventStream reader = reader("data: " + "x".repeat(100) + "\n\n", 32);
 
         SynapseException thrown = assertThrows(SynapseException.class, reader::hasNext);
@@ -184,7 +184,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void theBudgetCountsUtf8BytesRatherThanCharacters() {
+    void budgetCountsBytesNotCharacters() {
         // "data: 中文" is eight characters but twelve bytes on the wire.
         DefaultSseEventStream reader = reader("data: 中文\n\n", 10);
 
@@ -192,7 +192,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void dataLinesOfOneFrameAddUpAgainstTheBudget() {
+    void frameDataLinesShareBudget() {
         // Two lines of thirty bytes each: either alone is fine, together they cross a fifty-byte budget.
         DefaultSseEventStream reader = reader("data: " + "x".repeat(24) + "\ndata: " + "x".repeat(24) + "\n\n", 50);
 
@@ -200,7 +200,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void everyFrameGetsTheBudgetBack() {
+    void budgetResetsEveryFrame() {
         String frame = "data: " + "x".repeat(40) + "\n\n";
         DefaultSseEventStream reader = reader(frame + frame, 64);
 
@@ -210,13 +210,13 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void theBudgetMustBePositive() {
+    void budgetMustBePositive() {
         assertThrows(IllegalArgumentException.class,
                 () -> new DefaultSseEventStream(new ByteArrayInputStream(new byte[0]), 0));
     }
 
     @Test
-    void aLeadingUtf8BomIsSkipped() {
+    void leadingUtf8BomSkipped() {
         // The grammar allows one BOM at the very start; the reader must drop it, or the first
         // field name would carry it and the opening frame would be misread.
         DefaultSseEventStream reader = reader("\uFEFFdata: first\n\ndata: second\n\n");
@@ -227,7 +227,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void aTruncatedBomIsPushedBackOntoTheStream() throws IOException {
+    void truncatedBomPushedBack() throws IOException {
         // EF BB without the third byte is not a BOM. Pushed back, the two bytes decode to
         // replacement characters that corrupt the first field name — which is exactly how the
         // test observes they were not dropped: a dropped pair would leave "data: real" intact.
@@ -244,7 +244,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void anEmptyEventNameIsPreservedAsEmpty() {
+    void emptyEventNamePreserved() {
         DefaultSseEventStream reader = reader("event:\ndata: x\n\n");
 
         assertEquals("", reader.next().getEvent());
@@ -283,7 +283,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void aLineWithNoTerminatorStillStopsAtTheBudget() throws IOException {
+    void unterminatedLineStopsAtBudget() throws IOException {
         // The budget is enforced as bytes arrive: a server that never sends a newline cannot
         // pin the memory first and fail the read afterwards.
         byte[] endless = "x".repeat(64).getBytes(UTF_8);
@@ -296,7 +296,7 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void closingWhileTheReaderIsParkedOnTheBodyUnblocksIt() throws InterruptedException {
+    void closeUnblocksParkedReader() throws InterruptedException {
         SilentStream body = new SilentStream();
         DefaultSseEventStream reader = new DefaultSseEventStream(body,
                 HttpOptions.defaults().getMaxFrameBytes());

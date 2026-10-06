@@ -41,12 +41,12 @@ class MethodToolsTest {
     });
 
     @BeforeEach
-    void codecAnswersASchema() {
+    void codecAnswersSchema() {
         when(codec.generateDecodeSchema(any())).thenReturn(new JsonSchemaBuilder().setType("string").build());
     }
 
     @Test
-    void whatTheAnnotationsWroteLandsOnTheSpec() {
+    void annotationsLandOnSpec() {
         reader.from(new Bean());
 
         ToolMethodSpec written = specOf("renamed");
@@ -61,7 +61,7 @@ class MethodToolsTest {
     }
 
     @Test
-    void blanksReachTheCustomizersAndTheDefaultsFillThem() {
+    void blanksReachCustomizersBeforeDefaults() {
         List<String> names = new ArrayList<>();
         List<String> parameters = new ArrayList<>();
         reader.addCustomizer(spec -> {
@@ -84,7 +84,7 @@ class MethodToolsTest {
     }
 
     @Test
-    void anObjectSuppliesItsInstanceAndStaticMethodsAClassSuppliesTheStatics() {
+    void objectYieldsInstanceAndStatic() {
         reader.from(new Bean());
         assertEquals(Set.of("defaulted", "renamed", "fixed"), resolvedNames());
 
@@ -104,7 +104,7 @@ class MethodToolsTest {
     }
 
     @Test
-    void twoMethodsUnderOneNameAreRefused() {
+    void twoMethodsOneNameRefused() {
         SynapseException failure = assertThrows(SynapseException.class, () -> reader.from(new Doubled()));
 
         assertTrue(failure.getMessage().contains("'same'"));
@@ -113,7 +113,7 @@ class MethodToolsTest {
     }
 
     @Test
-    void methodsOfAnyVisibilityAreRead() {
+    void methodsOfAnyVisibilityRead() {
         reader.from(new Child());
         assertEquals(Set.of("own", "inherited"), resolvedNames());
 
@@ -123,28 +123,28 @@ class MethodToolsTest {
     }
 
     @Test
-    void anOverrideWithoutTheAnnotationTakesTheToolAway() {
+    void overrideWithoutAnnotationDropsTool() {
         reader.from(new Overriding());
 
         assertEquals(Set.of(), resolvedNames());
     }
 
     @Test
-    void aDefaultMethodIsReadFromItsInterface() {
+    void defaultMethodReadFromInterface() {
         reader.from(new Implementing());
 
         assertEquals(Set.of("shared"), resolvedNames());
     }
 
     @Test
-    void aBridgeMethodIsNotReadAsASecondTool() {
+    void bridgeMethodNotSecondTool() {
         reader.from(new Narrowed());
 
         assertEquals(Set.of("echo"), resolvedNames());
     }
 
     @Test
-    void aStaticMethodCarriesNoTargetEvenWhenReadFromAnObject() {
+    void staticMethodCarriesNoTarget() {
         Object instance = new Bean();
         reader.from(instance);
 
@@ -153,7 +153,7 @@ class MethodToolsTest {
     }
 
     @Test
-    void aClassWithoutAnnotatedMethodsYieldsNoTools() {
+    void unannotatedClassYieldsNoTools() {
         assertTrue(reader.from(Plain.class).isEmpty());
         assertTrue(reader.from(new Plain()).isEmpty());
     }

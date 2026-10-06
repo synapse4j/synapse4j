@@ -25,7 +25,7 @@ class JacksonJsonWriterTest {
     private final JacksonJsonCodec codec = new JacksonJsonCodec(JsonMapper.builder());
 
     @Test
-    void writesANestedDocumentAsItsExactText() {
+    void writesNestedDocumentExactly() {
         RecordingOutputStream sink = new RecordingOutputStream();
 
         JsonWriter writer = codec.writer(sink);
@@ -46,7 +46,7 @@ class JacksonJsonWriterTest {
     }
 
     @Test
-    void writesAValueTooLargeToHoldStraightFromAReader() {
+    void writesValueStreamedFromReader() {
         String value = "0123456789".repeat(50_000);
         TrackingReader text = new TrackingReader(value);
         RecordingOutputStream sink = new RecordingOutputStream();
@@ -60,7 +60,7 @@ class JacksonJsonWriterTest {
     }
 
     @Test
-    void writesABigNumberExactly() {
+    void writesBigNumberExactly() {
         RecordingOutputStream sink = new RecordingOutputStream();
 
         JsonWriter writer = codec.writer(sink);
@@ -74,7 +74,7 @@ class JacksonJsonWriterTest {
     }
 
     @Test
-    void writesAPreEncodedNumberAsGiven() {
+    void writesPreEncodedNumberVerbatim() {
         RecordingOutputStream sink = new RecordingOutputStream();
 
         JsonWriter writer = codec.writer(sink);
@@ -85,7 +85,7 @@ class JacksonJsonWriterTest {
     }
 
     @Test
-    void flushPushesTheDocumentIntoTheSinkWithoutClosingIt() {
+    void flushPushesWithoutClosingSink() {
         RecordingOutputStream sink = new RecordingOutputStream();
 
         JsonWriter writer = codec.writer(sink);
@@ -97,7 +97,7 @@ class JacksonJsonWriterTest {
     }
 
     @Test
-    void leavesTheSinkOpen() {
+    void closeLeavesSinkOpen() {
         RecordingOutputStream sink = new RecordingOutputStream();
 
         JsonWriter writer = codec.writer(sink);
@@ -109,7 +109,7 @@ class JacksonJsonWriterTest {
     }
 
     @Test
-    void writesAnObjectNoneOfTheTokenMethodsCovers() {
+    void writesUnmodelledObjectValue() {
         RecordingOutputStream sink = new RecordingOutputStream();
 
         JsonWriter writer = codec.writer(sink);
@@ -128,7 +128,7 @@ class JacksonJsonWriterTest {
     }
 
     @Test
-    void writesNullForANullValue() {
+    void writesNullForNullValue() {
         RecordingOutputStream sink = new RecordingOutputStream();
 
         JsonWriter writer = codec.writer(sink);
@@ -139,7 +139,7 @@ class JacksonJsonWriterTest {
     }
 
     @Test
-    void writesThisLibrariesOwnTypesAsTheDocumentsTheyDescribe() {
+    void writesLibraryTypesAsDocuments() {
         RecordingOutputStream sink = new RecordingOutputStream();
         ProviderExtras extras = new ProviderExtras().put(List.of("annotations", "title"), "x");
         JsonSchema schema = new JsonSchemaBuilder().setType("object").build();
@@ -158,7 +158,7 @@ class JacksonJsonWriterTest {
     }
 
     @Test
-    void writesAnOwnTypeNestedInAMapTheSameWay() {
+    void writesLibraryTypeInsideMap() {
         RecordingOutputStream sink = new RecordingOutputStream();
         JsonSchema schema = new JsonSchemaBuilder().setType("string").build();
 

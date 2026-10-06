@@ -22,19 +22,19 @@ import io.github.synapse4j.exception.SynapseException;
 class DefaultHttpResponseTest {
 
     @Test
-    void aResponseWithoutAContentTypeHasNoEventStream() {
+    void absentContentTypeNoStream() {
         assertNull(response("data: one\n\n", Map.of()).sseEventStream());
     }
 
     @Test
-    void aResponseOfAnotherMediaTypeHasNoEventStream() {
+    void wrongContentTypeNoStream() {
         DefaultHttpResponse response = response("{}", Map.of("Content-Type", List.of("application/json")));
 
         assertNull(response.sseEventStream());
     }
 
     @Test
-    void theMediaTypeIsReadWithoutCaseAndWithItsParametersCutOff() {
+    void mediaTypeIgnoredCaseParams() {
         DefaultHttpResponse response = response("data: one\n\n",
                 Map.of("content-type", List.of("TEXT/EVENT-STREAM; charset=utf-8")));
 
@@ -42,7 +42,7 @@ class DefaultHttpResponseTest {
     }
 
     @Test
-    void everyCallAnswersWithTheSameEventStream() {
+    void everyCallSameEventStream() {
         DefaultHttpResponse response = response("data: one\n\n", eventStream());
 
         SseEventStream first = response.sseEventStream();
@@ -51,7 +51,7 @@ class DefaultHttpResponseTest {
     }
 
     @Test
-    void theEventStreamReadsTheBodyAsFrames() {
+    void eventStreamReadsFrames() {
         DefaultHttpResponse response = response("data: one\n\ndata: two\n\n", eventStream());
 
         SseEventStream events = response.sseEventStream();
@@ -62,7 +62,7 @@ class DefaultHttpResponseTest {
     }
 
     @Test
-    void theFrameBudgetIsTheOneTheExchangeRanUnder() {
+    void frameBudgetFromExchangeOptions() {
         HttpOptions options = HttpOptions.defaults();
         options.setMaxFrameBytes(32);
         DefaultHttpResponse response = response("data: " + "x".repeat(100) + "\n\n", eventStream(), options);
@@ -74,7 +74,7 @@ class DefaultHttpResponseTest {
     }
 
     @Test
-    void aResponseHandedNoOptionsStillGetsAnEventStream() throws IOException {
+    void noOptionsStillGetsStream() throws IOException {
         try (DefaultHttpResponse response = new DefaultHttpResponse()) {
             response.setStatusCode(200);
             response.getHeaders().putAll(eventStream());
@@ -88,7 +88,7 @@ class DefaultHttpResponseTest {
     }
 
     @Test
-    void theFallbackBudgetIsTheOneTheLibraryDefaultsTo() throws IOException {
+    void fallbackBudgetFromLibraryDefault() throws IOException {
         try (DefaultHttpResponse response = new DefaultHttpResponse()) {
             response.setStatusCode(200);
             response.getHeaders().putAll(eventStream());
@@ -104,7 +104,7 @@ class DefaultHttpResponseTest {
     }
 
     @Test
-    void closingTheResponseReleasesTheBodyThroughTheStreamItHandedOut() throws IOException {
+    void closeResponseReleasesBody() throws IOException {
         TrackingStream body = new TrackingStream("data: one\n\n");
         DefaultHttpResponse response = response(body, eventStream());
 
@@ -115,7 +115,7 @@ class DefaultHttpResponseTest {
     }
 
     @Test
-    void closingTheResponseClosesTheBodyWhenNoStreamWasAskedFor() throws IOException {
+    void closeWithoutStreamClosesBody() throws IOException {
         TrackingStream body = new TrackingStream("data: one\n\n");
         DefaultHttpResponse response = response(body, eventStream());
 

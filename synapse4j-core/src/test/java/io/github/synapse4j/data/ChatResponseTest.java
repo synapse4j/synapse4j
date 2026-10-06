@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 class ChatResponseTest {
 
     @Test
-    void everyResponseGetsItsOwnBags() {
+    void responseBagsNotShared() {
         ChatResponse one = new ChatResponse();
         ChatResponse two = new ChatResponse();
 

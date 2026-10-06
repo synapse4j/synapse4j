@@ -15,7 +15,7 @@ class InlineJsonSchemaCustomizerTest {
     private final InlineJsonSchemaCustomizer customizer = new InlineJsonSchemaCustomizer();
 
     @Test
-    void aSchemaWithoutReferencesIsReturnedUnchanged() {
+    void schemaWithoutReferencesReturnedUnchanged() {
         JsonSchema schema = new JsonSchemaBuilder()
                 .setType("object")
                 .setProperties(Map.of("name", typed("string")))
@@ -28,7 +28,7 @@ class InlineJsonSchemaCustomizerTest {
     }
 
     @Test
-    void aDefinitionReferencedTwiceIsInlinedAndDropped() {
+    void referencedTwiceInlinedAndDropped() {
         JsonSchema schema = new JsonSchemaBuilder()
                 .setType("object")
                 .setProperties(Map.of(
@@ -48,7 +48,7 @@ class InlineJsonSchemaCustomizerTest {
     }
 
     @Test
-    void aReferenceThatClosesACycleIsKeptWithItsDefinition() {
+    void cycleClosingReferenceKept() {
         JsonSchema node = new JsonSchemaBuilder()
                 .setType("object")
                 .setProperties(Map.of("next", ref("#/$defs/Node")))
@@ -70,7 +70,7 @@ class InlineJsonSchemaCustomizerTest {
     }
 
     @Test
-    void aReferenceToTheRootIsKept() {
+    void referenceToRootKept() {
         JsonSchema schema = new JsonSchemaBuilder()
                 .setType("object")
                 .setProperties(Map.of("child", new JsonSchemaBuilder()
@@ -111,7 +111,7 @@ class InlineJsonSchemaCustomizerTest {
     }
 
     @Test
-    void aReferenceThatNamesNothingIsKept() {
+    void referenceNamingNothingKept() {
         JsonSchema schema = new JsonSchemaBuilder()
                 .setType("object")
                 .setProperties(Map.of("value", ref("#/$defs/Missing")))
@@ -121,7 +121,7 @@ class InlineJsonSchemaCustomizerTest {
     }
 
     @Test
-    void aReferenceInAFormItDoesNotResolveIsLeftAsItStands() {
+    void unresolvedReferenceFormKept() {
         JsonSchema nested = new JsonSchemaBuilder()
                 .setType("object")
                 .setProperties(Map.of("inner", ref("#/properties/nested/$defs/Inner")))
@@ -136,7 +136,7 @@ class InlineJsonSchemaCustomizerTest {
     }
 
     @Test
-    void theArgumentIsNotModified() {
+    void argumentNotModified() {
         JsonSchema schema = new JsonSchemaBuilder()
                 .setType("object")
                 .setProperties(Map.of("home", ref("#/$defs/Place")))

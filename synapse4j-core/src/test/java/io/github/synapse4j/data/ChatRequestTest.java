@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 class ChatRequestTest {
 
     @Test
-    void everyRequestGetsItsOwnOptions() {
+    void requestOptionsNotShared() {
         ChatRequest one = new ChatRequest();
         ChatRequest two = new ChatRequest();
 

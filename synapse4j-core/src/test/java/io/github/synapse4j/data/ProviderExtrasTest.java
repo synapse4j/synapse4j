@@ -23,7 +23,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 class ProviderExtrasTest {
 
     @Test
-    void putStoresAValueAtTheTopLevel() {
+    void putStoresTopLevelValue() {
         ProviderExtras extras = new ProviderExtras();
 
         ProviderExtras returned = extras.put("temperature", 0.5);
@@ -36,7 +36,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void putStoresAValueAtANestedPath() {
+    void putStoresNestedValue() {
         ProviderExtras extras = new ProviderExtras();
 
         extras.put(List.of("metadata", "trace_id"), "abc");
@@ -59,7 +59,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void aSeparatorInsideAKeyIsTakenLiterally() {
+    void separatorInsideKeyTakenLiterally() {
         ProviderExtras extras = new ProviderExtras();
 
         extras.put("a.b", 1);
@@ -70,7 +70,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void aLiteralKeyDoesNotConflictWithANestedPath() {
+    void literalKeyCoexistsWithPath() {
         ProviderExtras extras = new ProviderExtras();
 
         extras.put("a.b", 1);
@@ -81,7 +81,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void anEscapeCharacterInsideAKeyIsTakenLiterally() {
+    void keyEscapeTakenLiterally() {
         ProviderExtras extras = new ProviderExtras();
 
         extras.put("a\\b", 1);
@@ -91,7 +91,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void putOverwritesAnExistingPath() {
+    void putOverwritesExistingPath() {
         ProviderExtras extras = new ProviderExtras();
 
         extras.put("a", 1);
@@ -102,7 +102,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void aNullValueIsStored() {
+    void nullValueStored() {
         ProviderExtras extras = new ProviderExtras();
 
         extras.put("safety", null);
@@ -114,7 +114,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void aStoredValueIsKeptByReference() {
+    void storedValueKeptByReference() {
         ProviderExtras extras = new ProviderExtras();
         List<String> stop = new ArrayList<>(List.of("alpha"));
 
@@ -125,7 +125,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void settingAPathUnderAStoredLeafClearsTheLeaf() {
+    void nestedPathClearsLeaf() {
         ProviderExtras extras = new ProviderExtras().put("a", 1);
 
         extras.put(List.of("a", "b"), 2);
@@ -135,7 +135,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void settingAPathOverStoredDescendantsClearsThem() {
+    void shallowPathClearsDescendants() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 2);
 
         extras.put("a", 1);
@@ -145,28 +145,28 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void anEmptyPathIsRejected() {
+    void emptyPathRejected() {
         ProviderExtras extras = new ProviderExtras();
 
         assertThrows(IllegalArgumentException.class, () -> extras.put(List.of(), 1));
     }
 
     @Test
-    void anEmptyPathSegmentIsRejected() {
+    void emptyPathSegmentRejected() {
         ProviderExtras extras = new ProviderExtras();
 
         assertThrows(IllegalArgumentException.class, () -> extras.put(List.of("a", ""), 1));
     }
 
     @Test
-    void aNullPathSegmentIsRejected() {
+    void nullPathSegmentRejected() {
         ProviderExtras extras = new ProviderExtras();
 
         assertThrows(IllegalArgumentException.class, () -> extras.put(Arrays.asList("a", null), 1));
     }
 
     @Test
-    void putAllMergesTheOtherBag() {
+    void putAllMergesOtherBag() {
         ProviderExtras extras = new ProviderExtras().put("a", 1).put("b", 2);
         ProviderExtras other = new ProviderExtras().put("b", 3).put("c", 4);
 
@@ -178,7 +178,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void putAllWinsWhereThePathsOverlap() {
+    void putAllWinsOnOverlap() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
         ProviderExtras other = new ProviderExtras().put("a", 2);
 
@@ -188,7 +188,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void putAllWithAnEmptyBagChangesNothing() {
+    void emptyBagNoOp() {
         ProviderExtras extras = new ProviderExtras().put("a", 1);
 
         extras.putAll(new ProviderExtras());
@@ -197,7 +197,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void putAllWithThisBagIsANoOp() {
+    void putAllSelfNoOp() {
         ProviderExtras extras = new ProviderExtras().put("a", 1);
 
         assertSame(extras, extras.putAll(extras));
@@ -205,7 +205,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void theNestedMapIsAFreshCopy() {
+    void nestedMapFreshCopy() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
 
         Map<String, Object> nested = extras.nestedMap();
@@ -216,7 +216,7 @@ class ProviderExtrasTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void theNestedMapOfANestedPathIsAFreshCopyToo() {
+    void innerNestedMapFreshCopy() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
 
         Map<String, Object> inner = (Map<String, Object>) extras.nestedMap().get("a");
@@ -226,7 +226,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void bagsWithTheSameEntriesAreEqual() {
+    void bagsEqualBySameEntries() {
         ProviderExtras one = new ProviderExtras().put(List.of("a", "b"), 1);
         ProviderExtras two = new ProviderExtras().put(List.of("a", "b"), 1);
 
@@ -237,7 +237,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void freezeReturnsAReadOnlyCopy() {
+    void freezeReturnsReadOnlyCopy() {
         ProviderExtras frozen = new ProviderExtras().put("temperature", 0.5).freeze();
 
         assertEquals(0.5, frozen.get("temperature"));
@@ -250,7 +250,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void aFrozenCopyIsIndependentAndEqualByContent() {
+    void frozenCopyIndependentEqual() {
         ProviderExtras extras = new ProviderExtras().put("temperature", 0.5);
 
         ProviderExtras frozen = extras.freeze();
@@ -262,14 +262,14 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void toStringShowsTheRawEntries() {
+    void toStringShowsRawEntries() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
 
         assertEquals("{a.b=1}", extras.toString());
     }
 
     @Test
-    void removeDropsTheEntry() {
+    void removeDropsEntry() {
         ProviderExtras extras = new ProviderExtras().put("a", 1);
 
         assertSame(extras, extras.remove("a"));
@@ -280,7 +280,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void removeOfAnUnsetPathChangesNothing() {
+    void removeUnsetPathNoOp() {
         ProviderExtras extras = new ProviderExtras().put("a", 1);
 
         extras.remove("b");
@@ -290,7 +290,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void removeTakesAPathOfSegments() {
+    void removeTakesPathSegments() {
         ProviderExtras extras = new ProviderExtras().put(List.of("metadata", "trace_id"), "abc");
 
         extras.remove("metadata", "trace_id");
@@ -299,7 +299,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void removeOnlyTouchesTheExactPath() {
+    void removeTouchesExactPath() {
         ProviderExtras extras = new ProviderExtras().put(List.of("metadata", "trace_id"), "abc");
 
         extras.remove("metadata");
@@ -309,7 +309,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void removeRejectsAnEmptyOrInvalidPath() {
+    void removeRejectsInvalidPath() {
         ProviderExtras extras = new ProviderExtras().put("a", 1);
 
         assertThrows(IllegalArgumentException.class, () -> extras.remove());
@@ -321,7 +321,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void putRawStoresAnAssembledKeyAsGiven() {
+    void putRawStoresAssembledKey() {
         ProviderExtras extras = new ProviderExtras();
 
         ProviderExtras returned = extras.putRaw("metadata.trace_id", "abc");
@@ -333,7 +333,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void putRawKeepsAnEscapedSeparatorInTheKey() {
+    void putRawKeepsEscapedSeparator() {
         ProviderExtras extras = new ProviderExtras();
 
         extras.putRaw("a\\.b", 1);
@@ -343,7 +343,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void putRawClearsWhatItOverlaps() {
+    void putRawClearsOverlap() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
 
         extras.putRaw("a", 2);
@@ -353,7 +353,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void rawMapExposesTheEntriesUnderTheirAssembledKeys() {
+    void rawMapExposesAssembledKeys() {
         ProviderExtras extras = new ProviderExtras().put(List.of("metadata", "trace_id"), "abc").put("temperature",
                 0.5);
 
@@ -381,7 +381,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void getRawReadsTheAssembledKeySpace() {
+    void getRawReadsAssembledKeys() {
         // The counterpart of putRaw, so it addresses the keys rawMap spells rather than the path
         // segments get takes: a path and a key that spells the same text are two different entries.
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1).putRaw("a\\.b", 2);
@@ -393,7 +393,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void aBagRoundTripsThroughItsRawMap() {
+    void bagRoundTripsRawMap() {
         ProviderExtras extras = new ProviderExtras().put(List.of("metadata", "trace_id"), "abc").put("temperature",
                 0.5);
         ProviderExtras restored = new ProviderExtras();
@@ -405,7 +405,7 @@ class ProviderExtrasTest {
 
     @ParameterizedTest(name = "mergeInto {0}")
     @MethodSource("mergeCases")
-    void mergeIntoFollowsTheRules(String rule, List<Put> puts, Map<String, Object> members,
+    void mergeIntoFollowsRules(String rule, List<Put> puts, Map<String, Object> members,
             Map<String, Object> expected) {
         ProviderExtras extras = new ProviderExtras();
         for (Put put : puts) {
@@ -471,7 +471,7 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void copyingABagAndRemovingIsHowInheritedValuesAreDropped() {
+    void copyThenRemoveDropsInherited() {
         ProviderExtras defaults = new ProviderExtras().put("service_tier", "flex").put("temperature", 1.0).put("top_p",
                 0.5);
         ProviderExtras effective = new ProviderExtras().putAll(defaults);

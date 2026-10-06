@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 class BodyPublisherTest {
 
     @Test
-    void aDemandOfZeroIsAnErrorRatherThanSilence() {
+    void zeroDemandErrorNotSilence() {
         JdkHttpClient.OneBufferPublisher publisher = new JdkHttpClient.OneBufferPublisher(
                 ByteBuffer.wrap(new byte[] { 1, 2, 3 }));
         RecordingSubscriber subscriber = new RecordingSubscriber();
@@ -35,7 +35,7 @@ class BodyPublisherTest {
     }
 
     @Test
-    void aSecondSubscriptionSendsTheWholeBufferAgain() {
+    void secondSubscriptionResendsBuffer() {
         // The path a direct buffer takes: no array to hand over, so the publisher carries the
         // bytes itself — and a retry or a redirect subscribes again to the same content. What
         // the first subscriber drained belongs to the first subscriber alone.

@@ -13,7 +13,7 @@ import io.github.synapse4j.json.JsonSchemaBuilder;
 class ChatOptionsTest {
 
     @Test
-    void effectiveFillsEveryGapFromTheDefaultAndLetsTheCallWin() {
+    void effectiveFillsGapsCallWins() {
         ChatOptions call = new ChatOptions();
         call.setTemperature(0.2);
         call.getHeaders().put("x-shared", "call");
@@ -45,7 +45,7 @@ class ChatOptionsTest {
     }
 
     @Test
-    void everyOptionsGetsItsOwnBags() {
+    void optionsBagsNotShared() {
         ChatOptions one = new ChatOptions();
         ChatOptions two = new ChatOptions();
 

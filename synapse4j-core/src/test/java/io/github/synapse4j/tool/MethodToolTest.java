@@ -36,7 +36,7 @@ class MethodToolTest {
     private final MethodTools reader = new MethodTools(codec);
 
     @BeforeEach
-    void codecAnswersAPlainSchema() {
+    void codecAnswersPlainSchema() {
         // What the codec answers is the test's to choose; MethodTool only reacts to it. This default
         // lists the value as required, so a parameter is required unless the test says otherwise.
         when(codec.generateDecodeSchema(any()))
@@ -49,7 +49,7 @@ class MethodToolTest {
     // ===== factories and construction =====
 
     @Test
-    void instanceMethodNeedsATarget() {
+    void instanceMethodNeedsTarget() {
         Method instance = method("instanceGreet", String.class);
 
         // A static method's acceptance is every other test's subject; what only this one pins is the
@@ -60,7 +60,7 @@ class MethodToolTest {
     }
 
     @Test
-    void signatureBuildsTheDeclaration() {
+    void signatureBuildsDeclaration() {
         ToolDefinition definition = reader.of("weather", "Looks up weather", method("take", String.class), null)
                 .definition();
 
@@ -71,7 +71,7 @@ class MethodToolTest {
     }
 
     @Test
-    void chatContextParameterStaysOutOfTheSchema() {
+    void contextStaysOutOfSchema() {
         JsonSchema schema = reader.of("ctx", "Takes the context", method("withContext", ChatContext.class), null)
                 .definition()
                 .getInputSchema();
@@ -81,7 +81,7 @@ class MethodToolTest {
     }
 
     @Test
-    void privateMethodRunsOnceHandedOver() throws Exception {
+    void privateMethodRunsHandedOver() throws Exception {
         MethodTool tool = reader.of("secret", "A private method", Target.class.getDeclaredMethod("secret"), null);
 
         assertEquals("secret!", execute(tool, ""));
@@ -90,7 +90,7 @@ class MethodToolTest {
     // ===== resolveArguments =====
 
     @Test
-    void chatContextParameterReceivesTheConversation() throws Exception {
+    void chatContextParameterReceivesConversation() throws Exception {
         MethodTool tool = reader.of("ctx", "Takes the context", method("withContext", ChatContext.class), null);
 
         assertEquals("set", execute(tool, null, new ChatContext()));
@@ -108,7 +108,7 @@ class MethodToolTest {
     }
 
     @Test
-    void valueNotFittingItsParameterGoesThroughTheCodec() throws Exception {
+    void mismatchedValueGoesThroughCodec() throws Exception {
         when(codec.decode(any(), any())).thenReturn(Map.of("n", "21"));
         when(codec.convert("21", int.class)).thenReturn(21);
         MethodTool tool = reader.of("twice", "Doubles a number", method("twice", int.class), null);
@@ -119,7 +119,7 @@ class MethodToolTest {
     }
 
     @Test
-    void missingValueForAPrimitiveNamesTheParameter() {
+    void missingPrimitiveNamesParameter() {
         when(codec.decode(any(), any())).thenReturn(Map.of());
         MethodTool tool = reader.of("save", "Saves an id", method("save", int.class), null);
 
@@ -130,7 +130,7 @@ class MethodToolTest {
     }
 
     @Test
-    void missingValueForAnObjectIsNull() throws Exception {
+    void missingObjectValueIsNull() throws Exception {
         when(codec.decode(any(), any())).thenReturn(Map.of());
         MethodTool tool = reader.of("take", "Takes a string", method("take", String.class), null);
 
@@ -148,7 +148,7 @@ class MethodToolTest {
     }
 
     @Test
-    void keyTheMethodDoesNotDeclareIsIgnored() throws Exception {
+    void undeclaredKeyIgnored() throws Exception {
         when(codec.decode(any(), any())).thenReturn(Map.of("message", "hello", "extra", "ignored"));
         MethodTool tool = reader.of("take", "Takes a string", method("take", String.class), null);
 
@@ -158,7 +158,7 @@ class MethodToolTest {
     // ===== call =====
 
     @Test
-    void failureOutOfTheMethodArrivesUnwrapped() {
+    void methodFailureArrivesUnwrapped() {
         IllegalStateException unchecked = assertThrows(IllegalStateException.class,
                 () -> execute(reader.of("fail", "Always fails", method("fail"), null), ""));
         assertEquals("boom", unchecked.getMessage());
@@ -175,7 +175,7 @@ class MethodToolTest {
     // ===== resolveResult =====
 
     @Test
-    void returnValueBecomesTheResult() {
+    void returnValueBecomesResult() {
         MethodTool voidMethod = reader.of("save", "Saves an id", method("save", int.class), null);
         MethodTool stringMethod = reader.of("noop", "Does nothing", method("noop"), null);
         MethodTool otherMethod = reader.of("twice", "Doubles a number", method("twice", int.class), null);
@@ -191,7 +191,7 @@ class MethodToolTest {
     // ===== a parameter off the wire =====
 
     @Test
-    void aParameterOffTheWireTakesItsValueFromTheProvider() throws Exception {
+    void wireParameterTakesProviderValue() throws Exception {
         ChatContext context = new ChatContext();
         context.getAttributes().put("user", new CurrentUser("ada"));
 
@@ -210,7 +210,7 @@ class MethodToolTest {
     }
 
     @Test
-    void aResolvedInputSchemaIsWhatTheDeclarationCarries() {
+    void declarationCarriesResolvedSchema() {
         ToolMethodSpec spec = settled(resolutionOf(method("take", String.class), null));
         JsonSchema shaped = new JsonSchemaBuilder().setType("object")
                 .setProperties(Map.of("extra", new JsonSchemaBuilder().build())).build();
@@ -220,7 +220,7 @@ class MethodToolTest {
     }
 
     @Test
-    void parameterDescriptionFromItsAnnotationReachesThePropertySchema() {
+    void annotationDescriptionReachesSchema() {
         Tool tool = new MethodTools(codec).from(new Described()).get(0);
 
         JsonSchema property = tool.definition().getInputSchema().getProperties().get("message");
@@ -235,7 +235,7 @@ class MethodToolTest {
     }
 
     @Test
-    void arrayParameterIsDescribedAndBound() throws Exception {
+    void arrayParameterDescribedAndBound() throws Exception {
         when(codec.decode(any(), any())).thenReturn(Map.of("items", List.of("a", "b")));
         when(codec.convert(List.of("a", "b"), String[].class)).thenReturn(new String[] { "a", "b" });
         MethodTool tool = reader.of("join", "Joins items", method("join", String[].class), null);
@@ -249,7 +249,7 @@ class MethodToolTest {
     // ===== required =====
 
     @Test
-    void aTypeTheCodecDoesNotRequireIsLeftOut() {
+    void unrequiredTypeLeftOut() {
         when(codec.generateDecodeSchema(any())).thenReturn(new JsonSchemaBuilder().setType("object").build());
         MethodTool tool = reader.of("take", "Takes a string", method("take", String.class), null);
 
@@ -259,7 +259,7 @@ class MethodToolTest {
     }
 
     @Test
-    void writtenWordOverridesTheCodec() {
+    void writtenWordOverridesCodec() {
         Tool tool = new MethodTools(codec).from(new Written()).get(0);
 
         // the codec demands every property; the word on one takes it back, the word on another keeps

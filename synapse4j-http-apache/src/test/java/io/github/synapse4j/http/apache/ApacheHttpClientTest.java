@@ -66,7 +66,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void postRoundTripsMethodPathHeadersBodyAndStatus() throws Exception {
+    void postRoundTripsExchange() throws Exception {
         AtomicReference<String> seenMethod = new AtomicReference<>();
         AtomicReference<String> seenPath = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
@@ -102,7 +102,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void aResponseKeepsEveryValueOfARepeatedHeader() throws Exception {
+    void repeatedHeaderKeepsValues() throws Exception {
         server.createContext("/multi", exchange -> {
             exchange.getResponseHeaders().add("X-Multi", "first");
             exchange.getResponseHeaders().add("X-Multi", "second");
@@ -119,7 +119,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void aBodyThatHoldsItsBytesGoesOutWithALength() throws Exception {
+    void heldBodySendsLength() throws Exception {
         AtomicReference<byte[]> seenBody = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
         server.createContext("/ready", exchange -> {
@@ -144,7 +144,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void aBodyThatCanOnlyBeWrittenIsStreamed() throws Exception {
+    void writtenBodyStreamed() throws Exception {
         AtomicReference<byte[]> seenBody = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
         server.createContext("/streamed", exchange -> {
@@ -171,7 +171,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void aBufferedBodyIsGatheredBeforeItIsSent() throws Exception {
+    void bufferedBodyGatheredBeforeSent() throws Exception {
         AtomicReference<byte[]> seenBody = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
         server.createContext("/buffered", exchange -> {
@@ -201,7 +201,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void aBodyWriteModeThisImplementationDoesNotKnowIsRefusedBeforeTheCallGoesOut() throws IOException {
+    void unknownBodyWriteModeRefused() throws IOException {
         int freePort;
         try (ServerSocket socket = new ServerSocket(0)) {
             freePort = socket.getLocalPort();
@@ -226,7 +226,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void aServerErrorStatusIsReturnedNotThrown() throws Exception {
+    void errorStatusReturnedNotThrown() throws Exception {
         server.createContext("/boom", exchange -> {
             byte[] out = "server error".getBytes(UTF_8);
             exchange.sendResponseHeaders(500, out.length);
@@ -257,7 +257,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void anEventStreamArrivesFrameByFrame() throws Exception {
+    void eventStreamArrivesIncrementally() throws Exception {
         // The server holds the second frame back until the latch fires; a client that only hands
         // over the body once the response is complete would block on the first frame until the
         // latch timeout (5s), which the elapsed-time assertion below catches.
@@ -294,7 +294,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void theFrameBudgetTravelsWithTheRequest() throws Exception {
+    void frameBudgetTravelsWithRequest() throws Exception {
         server.createContext("/budget", exchange -> {
             exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
             exchange.sendResponseHeaders(200, 0);
@@ -317,7 +317,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void responseTimeoutAppliesToTheWaitForResponseHeaders() {
+    void responseTimeoutForHeaders() {
         // Ten times the client timeout: the client must give up long before the handler wakes up.
         server.createContext("/slow", exchange -> {
             try {
@@ -345,7 +345,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void aRedirectReplaysTheBody() throws Exception {
+    void redirectReplaysBody() throws Exception {
         AtomicInteger writes = new AtomicInteger();
         server.createContext("/redirect", exchange -> {
             // Read the body to the end, so the exchange completes cleanly before the 307 goes out.
@@ -380,7 +380,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void aStreamedBodyFailureReachesTheCallerWhateverItThrew() {
+    void streamedBodyFailureReachesCaller() {
         server.createContext("/failing", exchange -> {
             exchange.getRequestBody().readAllBytes();
             exchange.sendResponseHeaders(200, -1);
@@ -415,7 +415,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void closeCancelsABlockedBodyRead() throws Exception {
+    void closeCancelsBlockedRead() throws Exception {
         CountDownLatch release = new CountDownLatch(1);
         server.createContext("/stall", exchange -> {
             try {
@@ -457,7 +457,7 @@ class ApacheHttpClientTest {
     }
 
     @Test
-    void aBodyReadToTheEndGivesItsConnectionBackToThePool() throws Exception {
+    void readBodyReturnsConnection() throws Exception {
         server.createContext("/pooled", exchange -> {
             byte[] out = "pooled".getBytes(UTF_8);
             exchange.sendResponseHeaders(200, out.length);

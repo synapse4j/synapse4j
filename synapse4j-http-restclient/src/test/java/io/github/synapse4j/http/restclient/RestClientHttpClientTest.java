@@ -67,7 +67,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void postRoundTripsMethodPathHeadersBodyAndStatus() throws Exception {
+    void postRoundTripsExchange() throws Exception {
         AtomicReference<String> seenMethod = new AtomicReference<>();
         AtomicReference<String> seenPath = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
@@ -103,7 +103,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void aServerErrorStatusIsReturnedNotThrown() throws Exception {
+    void errorStatusReturnedNotThrown() throws Exception {
         server.createContext("/boom", exchange -> {
             byte[] out = "server error".getBytes(UTF_8);
             exchange.sendResponseHeaders(500, out.length);
@@ -120,7 +120,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void aResponseKeepsEveryValueOfARepeatedHeader() throws Exception {
+    void repeatedHeaderKeepsValues() throws Exception {
         server.createContext("/multi", exchange -> {
             exchange.getResponseHeaders().add("X-Multi", "first");
             exchange.getResponseHeaders().add("X-Multi", "second");
@@ -137,7 +137,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void aBodyThatHoldsItsBytesGoesOutWithALength() throws Exception {
+    void heldBodySendsLength() throws Exception {
         AtomicReference<byte[]> seenBody = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
         server.createContext("/ready", exchange -> {
@@ -162,7 +162,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void aBodyThatCanOnlyBeWrittenIsStreamedAndArrivesInFull() throws Exception {
+    void streamedBodyArrivesInFull() throws Exception {
         AtomicReference<byte[]> seenBody = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
         server.createContext("/streamed", exchange -> {
@@ -196,7 +196,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void aBufferedBodyIsGatheredBeforeItIsSent() throws Exception {
+    void bufferedBodyGatheredBeforeSent() throws Exception {
         AtomicReference<byte[]> seenBody = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
         server.createContext("/buffered", exchange -> {
@@ -228,7 +228,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void aBodyWriteModeThisImplementationDoesNotKnowIsRefusedBeforeTheCallGoesOut() throws IOException {
+    void unknownBodyWriteModeRefused() throws IOException {
         int freePort;
         try (ServerSocket socket = new ServerSocket(0)) {
             freePort = socket.getLocalPort();
@@ -253,7 +253,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void aBodyCarryingItsOwnFramingIsRefusedBeforeTheCallGoesOut() throws IOException {
+    void bodyOwnFramingRefused() throws IOException {
         int freePort;
         try (ServerSocket socket = new ServerSocket(0)) {
             freePort = socket.getLocalPort();
@@ -278,7 +278,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void aRequestWithNoBodySendsNoBodyAtAll() throws Exception {
+    void requestWithoutBodySendsNone() throws Exception {
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
         AtomicReference<byte[]> seenBody = new AtomicReference<>();
         server.createContext("/plain", exchange -> {
@@ -297,7 +297,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void anEmptyBodyIsNotTheSameAsNoBody() throws Exception {
+    void emptyBodyDiffersFromNone() throws Exception {
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
         AtomicReference<byte[]> seenBody = new AtomicReference<>();
         server.createContext("/empty", exchange -> {
@@ -337,7 +337,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void anEventStreamArrivesFrameByFrame() throws Exception {
+    void eventStreamArrivesIncrementally() throws Exception {
         // The server holds the second frame back until the latch fires; a client that only hands
         // over the body once the response is complete would block on the first frame until the
         // latch timeout (5s), which the elapsed-time assertion below catches.
@@ -374,7 +374,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void theFrameBudgetTravelsWithTheRequest() throws Exception {
+    void frameBudgetTravelsWithRequest() throws Exception {
         server.createContext("/budget", exchange -> {
             exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
             exchange.sendResponseHeaders(200, 0);
@@ -397,7 +397,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void aResponseTimeoutIsIgnoredWhereverItIsSet() throws Exception {
+    void responseTimeoutIgnoredWhereverSet() throws Exception {
         // The server answers well past the timeout, so an answer arriving proves the timeout was not
         // applied: one that honored it would fail here instead.
         server.createContext("/past-timeout", exchange -> {
@@ -428,7 +428,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void aTimeoutOnTheRequestFactoryEndsTheCall() throws Exception {
+    void factoryTimeoutEndsCall() throws Exception {
         // Ten times the factory timeout: the call must give up long before the handler wakes up.
         server.createContext("/never", exchange -> {
             try {
@@ -452,7 +452,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void aStreamedBodyFailureReachesTheCallerWhateverItThrew() {
+    void streamedBodyFailureReachesCaller() {
         server.createContext("/failing", exchange -> {
             exchange.getRequestBody().readAllBytes();
             exchange.sendResponseHeaders(200, -1);
@@ -487,7 +487,7 @@ class RestClientHttpClientTest {
     }
 
     @Test
-    void closeCancelsABlockedBodyRead() throws Exception {
+    void closeCancelsBlockedRead() throws Exception {
         CountDownLatch release = new CountDownLatch(1);
         server.createContext("/stall", exchange -> {
             try {

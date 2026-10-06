@@ -13,7 +13,7 @@ import io.github.synapse4j.tool.ToolParameterSpec;
 class ConfiguredToolMethodSpecCustomizerTest {
 
     @Test
-    void theConfiguredValuesReplaceTheAnnotationsAndUnsetOnesLeaveThem() {
+    void configuredValuesReplaceAnnotations() {
         ToolsProperties tools = new ToolsProperties();
         ToolMethodProperties greet = new ToolMethodProperties();
         greet.setDescription("from the configuration");
@@ -38,7 +38,7 @@ class ConfiguredToolMethodSpecCustomizerTest {
     }
 
     @Test
-    void aToolIsFoundUnderTheNameItCarriesGoingIn() {
+    void toolFoundUnderIncomingName() {
         ToolsProperties tools = new ToolsProperties();
         ToolMethodProperties greeting = new ToolMethodProperties();
         greeting.setName("greeting");
@@ -51,7 +51,7 @@ class ConfiguredToolMethodSpecCustomizerTest {
     }
 
     @Test
-    void theApplicationWideStrictFillsWhatTheToolStatesNone() {
+    void applicationStrictFillsUnstated() {
         ToolsProperties tools = new ToolsProperties();
         tools.setStrict("true");
 

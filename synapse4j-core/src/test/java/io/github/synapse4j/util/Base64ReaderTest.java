@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class Base64ReaderTest {
 
     @Test
-    void theTextIsThePrefixFollowedByTheBase64OfTheBytes() throws IOException {
+    void textPrefixThenBase64() throws IOException {
         byte[] bytes = "ping".getBytes(UTF_8);
 
         String text = read(new Base64Reader("data:image/png;base64,", InputStreamSupplier.of(bytes)));
@@ -27,7 +27,7 @@ class Base64ReaderTest {
     }
 
     @Test
-    void aReaderWithoutAPrefixIsTheBase64Alone() throws IOException {
+    void noPrefixReaderBase64Only() throws IOException {
         byte[] bytes = "ping".getBytes(UTF_8);
 
         String text = read(new Base64Reader(null, InputStreamSupplier.of(bytes)));
@@ -36,7 +36,7 @@ class Base64ReaderTest {
     }
 
     @Test
-    void everyRemainderIsPaddedTheWayTheJdkPadsIt() throws IOException {
+    void remaindersPaddedLikeJdk() throws IOException {
         for (int length = 0; length <= 6; length++) {
             byte[] bytes = new byte[length];
             for (int position = 0; position < length; position++) {
@@ -50,7 +50,7 @@ class Base64ReaderTest {
     }
 
     @Test
-    void aPayloadLargerThanOneChunkIsEncodedTheSameWay() throws IOException {
+    void multiChunkPayloadEncodedSame() throws IOException {
         byte[] bytes = new byte[10_000];
         new Random(42).nextBytes(bytes);
 
@@ -60,7 +60,7 @@ class Base64ReaderTest {
     }
 
     @Test
-    void onlyAsMuchOfTheSourceIsReadAsIsBeingAskedFor() throws IOException {
+    void readsOnlyRequestedAmount() throws IOException {
         byte[] bytes = new byte[10_000];
         CountingSource source = new CountingSource(bytes);
 
@@ -74,7 +74,7 @@ class Base64ReaderTest {
     }
 
     @Test
-    void theSourceIsOpenedOnlyWhenTheFirstCharacterIsAskedFor() throws IOException {
+    void sourceOpensOnFirstRead() throws IOException {
         CountingSource source = new CountingSource("ping".getBytes(UTF_8));
         try (Base64Reader ignored = new Base64Reader(source)) {
             // Nothing is read; the assertion is that opening the source was deferred.
@@ -84,7 +84,7 @@ class Base64ReaderTest {
     }
 
     @Test
-    void theSourceIsClosedOnceItsContentHasBeenReadOut() throws IOException {
+    void sourceClosedAfterRead() throws IOException {
         CountingSource source = new CountingSource("ping".getBytes(UTF_8));
         Base64Reader reader = new Base64Reader(source);
 
@@ -94,7 +94,7 @@ class Base64ReaderTest {
     }
 
     @Test
-    void closingTheReaderClosesTheSource() throws IOException {
+    void closeReaderClosesSource() throws IOException {
         // Larger than one chunk, so the source is still open after the first characters are read out.
         CountingSource source = new CountingSource(new byte[10_000]);
         Base64Reader reader = new Base64Reader(source);
@@ -107,7 +107,7 @@ class Base64ReaderTest {
     }
 
     @Test
-    void aSourceThatFailsToOpenFailsWhenTheFirstCharacterIsAskedFor() throws IOException {
+    void openFailureSurfacesOnRead() throws IOException {
         InputStreamSupplier source = () -> {
             throw new IOException("no bytes today");
         };

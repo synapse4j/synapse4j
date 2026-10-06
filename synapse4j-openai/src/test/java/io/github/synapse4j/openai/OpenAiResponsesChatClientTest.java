@@ -99,7 +99,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void theSystemMessageGoesOutAsInstructionsAndTheRestAsInputItems() {
+    void systemMessageBecomesInstructions() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -125,7 +125,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void aChainAnchorKeepsTheHistoryTheServerAlreadyHoldsOffTheWire() {
+    void chainAnchorSkipsHistory() {
         stubCompletion();
         ChatRequest withoutAnchor = requestWithModel();
         withoutAnchor.addHistoryMessage(ChatMessage.user("earlier"));
@@ -149,7 +149,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void foldingAnAnswerInNamesItAsTheChainAnchor() {
+    void foldAnswerNamesChainAnchor() {
         ChatRequest request = requestWithModel();
         ChatResponse answer = new ChatResponse();
         answer.setId("resp_next");
@@ -164,7 +164,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void anAnswerWithNoIdCannotAdvanceTheChain() {
+    void answerWithoutIdCannotAdvance() {
         ChatRequest request = requestWithModel();
         request.getOptions().getExtras().put(ResponsesWriter.PREVIOUS_RESPONSE_ID, "resp_old");
         request.addPendingMessage(ChatMessage.user("sent"));
@@ -182,7 +182,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void theStoreResolvesFromTheRequestThenTheFamilyConfigThenTheEndpointDefault() {
+    void storePrecedence() {
         stubCompletion();
         client.chat(requestWithModel());
         // Nothing set anywhere: the member stays off the wire and the endpoint's own default —
@@ -207,7 +207,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void anUnkeptAnswerUnderAnAnchorStaysPendingAndLeavesTheAnchor() {
+    void unkeptAnswerStaysPending() {
         ChatRequest request = requestWithModel();
         request.getOptions().getExtras().put(ResponsesWriter.STORE, false);
         request.getOptions().getExtras().put(ResponsesWriter.PREVIOUS_RESPONSE_ID, "resp_old");
@@ -228,7 +228,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void anUnkeptAnswerWithNoAnchorStillArchives() {
+    void unkeptAnswerStillArchives() {
         ChatRequest request = requestWithModel();
         request.getOptions().getExtras().put(ResponsesWriter.STORE, false);
         request.addPendingMessage(ChatMessage.user("sent"));
@@ -246,7 +246,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void theReasoningLevelGoesOutNestedUnderReasoning() {
+    void reasoningLevelNestedUnderReasoning() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -260,7 +260,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void toolDefinitionsGoOutFlatAndANamedToolChoiceNamesTheFunction() {
+    void toolDefinitionsGoOutFlat() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -292,7 +292,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void aJsonSchemaResponseFormatBecomesTheTextFormat() {
+    void jsonSchemaFormatBecomesText() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -320,7 +320,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void aToolCallComesBackKeyedByCallIdAndReplaysAsItsItem() {
+    void toolCallRoundTrips() {
         stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":["
                 + "{\"type\":\"function_call\",\"id\":\"fc_1\",\"call_id\":\"call_1\","
                 + "\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\","
@@ -348,7 +348,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void aToolResultReplaysAsATopLevelFunctionCallOutput() {
+    void toolResultAsCallOutput() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -369,7 +369,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void aReasoningItemKeepsItsSummaryAndItsEncryptedContent() {
+    void reasoningKeepsSummaryEncrypted() {
         stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":["
                 + "{\"type\":\"reasoning\",\"id\":\"rs_1\",\"encrypted_content\":\"opaque\","
                 + "\"status\":\"completed\",\"summary\":[{\"type\":\"summary_text\","
@@ -397,7 +397,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void theTokenLimitGoesOutUnderItsOwnNameAndUsageIsNormalised() {
+    void tokenLimitNameUsageNormalised() {
         stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":[],"
                 + "\"usage\":{\"input_tokens\":11,\"output_tokens\":7,\"total_tokens\":18,"
                 + "\"input_tokens_details\":{\"cached_tokens\":3},"
@@ -422,7 +422,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void theStatusDecidesTheFinishReason() {
+    void statusDecidesFinishReason() {
         stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":[]}");
         assertEquals(ChatFinishReason.STOP, client.chat(requestWithModel()).getFinishReason());
 
@@ -437,7 +437,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void aFailedResponseFailsWithTheProvidersOwnDetail() {
+    void failedResponseUsesProviderDetail() {
         stubResponse("{\"id\":\"resp_1\",\"status\":\"failed\",\"output\":[],"
                 + "\"error\":{\"code\":\"server_error\",\"message\":\"Something went wrong\","
                 + "\"type\":\"internal\"}}");
@@ -449,7 +449,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void aRefusalInTheContentIsKeptAsTheMessageMember() {
+    void refusalKeptAsMessageMember() {
         stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\","
                 + "\"output\":[{\"type\":\"message\",\"id\":\"msg_9\",\"status\":\"completed\","
                 + "\"content\":[{\"type\":\"refusal\",\"refusal\":\"I cannot help with that\"},"
@@ -467,7 +467,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void aRefusalOnlyTurnReplaysAsAContentEntry() {
+    void refusalTurnReplaysInContent() {
         stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\","
                 + "\"output\":[{\"type\":\"message\",\"id\":\"msg_9\",\"status\":\"completed\","
                 + "\"content\":[{\"type\":\"refusal\",\"refusal\":\"I cannot help with that\"}]}]}");
@@ -492,7 +492,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void aStreamedAnswerFoldsIntoTheSameTurnABlockingCallReturns() {
+    void streamedAnswerMatchesBlocking() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -564,7 +564,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void aBodyThatStopsWithoutClosingTheAnswerFailsAsTruncated() {
+    void bodyStopsEarlyFailsTruncated() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(
@@ -592,7 +592,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void anOpeningFrameArrivingAfterFragmentsKeepsWhatTheyBuilt() {
+    void lateOpeningFrameKeepsFragments() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(

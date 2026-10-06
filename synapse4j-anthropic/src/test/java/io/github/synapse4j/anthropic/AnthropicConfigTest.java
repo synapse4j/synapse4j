@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 class AnthropicConfigTest {
 
     @Test
-    void theApiKeyNeverRidesInToString() {
+    void apiKeyExcludedToString() {
         AnthropicConfig config = new AnthropicConfig();
         config.setApiKey("sk-ant-secret");
 

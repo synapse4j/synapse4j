@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 class JsonSchemasTest {
 
     @Test
-    void shapesOfAnswersTheFormsAKeywordTakes() {
+    void shapesOfAnswersKeywordForms() {
         assertEquals(Set.of(JsonSchemas.Shape.SCHEMA_MAP), JsonSchemas.shapesOf("properties"));
         assertEquals(Set.of(JsonSchemas.Shape.SCHEMA, JsonSchemas.Shape.SCHEMA_LIST),
                 JsonSchemas.shapesOf("items"));

@@ -20,7 +20,7 @@ class Synapse4jToolsAutoConfigurationTest {
             .withUserConfiguration(ToolBean.class);
 
     @Test
-    void wiresTheToolSupportAndReadsTheMarkedBeans() {
+    void wiresToolSupportMarkedBeans() {
         runner.run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context).hasSingleBean(MethodTools.class);
@@ -33,13 +33,13 @@ class Synapse4jToolsAutoConfigurationTest {
     }
 
     @Test
-    void turnsOnTheSpelCustomizerFromItsProperty() {
+    void spelCustomizerToggledByProperty() {
         runner.withPropertyValues("synapse4j.tools.spel=true")
                 .run(context -> assertThat(context).hasSingleBean(SpelToolMethodSpecCustomizer.class));
     }
 
     @Test
-    void theMarkedBeansToolsLandOnTheChatClient() {
+    void markedToolsLandOnClient() {
         runner.run(context -> assertThat(context.getBean(ChatClient.class).defaultTools())
                 .extracting(Tool::name)
                 .containsExactly("test_greet"));

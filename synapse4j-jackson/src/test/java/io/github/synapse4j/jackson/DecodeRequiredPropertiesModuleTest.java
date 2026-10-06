@@ -24,14 +24,14 @@ import tools.jackson.databind.json.JsonMapper;
 class DecodeRequiredPropertiesModuleTest {
 
     @Test
-    void theDecodeSchemaRequiresEveryPropertyExceptTheOptionalOnes() {
+    void decodeSchemaRequiresNonOptional() {
         assertEquals(List.of("count", "plain"), SchemaFixtures.required(generate(Both.class, SchemaFixtures.MAPPER)));
         assertEquals(List.of("number", "text"),
                 SchemaFixtures.required(generate(Settable.class, SchemaFixtures.MAPPER)));
     }
 
     @Test
-    void aMapperRefusingMissingCreatorsHasEveryPropertyRequired() {
+    void mapperRefusalRequiresEveryProperty() {
         JsonMapper refusing = JsonMapper.builder()
                 .enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)
                 .build();

@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 class OpenAiConfigTest {
 
     @Test
-    void theApiKeyNeverRidesInToString() {
+    void apiKeyNotInString() {
         OpenAiConfig config = new OpenAiConfig();
         config.setApiKey("sk-secret");
 

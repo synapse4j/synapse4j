@@ -11,7 +11,7 @@ import io.github.synapse4j.tool.ToolDefinition;
 class ToolDefinitionTest {
 
     @Test
-    void aDeclarationKeepsItsOwnFrozenCopyOfTheExtras() {
+    void declarationKeepsFrozenExtras() {
         ProviderExtras extras = new ProviderExtras().put("strict", true);
         ToolDefinition definition = new ToolDefinition("get_weather", null, null, null, extras);
 

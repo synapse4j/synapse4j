@@ -43,7 +43,7 @@ class JacksonJsonCodecTest {
     private final JacksonJsonCodec codec = new JacksonJsonCodec(jsonMapper.rebuild());
 
     @Test
-    void theEncodeSchemaNamesExactlyWhatWritingProduces() {
+    void encodeSchemaMatchesWrittenKeys() {
         assertEquals(keysOf(codec.encode(sampleOrder())), properties(codec.generateEncodeSchema(Order.class)));
         assertEquals(keysOf(codec.encode(new Sessions())), properties(codec.generateEncodeSchema(Sessions.class)));
         assertEquals(keysOf(codec.encode(sampleCredentials())),
@@ -54,7 +54,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void theDecodeSchemaNamesWhatReadingAccepts() {
+    void decodeSchemaMatchesAcceptedKeys() {
         assertEquals(List.of("id", "labels", "quantity", "shipTo"), sorted(codec.generateDecodeSchema(Order.class)));
         assertEquals(List.of("password", "username"), sorted(codec.generateDecodeSchema(Credentials.class)));
         assertEquals(List.of("a"), properties(codec.generateDecodeSchema(Helper.class)));
@@ -63,29 +63,29 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void aGetterWithoutASetterIsDescribedOnlyForWriting() {
+    void getterWithoutSetterEncodeOnly() {
         assertEquals(List.of("renamed", "sessions"), sorted(codec.generateEncodeSchema(Sessions.class)));
         assertNull(codec.generateDecodeSchema(Sessions.class).getProperties());
     }
 
     @Test
-    void aPropertyThatIsOnlyWrittenOrOnlyReadLandsOnItsOwnSide() {
+    void propertyAccessModeDecidesSide() {
         assertEquals(List.of("token", "username"), properties(codec.generateEncodeSchema(Credentials.class)));
         assertEquals(List.of("password", "username"), sorted(codec.generateDecodeSchema(Credentials.class)));
     }
 
     @Test
-    void aMethodThatIsNotAnAccessorIsNotDescribed() {
+    void nonAccessorMethodNotDescribed() {
         assertEquals(List.of("a"), properties(codec.generateEncodeSchema(Helper.class)));
     }
 
     @Test
-    void theOrderJacksonUsesIsTheOrderTheSchemaUses() {
+    void schemaUsesJacksonOrder() {
         assertEquals(List.of("quantity", "id"), properties(codec.generateEncodeSchema(Order.class)).subList(0, 2));
     }
 
     @Test
-    void theConfiguredNamingStrategyDecidesTheNames() {
+    void configuredNamingStrategyDecidesNames() {
         JacksonJsonCodec snakeCaseCodec = new JacksonJsonCodec(
                 JsonMapper.builder().propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE));
 
@@ -96,7 +96,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void theDecodeSchemaForbidsPropertiesItDoesNotDescribeWhereTheMapperRefusesThem() {
+    void decodeSchemaForbidsUndeclared() {
         JacksonJsonCodec strict = new JacksonJsonCodec(JsonMapper.builder()
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES));
         JsonSchema schema = strict.generateDecodeSchema(Order.class);
@@ -106,14 +106,14 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void theDecodeSchemaLeavesUndeclaredPropertiesOpenWhereTheMapperAcceptsThem() {
+    void decodeSchemaLeavesUndeclaredOpen() {
         // Jackson 3 accepts an undeclared property by default, so the default decode schema leaves it
         // open too — the keyword is written only where the reading refuses one.
         assertNull(codec.generateDecodeSchema(Order.class).getAdditionalProperties());
     }
 
     @Test
-    void aCustomizerCanChangeWhatTheGeneratedSchemaSays() {
+    void customizerChangesGeneratedSchema() {
         SchemaGeneratorConfigBuilder titledBuilder = JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(jsonMapper,
                 new JacksonSchemaSettings());
         titledBuilder.forFields().withTitleResolver(field -> field.getDeclaredName());
@@ -127,7 +127,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void theConfigBuilderCarriesTheSameDefaultsAsTheFactory() {
+    void configBuilderMatchesFactoryDefaults() {
         SchemaGeneratorConfigBuilder configBuilder = JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(jsonMapper,
                 new JacksonSchemaSettings());
         SchemaGenerator fromBuilder = new SchemaGenerator(configBuilder.build());
@@ -136,7 +136,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void aCustomizerAppliedToTheConfigBuilderReachesTheSchema() {
+    void configBuilderCustomizerReachesSchema() {
         SchemaGeneratorConfigBuilder configBuilder = JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(jsonMapper,
                 new JacksonSchemaSettings());
         configBuilder.forFields().withTitleResolver(field -> field.getDeclaredName());
@@ -148,7 +148,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void writesAndReadsAValue() {
+    void writesAndReadsValue() {
         String json = codec.encode(sampleOrder());
 
         Order order = codec.decode(json, Order.class);
@@ -160,7 +160,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void writesADocumentTokenByTokenAndReadsItBack() {
+    void writerTokensRoundTrip() {
         ByteArrayOutputStream sink = new ByteArrayOutputStream();
 
         JsonWriter writer = codec.writer(sink);
@@ -179,7 +179,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void writesAndReadsASchemaThroughTheSameTwoMethods() {
+    void schemaRoundTripsThroughCodec() {
         JsonSchema schema = codec.generateEncodeSchema(Order.class);
 
         String json = codec.encode(schema);
@@ -189,7 +189,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void aKeywordWhoseValueIsNullSurvivesTheRoundTrip() {
+    void nullValuedKeywordRoundTrips() {
         JsonSchema schema = new JsonSchemaBuilder().put("additionalProperties", null).build();
 
         JsonSchema decoded = codec.decode(codec.encode(schema), JsonSchema.class);
@@ -200,7 +200,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void convertReadsASchemaThroughTheModule() {
+    void convertReadsSchemaThroughModule() {
         JsonSchema schema = codec.generateEncodeSchema(Order.class);
         Object decoded = codec.decode(codec.encode(schema), Map.class);
 
@@ -212,7 +212,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void genericTypeArgumentsShapeThePropertySchemas() {
+    void genericTypeArgumentsShapeSchemas() {
         JsonSchema schema = codec.generateEncodeSchema(new TypeReference<Box<String>>() {
         }.getType());
 
@@ -223,21 +223,21 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void aMethodToolRequiresAPlainParameter() throws Exception {
+    void methodToolRequiresPlainParameter() throws Exception {
         MethodTool tool = methodTool("takes", String.class);
 
         assertEquals(List.of("text"), tool.definition().getInputSchema().getRequired());
     }
 
     @Test
-    void aMethodToolLeavesAnOptionalParameterOutOfRequired() throws Exception {
+    void methodToolOptionalNotRequired() throws Exception {
         MethodTool tool = methodTool("maybe", Optional.class);
 
         assertNull(tool.definition().getInputSchema().getRequired());
     }
 
     @Test
-    void aMethodToolFillsAnAbsentOptionalWithEmpty() throws Exception {
+    void methodToolFillsAbsentOptional() throws Exception {
         MethodTool tool = methodTool("maybe", Optional.class);
 
         assertEquals(Optional.empty(), tool.resolveArguments("{}", null)[0]);
@@ -261,7 +261,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void aTypeUsedTwiceIsDefinedOnceAndReferenced() {
+    void typeUsedTwiceDefinedOnce() {
         JsonSchema schema = codec.generateEncodeSchema(new TypeReference<Box<Order>>() {
         }.getType());
 
@@ -274,7 +274,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void aListTypeDescribesItsElement() {
+    void listTypeDescribesElement() {
         JsonSchema schema = codec.generateEncodeSchema(new TypeReference<List<Order>>() {
         }.getType());
 
@@ -408,7 +408,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void aCreatorOnlyPropertyRefusesTheDecodeSchemaRatherThanOmittingIt() {
+    void creatorPropertyRefusesDecodeSchema() {
         // The binder reads "alias"; the schema will not pretend to describe a property the
         // generator has no member to carry — a refusal beats a document that disagrees with
         // the reader in silence.
@@ -421,7 +421,7 @@ class JacksonJsonCodecTest {
     }
 
     @Test
-    void aBindingFailureIsReportedAsASynapseException() {
+    void bindingFailureIsSynapseException() {
         assertThrows(SynapseException.class, () -> codec.decode("{ not json", Point.class));
         assertThrows(SynapseException.class, () -> codec.convert(Map.of("x", "not a number"), Point.class));
     }

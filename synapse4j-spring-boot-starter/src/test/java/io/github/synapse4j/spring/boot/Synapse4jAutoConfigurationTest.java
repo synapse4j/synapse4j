@@ -59,7 +59,7 @@ class Synapse4jAutoConfigurationTest {
             .withConfiguration(AutoConfigurations.of(Synapse4jAutoConfiguration.class));
 
     @Test
-    void wiresTheWholeStackWithNoProperties() {
+    void wiresWholeStackNoProperties() {
         runner.run(context -> {
             assertThat(context).hasSingleBean(ChatClient.class);
             // The tool-calling loop is on by default, so the bean is the wrapper around the
@@ -81,7 +81,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void theProtocolClientIsCompletionsByDefault() {
+    void protocolClientCompletionsByDefault() {
         // The loop is off so the protocol client itself shows, which is the only way to see which
         // protocol the default picked.
         runner.withPropertyValues("synapse4j.chat.auto-tool-calling=false").run(context -> {
@@ -91,7 +91,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void selectsTheResponsesClientFromItsProperty() {
+    void responsesClientSelectedByProperty() {
         // The key and its values are the starter's public contract, like every other key bound
         // here: a rename silently reverts every application that asked for Responses back to
         // the default client, and no other test would notice. The loop is off so the protocol
@@ -104,7 +104,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void anUnknownChatClientValueFailsTheContext() {
+    void unknownClientValueFailsContext() {
         // The switch has no case for an unknown value — it would be a missing-bean error far away
         // from the typo. The binding is what refuses it here, at startup, with the property named.
         runner.withPropertyValues("synapse4j.chat.client=bogus")
@@ -112,7 +112,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void selectsTheAnthropicClientFromItsProperty() {
+    void anthropicClientSelectedByProperty() {
         // The value is part of the same contract as the key: a rename silently falls every
         // application that asked for Anthropic back to the default client.
         runner.withPropertyValues("synapse4j.chat.client=anthropic", "synapse4j.chat.auto-tool-calling=false")
@@ -123,7 +123,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void selectsTheApacheTransportFromItsProperty() {
+    void apacheTransportSelectedByProperty() {
         // The transport key and its values are the starter's public contract for the same
         // reason the chat.client ones are: a rename reverts every application to the Spring
         // transport without a word.
@@ -134,7 +134,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void noApacheTypeSitsOnTheConfigurationEveryApplicationLoads() {
+    void noApacheTypesOnConfiguration() {
         // Spring introspects a configuration class's bean-method signatures before it evaluates any
         // condition, so a bean method returning or taking an Apache type here fails every
         // application that does not carry httpclient5 — during bean-factory post-processing, with
@@ -149,7 +149,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void selectingApacheWithoutItsLibraryFailsNamingTheLibrary() {
+    void apacheWithoutLibraryFailsNaming() {
         // The starter keeps httpclient5 off the application's classpath, so choosing this transport
         // without declaring the library is a plain misconfiguration. It has to fail with the
         // library named: the selection alone leaves no transport bean, and a bare missing-bean
@@ -165,7 +165,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void selectingApacheWithoutItsLibraryStartsWhenTheApplicationWiresItsOwnClient() {
+    void apacheStartsWithOwnClient() {
         // The selector names a transport the starter would build. An application that declares its
         // own HttpClient has already wired one by hand, so the selector is inert for it and naming a
         // library it deliberately does not use would be wrong: the context has to start.
@@ -181,7 +181,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void aRelaxedTransportSpellingStillSelects() {
+    void relaxedTransportSpellingStillSelects() {
         // The binder accepts the spellings Spring binds everywhere else, and the bean that has to
         // exist follows the same value the client reads. A raw string comparison accepted
         // "restclient" but silently left no transport at all for "rest-client" — a value the IDE
@@ -204,7 +204,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void theApacheTransportClosesItsPoolWithTheContext() {
+    void apachePoolClosedWithContext() {
         AtomicReference<CloseableHttpClient> transport = new AtomicReference<>();
         runner.withPropertyValues("synapse4j.http-client=apache")
                 .run(context -> transport.set(context.getBean(CloseableHttpClient.class)));
@@ -219,7 +219,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void bindsOpenAiPropertiesOntoTheConfig() {
+    void openAiConfigBindsProperties() {
         runner.withPropertyValues(
                 "synapse4j.openai.api-key=sk-test",
                 "synapse4j.openai.base-url=https://example.test/v1",
@@ -238,7 +238,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void bindsAnthropicPropertiesOntoTheConfig() {
+    void anthropicConfigBindsProperties() {
         runner.withPropertyValues(
                 "synapse4j.anthropic.api-key=sk-ant-test",
                 "synapse4j.anthropic.base-url=https://example.test/v1",
@@ -266,7 +266,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void chatCustomizerBeansRunOnEveryCall() {
+    void chatCustomizersRunEveryCall() {
         List<String> ran = new ArrayList<>();
         runner.withPropertyValues(
                 "synapse4j.openai.api-key=sk-test",
@@ -285,7 +285,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void theStandingSystemMessageReachesTheWire() {
+    void standingSystemMessageReachesWire() {
         StubHttpClient transport = new StubHttpClient();
         runner.withPropertyValues(
                 "synapse4j.openai.api-key=sk-test",
@@ -301,7 +301,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void aChatClientCustomizerHasTheLastWordOverTheBoundOptions() {
+    void customizerWinsOverBoundOptions() {
         StubHttpClient transport = new StubHttpClient();
         runner.withPropertyValues(
                 "synapse4j.openai.api-key=sk-test",
@@ -344,7 +344,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void theBoundChatOptionsReachTheWire() {
+    void boundChatOptionsReachWire() {
         StubHttpClient transport = new StubHttpClient();
         runner.withPropertyValues(
                 "synapse4j.openai.api-key=sk-test",
@@ -361,7 +361,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void theApplicationsJacksonConfigurationReachesTheCodec() {
+    void jacksonConfigurationReachesCodec() {
         // Goes through Boot's own Jackson auto-configuration rather than a mapper registered by
         // hand, because the dependency on spring-boot-jackson is what makes the mapper exist in a
         // real application — drop it and this test stops compiling, which is the point.
@@ -383,7 +383,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void theApplicationsOwnMapperBindsASchemaAsItsDocument() {
+    void applicationMapperBindsSchema() {
         // The module is a bean, so Boot puts it on the auto-configured JsonMapper — the mapper the
         // codec is built over and the one an application injects. Without it the mapper writes a
         // schema as the fields of its class, and cannot read one back at all.
@@ -400,7 +400,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void bindsTheJacksonSchemaSettings() {
+    void bindsJacksonSchemaSettings() {
         // synapse4j.jackson.* is the JSON implementation's own group, and the setting here shows in
         // a schema: with it on, a byte[] is the base64 string the mapper really writes; turned off,
         // victools' own array description comes back. A key that never bound would leave the base64
@@ -416,7 +416,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void applicationBeansWinOverEveryDefault() {
+    void applicationBeansWinOverDefaults() {
         JsonCodec codec = new JacksonJsonCodec();
         HttpClient http = new RestClientHttpClient();
         ChatClient client = new OpenAiCompletionsChatClient(http, codec, new OpenAiConfig());
@@ -434,7 +434,7 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void disabledSwitchesTheWholeStarterOff() {
+    void disabledSwitchesStarterOff() {
         runner.withPropertyValues("synapse4j.enabled=false").run(context -> {
             assertThat(context).doesNotHaveBean(ChatClient.class);
             assertThat(context).doesNotHaveBean(JsonCodec.class);

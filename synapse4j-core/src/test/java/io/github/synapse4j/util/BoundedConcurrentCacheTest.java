@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class BoundedConcurrentCacheTest {
 
     @Test
-    void aValueIsComputedOnceAndAnsweredFromTheCacheAfter() {
+    void valueComputedOnceThenCached() {
         BoundedConcurrentCache<String, String> cache = new BoundedConcurrentCache<>();
         AtomicInteger computed = new AtomicInteger();
 
@@ -28,7 +28,7 @@ class BoundedConcurrentCacheTest {
     }
 
     @Test
-    void storingPastTheCapacityStartsTheCacheOver() {
+    void pastCapacityResetsCache() {
         BoundedConcurrentCache<String, String> cache = new BoundedConcurrentCache<>(2);
 
         cache.get("a", key -> "A");

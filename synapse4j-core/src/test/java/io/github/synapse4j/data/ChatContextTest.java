@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class ChatContextTest {
 
     @Test
-    void contextsCompareByIdentityNotContents() {
+    void contextsCompareByIdentity() {
         ChatContext one = new ChatContext();
         one.setSessionId("s-1");
         ChatContext two = new ChatContext();
@@ -21,7 +21,7 @@ class ChatContextTest {
     }
 
     @Test
-    void toStringCarriesTheSessionIdAndTurnButCountsTheEntries() {
+    void toStringCountsAttributesOnly() {
         ChatContext context = new ChatContext();
         context.setSessionId("s-1");
         context.setTurn(3);

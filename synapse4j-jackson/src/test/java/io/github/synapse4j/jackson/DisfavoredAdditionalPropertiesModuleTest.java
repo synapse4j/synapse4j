@@ -28,21 +28,21 @@ class DisfavoredAdditionalPropertiesModuleTest {
     }
 
     @Test
-    void anObjectThatListsPropertiesIsClosed() {
+    void objectListingPropertiesClosed() {
         JsonNode schema = generate(HasProperties.class);
 
         assertEquals(false, schema.get("additionalProperties").asBoolean(), schema.toString());
     }
 
     @Test
-    void anObjectThatListsNoPropertyIsNotClosed() {
+    void objectWithoutPropertiesNotClosed() {
         // A type the generator cannot enumerate — an interface — is described as an object with no
         // property, and closing it would say it admits nothing at all.
         assertFalse(generate(NoProperties.class).has("additionalProperties"));
     }
 
     @Test
-    void aMapKeepsTheValueSchemaItAlreadyCarries() {
+    void mapKeepsValueSchema() {
         JsonNode schema = new SchemaGenerator(JacksonSchemaConfigBuilders.decodeSchemaConfigBuilder(MAPPER, null)
                 .with(new DisfavoredAdditionalPropertiesModule())
                 .with(SchemaFixtures.mapValues())

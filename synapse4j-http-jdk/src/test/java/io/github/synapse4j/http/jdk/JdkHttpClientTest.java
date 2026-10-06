@@ -63,7 +63,7 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void aRequestCarryingItsOwnFramingIsRefused() {
+    void requestCarryingOwnFramingRefused() {
         // The JDK takes Transfer-Encoding as an ordinary header and frames the body itself, so a
         // request that set it would go out with two framings. Refused here, as the other transports
         // refuse the pair, before anything reaches the wire.
@@ -76,7 +76,7 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void postRoundTripsMethodPathHeadersBodyAndStatus() throws Exception {
+    void postRoundTripsExchange() throws Exception {
         AtomicReference<String> seenMethod = new AtomicReference<>();
         AtomicReference<String> seenPath = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
@@ -112,7 +112,7 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void aBodyThatHoldsItsBytesGoesOutWithALength() throws Exception {
+    void heldBodySendsLength() throws Exception {
         AtomicReference<byte[]> seenBody = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
         server.createContext("/ready", exchange -> {
@@ -137,7 +137,7 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void aWrittenBodyIsGatheredUnderTheDefaultMode() throws Exception {
+    void writtenBodyGatheredByDefault() throws Exception {
         AtomicReference<byte[]> seenBody = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();
         server.createContext("/gathered", exchange -> {
@@ -166,7 +166,7 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void aBodyWriteModeThisTransportDoesNotTakeIsRefused() {
+    void unsupportedBodyWriteModeRefused() {
         HttpOptions options = HttpOptions.defaults();
         options.setBodyWriteMode("spooled");
         HttpRequest request = new HttpRequest(baseUrl + "/nowhere");
@@ -185,7 +185,7 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void aWrittenBodyFailureReachesTheCallerWhateverItThrew() {
+    void writtenBodyFailureReachesCaller() {
         server.createContext("/failing", exchange -> {
             exchange.getRequestBody().readAllBytes();
             exchange.sendResponseHeaders(200, -1);
@@ -229,7 +229,7 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void nonSuccessStatusIsReturnedNotThrown() throws Exception {
+    void nonSuccessStatusReturned() throws Exception {
         server.createContext("/limited", exchange -> {
             byte[] out = "slow down".getBytes(UTF_8);
             exchange.sendResponseHeaders(429, out.length);
@@ -246,7 +246,7 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void bodyArrivesIncrementallyBeforeTheResponseCompletes() throws Exception {
+    void bodyArrivesBeforeCompletion() throws Exception {
         // The server holds the second line back until the latch fires; a client that only hands
         // over the body once the response is complete would block on readLine() for the latch
         // timeout (5s), which the elapsed-time assertion below catches.
@@ -279,7 +279,7 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void closeCancelsABlockedBodyRead() throws Exception {
+    void closeCancelsBlockedRead() throws Exception {
         CountDownLatch release = new CountDownLatch(1);
         server.createContext("/stall", exchange -> {
             try {
@@ -321,7 +321,7 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void responseTimeoutAppliesToTheWaitForResponseHeaders() {
+    void responseTimeoutForHeaders() {
         // Ten times the client timeout: the client must give up long before the handler wakes up.
         server.createContext("/slow", exchange -> {
             try {

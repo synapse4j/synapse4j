@@ -37,7 +37,7 @@ class FinalToolMethodSpecCustomizerTest {
     }
 
     @Test
-    void whatNobodyWroteIsSettledFromTheMethod() {
+    void blanksSettledFromMethod() {
         ToolMethodSpec spec = specOf();
 
         customizer.customize(spec);
@@ -63,7 +63,7 @@ class FinalToolMethodSpecCustomizerTest {
     }
 
     @Test
-    void whatACustomizerWroteIsLeftAlone() {
+    void customizerWrittenFieldsKept() {
         ToolMethodSpec spec = specOf();
         spec.setName("chosen");
         JsonSchema wholeSchema = new JsonSchemaBuilder().setType("integer").build();

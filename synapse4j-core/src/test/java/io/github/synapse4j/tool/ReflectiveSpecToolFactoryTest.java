@@ -31,7 +31,7 @@ class ReflectiveSpecToolFactoryTest {
             });
 
     @Test
-    void aBlankTypeIsBuiltFromTheFunctionHandedIn() {
+    void blankTypeUsesHandedFunction() {
         ToolMethodSpec spec = specOf("");
 
         assertInstanceOf(Default.class, factory.create(spec, codec));
@@ -39,12 +39,12 @@ class ReflectiveSpecToolFactoryTest {
     }
 
     @Test
-    void anyOtherTypeIsTheClassItNames() {
+    void otherTypeBecomesNamedClass() {
         assertInstanceOf(Named.class, factory.create(specOf(Named.class.getName()), codec));
     }
 
     @Test
-    void anUnknownTypeIsRefused() {
+    void unknownTypeRefused() {
         SynapseException failure = assertThrows(SynapseException.class,
                 () -> factory.create(specOf("no.such.Tool"), codec));
 
@@ -53,7 +53,7 @@ class ReflectiveSpecToolFactoryTest {
     }
 
     @Test
-    void aClassThatIsNotAToolIsRefused() {
+    void nonToolClassRefused() {
         SynapseException failure = assertThrows(SynapseException.class,
                 () -> factory.create(specOf(NotATool.class.getName()), codec));
 
@@ -61,7 +61,7 @@ class ReflectiveSpecToolFactoryTest {
     }
 
     @Test
-    void aClassWithoutTheExpectedConstructorIsRefused() {
+    void classWithoutExpectedConstructorRefused() {
         SynapseException failure = assertThrows(SynapseException.class,
                 () -> factory.create(specOf(NeedsAnArgument.class.getName()), codec));
 

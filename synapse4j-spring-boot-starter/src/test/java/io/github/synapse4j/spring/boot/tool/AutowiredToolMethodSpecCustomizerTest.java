@@ -29,7 +29,7 @@ class AutowiredToolMethodSpecCustomizerTest {
     }
 
     @Test
-    void markedParameterLeavesTheWire() {
+    void markedParameterLeavesWire() {
         ToolMethodSpec spec = specOf("byType", Catalogue.class);
 
         new AutowiredToolMethodSpecCustomizer(context.getBeanFactory()).customize(spec);
@@ -65,7 +65,7 @@ class AutowiredToolMethodSpecCustomizerTest {
     }
 
     @Test
-    void unmarkedParameterStaysWithTheModel() {
+    void unmarkedParameterStaysWithModel() {
         ToolMethodSpec spec = specOf("fromModel", Catalogue.class);
 
         new AutowiredToolMethodSpecCustomizer(context.getBeanFactory()).customize(spec);

@@ -19,7 +19,7 @@ import org.junit.jupiter.api.io.TempDir;
 class InputStreamSupplierTest {
 
     @Test
-    void aSourceOfBytesOpensAFreshStreamEveryTime() throws IOException {
+    void byteSourceOpensFreshStream() throws IOException {
         InputStreamSupplier source = InputStreamSupplier.of("ping".getBytes(UTF_8));
 
         assertEquals("ping", read(source.get()));
@@ -27,7 +27,7 @@ class InputStreamSupplierTest {
     }
 
     @Test
-    void aSourceOfBytesUsesTheArrayItWasGivenRatherThanACopy() throws IOException {
+    void byteSourceKeepsGivenArray() throws IOException {
         byte[] bytes = "ping".getBytes(UTF_8);
         InputStreamSupplier source = InputStreamSupplier.of(bytes);
 
@@ -37,14 +37,14 @@ class InputStreamSupplierTest {
     }
 
     @Test
-    void aSourceOfTextIsEncodedInTheGivenCharset() throws IOException {
+    void textSourceUsesGivenCharset() throws IOException {
         InputStreamSupplier source = InputStreamSupplier.of("héllo", ISO_8859_1);
 
         assertArrayEquals("h\u00E9llo".getBytes(ISO_8859_1), source.get().readAllBytes());
     }
 
     @Test
-    void aSourceOfAFileOpensItAgainForEveryCall(@TempDir Path directory) throws IOException {
+    void fileSourceReopensEveryCall(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("image.bin");
         Files.write(file, new byte[] { 1, 2, 3 });
         InputStreamSupplier source = InputStreamSupplier.of(file);
@@ -57,14 +57,14 @@ class InputStreamSupplierTest {
     }
 
     @Test
-    void aFileThatIsNotThereFailsWhenItIsOpened(@TempDir Path directory) {
+    void missingFileFailsWhenOpened(@TempDir Path directory) {
         InputStreamSupplier source = InputStreamSupplier.of(directory.resolve("missing.bin"));
 
         assertThrows(IOException.class, source::get);
     }
 
     @Test
-    void aSourceAlreadyInTheSuppliersShapeIsAdapted() throws IOException {
+    void supplierShapedSourceAdapted() throws IOException {
         InputStreamSupplier source = InputStreamSupplier
                 .of(() -> new ByteArrayInputStream("ping".getBytes(UTF_8)));
 
@@ -72,7 +72,7 @@ class InputStreamSupplierTest {
     }
 
     @Test
-    void aStreamThatCanOnlyBeOpenedOnceAnswersOnceAndThenRefuses() throws IOException {
+    void onceStreamAnswersThenRefuses() throws IOException {
         InputStream stream = new ByteArrayInputStream("ping".getBytes(UTF_8));
         InputStreamSupplier source = InputStreamSupplier.once(stream);
 
@@ -84,7 +84,7 @@ class InputStreamSupplierTest {
     }
 
     @Test
-    void aFailureToOpenArrivesAsItIs() {
+    void openFailureArrivesAsIs() {
         InputStreamSupplier source = () -> {
             throw new IOException("no bytes today");
         };

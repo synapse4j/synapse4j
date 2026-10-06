@@ -31,14 +31,14 @@ class FunctionToolTest {
     }
 
     @BeforeEach
-    void codecAnswersAnObjectSchema() {
+    void codecAnswersObjectSchema() {
         when(codec.generateDecodeSchema(any())).thenReturn(new JsonSchemaBuilder().setType("object").build());
     }
 
     // ===== factories =====
 
     @Test
-    void signatureFactoryBuildsTheDeclarationFromTheType() {
+    void signatureFactoryBuildsDeclaration() {
         FunctionTool<Input, String> tool = FunctionTool.of("echo", "Echoes back", Input.class,
                 (input, context) -> input.value(), codec);
 
@@ -48,7 +48,7 @@ class FunctionToolTest {
     }
 
     @Test
-    void scalarInputTypeIsRefusedAtTheFactory() {
+    void scalarInputTypeRefused() {
         when(codec.generateDecodeSchema(String.class)).thenReturn(new JsonSchemaBuilder().setType("string").build());
 
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
@@ -58,7 +58,7 @@ class FunctionToolTest {
     }
 
     @Test
-    void handedDeclarationIsKeptAsIs() {
+    void handedDeclarationKeptAsIs() {
         ToolDefinition handed = new ToolDefinition("handed", "Built by hand",
                 new JsonSchemaBuilder().setType("object").build());
 
@@ -70,7 +70,7 @@ class FunctionToolTest {
     // ===== the three stages =====
 
     @Test
-    void argumentsDecodeIntoOneValueAndReachTheExecutor() throws Exception {
+    void argumentsDecodeIntoOneValue() throws Exception {
         Input decoded = new Input("hello");
         when(codec.decode(any(), any())).thenReturn(decoded);
         StringBuilder seen = new StringBuilder();
@@ -89,7 +89,7 @@ class FunctionToolTest {
     }
 
     @Test
-    void argumentsThatNeverArrivedDecodeAsAnEmptyObject() throws Exception {
+    void absentArgumentsBecomeEmptyObject() throws Exception {
         FunctionTool<Input, String> tool = FunctionTool.of("echo", "Echoes back", Input.class,
                 (input, ctx) -> "ok", codec);
 
@@ -102,7 +102,7 @@ class FunctionToolTest {
     }
 
     @Test
-    void aStringValueReachesTheModelAsItself() throws Exception {
+    void stringValuePassedThrough() throws Exception {
         when(codec.decode(any(), any())).thenReturn(new Input("plain"));
         FunctionTool<Input, String> tool = FunctionTool.of("echo", "Echoes back", Input.class,
                 (input, context) -> "already text", codec);
@@ -111,7 +111,7 @@ class FunctionToolTest {
     }
 
     @Test
-    void otherReturnsAreRenderedByTheCodec() throws Exception {
+    void otherReturnsRenderedByCodec() throws Exception {
         Input decoded = new Input("x");
         when(codec.decode(any(), any())).thenReturn(decoded);
         when(codec.encode(decoded)).thenReturn("encoded");
@@ -122,7 +122,7 @@ class FunctionToolTest {
     }
 
     @Test
-    void aNullReturnRendersAsJsonNull() throws Exception {
+    void nullReturnRendersJsonNull() throws Exception {
         when(codec.decode(any(), any())).thenReturn(new Input("x"));
         when(codec.encode(null)).thenReturn("null");
         FunctionTool<Input, String> tool = FunctionTool.of("maybe", "Sometimes silent", Input.class,
@@ -147,7 +147,7 @@ class FunctionToolTest {
     }
 
     @Test
-    void aDocumentThatDecodesToNothingIsRefusedBeforeTheExecutor() {
+    void emptyDocumentRefusedBeforeExecutor() {
         FunctionTool<Input, String> tool = FunctionTool.of("maybe", "Sometimes silent", Input.class,
                 (input, context) -> "ran", codec);
 

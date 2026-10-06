@@ -17,7 +17,7 @@ import io.github.synapse4j.json.JsonSchemaBuilder;
 class ToolMethodSpecTest {
 
     @Test
-    void aResolutionThatCannotBecomeADeclarationIsRefused() {
+    void resolutionRefusedWhenNotDeclarable() {
         ToolMethodSpec spec = specOf();
 
         SynapseException unnamedTool = assertThrows(SynapseException.class, spec::definition);
@@ -47,7 +47,7 @@ class ToolMethodSpecTest {
     }
 
     @Test
-    void strictIsLeftToTheProtocolWhenNobodySaid() {
+    void strictLeftToProtocol() {
         ToolMethodSpec spec = declarable();
 
         assertNull(spec.definition().getStrict());
@@ -60,7 +60,7 @@ class ToolMethodSpecTest {
     }
 
     @Test
-    void theExtrasACustomizerWroteReachTheDeclaration() {
+    void extrasCustomizerWroteReachDeclaration() {
         ToolMethodSpec spec = declarable();
         spec.setExtras(new ProviderExtras().put("x_vendor", "yes"));
 

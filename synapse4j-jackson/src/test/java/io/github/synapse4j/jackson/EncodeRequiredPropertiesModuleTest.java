@@ -19,13 +19,13 @@ import tools.jackson.databind.json.JsonMapper;
 class EncodeRequiredPropertiesModuleTest {
 
     @Test
-    void theEncodeSchemaDemandsEveryPropertyWhenWritingProducesEveryProperty() {
+    void encodeSchemaDemandsWrittenProperties() {
         assertEquals(List.of("count", "optional", "plain"),
                 SchemaFixtures.required(generate(Both.class, SchemaFixtures.MAPPER)));
     }
 
     @Test
-    void aSettingThatOmitsValuesLeavesAPrimitiveDemanded() {
+    void omittingValuesLeavesPrimitiveRequired() {
         // A primitive can be neither null nor empty, so the property is still always written out.
         assertEquals(List.of("count"),
                 SchemaFixtures.required(generate(Both.class, omitting(JsonInclude.Include.NON_NULL))));
@@ -36,13 +36,13 @@ class EncodeRequiredPropertiesModuleTest {
     }
 
     @Test
-    void aSettingThatOmitsDefaultsTakesAPrimitiveWithIt() {
+    void omittingDefaultsAlsoOmitsPrimitive() {
         assertEquals(List.of(),
                 SchemaFixtures.required(generate(Both.class, omitting(JsonInclude.Include.NON_DEFAULT))));
     }
 
     @Test
-    void aPropertyItsOwnInclusionIsReadBeforeTheMapperDefault() {
+    void propertyInclusionBeatsMapperDefault() {
         // The mapper writes everything by default, but the annotation omits nulls on one property, so
         // the schema must not demand what writing leaves out.
         assertEquals(List.of("always"),

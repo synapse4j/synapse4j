@@ -30,7 +30,7 @@ class JacksonJsonReaderTest {
     private final JacksonJsonCodec codec = new JacksonJsonCodec(JsonMapper.builder());
 
     @Test
-    void walksADocumentTokenByToken() {
+    void walksDocumentTokenByToken() {
         JsonReader reader = codec.reader(source("{\"name\":\"Ada\",\"count\":3,\"ok\":true,\"none\":null,"
                 + "\"items\":[1,\"two\"]}"));
 
@@ -70,7 +70,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void skipsAValueWhicheverShapeItHas() {
+    void skipsValueWhicheverShape() {
         JsonReader reader = codec
                 .reader(source("{\"kept\":1,\"object\":{\"a\":{\"b\":[1,2]}},\"array\":[{\"c\":3},4],\"also\":2}"));
 
@@ -100,7 +100,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void answersWithTheTokenTheLastAdvanceReturned() {
+    void tokenAnswersLastAdvance() {
         JsonReader reader = codec.reader(source("{\"a\":1}"));
 
         assertNull(reader.token());
@@ -122,7 +122,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void capturesScalarsInTheShapeADecodedDocumentHas() {
+    void capturesScalarsAsDecodedTypes() {
         JsonReader reader = codec.reader(source(
                 "[\"Ada\",3,2147483647,2147483648,9223372036854775807,9223372036854775808,2.5,true,false,null]"));
 
@@ -165,7 +165,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void capturesAnObjectAndAnArrayWithNothingInThem() {
+    void capturesEmptyObjectAndArray() {
         JsonReader reader = codec.reader(source("{\"empty\":{},\"list\":[],\"dup\":1,\"dup\":2}"));
 
         assertEquals(Token.START_OBJECT, reader.nextToken());
@@ -180,7 +180,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void capturesANumberInTheNarrowestTypeThatHoldsIt() {
+    void capturesNumberInNarrowestType() {
         JsonReader reader = codec.reader(source("[0,-0,999999999,1000000000,2147483647,-2147483648,"
                 + "2147483648,-2147483649,999999999999999999,1000000000000000000,9223372036854775807,"
                 + "-9223372036854775808,9223372036854775808,-9223372036854775809,2.5,1.0,1e2,1e309,1e-400]"));
@@ -254,7 +254,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void capturesAnObjectKeepingItsKeysInDocumentOrder() {
+    void capturesObjectInDocumentOrder() {
         JsonReader reader = codec
                 .reader(source("{\"object\":{\"b\":1,\"a\":\"two\",\"nested\":{\"x\":true}}}"));
 
@@ -273,7 +273,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void capturesAnArrayOfMixedElements() {
+    void capturesMixedElementArray() {
         JsonReader reader = codec.reader(source("{\"list\":[1,\"two\",{\"three\":3},[4],null]}"));
 
         assertEquals(Token.START_OBJECT, reader.nextToken());
@@ -287,7 +287,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void capturingASubtreeLeavesTheEnclosingWalkInPlace() {
+    void subtreeCaptureKeepsWalkPosition() {
         JsonReader reader = codec
                 .reader(source("{\"kept\":{\"deep\":[1,{\"deeper\":2}]},\"after\":\"value\"}"));
 
@@ -308,7 +308,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void capturingTheLastValueOfAnObjectLeavesTheWalkOnItsEndToken() {
+    void lastValueLeavesEndToken() {
         JsonReader reader = codec.reader(source("{\"a\":1,\"kept\":{\"b\":[2]}}"));
 
         assertEquals(Token.START_OBJECT, reader.nextToken());
@@ -325,7 +325,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void captureValueNeedsAValueToStandOn() {
+    void captureValueNeedsCurrentValue() {
         JsonReader reader = codec.reader(source("{\"a\":1}"));
 
         assertThrows(IllegalStateException.class, reader::captureValue);
@@ -344,7 +344,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void streamsAStringValueIntoTheGivenWriter() {
+    void streamsStringIntoWriter() {
         String value = "0123456789".repeat(50_000);
         JsonReader reader = codec.reader(source("{\"payload\":\"" + value + "\"}"));
 
@@ -360,7 +360,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void aTokenRefusesAValueItCannotCarry() {
+    void tokenRefusesValueCannotCarry() {
         JsonReader reader = codec.reader(source("[\"text\",1,2.5,true]"));
 
         assertEquals(Token.START_ARRAY, reader.nextToken());
@@ -389,7 +389,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void stringAnswersOnlyForTokensThatCarryText() {
+    void stringAnswersOnlyTextTokens() {
         JsonReader reader = codec.reader(source("{\"text\":\"value\",\"int\":7,\"float\":1e2,\"yes\":true,"
                 + "\"no\":false,\"none\":null,\"object\":{},\"array\":[]}"));
 
@@ -443,7 +443,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void nameAnswersOnlyOnAPropertyName() {
+    void nameAnswersOnlyOnNames() {
         JsonReader reader = codec.reader(source("{\"outer\":{\"inner\":1}}"));
 
         assertEquals(Token.START_OBJECT, reader.nextToken());
@@ -471,7 +471,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void aNumberTooLargeForALongIsNeverTruncated() {
+    void numberBeyondLongNeverTruncated() {
         JsonReader reader = codec.reader(source("[9223372036854775808]"));
 
         assertEquals(Token.START_ARRAY, reader.nextToken());
@@ -488,7 +488,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void aNumberSpelledWithAFractionIsReadAsALongOnlyWhenItIsWhole() {
+    void fractionReadsLongWhenWhole() {
         JsonReader reader = codec.reader(source("[11.0,11.5]"));
 
         assertEquals(Token.START_ARRAY, reader.nextToken());
@@ -504,7 +504,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void malformedJsonIsASynapseException() {
+    void malformedJsonSynapseException() {
         JsonReader reader = codec.reader(source("{\"a\":1,\"b\":}"));
 
         assertEquals(Token.START_OBJECT, reader.nextToken());
@@ -516,7 +516,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void aFailingSourceIsASynapseIOException() {
+    void failingSourceSynapseIOException() {
         JsonReader reader = codec.reader(new FailingInputStream("{\"a\":1"));
 
         assertEquals(Token.START_OBJECT, reader.nextToken());
@@ -528,7 +528,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void aSourceThatHasAlreadyFailedIsASynapseIOExceptionWhereTheReaderIsOpened() {
+    void readerOpenRejectsFailedSource() {
         SynapseIOException failure = assertThrows(SynapseIOException.class,
                 () -> codec.reader(new FailingInputStream("")));
 
@@ -536,7 +536,7 @@ class JacksonJsonReaderTest {
     }
 
     @Test
-    void leavesTheSourceOpen() {
+    void readerCloseLeavesSourceOpen() {
         RecordingInputStream source = new RecordingInputStream("{\"a\":[1]}");
         JsonReader reader = codec.reader(source);
 

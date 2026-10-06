@@ -13,21 +13,21 @@ class ErrorHandlersTest {
     private final ToolCallPart call = new ToolCallPart("call-1", "get_weather", "{}");
 
     @Test
-    void messageCarriesThePrefix() throws Exception {
+    void messageCarriesPrefix() throws Exception {
         ToolExecutor.ErrorHandler handler = ErrorHandlers.message("Error: ");
 
         assertEquals("Error: connection refused", handler.handle(call, new RuntimeException("connection refused")));
     }
 
     @Test
-    void messageAlreadyStartingWithThePrefixComesBackVerbatim() throws Exception {
+    void prefixedMessageReturnedVerbatim() throws Exception {
         ToolExecutor.ErrorHandler handler = ErrorHandlers.message("Error: ");
 
         assertEquals("Error: already marked", handler.handle(call, new RuntimeException("Error: already marked")));
     }
 
     @Test
-    void anEmptyMessageFallsBackToTheExceptionItself() throws Exception {
+    void emptyMessageUsesExceptionText() throws Exception {
         ToolExecutor.ErrorHandler handler = ErrorHandlers.message("Error: ");
 
         String answer = handler.handle(call, new NullPointerException());
@@ -36,14 +36,14 @@ class ErrorHandlersTest {
     }
 
     @Test
-    void anEmptyPrefixAnswersTheMessageUntouched() throws Exception {
+    void emptyPrefixAnswersMessageUntouched() throws Exception {
         ToolExecutor.ErrorHandler handler = ErrorHandlers.message("");
 
         assertEquals("bare", handler.handle(call, new RuntimeException("bare")));
     }
 
     @Test
-    void fixedAlwaysAnswersTheSameText() throws Exception {
+    void fixedAlwaysSameText() throws Exception {
         ToolExecutor.ErrorHandler handler = ErrorHandlers.fixed("the tool is unavailable, tell the user");
 
         assertEquals("the tool is unavailable, tell the user",
@@ -51,7 +51,7 @@ class ErrorHandlersTest {
     }
 
     @Test
-    void rethrowLetsTheOriginalFailureOut() {
+    void rethrowReleasesOriginalFailure() {
         ToolExecutor.ErrorHandler handler = ErrorHandlers.rethrow();
         RuntimeException failure = new RuntimeException("boom");
 

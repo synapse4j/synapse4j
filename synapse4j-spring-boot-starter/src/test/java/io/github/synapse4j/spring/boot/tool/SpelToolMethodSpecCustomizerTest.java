@@ -20,7 +20,7 @@ class SpelToolMethodSpecCustomizerTest {
     private final DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
 
     @Test
-    void expressionsResolveAndEverythingElseStays() {
+    void expressionsResolveOthersStay() {
         beanFactory.registerSingleton("greeter", new Greeter());
         StandardEnvironment environment = new StandardEnvironment();
         environment.getPropertySources()
@@ -44,7 +44,7 @@ class SpelToolMethodSpecCustomizerTest {
     }
 
     @Test
-    void anExpressionThatAnswersNothingLeavesTheFieldBlank() {
+    void nullExpressionLeavesFieldBlank() {
         ToolMethodSpec spec = specOf();
         spec.setName("#{null}");
 
@@ -54,7 +54,7 @@ class SpelToolMethodSpecCustomizerTest {
     }
 
     @Test
-    void aSpellingTheApplicationReconfiguredIsHonoured() {
+    void reconfiguredSpellingHonoured() {
         beanFactory.registerSingleton("greeter", new Greeter());
         StandardBeanExpressionResolver reconfigured = new StandardBeanExpressionResolver();
         reconfigured.setExpressionPrefix("%{");

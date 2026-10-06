@@ -24,7 +24,7 @@ import io.github.synapse4j.exception.SynapseIOException;
 class AbstractJsonReaderTest {
 
     @Test
-    void classifiesWholeNumbersByHowTheyAreSpelled() {
+    void wholeNumbersClassifiedBySpelling() {
         assertEquals(5, capture(number("5")));
         assertEquals(-7, capture(number("-7")));
         assertEquals(3_000_000_000L, capture(number("3000000000")));
@@ -32,7 +32,7 @@ class AbstractJsonReaderTest {
     }
 
     @Test
-    void numbersSpelledWithAFractionOrExponentAreDoubles() {
+    void fractionAndExponentBecomeDoubles() {
         assertEquals(1e5, (Double) capture(number("1e5")), 0.0);
         assertEquals(100.0, (Double) capture(number("100.0")), 0.0);
         assertEquals(2.5e-3, (Double) capture(number("2.5E-3")), 0.0);
@@ -47,7 +47,7 @@ class AbstractJsonReaderTest {
     }
 
     @Test
-    void capturesObjectsAndArraysInTheDecodedShape() {
+    void capturesObjectsAndArrays() {
         Object captured = capture(new Entry(JsonReader.Token.START_OBJECT, null),
                 new Entry(JsonReader.Token.NAME, "a"),
                 number("5"),
@@ -62,7 +62,7 @@ class AbstractJsonReaderTest {
     }
 
     @Test
-    void keepsObjectKeysInDocumentOrder() {
+    void objectKeysKeepDocumentOrder() {
         Object captured = capture(new Entry(JsonReader.Token.START_OBJECT, null),
                 new Entry(JsonReader.Token.NAME, "first"),
                 number("1"),
@@ -76,7 +76,7 @@ class AbstractJsonReaderTest {
     }
 
     @Test
-    void refusesToCaptureBeforeTheReaderHasAdvanced() {
+    void refusesCaptureBeforeAdvance() {
         try (StubReader reader = new StubReader()) {
             assertThrows(IllegalStateException.class, reader::captureValue);
         }

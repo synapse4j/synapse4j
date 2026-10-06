@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class ChatMessageTest {
 
     @Test
-    void getOrCreateExtrasBuildsTheBagOnceAndNeverAnswersNull() {
+    void extrasNeverNullAndCached() {
         ChatMessage message = new ChatMessage();
 
         ProviderExtras created = message.getOrCreateExtras();
@@ -20,7 +20,7 @@ class ChatMessageTest {
     }
 
     @Test
-    void getTextJoinsEveryTextPartInOrderAndLeavesTheOtherKindsOut() {
+    void joinsTextPartsInOrder() {
         ChatMessage message = new ChatMessage(ChatRole.ASSISTANT)
                 .addText("Hello")
                 .addPart(new ReasoningPart("weigh it up"))
@@ -31,7 +31,7 @@ class ChatMessageTest {
     }
 
     @Test
-    void getTextAnswersEmptyWhenTheMessageSaysNothingInText() {
+    void textEmptyWithoutTextParts() {
         assertEquals("", new ChatMessage().getText());
         assertEquals("", new ChatMessage(ChatRole.ASSISTANT).addPart(new ReasoningPart("hmm")).getText());
     }

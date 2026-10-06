@@ -9,7 +9,7 @@ import io.github.synapse4j.data.ChatRequest;
 class DefaultSystemMessageCustomizerTest {
 
     @Test
-    void suppliesTheStandingMessageOnlyToARequestThatCarriesNone() {
+    void standingMessageFillsOnlyGaps() {
         AbstractChatClientTest.StubChatClient client = new AbstractChatClientTest.StubChatClient();
         client.addChatCustomizer(new DefaultSystemMessageCustomizer("You are terse."));
 

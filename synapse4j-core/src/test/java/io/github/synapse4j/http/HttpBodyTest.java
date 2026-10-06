@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 class HttpBodyTest {
 
     @Test
-    void aLambdaBodyWritesWhatItWritesAndHasNoBuffer() throws IOException {
+    void lambdaBodyHasNoBuffer() throws IOException {
         HttpBody body = out -> out.write("hello".getBytes(UTF_8));
 
         assertArrayEquals("hello".getBytes(UTF_8), written(body));
@@ -24,7 +24,7 @@ class HttpBodyTest {
     }
 
     @Test
-    void aBodyOfBytesWritesThemAndAnswersWithABuffer() throws IOException {
+    void byteBodyWritesAndBuffers() throws IOException {
         HttpBody body = HttpBody.of("{\"a\":1}".getBytes(UTF_8));
 
         assertArrayEquals("{\"a\":1}".getBytes(UTF_8), written(body));
@@ -33,7 +33,7 @@ class HttpBodyTest {
     }
 
     @Test
-    void aBodyOfBytesUsesTheArrayItWasGivenRatherThanACopy() throws IOException {
+    void byteBodyKeepsGivenArray() throws IOException {
         byte[] bytes = { 1, 2, 3 };
         HttpBody body = HttpBody.of(bytes);
 
@@ -44,7 +44,7 @@ class HttpBodyTest {
     }
 
     @Test
-    void aBodyOfTextIsWrittenInUtf8() throws IOException {
+    void textBodyWrittenInUtf8() throws IOException {
         HttpBody body = HttpBody.of("héllo");
 
         assertArrayEquals("h\u00E9llo".getBytes(UTF_8), written(body));
@@ -52,7 +52,7 @@ class HttpBodyTest {
     }
 
     @Test
-    void aBodyOfTextCanBeWrittenInAnotherCharset() throws IOException {
+    void textBodyUsesGivenCharset() throws IOException {
         HttpBody body = HttpBody.of("héllo", ISO_8859_1);
 
         assertArrayEquals("h\u00E9llo".getBytes(ISO_8859_1), written(body));
@@ -60,7 +60,7 @@ class HttpBodyTest {
     }
 
     @Test
-    void everyCallAnswersWithABufferOfItsOwn() {
+    void bufferFreshPerCall() {
         HttpBody body = HttpBody.of("{\"a\":1}");
 
         ByteBuffer first = body.buffer();
@@ -74,7 +74,7 @@ class HttpBodyTest {
     }
 
     @Test
-    void aBodyProducesTheSameBytesEveryTimeItIsAsked() throws IOException {
+    void bodyRepeatsSameBytes() throws IOException {
         // A request is sent again on a retry, on a redirect, and after an authentication challenge.
         HttpBody body = HttpBody.of("{\"a\":1}");
 
@@ -83,7 +83,7 @@ class HttpBodyTest {
     }
 
     @Test
-    void aBodyLeavesTheSinkItWritesToOpen() throws IOException {
+    void bodyLeavesSinkOpen() throws IOException {
         RecordingOutputStream out = new RecordingOutputStream();
 
         HttpBody.of("{}").writeTo(out);

@@ -31,7 +31,7 @@ class DefaultToolExecutorTest {
     private final DefaultToolExecutor executor = new DefaultToolExecutor();
 
     @Test
-    void answersComeBackPairedWithTheirCalls() throws Exception {
+    void answersPairedWithCalls() throws Exception {
         List<ToolResultPart> results = executor.execute(
                 List.of(call("c1", "alpha"), call("c2", "beta")),
                 List.of(tool("alpha", arguments -> "A"), tool("beta", arguments -> "B")),
@@ -47,7 +47,7 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void aFailureComesBackMarkedUnderTheDefaultPrefix() throws Exception {
+    void failureMarkedWithDefaultPrefix() throws Exception {
         List<ToolResultPart> results = executor.execute(
                 List.of(call("c1", "flaky")),
                 List.of(tool("flaky", arguments -> {
@@ -61,7 +61,7 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void aCustomHandlerDecidesWhatTheModelSees() throws Exception {
+    void customHandlerDecidesModelOutput() throws Exception {
         DefaultToolExecutor custom = new DefaultToolExecutor(null, ErrorHandlers.fixed("ask the user instead"));
 
         List<ToolResultPart> results = custom.execute(
@@ -76,7 +76,7 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void anAbortKeepsLaterCallsFromStarting() {
+    void abortPreventsLaterCalls() {
         AtomicBoolean laterRan = new AtomicBoolean();
         DefaultToolExecutor strict = new DefaultToolExecutor(null, ErrorHandlers.rethrow());
 
@@ -94,7 +94,7 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void anUnknownNameFailsThroughTheSamePath() throws Exception {
+    void unknownNameFailsSamePath() throws Exception {
         List<ToolResultPart> results = executor.execute(
                 List.of(call("c1", "ghost")),
                 List.of(tool("alpha", arguments -> "A")),
@@ -105,7 +105,7 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void aCustomHandlerCanTellAnUnknownNameFromARealFailure() throws Exception {
+    void handlerDistinguishesUnknownFromFailure() throws Exception {
         AtomicReference<Exception> seen = new AtomicReference<>();
         DefaultToolExecutor observed = new DefaultToolExecutor(null, (call, failure) -> {
             seen.set(failure);
@@ -121,7 +121,7 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void anAnswerOfNullCountsAsAFailure() throws Exception {
+    void nullAnswerCountsAsFailure() throws Exception {
         List<ToolResultPart> results = executor.execute(
                 List.of(call("c1", "quiet")),
                 List.of(tool("quiet", arguments -> null)),
@@ -132,12 +132,12 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void anEmptyBatchAnswersNothing() throws Exception {
+    void emptyBatchAnswersNothing() throws Exception {
         assertTrue(executor.execute(List.of(), List.of(), null).isEmpty());
     }
 
     @Test
-    void aHandlerAnsweringNullAborts() {
+    void handlerAnsweringNullAborts() {
         DefaultToolExecutor broken = new DefaultToolExecutor(null, (call, failure) -> null);
 
         assertThrows(NullPointerException.class, () -> broken.execute(
@@ -149,7 +149,7 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void workersRunTheBatchConcurrentlyButAnswersStillComeBackInCallOrder() throws Exception {
+    void parallelBatchKeepsCallOrder() throws Exception {
         CountDownLatch secondDone = new CountDownLatch(1);
         ExecutorService workers = Executors.newFixedThreadPool(2);
         try {
@@ -177,7 +177,7 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void anAbortWaitsForTheBatchAndRethrowsTheFirstFailureInCallOrder() throws Exception {
+    void abortRethrowsFirstFailure() throws Exception {
         CountDownLatch secondFailed = new CountDownLatch(1);
         IllegalStateException first = new IllegalStateException("first");
         IllegalStateException second = new IllegalStateException("second");
@@ -211,7 +211,7 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void anInterruptedWaitRestoresTheStatusAndComesStraightOut() throws Exception {
+    void interruptedWaitRestoresStatus() throws Exception {
         CountDownLatch started = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         ExecutorService workers = Executors.newSingleThreadExecutor();
@@ -247,7 +247,7 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void aBatchAtTheTurnCapIsDeclined() throws Exception {
+    void batchAtTurnCapDeclined() throws Exception {
         DefaultToolExecutor capped = new DefaultToolExecutor(null, null, 3);
         AtomicBoolean ran = new AtomicBoolean();
         ChatContext context = new ChatContext();
@@ -266,7 +266,7 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void aBatchUnderTheTurnCapRuns() throws Exception {
+    void batchUnderTurnCapRuns() throws Exception {
         DefaultToolExecutor capped = new DefaultToolExecutor(null, null, 3);
         ChatContext context = new ChatContext();
         context.setTurn(2);
@@ -280,7 +280,7 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void theCapNeverBitesWhereNoLoopCounts() throws Exception {
+    void capNeverBitesWithoutContext() throws Exception {
         DefaultToolExecutor capped = new DefaultToolExecutor(null, null, 1);
 
         List<ToolResultPart> results = capped.execute(
@@ -292,7 +292,7 @@ class DefaultToolExecutorTest {
     }
 
     @Test
-    void anInterruptionFromACallComesStraightOutWithoutTheHandlerSeeingIt() {
+    void callInterruptionBypassesHandler() {
         AtomicBoolean handled = new AtomicBoolean();
         DefaultToolExecutor withHandler = new DefaultToolExecutor(null, (call, failure) -> {
             handled.set(true);

@@ -43,7 +43,7 @@ class JsonSchemaBuilderTest {
     }
 
     @Test
-    void fromLeavesTheOriginalAlone() {
+    void fromLeavesSourceUnchanged() {
         JsonSchema source = new JsonSchemaBuilder().setType("object").build();
 
         JsonSchema copy = JsonSchemaBuilder.from(source).setType("array").build();
@@ -53,12 +53,12 @@ class JsonSchemaBuilderTest {
     }
 
     @Test
-    void fromRefusesABooleanSchema() {
+    void fromRefusesBooleanSchema() {
         assertThrows(SynapseException.class, () -> JsonSchemaBuilder.from(BooleanJsonSchema.TRUE));
     }
 
     @Test
-    void settingAModelledKeywordToNullClearsIt() {
+    void nullClearsModelledKeyword() {
         JsonSchema schema = new JsonSchemaBuilder()
                 .setType("object")
                 .setTitle("WeatherQuery")

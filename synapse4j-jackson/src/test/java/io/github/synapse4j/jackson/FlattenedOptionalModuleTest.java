@@ -57,7 +57,7 @@ class FlattenedOptionalModuleTest {
     }.getType();
 
     @Test
-    void anOptionalIsItsValueAndNullInEveryPosition() {
+    void optionalValueAndNullEverywhere() {
         JsonNode holder = generate(Holder.class, new FlattenedOptionalModule(), SchemaFixtures.mapValues());
 
         assertEquals("string", holder.at("/properties/text/anyOf/0/type").asString());
@@ -71,7 +71,7 @@ class FlattenedOptionalModuleTest {
     }
 
     @Test
-    void aWrapperOfAnObjectIsItsSchemaAndNull() {
+    void objectWrapperSchemaAndNull() {
         JsonNode holder = generate(Holder.class, new FlattenedOptionalModule());
 
         assertEquals("object", holder.at("/properties/nested/anyOf/0/type").asString());
@@ -80,7 +80,7 @@ class FlattenedOptionalModuleTest {
     }
 
     @Test
-    void thePrimitiveOptionalKinAreTheirBoxedValueAndNull() {
+    void primitiveOptionalsBoxedAndNull() {
         assertEquals("integer", generate(SchemaFixtures.OPTIONAL_INT, new FlattenedOptionalModule())
                 .at("/anyOf/0/type").asString());
         assertEquals("integer", generate(SchemaFixtures.OPTIONAL_LONG, new FlattenedOptionalModule())
@@ -92,7 +92,7 @@ class FlattenedOptionalModuleTest {
     }
 
     @Test
-    void aWrapperOfAContainerIsItsSchemaAndNull() {
+    void containerWrapperSchemaAndNull() {
         JsonNode schema = generate(OPTIONAL_LIST_OF_STRING, new FlattenedOptionalModule());
 
         assertEquals("array", schema.at("/anyOf/0/type").asString());
@@ -101,7 +101,7 @@ class FlattenedOptionalModuleTest {
     }
 
     @Test
-    void aWrapperInsideNestedContainersIsStillNullable() {
+    void nestedContainerWrapperStillNullable() {
         JsonNode schema = generate(LIST_OF_LIST_OF_OPTIONAL_STRING, new FlattenedOptionalModule());
 
         assertEquals("string", schema.at("/items/items/anyOf/0/type").asString());
@@ -109,7 +109,7 @@ class FlattenedOptionalModuleTest {
     }
 
     @Test
-    void theRuleReachesIntoANestedType() {
+    void ruleReachesIntoNestedType() {
         JsonNode branch = generate(Branch.class, new FlattenedOptionalModule());
         JsonNode grove = generate(Grove.class, new FlattenedOptionalModule());
         JsonNode orchard = generate(Orchard.class, new FlattenedOptionalModule(), SchemaFixtures.mapValues());
@@ -126,7 +126,7 @@ class FlattenedOptionalModuleTest {
     }
 
     @Test
-    void aRecursiveOptionalStaysFinite() {
+    void recursiveOptionalStaysFinite() {
         JsonNode schema = generate(Node.class, new FlattenedOptionalModule());
 
         // The wrapped type is what recurses, so its reference is the one a cycle needs.
@@ -135,7 +135,7 @@ class FlattenedOptionalModuleTest {
     }
 
     @Test
-    void victoolsOwnOptionalHandlingIsTurnedOff() {
+    void victoolsOptionalHandlingDisabled() {
         // PLAIN_JSON ships Option.FLATTENED_OPTIONALS, which answers for a member and for nothing else:
         // without this module a field of the same type comes out unlike the type itself.
         JsonNode bareField = generate(Holder.class, SchemaFixtures.mapValues()).at("/properties/text");
@@ -152,7 +152,7 @@ class FlattenedOptionalModuleTest {
     }
 
     @Test
-    void theWrapperCarriesNoAttributesOfItsOwn() {
+    void wrapperCarriesNoOwnAttributes() {
         JsonNode schema = generate(Holder.class, new FlattenedOptionalModule(),
                 configBuilder -> configBuilder.with(Option.FORBIDDEN_ADDITIONAL_PROPERTIES_BY_DEFAULT));
 
@@ -163,7 +163,7 @@ class FlattenedOptionalModuleTest {
     }
 
     @Test
-    void aTypeUsedTwiceIsNotSweptIntoDefinitions() {
+    void typeUsedTwiceStaysInline() {
         assertFalse(generate(Holder.class, new FlattenedOptionalModule()).has("$defs"));
     }
 

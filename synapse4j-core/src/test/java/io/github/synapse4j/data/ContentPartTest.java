@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 class ContentPartTest {
 
     @Test
-    void getOrCreateExtrasBuildsTheBagOnceAndNeverAnswersNull() {
+    void extrasNeverNullAndCached() {
         TextPart part = new TextPart("hello");
 
         ProviderExtras created = part.getOrCreateExtras();
@@ -21,7 +21,7 @@ class ContentPartTest {
     }
 
     @Test
-    void copyIsIndependentAndCarriesTheFieldsAndExtras() {
+    void copyIndependentWithExtras() {
         TextPart part = new TextPart("hello");
         part.getOrCreateExtras().put("vendor", "x");
 

@@ -32,7 +32,7 @@ import io.github.synapse4j.tool.ToolProvider;
 class AbstractChatClientTest {
 
     @Test
-    void customizersRunInTheOrderTheyWereAddedBeforeTheSubclassSeesTheRequest() {
+    void customizersRunInAddedOrder() {
         List<String> ran = new ArrayList<>();
         StubChatClient client = new StubChatClient();
         client.addChatCustomizer(new ChatCustomizer() {
@@ -57,7 +57,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void theStreamedCallIsPreparedTheSameWay() {
+    void streamedCallPreparedSameWay() {
         StubChatClient client = new StubChatClient();
         client.addChatCustomizer(new ChatCustomizer() {
             @Override
@@ -72,7 +72,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aRequestNoCustomizerTouchesIsHandedOnUnchanged() {
+    void untouchedRequestHandedOnUnchanged() {
         StubChatClient client = new StubChatClient();
         ChatRequest request = new ChatRequest();
 
@@ -82,7 +82,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void theSameCustomizerAddedTwiceRunsTwice() {
+    void customizerAddedTwiceRunsTwice() {
         List<String> ran = new ArrayList<>();
         ChatCustomizer customizer = new ChatCustomizer() {
             @Override
@@ -100,7 +100,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aRemovedCustomizerNoLongerRuns() {
+    void removedCustomizerNoLongerRuns() {
         List<String> ran = new ArrayList<>();
         ChatCustomizer customizer = new ChatCustomizer() {
             @Override
@@ -119,7 +119,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void oneRemovalTakesEveryRegistrationOfTheCustomizer() {
+    void removalTakesEveryRegistration() {
         List<String> ran = new ArrayList<>();
         ChatCustomizer customizer = new ChatCustomizer() {
             @Override
@@ -138,7 +138,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aCustomizerRegisteredOnceRunsInEveryPassItImplements() {
+    void customizerRunsInEveryPass() {
         List<String> ran = new ArrayList<>();
         ChatCustomizer customizer = new ChatCustomizer() {
             @Override
@@ -170,7 +170,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void customizersReceiveTheClientThatAppliesThem() {
+    void customizersReceiveApplyingClient() {
         StubChatClient client = new StubChatClient();
         List<ChatClient> applied = new ArrayList<>();
         client.addChatCustomizer(new ChatCustomizer() {
@@ -197,7 +197,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void theContextRidesBackOnTheAnswer() {
+    void contextRidesBackOnAnswer() {
         StubChatClient client = new StubChatClient();
         ChatContext context = new ChatContext();
         context.setSessionId("s-1");
@@ -210,7 +210,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void continuingFoldsTheAnswerIntoTheHistoryAndTakesTheContextItCameBackOn() {
+    void continueWithFoldsAnswer() {
         ChatContext context = new ChatContext();
         context.setSessionId("session-1");
         ChatResponse answer = new ChatResponse();
@@ -233,7 +233,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void foldingTheAnswerInArchivesWhatTheCallSent() {
+    void foldArchivesSentMessages() {
         StubChatClient client = new StubChatClient();
         ChatRequest request = new ChatRequest();
         ChatMessage sent = ChatMessage.user("hi");
@@ -256,7 +256,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aFailedSendLeavesThePendingMessagesWhereARetryCanSendThem() {
+    void failedSendLeavesPendingMessages() {
         StubChatClient client = new StubChatClient() {
             @Override
             protected ChatResponse doChat(ChatRequest request) {
@@ -273,7 +273,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void theStreamedAnswerCarriesTheContextToo() {
+    void streamedAnswerCarriesContextToo() {
         StubChatClient client = new StubChatClient();
         ChatContext context = new ChatContext();
         ChatRequest request = new ChatRequest();
@@ -286,7 +286,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void anAnswerWhoseExchangeReportedASessionIdHasItAdopted() {
+    void reportedSessionIdAdopted() {
         ChatContext reported = new ChatContext();
         reported.setSessionId("provider-1");
         StubChatClient client = new StubChatClient() {
@@ -309,7 +309,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aRequestWithoutAContextGetsOneItNeverSees() {
+    void contextlessRequestGetsUnseenContext() {
         StubChatClient client = new StubChatClient();
         ChatRequest request = new ChatRequest();
 
@@ -325,7 +325,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void theContextCarriesTheRequestAsItWentOut() {
+    void contextCarriesSentRequest() {
         StubChatClient client = new StubChatClient();
         ChatRequest request = new ChatRequest();
 
@@ -335,7 +335,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void everyCallOverwritesWhatTheContextCarried() {
+    void eachCallOverwritesContext() {
         StubChatClient client = new StubChatClient();
         ChatContext context = new ChatContext();
         ChatRequest first = new ChatRequest();
@@ -351,7 +351,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void theClientNeverTouchesTheTurn() {
+    void clientNeverTouchesTurn() {
         StubChatClient client = new StubChatClient();
         ChatContext context = new ChatContext();
         context.setTurn(7);
@@ -364,7 +364,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void responseCustomizersRunAfterTheContextHasRiddenBack() {
+    void responseCustomizersRunAfterContext() {
         StubChatClient client = new StubChatClient();
         ChatContext context = new ChatContext();
         ChatRequest request = new ChatRequest();
@@ -384,7 +384,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void everyCustomizerIsHandedTheAnswerCarryingTheContext() {
+    void customizersHandedAnswerWithContext() {
         StubChatClient client = new StubChatClient();
         ChatContext context = new ChatContext();
         ChatRequest request = new ChatRequest();
@@ -419,7 +419,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void theStreamedAnswerIsStampedTheSameWay() {
+    void streamedAnswerStampedSameWay() {
         StubChatClient client = new StubChatClient();
         ChatContext context = new ChatContext();
         ChatRequest request = new ChatRequest();
@@ -442,7 +442,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void eventCustomizersRunBeforeTheFoldAndTheCallerSeesTheSameEvent() {
+    void eventCustomizersRunBeforeFold() {
         StubChatClient client = new StubChatClient();
         client.addChatCustomizer(new ChatCustomizer() {
             @Override
@@ -462,7 +462,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void eventCustomizersRunInOrderEachAnsweringTheNext() {
+    void eventCustomizersChainInOrder() {
         StubChatClient client = new StubChatClient();
         client.addChatCustomizer(new ChatCustomizer() {
             @Override
@@ -484,7 +484,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void anEventCustomizerRegisteredAfterTheStreamOpenedDoesNotJoinIt() {
+    void lateEventCustomizerNeverJoins() {
         StubChatClient client = new StubChatClient();
         ChatStream stream = client.stream(new ChatRequest());
         client.addChatCustomizer(new ChatCustomizer() {
@@ -500,7 +500,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void anEventCustomizerNeverRunsOnABlockingCall() {
+    void eventCustomizerSkipsBlockingCall() {
         List<String> ran = new ArrayList<>();
         StubChatClient client = new StubChatClient();
         client.addChatCustomizer(new ChatCustomizer() {
@@ -516,7 +516,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aRemovedResponseCustomizerNoLongerRuns() {
+    void removedResponseCustomizerNeverRuns() {
         List<String> ran = new ArrayList<>();
         ChatCustomizer customizer = namedResponse("run", ran);
         StubChatClient client = new StubChatClient();
@@ -530,7 +530,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void theStreamRunsItsResponseCustomizersOnceItIsDrained() {
+    void drainedStreamRunsResponseCustomizers() {
         StubChatClient client = new StubChatClient();
         ChatContext context = new ChatContext();
         ChatRequest request = new ChatRequest();
@@ -552,7 +552,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void anAbandonedStreamNeverRunsItsResponseCustomizers() {
+    void abandonedStreamSkipsResponseCustomizers() {
         StubChatClient client = new StubChatClient();
         List<String> ran = new ArrayList<>();
         client.addChatCustomizer(namedResponse("run", ran));
@@ -564,7 +564,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void responseCustomizersRunInTheOrderTheyWereAdded() {
+    void responseCustomizersRunInOrder() {
         List<String> ran = new ArrayList<>();
         StubChatClient client = new StubChatClient();
         client.addChatCustomizer(namedResponse("first", ran));
@@ -577,7 +577,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void theClientDefaultsApplyBeforeEveryCustomizer() {
+    void defaultsApplyBeforeCustomizers() {
         List<String> ran = new ArrayList<>();
         DefaultsChatClient client = new DefaultsChatClient();
         client.addChatCustomizer(new ChatCustomizer() {
@@ -600,7 +600,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void theClientDefaultsApplyEvenWhenNoCustomizerIsRegistered() {
+    void clientDefaultsApplyWithoutCustomizers() {
         DefaultsChatClient client = new DefaultsChatClient();
 
         client.chat(new ChatRequest());
@@ -610,7 +610,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void defaultOptionsFillWhatTheRequestLeavesUnstated() {
+    void defaultOptionsFillUnstated() {
         StubChatClient client = new StubChatClient();
         ChatOptions defaults = new ChatOptions();
         defaults.setModel("gpt-4o");
@@ -627,7 +627,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void defaultToolsGoOutBeforeTheOnesTheRequestItselfCarries() {
+    void defaultToolsPrecedeRequestTools() {
         StubChatClient client = new StubChatClient();
         client.addDefaultTool(tool("a"));
         client.addDefaultTool(tool("b"));
@@ -640,7 +640,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aRequestToolOfADefaultsNameStandsInItsSlot() {
+    void requestToolInDefaultSlot() {
         StubChatClient client = new StubChatClient();
         client.addDefaultTool(tool("a"));
         client.addDefaultTool(tool("b"));
@@ -657,7 +657,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void sendingTheSameRequestTwiceProducesTheSameOrder() {
+    void resendingRequestKeepsSameOrder() {
         StubChatClient client = new StubChatClient();
         client.addDefaultTool(tool("a"));
         client.addDefaultTool(tool("b"));
@@ -673,7 +673,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void registeringANameAgainReplacesTheToolInPlace() {
+    void registeringNameAgainReplacesTool() {
         StubChatClient client = new StubChatClient();
         client.addDefaultTool(tool("a"));
         client.addDefaultTool(tool("b"));
@@ -687,7 +687,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aRemovedDefaultNoLongerGoesOut() {
+    void removedDefaultNotSent() {
         StubChatClient client = new StubChatClient();
         client.addDefaultTool(tool("a"));
         client.addDefaultTool(tool("b"));
@@ -701,7 +701,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aProviderIsAskedOncePerCallDuringPreparation() {
+    void providerAskedOncePerCall() {
         StubChatClient client = new StubChatClient();
         List<String> asked = new ArrayList<>();
         List<ChatRequest> handed = new ArrayList<>();
@@ -721,7 +721,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void everyCustomizerSeesWhatTheProvidersAnswered() {
+    void customizersSeeProviderAnswers() {
         StubChatClient client = new StubChatClient();
         client.addToolProvider((it, request) -> List.of(tool("p")));
         List<String> seen = new ArrayList<>();
@@ -738,7 +738,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aProviderReplacesADefaultOfTheSameNameInItsSlot() {
+    void providerReplacesDefaultInSlot() {
         StubChatClient client = new StubChatClient();
         client.addDefaultTool(tool("a"));
         client.addDefaultTool(tool("b"));
@@ -752,7 +752,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aRequestToolReplacesWhatAProviderAnswered() {
+    void requestToolReplacesProviderAnswer() {
         StubChatClient client = new StubChatClient();
         client.addToolProvider((it, request) -> List.of(tool("a"), tool("b")));
         ChatRequest request = new ChatRequest();
@@ -766,7 +766,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void duplicateNamesWithinTheRequestCollapseToTheLast() {
+    void duplicateNamesCollapseToLast() {
         StubChatClient client = new StubChatClient();
         client.addDefaultTool(tool("d"));
         ChatRequest request = new ChatRequest();
@@ -784,7 +784,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void providersFillTheirAnswersInRegistrationOrder() {
+    void providersFillInRegistrationOrder() {
         StubChatClient client = new StubChatClient();
         client.addDefaultTool(tool("d"));
         Tool fromFirst = tool("x");
@@ -799,7 +799,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aProviderAnsweringNullFailsLoudly() {
+    void providerAnsweringNullFailsLoudly() {
         StubChatClient client = new StubChatClient();
         client.addToolProvider((it, request) -> null);
 
@@ -810,7 +810,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void aRemovedProviderIsNoLongerAsked() {
+    void removedProviderNoLongerAsked() {
         StubChatClient client = new StubChatClient();
         AtomicInteger asks = new AtomicInteger();
         ToolProvider provider = (it, request) -> {
@@ -827,7 +827,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void theSameProviderRegisteredTwiceIsAskedOnce() {
+    void providerRegisteredTwiceAskedOnce() {
         StubChatClient client = new StubChatClient();
         AtomicInteger asks = new AtomicInteger();
         ToolProvider provider = (it, request) -> {
@@ -845,7 +845,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void schemaCustomizerReshapesToolAndResponseFormatSchemas() {
+    void schemaCustomizerReshapesBothSchemas() {
         StubChatClient client = new StubChatClient();
         JsonSchema reshaped = new JsonSchemaBuilder().build();
         client.addJsonSchemaCustomizer(schema -> reshaped);
@@ -863,7 +863,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void schemaCustomizerRegisteredLaterReshapesNextCall() {
+    void lateSchemaCustomizerReshapesCall() {
         StubChatClient client = new StubChatClient();
         JsonSchema shared = new JsonSchemaBuilder().build();
         JsonSchema firstPass = new JsonSchemaBuilder().build();

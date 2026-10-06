@@ -40,7 +40,7 @@ class ToolCallingChatClientTest {
     private final ScriptedChatClient inner = new ScriptedChatClient();
 
     @Test
-    void aRoundExecutesTheCallsAndSendsTheResultsBack() throws Exception {
+    void roundExecutesCallsThenResults() throws Exception {
         inner.script.add(toolCallResponse("c1", "alpha"));
         inner.script.add(textResponse("done"));
         AtomicBoolean ran = new AtomicBoolean();
@@ -69,7 +69,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void everyRoundSeesTheSameRequestGrowingInTheCallersHand() {
+    void everyRoundSeesSameRequest() {
         inner.script.add(toolCallResponse("c1", "alpha"));
         inner.script.add(textResponse("done"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner);
@@ -85,7 +85,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void theTurnCountsEachTripAround() {
+    void turnCountsEachTripAround() {
         inner.script.add(toolCallResponse("c1", "alpha"));
         inner.script.add(textResponse("done"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner);
@@ -99,7 +99,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void theDecoratorCreatesAContextTheRequestCanReach() {
+    void decoratorCreatesReachableContext() {
         inner.script.add(textResponse("plain"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner);
         ChatRequest request = new ChatRequest();
@@ -114,7 +114,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void aDeclineEndsTheRoundWithTheCallsUnanswered() {
+    void declineLeavesCallsUnanswered() {
         inner.script.add(toolCallResponse("c1", "alpha"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner, (calls, available, context) -> null);
         ChatRequest request = new ChatRequest();
@@ -131,7 +131,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void aFailureTheExecutorThrowsComesStraightOut() {
+    void executorFailureComesStraightOut() {
         inner.script.add(toolCallResponse("c1", "alpha"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner, (calls, available, context) -> {
             throw new IllegalStateException("boom");
@@ -145,7 +145,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void aCheckedFailureFromTheExecutorArrivesUnderASynapseException() {
+    void checkedFailureBecomesSynapseException() {
         inner.script.add(toolCallResponse("c1", "alpha"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner, (calls, available, context) -> {
             throw new java.io.IOException("wire broke");
@@ -159,7 +159,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void theTurnCapEndsTheRoundWhenItIsReached() {
+    void turnCapEndsRound() {
         inner.script.add(toolCallResponse("c1", "alpha"));
         inner.script.add(toolCallResponse("c2", "alpha"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner, new DefaultToolExecutor(null, null, 2));
@@ -175,7 +175,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void defaultsRegisteredOnTheDecoratorReachTheExecutor() {
+    void decoratorDefaultsReachExecutor() {
         inner.script.add(toolCallResponse("c1", "alpha"));
         inner.script.add(textResponse("done"));
         AtomicBoolean ran = new AtomicBoolean();
@@ -193,7 +193,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void aProviderOnTheInnerClientIsAskedEachRoundAndOnceOnTheDecorator() {
+    void innerPerRoundDecoratorOnce() {
         inner.script.add(toolCallResponse("c1", "alpha"));
         inner.script.add(textResponse("done"));
         AtomicInteger innerAsks = new AtomicInteger();
@@ -219,7 +219,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void streamSplicesEveryRoundIntoOneSequence() {
+    void streamSplicesRoundsIntoSequence() {
         inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
         inner.streamScript.add(new StreamRound(textResponse("done"), "r2"));
         AtomicBoolean ran = new AtomicBoolean();
@@ -252,7 +252,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void streamShowsTheRoundInProgressAndRebindsTheContext() {
+    void streamShowsRoundRebindsContext() {
         inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
         inner.streamScript.add(new StreamRound(textResponse("done"), "r2"));
         List<ChatResponse> atBatch = new ArrayList<>();
@@ -281,7 +281,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void streamDeclineEndsWithTheCallsUnanswered() {
+    void streamDeclineLeavesCallsUnanswered() {
         inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner, (calls, available, context) -> null);
         ChatRequest request = new ChatRequest();
@@ -302,7 +302,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void closingDuringTheBatchOpensNoFurtherRound() {
+    void closeDuringBatchStopsRounds() {
         inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
         ChatStream[] held = new ChatStream[1];
         ToolCallingChatClient client = new ToolCallingChatClient(inner, (calls, available, context) -> {
@@ -326,7 +326,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void aBatchFailureEndsTheStreamAndNeverRunsTwice() {
+    void batchFailureEndsStreamOnce() {
         inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
         AtomicInteger attempts = new AtomicInteger();
         ToolCallingChatClient client = new ToolCallingChatClient(inner, (calls, available, context) -> {
@@ -348,7 +348,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void anErrorFromTheBatchIsReplayedAndTheBatchRunsOnce() {
+    void batchErrorReplayedOnce() {
         inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
         AtomicInteger attempts = new AtomicInteger();
         ToolCallingChatClient client = new ToolCallingChatClient(inner, (calls, available, context) -> {
@@ -370,7 +370,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void aFailureWhilePullingAnEventEndsTheStreamAndReleasesIt() {
+    void eventPullFailureReleasesStream() {
         inner.streamScript.add(new StreamRound(textResponse("done"), "r1"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner);
         client.addChatCustomizer(new ChatCustomizer() {
@@ -393,7 +393,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void aDrainedStreamReleasesEveryRoundAndCloseAddsNothing() {
+    void drainedStreamReleasesEveryRound() {
         inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
         inner.streamScript.add(new StreamRound(textResponse("done"), "r2"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner);
@@ -413,7 +413,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void theResponseHookRunsOnEveryRoundsDrainedAnswer() {
+    void responseHookRunsEachRound() {
         inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
         inner.streamScript.add(new StreamRound(textResponse("done"), "r2"));
         AtomicInteger passes = new AtomicInteger();
@@ -503,7 +503,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void eventCustomizersRegisteredOnTheDecoratorRunInEveryInnerStream() {
+    void decoratorCustomizersRunEachRound() {
         inner.streamScript.add(new StreamRound(toolCallResponse("c1", "alpha"), "r1"));
         inner.streamScript.add(new StreamRound(textResponse("done"), "r2"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner);

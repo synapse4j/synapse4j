@@ -91,7 +91,7 @@ class JacksonSchemaConfigBuildersTest {
     private final JacksonJsonCodec codec = new JacksonJsonCodec(jsonMapper.rebuild());
 
     @Test
-    void theDecodeSchemaRequiresEveryPropertyTheTypeDoesNotMakeOptional() {
+    void decodeSchemaRequiresNonOptional() {
         JsonSchema schema = codec.generateDecodeSchema(Kitchen.class);
 
         assertEquals(List.of("text", "number", "boxed", "list", "optionals", "map", "open", "anything",
@@ -99,7 +99,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void onlyAnAnnotationThatDemandsHasAnEffect() {
+    void demandingAnnotationHasEffect() {
         JsonSchema schema = codec.generateDecodeSchema(Annotated.class);
 
         // optional is demanded by its annotation alone, the type making it optional; loosened is
@@ -109,7 +109,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void theDecodeSchemaAllowsNullExactlyWhereTheTypeDoes() {
+    void decodeSchemaMirrorsTypeNulls() {
         JsonSchema schema = codec.generateDecodeSchema(Kitchen.class);
 
         assertTrue(allowsNull(schema, schema.getProperties().get("optional")));
@@ -120,7 +120,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void optionalIsTreatedAlikeInEveryPosition() {
+    void optionalAlikeInEveryPosition() {
         JsonSchema root = codec.generateDecodeSchema(OPTIONAL_STRING);
         JsonSchema kitchen = codec.generateDecodeSchema(Kitchen.class);
         JsonSchema list = codec.generateDecodeSchema(LIST_OF_OPTIONAL_STRING);
@@ -134,7 +134,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void aMapKeepsItsFreeKeysAndItsValueType() {
+    void mapKeepsKeysValueType() {
         JsonSchema map = codec.generateDecodeSchema(MAP_OF_STRING);
 
         assertEquals(List.of("object"), map.getType());
@@ -155,7 +155,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void theScalarKindsAreDescribedByTheirType() {
+    void scalarKindsDescribedByType() {
         JsonSchema schema = codec.generateDecodeSchema(Variety.class);
         Map<String, JsonSchema> properties = schema.getProperties();
 
@@ -177,7 +177,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void aSelfReferencingTypeStaysFinite() {
+    void selfReferencingTypeStaysFinite() {
         JsonSchema schema = codec.generateDecodeSchema(Link.class);
 
         assertEquals(List.of("string"), schema.getProperties().get("name").getType());
@@ -185,7 +185,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void aTypeUsedOnceIsDescribedInPlace() {
+    void typeUsedOnceStaysInline() {
         JsonSchema schema = codec.generateDecodeSchema(Kitchen.class);
 
         // Nothing is swept into $defs: every type here is written once, so each is described where it
@@ -195,7 +195,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void theDecodeSchemaAcceptsEveryDocumentItAllows() {
+    void decodeSchemaAcceptsAllowedDocuments() {
         assertEquals(sampleKitchen(), codec.decode(EVERYTHING, Kitchen.class));
         assertEquals(sampleKitchen(), codec.decode(WITHOUT_OPTIONAL, Kitchen.class));
         // A settable property may be left out even though the schema demands it: being stricter than
@@ -205,7 +205,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void theEncodeSchemaDescribesWhatWritingProduces() {
+    void encodeSchemaDescribesWriting() {
         JsonSchema schema = codec.generateEncodeSchema(Kitchen.class);
 
         assertEquals(properties(schema), keysOf(codec.encode(sampleKitchen())));
@@ -218,14 +218,14 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void theEncodeSchemaIsNotClosedAgainstUndeclaredProperties() {
+    void encodeSchemaOpenToUndeclared() {
         // Only the decode schema answers the binder's refusal of an undeclared property; what this
         // library writes names exactly the properties the schema lists.
         assertNull(codec.generateEncodeSchema(Kitchen.class).getAdditionalProperties());
     }
 
     @Test
-    void thePromiseHoldsUnderOtherMapperSettings() {
+    void promiseHoldsUnderOtherMappers() {
         for (JsonMapper mapper : otherMappers()) {
             JacksonJsonCodec other = new JacksonJsonCodec(mapper.rebuild());
 
@@ -244,7 +244,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void nullSettingsApplyNoneOfTheChoices() {
+    void nullSettingsApplyNoChoices() {
         JsonSchema schema = codecWith(null).generateEncodeSchema(Kitchen.class);
 
         // None of the option sets, module flags or Jackson options are applied: no additionalProperties,
@@ -255,7 +255,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void theOptionSetsAreTheOnesInTheSettings() {
+    void optionSetsComeFromSettings() {
         JacksonSchemaSettings settings = new JacksonSchemaSettings();
         settings.getOptions().clear();
         settings.getSuppressedOptions().clear();
@@ -267,7 +267,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void theModuleFlagsAreTheOnesInTheSettings() {
+    void moduleFlagsComeFromSettings() {
         JacksonSchemaSettings settings = new JacksonSchemaSettings();
         settings.setRequiredProperties(false);
         settings.setFlattenOptionals(false);
@@ -279,7 +279,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void theJacksonOptionsAreTheOnesInTheSettings() {
+    void jacksonOptionsComeFromSettings() {
         JacksonSchemaSettings settings = new JacksonSchemaSettings();
         settings.getJacksonOptions().clear();
 
@@ -288,7 +288,7 @@ class JacksonSchemaConfigBuildersTest {
     }
 
     @Test
-    void theByteArrayIsAStringOnlyWhileTheChoiceIsOn() {
+    void byteArrayStringWhenBase64() {
         JacksonSchemaSettings settings = new JacksonSchemaSettings();
         settings.setBase64Bytes(false);
 

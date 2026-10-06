@@ -12,7 +12,7 @@ import io.github.synapse4j.json.JsonSchemaBuilder;
 class ChatResponseFormatTest {
 
     @Test
-    void effectiveFillsEveryGapFromTheDefaultAndLetsTheCallWin() {
+    void effectiveFillsGapsCallWins() {
         ChatResponseFormat call = new ChatResponseFormat();
         call.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
         call.getExtras().put("strict", true);

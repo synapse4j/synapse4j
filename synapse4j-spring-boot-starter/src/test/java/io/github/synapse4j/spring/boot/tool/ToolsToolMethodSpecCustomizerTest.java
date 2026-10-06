@@ -13,7 +13,7 @@ import io.github.synapse4j.tool.ToolParameterSpec;
 class ToolsToolMethodSpecCustomizerTest {
 
     @Test
-    void thePrefixIsWrittenInFrontOfEveryToolNameTheClassDeclares() {
+    void prefixPrependedToToolNames() {
         ToolMethodSpec named = specOf(Prefixed.class);
         named.setName("daily");
         new ToolsToolMethodSpecCustomizer().customize(named);
@@ -25,7 +25,7 @@ class ToolsToolMethodSpecCustomizerTest {
     }
 
     @Test
-    void aBlankPrefixAndAnUnmarkedClassAreLeftAlone() {
+    void blankPrefixUnmarkedLeftAlone() {
         ToolMethodSpec unprefixed = specOf(Unprefixed.class);
         new ToolsToolMethodSpecCustomizer().customize(unprefixed);
         assertThat(unprefixed.getName()).isEmpty();

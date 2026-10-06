@@ -20,7 +20,7 @@ class Synapse4jJacksonModuleTest {
     private final JsonMapper mapper = JsonMapper.builder().addModule(new Synapse4jJacksonModule()).build();
 
     @Test
-    void aSchemaIsWrittenAsTheDocumentItDescribes() {
+    void schemaWrittenAsDocument() {
         // The schema's own document, not the shape of its class: without the module the mapper would
         // write its getters instead — type as an array, every other keyword as null.
         Map<?, ?> written = mapper.readValue(mapper.writeValueAsString(objectSchema()), Map.class);
@@ -31,7 +31,7 @@ class Synapse4jJacksonModuleTest {
     }
 
     @Test
-    void aSchemaNestedInAValueIsWrittenAndReadBack() {
+    void nestedSchemaRoundTrips() {
         Carries original = new Carries(objectSchema(), List.of(typed("string")));
 
         String json = mapper.writeValueAsString(original);
@@ -43,7 +43,7 @@ class Synapse4jJacksonModuleTest {
     }
 
     @Test
-    void aBooleanSchemaSurvivesBothWays() {
+    void booleanSchemaSurvivesBothWays() {
         // Written: a boolean schema nested in an object schema goes out as its boolean.
         assertEquals("{\"not\":true}", mapper.writeValueAsString(Map.of("not", BooleanJsonSchema.TRUE)));
 
@@ -52,7 +52,7 @@ class Synapse4jJacksonModuleTest {
     }
 
     @Test
-    void aValueInNoModelledFormIsRefused() {
+    void unmodelledValueRefused() {
         // "properties" is modelled as a map of schemas; a string there is a document this library
         // cannot read, and it is refused rather than carried along.
         MismatchedInputException thrown = assertThrows(MismatchedInputException.class,
@@ -62,7 +62,7 @@ class Synapse4jJacksonModuleTest {
     }
 
     @Test
-    void aKeywordTheLibraryHasNotModelledIsCarriedAsItIs() {
+    void unmodelledKeywordCarriedAsIs() {
         // "type" is not modelled — the library types only the schema-valued keywords — so its value
         // is kept as the JSON data it is.
         JsonSchema schema = mapper.readValue("{\"type\":[\"object\",\"null\"]}", JsonSchema.class);
@@ -71,7 +71,7 @@ class Synapse4jJacksonModuleTest {
     }
 
     @Test
-    void addingTheModuleTwiceLeavesASchemaReadable() {
+    void moduleAddedTwiceSchemaReadable() {
         JsonMapper twice = JsonMapper.builder()
                 .addModule(new Synapse4jJacksonModule())
                 .addModule(new Synapse4jJacksonModule())
