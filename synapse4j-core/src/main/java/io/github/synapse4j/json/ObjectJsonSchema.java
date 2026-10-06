@@ -15,6 +15,7 @@ import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
 
 import lombok.EqualsAndHashCode;
+import lombok.EqualsAndHashCode.CacheStrategy;
 import lombok.NonNull;
 
 /**
@@ -51,7 +52,7 @@ import lombok.NonNull;
  * This class is final: {@link #map(UnaryOperator)} answers a rewritten node with a new
  * {@code ObjectJsonSchema}, so a subclass could not survive its own rewrite.
  */
-@EqualsAndHashCode
+@EqualsAndHashCode(cacheStrategy = CacheStrategy.LAZY)
 public final class ObjectJsonSchema implements JsonSchema {
 
     /** Every keyword a node carries, keyed by JSON name: frozen, never changed after construction. */
