@@ -27,6 +27,9 @@
 
     <jsonschema-generator.version>5.0.0</jsonschema-generator.version>
 
+    <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
+    <maven-javadoc-plugin.version>3.11.2</maven-javadoc-plugin.version>
+
     <!-- The static checker that gives the @NullMarked declarations above their teeth: NullAway
          runs as an Error Prone plugin inside javac, so handing null to a parameter that is not
          nullable — or answering a non-null method with null — fails the build instead of a
@@ -35,9 +38,12 @@
     <nullaway.version>0.14.2</nullaway.version>
 
     <!-- The one line this build rides: whatever spring-boot-dependencies pins is the version of
-         Spring, Jackson, JUnit, Lombok and the rest. Nothing here pins a second version of
-         anything it manages — one authority per artifact, and nothing to keep in sync. -->
+         Spring, Jackson, JUnit and the rest. -->
     <spring-boot.version>4.1.1</spring-boot.version>
+
+    <!-- As plugin dependency cannot take one from the imported BOM, we have to manage this by
+         ourselves. -->
+    <lombok.version>1.18.46</lombok.version>
   </properties>
 
   <dependencyManagement>
@@ -48,6 +54,11 @@
         <version>${jsonschema-generator.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <version>${lombok.version}</version>
       </dependency>
       <dependency>
         <groupId>org.springframework.boot</groupId>
@@ -207,5 +218,69 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok-maven-plugin</artifactId>
+            <version>${lombok-maven-plugin.version}</version>
+            <!-- The Lombok the plugin carries is years old and does not run on the JDK this builds
+                 on, so it is replaced with the one this build compiles with. -->
+            <dependencies>
+              <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+              </dependency>
+            </dependencies>
+            <configuration>
+              <sourceDirectory>${project.build.sourceDirectory}</sourceDirectory>
+              <outputDirectory>${project.build.directory}/delombok</outputDirectory>
+              <!-- Not a source root: the delomboked tree is for javadoc to read, not for the
+                   compiler to build a second time. -->
+              <addOutputDirectory>false</addOutputDirectory>
+            </configuration>
+            <executions>
+              <execution>
+                <id>delombok</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>delombok</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>${maven-javadoc-plugin.version}</version>
+            <configuration>
+              <!-- The tree the delombok step above wrote. The plugin documents by package name, so
+                   pointing sourcepath there is what makes the pages come from the delomboked sources
+                   — the ones that carry what Lombok generates. -->
+              <sourcepath>${project.build.directory}/delombok</sourcepath>
+              <!-- Errors for malformed markup and broken links, silence for the missing-tag noise:
+                   the prose carries the contract here, and a missing @param on a one-line accessor
+                   must not hold a release hostage. -->
+              <doclint>all,-missing</doclint>
+            </configuration>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 
 </project>
