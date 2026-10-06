@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.Objects;
 import java.util.concurrent.Flow;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.BodyWriteMode;
 import io.github.synapse4j.http.DefaultHttpResponse;
@@ -20,7 +22,6 @@ import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.http.HttpRequest;
 import io.github.synapse4j.http.HttpResponse;
-import org.jspecify.annotations.Nullable;
 
 /**
  * The {@link HttpClient} SPI implemented on the JDK's {@code java.net.http.HttpClient}, adding no

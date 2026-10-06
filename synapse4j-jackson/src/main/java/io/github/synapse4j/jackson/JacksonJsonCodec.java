@@ -13,14 +13,13 @@ import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonWriter;
+import lombok.NonNull;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.core.StreamWriteFeature;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
-
-import lombok.NonNull;
 
 /**
  * A {@link io.github.synapse4j.json.JsonCodec} over Jackson and victools: values are (de)serialized

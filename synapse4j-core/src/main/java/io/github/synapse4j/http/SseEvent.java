@@ -1,10 +1,10 @@
 package io.github.synapse4j.http;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NonNull;
-
-import org.jspecify.annotations.Nullable;
 
 /**
  * One server-sent event as it arrived: the frame of the {@code text/event-stream} format, before

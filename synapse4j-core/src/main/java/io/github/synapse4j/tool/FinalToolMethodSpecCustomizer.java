@@ -9,7 +9,6 @@ import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonSchemaBuilder;
-
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 

@@ -3,9 +3,9 @@ package io.github.synapse4j.data;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import io.github.synapse4j.http.HttpOptions;
 import org.jspecify.annotations.Nullable;
 
+import io.github.synapse4j.http.HttpOptions;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;

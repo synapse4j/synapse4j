@@ -2,10 +2,10 @@ package io.github.synapse4j.tool;
 
 import java.util.List;
 
-import io.github.synapse4j.data.ChatContext;
-import io.github.synapse4j.data.ContentPart;
 import org.jspecify.annotations.Nullable;
 
+import io.github.synapse4j.data.ChatContext;
+import io.github.synapse4j.data.ContentPart;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 

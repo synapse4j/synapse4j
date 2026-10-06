@@ -10,8 +10,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import io.github.synapse4j.exception.SynapseException;
 import org.junit.jupiter.api.Test;
+
+import io.github.synapse4j.exception.SynapseException;
 
 class JsonSchemaBuilderTest {
 

@@ -6,9 +6,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.github.synapse4j.exception.SynapseException;
 import org.jspecify.annotations.Nullable;
 
+import io.github.synapse4j.exception.SynapseException;
 import lombok.NonNull;
 
 /**

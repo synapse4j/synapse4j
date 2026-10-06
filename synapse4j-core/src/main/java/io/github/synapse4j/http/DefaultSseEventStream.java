@@ -8,9 +8,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
-import org.jspecify.annotations.Nullable;
 
 /**
  * The default {@link SseEventStream}: reads the body as UTF-8, the encoding every mainstream

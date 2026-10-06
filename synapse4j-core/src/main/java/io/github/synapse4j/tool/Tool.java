@@ -1,10 +1,11 @@
 package io.github.synapse4j.tool;
 
-import io.github.synapse4j.data.ChatContext;
-import io.github.synapse4j.data.ContentPart;
+import java.util.List;
+
 import org.jspecify.annotations.Nullable;
 
-import java.util.List;
+import io.github.synapse4j.data.ChatContext;
+import io.github.synapse4j.data.ContentPart;
 
 /**
  * A tool the model may call, in both of its halves: the declaration that is sent, and the execution

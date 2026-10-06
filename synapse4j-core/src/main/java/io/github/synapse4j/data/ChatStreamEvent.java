@@ -1,10 +1,10 @@
 package io.github.synapse4j.data;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
-
-import org.jspecify.annotations.Nullable;
 
 /**
  * One event of a streaming answer: a protocol event, mapped one to one and kept in arrival order.

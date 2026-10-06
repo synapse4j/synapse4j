@@ -28,7 +28,6 @@ import io.github.synapse4j.jackson.SchemaFixtures.Nested;
 import io.github.synapse4j.jackson.SchemaFixtures.Settable;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonSchemaBuilder;
-
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 

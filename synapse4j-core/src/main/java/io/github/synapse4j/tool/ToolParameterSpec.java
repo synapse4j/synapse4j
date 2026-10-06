@@ -2,10 +2,9 @@ package io.github.synapse4j.tool;
 
 import java.lang.reflect.Parameter;
 
-import io.github.synapse4j.json.JsonSchema;
-
 import org.jspecify.annotations.Nullable;
 
+import io.github.synapse4j.json.JsonSchema;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;

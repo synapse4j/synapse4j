@@ -7,7 +7,6 @@ import java.util.Map;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.TextPart;
-
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

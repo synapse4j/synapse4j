@@ -5,9 +5,10 @@ import java.io.IOException;
 import java.io.Reader;
 import java.math.BigDecimal;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.exception.SynapseIOException;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Writes one JSON document to a sink, token by token.

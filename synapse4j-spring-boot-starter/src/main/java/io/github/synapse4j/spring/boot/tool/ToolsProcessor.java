@@ -13,7 +13,6 @@ import io.github.synapse4j.chat.ChatClient;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.tool.MethodTools;
 import io.github.synapse4j.tool.Tool;
-
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.apachecommons.CommonsLog;

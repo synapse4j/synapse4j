@@ -10,6 +10,8 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.chat.DefaultChatStream;
 import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatResponse;
@@ -25,7 +27,6 @@ import io.github.synapse4j.http.SseEvent;
 import io.github.synapse4j.http.SseEventStream;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
-import org.jspecify.annotations.Nullable;
 
 /**
  * The Messages stream: one streamed exchange, pulled frame by frame, that assembles the answer as

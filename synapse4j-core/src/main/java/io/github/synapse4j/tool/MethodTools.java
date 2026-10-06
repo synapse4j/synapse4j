@@ -1,7 +1,5 @@
 package io.github.synapse4j.tool;
 
-import io.github.synapse4j.exception.SynapseException;
-import io.github.synapse4j.json.JsonCodec;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
@@ -13,6 +11,8 @@ import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
 
+import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.json.JsonCodec;
 import lombok.NonNull;
 
 /**

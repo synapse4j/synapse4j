@@ -13,6 +13,9 @@
     "java.format.settings.url": "${workspaceFolder}/.vscode/eclipse-formatter.xml",
     "java.format.settings.profile": "Eclipse",
     "editor.formatOnSave": true,
+    // The same order Spotless enforces at build time (synapse4j-parent/pom.xml), pinned here so a
+    // change in jdt.ls's default cannot drift the editor's organize-imports away from the build.
+    "java.completion.importOrder": ["#", "java", "javax", "org", "com", ""],
     // jdt.ls takes indentation from these client-side options rather than from the formatter
     // profile, so they must be pinned here (with detection off) to stay in sync with it.
     "[java]": {

@@ -15,7 +15,6 @@ import com.github.victools.jsonschema.generator.Module;
 import com.github.victools.jsonschema.generator.Option;
 
 import io.github.synapse4j.jackson.SchemaFixtures.Nested;
-
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 

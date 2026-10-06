@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatRequest;
@@ -18,8 +20,6 @@ import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.tool.DefaultToolExecutor;
 import io.github.synapse4j.tool.ToolExecutor;
-import org.jspecify.annotations.Nullable;
-
 import lombok.NonNull;
 
 /**

@@ -3,6 +3,8 @@ package io.github.synapse4j.anthropic;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.data.ChatFinishReason;
 import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatResponse;
@@ -16,8 +18,6 @@ import io.github.synapse4j.data.Usage;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
-import org.jspecify.annotations.Nullable;
-
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 

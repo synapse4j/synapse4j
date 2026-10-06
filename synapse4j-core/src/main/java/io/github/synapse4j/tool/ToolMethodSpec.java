@@ -5,17 +5,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonSchema;
-
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-
-import org.jspecify.annotations.Nullable;
 
 /**
  * One method on its way to becoming a tool: the Java side it was read from, and the values its

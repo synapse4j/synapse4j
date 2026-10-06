@@ -2,10 +2,11 @@ package io.github.synapse4j.tool;
 
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Runs one round's worth of tool calls: each call the model made, resolved by name against the

@@ -26,6 +26,7 @@ import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.util.Timeout;
+import org.jspecify.annotations.Nullable;
 
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.http.BodyWriteMode;
@@ -35,8 +36,6 @@ import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.http.HttpRequest;
 import io.github.synapse4j.http.HttpResponse;
-import org.jspecify.annotations.Nullable;
-
 import lombok.NonNull;
 
 /**

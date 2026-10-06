@@ -6,7 +6,6 @@ import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 import com.github.victools.jsonschema.generator.SchemaKeyword;
 
 import io.github.synapse4j.json.JsonSchemaKeywords;
-
 import tools.jackson.databind.node.ObjectNode;
 
 /**

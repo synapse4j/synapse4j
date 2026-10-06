@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.data.ChatFinishReason;
 import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatResponse;
@@ -18,7 +20,6 @@ import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.Usage;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonReader;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Walks a protocol document from a caller-supplied {@link JsonReader} into the shared model.

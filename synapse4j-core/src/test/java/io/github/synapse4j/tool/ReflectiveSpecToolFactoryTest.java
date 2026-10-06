@@ -6,14 +6,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
+
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
-import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Test;
 
 class ReflectiveSpecToolFactoryTest {
 

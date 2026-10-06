@@ -177,11 +177,14 @@
         <version>${spotless-maven-plugin.version}</version>
         <configuration>
           <java>
+            <!-- Static imports, then the JDK packages, then the catch-all — one blank line between
+                 groups. This is jdt.ls's own default order, mirrored here and pinned in
+                 .vscode/settings.json, so the editor's organize-imports action and the build agree
+                 instead of each inventing a grouping. The empty trailing entry is that catch-all. -->
+            <importOrder>
+              <order>\#,java,javax,org,com,</order>
+            </importOrder>
             <removeUnusedImports />
-            <!-- Import ordering is deliberately not enforced. The IDE's organize-imports action and
-                 Spotless would each have to agree on the same grouping, and a mismatch would produce
-                 exactly the editor/build inconsistency this configuration exists to prevent. Unused
-                 imports are still removed on both sides. -->
             <eclipse>
               <!-- The root, where the profile lives. mvn sets this property from its launcher
                    script, m2e does not, hence the ignore below. Editing that profile needs a

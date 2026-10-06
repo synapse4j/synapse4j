@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.chat.AbstractChatClient;
 import io.github.synapse4j.chat.ChatStream;
 import io.github.synapse4j.data.ChatRequest;
@@ -22,8 +24,6 @@ import io.github.synapse4j.http.SseEventStream;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonWriter;
-import org.jspecify.annotations.Nullable;
-
 import lombok.NonNull;
 
 /**

@@ -3,6 +3,8 @@ package io.github.synapse4j.openai;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
@@ -13,8 +15,6 @@ import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.Usage;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonReader;
-import org.jspecify.annotations.Nullable;
-
 import lombok.AccessLevel;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;

@@ -9,7 +9,6 @@ import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
-
 import lombok.Getter;
 import lombok.Setter;
 

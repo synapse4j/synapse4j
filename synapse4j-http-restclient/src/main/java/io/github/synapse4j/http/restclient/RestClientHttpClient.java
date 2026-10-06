@@ -8,8 +8,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import lombok.NonNull;
-import lombok.extern.apachecommons.CommonsLog;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.StreamingHttpOutputMessage;
 import org.springframework.web.client.ResourceAccessException;
@@ -23,7 +22,8 @@ import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.http.HttpRequest;
 import io.github.synapse4j.http.HttpResponse;
-import org.jspecify.annotations.Nullable;
+import lombok.NonNull;
+import lombok.extern.apachecommons.CommonsLog;
 
 /**
  * The {@link HttpClient} SPI implemented on Spring's {@link RestClient}.

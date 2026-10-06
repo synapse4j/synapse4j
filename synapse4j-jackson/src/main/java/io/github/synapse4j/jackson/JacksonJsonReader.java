@@ -7,12 +7,12 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.function.Supplier;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
 import io.github.synapse4j.json.AbstractJsonReader;
 import io.github.synapse4j.json.JsonReader;
-import org.jspecify.annotations.Nullable;
-
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import tools.jackson.core.JacksonException;

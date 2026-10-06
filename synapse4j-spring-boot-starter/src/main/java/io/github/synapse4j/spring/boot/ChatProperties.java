@@ -1,9 +1,10 @@
 package io.github.synapse4j.spring.boot;
 
-import lombok.Getter;
-import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
+
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * The {@code synapse4j.chat.*} settings: which chat client the auto-configuration builds, whether it

@@ -136,7 +136,9 @@ one would block extension by users and providers.
 - **Formatting is enforced by Spotless.** Run `mvn spotless:apply` right after editing Java — keep the
   tree formatted as you go rather than fixing it up later, so review sees the committed form. Do not
   hand-format. The profile is `.vscode/eclipse-formatter.xml`, the one the editor also uses, so both
-  sides produce the same output; import ordering is deliberately not enforced by either.
+  sides produce the same output. Import order is enforced too — static imports, then `java`/`javax`/
+  `org`/`com`, then everything else — and pinned identically in `synapse4j-parent/pom.xml` and
+  `.vscode/settings.json`, so the editor's organize-imports and the build agree.
 - **All comments are in English** — Javadoc (including on private members), inline comments and
   TODOs. Comments explain *why*; do not restate what the code does.
 - **Javadoc states the contract, not the implementation.** Say what a type or method promises — what it

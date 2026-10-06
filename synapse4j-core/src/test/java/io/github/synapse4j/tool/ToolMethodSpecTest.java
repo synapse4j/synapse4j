@@ -8,10 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 
+import org.junit.jupiter.api.Test;
+
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonSchemaBuilder;
-import org.junit.jupiter.api.Test;
 
 class ToolMethodSpecTest {
 

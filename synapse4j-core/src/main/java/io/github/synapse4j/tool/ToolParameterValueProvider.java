@@ -1,8 +1,8 @@
 package io.github.synapse4j.tool;
 
-import io.github.synapse4j.data.ChatContext;
-
 import org.jspecify.annotations.Nullable;
+
+import io.github.synapse4j.data.ChatContext;
 
 /**
  * Where an argument the model does not produce gets its value.

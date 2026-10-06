@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.github.synapse4j.jackson.SchemaFixtures.Both;
-
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 

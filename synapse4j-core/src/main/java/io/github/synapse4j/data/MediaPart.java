@@ -1,8 +1,8 @@
 package io.github.synapse4j.data;
 
-import io.github.synapse4j.util.InputStreamSupplier;
 import org.jspecify.annotations.Nullable;
 
+import io.github.synapse4j.util.InputStreamSupplier;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

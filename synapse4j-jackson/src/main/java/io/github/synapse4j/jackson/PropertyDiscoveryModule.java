@@ -9,14 +9,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.jspecify.annotations.Nullable;
+
 import com.github.victools.jsonschema.generator.MemberScope;
 import com.github.victools.jsonschema.generator.Module;
 import com.github.victools.jsonschema.generator.Option;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 
 import io.github.synapse4j.exception.SynapseException;
-import org.jspecify.annotations.Nullable;
-
 import lombok.RequiredArgsConstructor;
 import tools.jackson.databind.BeanDescription;
 import tools.jackson.databind.JavaType;

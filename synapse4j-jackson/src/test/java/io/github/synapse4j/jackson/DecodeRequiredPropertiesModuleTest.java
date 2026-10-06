@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.jackson.SchemaFixtures.Both;
 import io.github.synapse4j.jackson.SchemaFixtures.Settable;
-
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;

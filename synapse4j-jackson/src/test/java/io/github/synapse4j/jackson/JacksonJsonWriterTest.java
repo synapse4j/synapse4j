@@ -15,9 +15,9 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.data.ProviderExtras;
-import io.github.synapse4j.json.JsonWriter;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonSchemaBuilder;
+import io.github.synapse4j.json.JsonWriter;
 import tools.jackson.databind.json.JsonMapper;
 
 class JacksonJsonWriterTest {

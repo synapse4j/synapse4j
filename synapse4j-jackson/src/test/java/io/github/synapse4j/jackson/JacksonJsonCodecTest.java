@@ -14,8 +14,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeSet;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.github.victools.jsonschema.generator.SchemaGenerator;
@@ -29,7 +31,6 @@ import io.github.synapse4j.json.JsonWriter;
 import io.github.synapse4j.tool.MethodTool;
 import io.github.synapse4j.tool.MethodTools;
 import lombok.Data;
-import org.junit.jupiter.api.Test;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.PropertyNamingStrategies;

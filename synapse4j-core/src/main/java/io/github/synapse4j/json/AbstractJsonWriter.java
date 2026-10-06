@@ -6,8 +6,9 @@ import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 
-import io.github.synapse4j.data.ProviderExtras;
 import org.jspecify.annotations.Nullable;
+
+import io.github.synapse4j.data.ProviderExtras;
 
 /**
  * A {@link JsonWriter} that adds the writing of a whole value over the tokens, leaving the tokens

@@ -9,15 +9,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.github.synapse4j.exception.SynapseException;
-import io.github.synapse4j.json.JsonCodec;
-import io.github.synapse4j.json.JsonSchemaBuilder;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.json.JsonCodec;
+import io.github.synapse4j.json.JsonSchemaBuilder;
 
 class MethodToolsTest {
 

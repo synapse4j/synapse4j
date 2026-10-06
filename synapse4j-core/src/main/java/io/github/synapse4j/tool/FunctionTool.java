@@ -1,15 +1,15 @@
 package io.github.synapse4j.tool;
 
+import java.util.List;
+
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonSchema;
-import org.jspecify.annotations.Nullable;
-
-import java.util.List;
-
 import lombok.NonNull;
 
 /**

@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
@@ -24,8 +26,6 @@ import io.github.synapse4j.json.JsonWriter;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolDefinition;
 import io.github.synapse4j.util.Base64Reader;
-import org.jspecify.annotations.Nullable;
-
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 

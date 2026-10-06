@@ -6,7 +6,6 @@ import org.springframework.core.annotation.AnnotatedElementUtils;
 
 import io.github.synapse4j.tool.ToolMethodSpec;
 import io.github.synapse4j.tool.ToolMethodSpecCustomizer;
-
 import lombok.NonNull;
 
 /**

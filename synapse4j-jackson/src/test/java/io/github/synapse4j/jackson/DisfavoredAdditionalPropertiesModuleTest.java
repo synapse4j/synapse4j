@@ -7,9 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Type;
 
-import com.github.victools.jsonschema.generator.SchemaGenerator;
-
 import org.junit.jupiter.api.Test;
+
+import com.github.victools.jsonschema.generator.SchemaGenerator;
 
 import tools.jackson.databind.JsonNode;
 

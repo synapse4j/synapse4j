@@ -4,7 +4,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import io.github.synapse4j.data.ContentPart;
-
 import lombok.Getter;
 import lombok.NonNull;
 

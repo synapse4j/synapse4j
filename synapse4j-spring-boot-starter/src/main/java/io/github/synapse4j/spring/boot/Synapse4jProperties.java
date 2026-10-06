@@ -1,6 +1,5 @@
 package io.github.synapse4j.spring.boot;
 
-import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
@@ -10,6 +9,7 @@ import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.jackson.JacksonSchemaSettings;
 import io.github.synapse4j.openai.OpenAiConfig;
+import lombok.Data;
 
 /**
  * The {@code synapse4j.*} settings this starter binds.

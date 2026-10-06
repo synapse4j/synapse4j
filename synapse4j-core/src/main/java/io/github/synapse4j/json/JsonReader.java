@@ -3,9 +3,10 @@ package io.github.synapse4j.json;
 import java.io.IOException;
 import java.io.Writer;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Reads one JSON document from a source, token by token.
