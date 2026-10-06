@@ -25,6 +25,14 @@ import lombok.NonNull;
  * a keyword whose value is a sub-schema is visited and mapped like any other.
  *
  * <p>
+ * Nothing a schema carries is lost: a keyword this interface does not name is kept as it is and read
+ * through {@link #keys()} and {@link #get(String, Class)}, so a schema of any draft survives a round
+ * trip. The named getters, though, are those of JSON Schema 2019-09 and later and read only that
+ * spelling — where a keyword was renamed, {@link #getDefs()} answers {@code $defs} and not the older
+ * {@code definitions} of draft-07 and earlier. Reading a schema of another dialect through the named
+ * getters is not what this interface does; {@link #keys()} and {@link #get(String, Class)} see it all.
+ *
+ * <p>
  * {@link #visit(Consumer)} walks the tree and lets each node be read. {@link #map(UnaryOperator)} walks
  * it and produces a new tree: the function answers which node to use, and a node it leaves unchanged is
  * shared rather than copied, so only the path to a change is rebuilt.
@@ -117,6 +125,13 @@ public interface JsonSchema {
 
     /**
      * Reusable sub-schemas, addressed by {@link #getRef()}.
+     *
+     * <p>
+     * This answers the {@code $defs} keyword of JSON Schema 2019-09 and later. The older spelling,
+     * {@code definitions} (draft-07 and earlier), is a different keyword and is not answered here; it is
+     * still carried, and read through {@link #keys()} and {@link #get(String, Class)} like any keyword
+     * this interface does not name. The named getters read the modern spelling only — a schema of
+     * another dialect is read through {@link #keys()} and {@link #get(String, Class)}, not through them.
      *
      * @return the definitions by name, or {@code null} if this node has none
      */

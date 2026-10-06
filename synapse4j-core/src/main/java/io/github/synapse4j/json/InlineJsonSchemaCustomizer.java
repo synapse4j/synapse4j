@@ -22,11 +22,17 @@ import org.jspecify.annotations.Nullable;
  * {@code $ref}.
  *
  * <p>
+ * The references it resolves are {@code #} and {@code #/$defs/Name}, the name looked up in the root's
+ * {@code $defs}. A reference in any other form — into a nested {@code $defs}, into {@code definitions},
+ * or one an {@code $id} would re-base — is not resolved, nor is a name the root's {@code $defs} does
+ * not hold. Such a reference is left as it stands: this step resolves what it recognises and never
+ * fails on a schema it does not, handing on what it cannot expand.
+ *
+ * <p>
  * A reference that closes a cycle — one whose target is a schema already on the path down to it — is
- * left as it stands, and the definition it names stays in {@code $defs}: a schema that contains itself
- * has no document to expand into. A reference that names nothing is left as it stands; this step does
- * not invent a schema. What remains of {@code $defs} is exactly what a kept reference still names, so a
- * definition that was fully inlined is dropped.
+ * left as it stands too, and the definition it names stays in {@code $defs}: a schema that contains
+ * itself has no document to expand into. What remains of {@code $defs} is exactly what a kept
+ * reference still names, so a definition that was fully inlined is dropped.
  *
  * <p>
  * The schema handed in is untouched: the answer is always a new schema, whether or not a reference was

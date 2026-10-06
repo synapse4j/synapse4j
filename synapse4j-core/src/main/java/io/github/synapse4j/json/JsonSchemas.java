@@ -46,30 +46,41 @@ public final class JsonSchemas {
      * while {@code true} as the value of {@code uniqueItems} is a boolean — only the keyword tells them
      * apart. Which keywords carry sub-schemas is the specification's to say, not something to infer
      * from a value, so the library carries the knowledge, and the table grows when the specification
-     * does.
+     * does. Every schema-valued keyword is here, grouped by the newest draft that still supports it, so
+     * a walk reaches every sub-schema whatever dialect a schema is written in.
+     *
+     * <p>
+     * One draft-07 keyword is left out on purpose: {@code dependencies}. Its value is a schema or a list
+     * of names, and each entry in its object form is too, so no one form describes it. It is carried as
+     * raw data instead — nothing is lost, but a sub-schema under it is not walked.
      */
     private static final Map<String, Set<Shape>> SCHEMA_KEYWORDS = Map.ofEntries(
+            // still in the latest spec, 2020-12
             Map.entry(PROPERTIES, Set.of(Shape.SCHEMA_MAP)),
             Map.entry(PATTERN_PROPERTIES, Set.of(Shape.SCHEMA_MAP)),
-            Map.entry(DEFS, Set.of(Shape.SCHEMA_MAP)),
-            Map.entry(DEFINITIONS, Set.of(Shape.SCHEMA_MAP)),
-            Map.entry(DEPENDENT_SCHEMAS, Set.of(Shape.SCHEMA_MAP)),
-            Map.entry(ITEMS, Set.of(Shape.SCHEMA, Shape.SCHEMA_LIST)),
-            Map.entry(ADDITIONAL_ITEMS, Set.of(Shape.SCHEMA)),
             Map.entry(ADDITIONAL_PROPERTIES, Set.of(Shape.SCHEMA)),
-            Map.entry(NOT, Set.of(Shape.SCHEMA)),
+            Map.entry(ITEMS, Set.of(Shape.SCHEMA, Shape.SCHEMA_LIST)),
+            Map.entry(PROPERTY_NAMES, Set.of(Shape.SCHEMA)),
+            Map.entry(CONTAINS, Set.of(Shape.SCHEMA)),
             Map.entry(IF, Set.of(Shape.SCHEMA)),
             Map.entry(THEN, Set.of(Shape.SCHEMA)),
             Map.entry(ELSE, Set.of(Shape.SCHEMA)),
-            Map.entry(CONTAINS, Set.of(Shape.SCHEMA)),
-            Map.entry(PROPERTY_NAMES, Set.of(Shape.SCHEMA)),
+            Map.entry(DEFS, Set.of(Shape.SCHEMA_MAP)),
+            Map.entry(DEPENDENT_SCHEMAS, Set.of(Shape.SCHEMA_MAP)),
             Map.entry(UNEVALUATED_ITEMS, Set.of(Shape.SCHEMA)),
             Map.entry(UNEVALUATED_PROPERTIES, Set.of(Shape.SCHEMA)),
             Map.entry(CONTENT_SCHEMA, Set.of(Shape.SCHEMA)),
+            Map.entry(PREFIX_ITEMS, Set.of(Shape.SCHEMA_LIST)),
             Map.entry(ALL_OF, Set.of(Shape.SCHEMA_LIST)),
             Map.entry(ANY_OF, Set.of(Shape.SCHEMA_LIST)),
             Map.entry(ONE_OF, Set.of(Shape.SCHEMA_LIST)),
-            Map.entry(PREFIX_ITEMS, Set.of(Shape.SCHEMA_LIST)));
+            Map.entry(NOT, Set.of(Shape.SCHEMA)),
+
+            // dropped in 2020-12; last in 2019-09
+            Map.entry(ADDITIONAL_ITEMS, Set.of(Shape.SCHEMA)),
+
+            // dropped in 2019-09; last in draft-07
+            Map.entry(DEFINITIONS, Set.of(Shape.SCHEMA_MAP)));
 
     /**
      * The forms this library knows the value of the given keyword may take, or {@code null} when the

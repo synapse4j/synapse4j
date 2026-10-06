@@ -121,6 +121,21 @@ class InlineJsonSchemaCustomizerTest {
     }
 
     @Test
+    void aReferenceInAFormItDoesNotResolveIsLeftAsItStands() {
+        JsonSchema nested = new JsonSchemaBuilder()
+                .setType("object")
+                .setProperties(Map.of("inner", ref("#/properties/nested/$defs/Inner")))
+                .setDefs(Map.of("Inner", typed("string")))
+                .build();
+        JsonSchema schema = new JsonSchemaBuilder()
+                .setType("object")
+                .setProperties(Map.of("nested", nested))
+                .build();
+
+        assertEquals(schema, customizer.customize(schema));
+    }
+
+    @Test
     void theArgumentIsNotModified() {
         JsonSchema schema = new JsonSchemaBuilder()
                 .setType("object")
