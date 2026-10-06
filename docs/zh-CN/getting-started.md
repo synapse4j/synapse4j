@@ -109,7 +109,7 @@ System.out.println(response.getText());
 ```
 
 答案里助手的这一轮就是一个 `ChatMessage`——和构建请求用的是同一个类。`getText()` 把它读回来：按顺序
-拼接消息里的文本部分，推理部分和其他种类不参与，得到的就是答案的文字本身。
+拼接消息里的文本部分，推理部分和其他种类不参与，得到的就是以文字形式呈现的答案。
 
 ## 5. 继续对话
 
@@ -127,11 +127,14 @@ request.addUserMessage("那为什么日落时是红色的？");
 ChatResponse second = client.chat(request);
 ```
 
-`continueWith` 把刚发出去的那一轮归档，并追加助手的回答，因此下一次 `chat` 会发出整段往来。这是唯一
-一处「服务端替你记住对话」时写法不同的地方；采用那种协议的客户端会重写它，而调用点不变。
+`continueWith` 会把刚发出的一轮归档，并追加助手的答案，因此下一次 `chat` 发出整段往来。另有一种协议
+把对话留在服务端：OpenAI Responses API 保存每个答案，`OpenAiResponsesChatClient` 重写
+`continueWith`，改为指向服务端存下的上一次响应，而不是把完整的对话记录归档后再重发。两种情况下你的代码读起来都
+一样；[对话](conversations.md)两种形态都讲。
 
-如果你想自己持久化对话，实现一个 `ChatCustomizer`，在它的钩子触发时把请求与响应写出去。
-库永远不会去碰你的存储。
+如果你自己持久化对话，就实现一个 `ChatCustomizer`——一个在每次调用前后运行的钩子，请求发出前、答案
+返回时都会交给它——在其中把这一对写出去。用 `client.addChatCustomizer(...)` 注册它；
+[对话](conversations.md#自己持久化对话)展示了这种写法。库永远不会去碰你的存储。
 
 ## 6. 流式接收答案
 
@@ -151,13 +154,14 @@ try (ChatStream stream = client.stream(request)) {
 ```
 
 流在拉取过程中自行组装：循环结束后，`stream.aggregatedResponse()` 持有阻塞调用会返回的那个轮次。
-`ChatStream` 刻意实现了 `Iterable` 与 `AutoCloseable`——带 `break` 的 `for`
-循环就是预期的用法，提前退出时 try-with-resources 会关闭连接。
+`ChatStream` 刻意实现了 `Iterable` 与 `AutoCloseable`——带 `break` 的 `for` 循环就是预期的用法，
+提前退出时 try-with-resources 会关闭连接。
 
 ## 7. 让模型调用工具
 
-一个工具是它的声明加上声明背后的代码。`FunctionTool` 从一个类型和一个 lambda 同时构建两者：模型的
-参数被解码成你定义的 `record`，lambda 运行，返回的结果再渲染回去。
+一个工具就是一份声明，加上声明背后的代码。`FunctionTool` 从一个类型和一个 lambda 同时构建两者：模型
+给出的入参会被解码进你定义的 record，lambda 运行，结果再渲染回去。lambda 的第二个参数是这次调用所属
+对话的 `ChatContext`——没有关联对话时为 `null`——大多数工具并不关心它。
 
 ```java
 import io.github.synapse4j.chat.ToolCallingChatClient;
@@ -170,7 +174,7 @@ Tool weather = FunctionTool.of(
         "get_weather",
         "查询某个城市的当前天气",
         Weather.class,
-        (input, context) -> "巴黎天气晴朗",
+        (input, context) -> input.city() + "天气晴朗",
         codec);
 
 ChatClient toolClient = new ToolCallingChatClient(client);
@@ -188,7 +192,7 @@ System.out.println(answer.getText());
 
 ## 8. 要求结构化输出
 
-把你的值转成 JSON 的那个编解码器，也负责生成约束模型的 schema。
+绑定你的值的那个编解码器，同时生成约束模型的 schema。
 
 ```java
 import io.github.synapse4j.data.ChatOptions;
@@ -213,10 +217,15 @@ ChatResponse response = client.chat(structured);
 Person person = codec.decode(response.getText(), Person.class);
 ```
 
-schema 是由你的编解码器产出的 `JsonSchema` 值，因此模型被约束到你的编解码器恰好能读回的那份 JSON
+schema 是由你的编解码器产出的 `JsonSchema` 值，因此模型只能产出你的编解码器恰好能读回的那份 JSON
 ——不用第二个库，也不用手写 schema。
 
 ## 下一步
 
+- [调用模型](model.md)——本教程用到的请求、响应、消息、内容部分与选项。
+- [对话](conversations.md)——跨轮次持有历史，包括第 5 节提到的服务端形态。
+- [流式](streaming.md)——逐个事件消费答案。
+- [工具](tools.md)——声明工具，运行模型的工具调用。
+- [结构化输出](structured-output.md)——要求符合 schema 的 JSON。
 - [设计与取舍](design.md)说明库做什么、不做什么，以及为什么。
 - 上文用到的每个类型与方法的参考以 Javadoc 为准。

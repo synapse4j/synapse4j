@@ -2,14 +2,14 @@
 
 [English](../en/comparison.md) | **中文**
 
-本文讲的是行为，而不是代码：每个库替你做什么，以及它们之间的界线在哪里。它涵盖你通常要从中挑选的三种
+本文讲的是行为，而不是代码：每个库替你做什么，以及它们之间的界线在哪里。它涵盖你最可能要在其中做选择的三种
 形态——工具集、框架、厂商 SDK——以及 synapse4j 处在什么位置。
 
 ## 一览
 
 | | synapse4j | LangChain4j | Spring AI | 官方 SDK |
 |---|---|---|---|---|
-| 对话记忆 | 无；由你持有 | 内置（`ChatMemory`，窗口、淘汰、持久化） | 内置（`ChatMemory` 加 advisor） | 无 |
+| 对话记忆 | 无；由你持有 | 内置（`ChatMemory`，窗口、淘汰、可插拔存储） | 内置（`ChatMemory` 加 advisor） | 无 |
 | 提供商抽象 | 一套模型 + 提供商模块 | 一套模型 + 各提供商模块 | `ChatModel` 加 `ChatClient` | 仅一家提供商 |
 | 框架耦合 | 无 | 无（一个工具集） | Spring，与 Boot 配合最佳 | 无 |
 | JSON 库 | 由你选，接口背后的实现可换 | Jackson | Jackson | 自带，生成的 |
@@ -17,7 +17,7 @@
 | API 风格 | 阻塞；流是拉取的 | 阻塞 + 流式回调 | 阻塞 + 流式（Flux） | 阻塞 + 流式 |
 | 声明式接口 | 无 | 有（`AiService`） | 无 | 无 |
 | 工具调用 | `Tool` 加执行器与循环；也可以用 `@ToolMethod` 标注自己的方法 | `@Tool` 注解 | `@Tool` 加 `ChatClient` | 原始调用 |
-| 扩展模型 | 开放结构，外加可透传的附加字段 | 自己的类型 | 自己的类型 | 生成的类型 |
+| 扩展模型 | 开放结构，外加一个可透传的字段容器 | 自己的类型 | 自己的类型 | 生成的类型 |
 
 ## LangChain4j
 
@@ -42,7 +42,7 @@ interface Assistant {
 Spring 原生。`ChatModel` 抽象一家提供商；`ChatClient` 是链式调用的入口，`ChatMemory` 加 advisor
 提供记忆和其他横切行为。
 
-记忆通过一个 advisor 接入——`MessageChatMemoryAdvisor` 从 `ChatMemory` 取出历史、把回答写回——因此
+记忆通过一个 advisor 接入——`MessageChatMemoryAdvisor` 从 `ChatMemory` 取出历史、把答案写回——因此
 每个客户端可以自己决定要不要用；把它限定到正确的对话，则是应用的事。
 
 当你的应用已经在用 Spring Boot、且希望 LLM 调用看起来和应用其余部分一样时，选它。
@@ -52,7 +52,7 @@ Spring 原生。`ChatModel` 抽象一家提供商；`ChatClient` 是链式调用
 `openai-java` 与 `anthropic-java` 是生成的、按提供商划分的客户端。它们暴露某一家厂商的完整 API 面
 ——批处理、文件、所有东西——请求类型不可变、基于 builder。
 
-没有与提供商无关的模型，也没有记忆：每个 SDK 只说一家提供商，在它们之间切换意味着重写调用。
+没有与提供商无关的模型，也没有记忆：每个 SDK 只面向一家提供商，在它们之间切换意味着重写调用。
 
 当你只用一家提供商、且想直接访问它的整个 API（尤其是聊天之外的功能）时，选它。
 

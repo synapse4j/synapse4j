@@ -6,7 +6,7 @@
 
 ## 更换 JSON 库或 HTTP 客户端
 
-两者都是 core 里的接口，实现在各自的模块里。想用另一个，就实例化它并交给客户端：
+两者都是 core 里的接口，实现在各自的模块里。想换一个，就实例化它并交给客户端：
 
 ```java
 JsonCodec codec = new JacksonJsonCodec();
@@ -18,12 +18,19 @@ ChatClient client = new OpenAiCompletionsChatClient(http, codec, config);
 
 ## 生成的 schema
 
-codec 为工具的入参和结构化回答生成 JSON Schema，来源是 Java 类型，以及绑定 JSON 用的同一个
-`JsonMapper`。要应用 Jackson 模块推荐的哪些选择，由 `JacksonSchemaSettings` 决定——每个选择对应一个
-开关或一组设置，默认值就是推荐的做法。关掉某个选择，就是「不应用它」；这也正是替换它的办法：关掉，再
+编解码器为工具的入参和结构化答案生成 JSON Schema，来源是 Java 类型，以及绑定 JSON 用的同一个
+`JsonMapper`。底层机制是 victools 的 jsonschema-generator 库——它是 Jackson 模块的一个依赖，所以
+一旦引入 `synapse4j-jackson`，它的类型就出现在 classpath 上。`SchemaGenerator`、
+`SchemaGeneratorConfigBuilder` 和 `Module` 都是 victools 的类型，来自
+`com.github.victools.jsonschema.generator` 包。
+
+要应用 Jackson 模块推荐选择中的哪些，由 `JacksonSchemaSettings` 决定——每个选择对应一个开关或一组
+设置，默认就是推荐的做法。关掉某个选择，就等于不应用它，而这正是替换它的方式：关掉它，再在它的位置
 挂上你自己的 victools `Module`。
 
 ```java
+JsonMapper mapper = JsonMapper.builder().build();
+
 JacksonSchemaSettings settings = new JacksonSchemaSettings();
 settings.setFlattenOptionals(false);            // 不应用推荐的那个选择
 
@@ -31,17 +38,16 @@ SchemaGeneratorConfigBuilder builder =
         JacksonSchemaConfigBuilders.encodeSchemaConfigBuilder(mapper, settings);
 builder.with(myOptionalModule);                 // 换成你自己的规则
 
-JsonCodec codec = new JacksonJsonCodec(mapper, new SchemaGenerator(builder.build()),
+JsonCodec codec = new JacksonJsonCodec(mapper.rebuild(), new SchemaGenerator(builder.build()),
         new SchemaGenerator(JacksonSchemaConfigBuilders.decodeSchemaConfigBuilder(mapper, settings).build()));
 ```
 
-每个选择是什么、默认做什么，写在 `JacksonSchemaSettings` 的 Javadoc 里；每个模块贡献什么，写在它
-自己的 Javadoc 里。`settings` 传 `null` 表示一个选择都不应用，留一份 victools 的朴素配置给想全部
-自己组装的人。
+设置类的 Javadoc 列出了每个选择及其默认行为；每个模块的 Javadoc 说明它贡献了什么。`settings` 传
+`null` 就是一个选择都不应用，把 victools 的纯净配置留给宁愿全部自己组装的人。
 
 ## 常驻在客户端上的配置
 
-模型、温度或响应格式如果每次调用都共用，应该放在客户端上：
+模型、温度或响应格式如果每次调用都共用，就该放在客户端上：
 
 ```java
 ChatOptions defaults = new ChatOptions();
@@ -49,10 +55,11 @@ defaults.setModel("gpt-4o-mini");
 client.setDefaultOptions(defaults);
 ```
 
-默认值补上调用没有声明的东西：调用留作 `null` 的字段取默认值，两个 extras 映射合并，调用的条目按键
-胜出。设置属于配置动作，应在共享客户端之前完成。
+默认值补上调用没有言明的东西：调用留作 `null` 的字段取用默认值；两个 extras 映射合并，调用的条目
+按键胜出；请求头也是如此——常驻请求头对每次调用都生效，调用指定了同名请求头时以调用为准。
+设置属于配置，应在客户端共享之前完成。
 
-工具也可以常驻客户端——注册的工具，以及每次调用都会问的 `ToolProvider`：
+工具也可以常驻客户端——已注册的工具，以及每次调用都会询问的工具提供者：
 
 ```java
 client.addDefaultTool(weather);
@@ -62,8 +69,8 @@ client.addToolProvider((c, request) -> List.of(weather));
 ## 一次往来前后的钩子
 
 `ChatCustomizer` 在一次往来的一个或多个步骤上运行：`customizeRequest` 在请求发出之前，
-`customizeResponse` 在答案返回途中，`customizeStreamEvent` 在流的每个事件上。每个钩子拿到的是
-客户端已经持有的那个值，并就地修改它。
+`customizeResponse` 在响应回来的途中，`customizeStreamEvent` 在流的每个事件上。每个钩子拿到客户端
+已经持有的那个值，并就地修改它。
 
 ```java
 client.addChatCustomizer(new ChatCustomizer() {
@@ -74,19 +81,19 @@ client.addChatCustomizer(new ChatCustomizer() {
 });
 ```
 
-`ChatCustomizer` 按添加顺序运行，没有重写的钩子什么都不做。客户端跨线程共享时，每次调用拿到一致的
-列表，因此 `ChatCustomizer` 自身必须可并发运行。
+customizer 按添加顺序运行，未被重写的钩子什么都不做。跨线程共享的客户端会给每次调用一份
+一致的列表，因此 customizer 自身必须可安全并发运行。
 
 ## 库自带的一个 customizer
 
-`DefaultSystemMessageCustomizer` 是库提供的一个 `ChatCustomizer`：凡是自身没有系统消息的请求，它都补上
-一条内容为构造时那段文本的系统消息。像其他 customizer 一样注册它：
+`DefaultSystemMessageCustomizer` 是一个 `ChatCustomizer`，它会给每个自身不带系统消息的请求补上一条，
+内容为构造它时用的那段文本。像其他 customizer 一样注册它：
 
 ```java
 client.addChatCustomizer(new DefaultSystemMessageCustomizer("用一句话回答。"));
 ```
 
-自带系统消息的请求保持原样——常驻的那条只填空缺。Spring Boot starter 会从
+自己声明了系统消息的请求保持原样——常驻的那条只填空缺。Spring Boot starter 会从
 `synapse4j.chat.system-message` 装配一个。
 
 ## 每次调用的 HTTP 设置
@@ -102,8 +109,25 @@ options.setHttpOptions(http);
 options.getHeaders().put("X-Request-Id", id);
 ```
 
-`HttpOptions` 承载本次调用的 HTTP 层设置：等待响应头的超时（它不限制读取正文）、写出的正文如何交给
-一个无法直接接收流式正文的传输层，以及一个 server-sent event 帧的预算。字段名与取值以该类的 Javadoc
-为准；其中正文写出模式是字符串 `"streamed"` 或 `"buffered"`，不是枚举。
+`HttpOptions` 承载三项每次调用的设置：
 
-请求的设置与实现自身的设置合并，方式和调用选项一样。
+- `responseTimeout`——等待响应开始到达的时长，是一个 `Duration`。JDK 传输层按请求应用它，只约束等待
+  响应头的时间，从不读取正文。Apache 也按请求应用，且它的计时器还覆盖读取正文期间的一段静默间隔。
+  RestClient 实现无法应用它——`RestClient` 抽象没有按请求超时——因而忽略它，并以一条警告说明一次，
+  指向请求工厂自己的读取超时。不设置就不启计时器：底层客户端自身的配置说了算。
+- `bodyWriteMode`——写出的正文如何到达传输层，是一个字符串，命名 `BodyWriteMode` 枚举所定义的模式之一。
+  `"auto"` 是默认值，让每个传输层挑选自己最擅长的模式——JDK 传输层会把正文聚集起来，而 Apache 和
+  RestClient 则流式发送。`"streamed"` 在正文产生的过程中写出它，不占内存；JDK 传输层无法以这种方式
+  接收正文，会拒绝该请求。`"buffered"` 在发送前把正文聚集到内存中。若拼写不对应库定义的任何模式，则
+  直接拒绝。
+- `maxFrameBytes`——一个 server-sent event 帧最多可累积的字节数，按传输线上的 UTF-8 字节计。该上限对每个传输层
+  都成立，超过它的帧会让读取失败，而不是把它截断。
+
+`HttpOptions.defaults()` 返回 `"auto"`、没有自己的响应超时，以及 256 KiB 的帧预算。该类的 Javadoc
+承载其余内容。
+
+每个实现也各自携带自己的 `HttpOptions`，作为构造器的第二个参数传入——`new JdkHttpClient(delegate,
+options)` 及其他 HTTP 模块中的对应构造器，其中第一个参数是该库自己用来发送的客户端（对 `JdkHttpClient`
+来说是 `java.net.http.HttpClient`）。无参构造器用 `HttpOptions.defaults()` 构建一个默认的底层客户端，
+因此 `new JdkHttpClient()` 就是未配置的情形。请求的设置与实现自身的设置按与调用选项相同的填空规则合并：
+请求未设置的字段取实现的值，实现从未设置过的则回退到 `HttpOptions.defaults()`。

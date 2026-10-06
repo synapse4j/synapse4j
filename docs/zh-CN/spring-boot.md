@@ -2,7 +2,7 @@
 
 [English](../en/spring-boot.md) | **中文**
 
-`synapse4j-spring-boot-starter` 把一整套栈接进 Spring Boot 应用——Jackson 编解码器、一个传输层、一个
+`synapse4j-spring-boot-starter` 把一整套栈接入 Spring Boot 应用——Jackson 编解码器、一个传输层、一个
 聊天客户端——全部从 `synapse4j.*` 属性绑定。
 
 ## 加入依赖
@@ -19,6 +19,10 @@ starter 需要 Spring Boot 4.1 或更新版本——这是它构建与测试所�
 内，能不能用没有保证：JSON 模块需要 Jackson 3.1，而 Boot 4.0.4 是第一个把 Jackson 3.1 纳入依赖管理
 的版本。
 
+starter 携带这套栈所需的库模块——Jackson 编解码器、两个传输层的模块，以及 OpenAI 和 Anthropic
+提供商模块——因此 `synapse4j.chat.client` 的每个取值都无需再添加依赖即可工作。它刻意不放进你
+classpath 的那个库，是 Apache HttpClient 5 本身；见[传输层](#传输层)。
+
 ## 它接了什么
 
 默认接线是三个 bean，你自己声明同类型 bean 时各自让位：
@@ -28,7 +32,7 @@ starter 需要 Spring Boot 4.1 或更新版本——这是它构建与测试所�
   的 JSON。
 - **`HttpClient`**——`synapse4j.http-client` 指定的传输层。
 - **`ChatClient`**——`synapse4j.chat.client` 指定的协议；除非 `synapse4j.chat.auto-tool-calling`
-  关掉，否则会包上 `ToolCallingChatClient`。
+  关掉，否则会用 `ToolCallingChatClient` 包装。
 
 选择 Apache 传输层会多出第四个 bean，即持有连接池的 `CloseableHttpClient`。你声明自己的
 `CloseableHttpClient` 或 `HttpClient` 时，它会退让。
@@ -68,7 +72,7 @@ synapse4j:
 下面：`synapse4j.chat.client`、`synapse4j.chat.auto-tool-calling`、`synapse4j.chat.system-message`，
 以及 `synapse4j.chat.options.*`。每个键都是它绑定的那个类型上的一个字段，含义在该类型上有文档；
 options 这一组只重述 Spring 能绑定的字段。
-`synapse4j.chat.options.extras` 按原始键绑定：键用的就是提供商的协议字段名，点分键指向嵌套成员。
+`synapse4j.chat.options.extras` 按原始键绑定：键就是提供商在协议上所用的名字，点分键指向嵌套成员。
 非字符串的值需要 YAML——`.properties` 文件会把每个值都变成字符串。
 
 工具支持有自己的一组键，`synapse4j.tools.*`，绑定 `ToolsProperties`；每个键的作用见
@@ -125,8 +129,8 @@ class WeatherTools {
 `synapse4j.tools.*` 绑定这些设置。`spel` 默认关闭；打开后，注解文本里的 `#{...}` SpEL 和 `${...}`
 占位符会被解析，配置里写的值也算在内。`strict` 是应用为所有工具统一设置的那一项：某个工具既没在注解
 里、也没在 `methods` 下自己的条目里说明时，就落到这个值。`methods` 存放每个工具的覆盖项，键是配置生效
-之前这个工具所带的名称——注解给它起的名字，或者注解没起名时方法自己的名字再加上类的 prefix。条目里写的
-名字不会挪动它原来所在的键。
+之前该工具所用的名称——注解给它起的名字，或者注解没起名时方法自己的名字再加上类的 prefix。条目里写的
+名字不会改变该条目所属的键。
 
 starter 自带的步骤都是排好序的 bean；声明一个自己的 `ToolMethodSpecCustomizer` 并标上 `@Order`，就能插进
 它们之间。
@@ -137,7 +141,7 @@ starter 自带的步骤都是排好序的 bean；声明一个自己的 `ToolMeth
 
 - **`ChatCustomizer`** bean 加入它的每次调用钩子，因此每次调用都会运行。
 - **`ChatClientCustomizer`** bean 在 `synapse4j.chat.options.*` 默认值之后运行，对客户端的选项与
-  工具说了算：它们可以替换默认选项、注册工具或 `ToolProvider`，或添加一个 `ChatCustomizer`。
+  工具说了算：它们可以替换默认选项、注册工具或工具提供者，或添加一个 `ChatCustomizer`。
 
 ```java
 @Bean
@@ -155,7 +159,10 @@ ChatClientCustomizer tenantHeader(String tenant) {
 
 customizer 改不了提供商配置——base URL、API key、协议字段的拼写。`setConfig` 不在 `ChatClient`
 接口上，而且 `synapse4j.chat.auto-tool-calling` 打开时（默认如此），customizer 拿到的是
-`ToolCallingChatClient` 包装，它不暴露任何可以穿透的委托对象。要改就改绑定进来的配置：
+`ToolCallingChatClient` 包装对象，它不暴露任何可以穿透的委托对象。要改就改绑定进来的配置。每个
+`synapse4j.*` 键都绑定在 starter 注册的一个 `Synapse4jProperties` bean 上，starter 构建的各个
+客户端都从这同一个实例读取自己所属厂商的配置——因此，注入这个 bean 并改动它持有的配置，就是从代码里
+改提供商配置的办法：
 
 ```java
 @Component
@@ -170,7 +177,7 @@ class GatewaySettings {
 ## 定制 schema
 
 `synapse4j.jackson.*` 绑定 Jackson 模块的 schema 各项选择——每个选择是一个开关或一组设置，默认就是
-推荐值；你自己写的 victools `Module` bean 会在这些选择之后，挂到 codec 用的两个生成器上。把某个选择
+推荐值；你自己写的 victools `Module` bean 会在这些选择之后，挂到编解码器所用的两个生成器上。把某个选择
 关掉、再挂一个模块进去，就是替换推荐规则的做法；这些选择和模块分别是什么，见
 [定制](customizing.md#生成的-schema)。
 
@@ -183,7 +190,7 @@ Module optionalAsItsValue() {
 ```
 
 每个键都是 `JacksonSchemaSettings` 上的一个字段，含义写在那里。`synapse4j.jackson.*` 只在 starter
-组装 codec 时读取：自己声明 `JsonCodec` bean 的应用，两个生成器完全由它掌握。
+组装编解码器时读取：自己声明 `JsonCodec` bean 的应用，两个生成器完全由它掌握。
 
 ## 声明你自己的 bean
 
@@ -198,12 +205,12 @@ starter 自己不读取任何密钥。API key 和其他属性一样进来：`syn
 `spring.config.import` 引入的 vault 或配置服务器，或任何别的属性来源。把密钥挡在应用自己的文件之外，
 是应用持有的每一项凭据都要面对的同一个问题。
 
-如果端点本来就不需要密钥——比如本地的 OpenAI 兼容服务——就不要设这个属性。调用会不带鉴权头发出，
+如果端点本来就不需要密钥——比如本地的 OpenAI 兼容服务——就不要设这个属性。调用会在不带任何鉴权请求头的情况下发出，
 而不是塞一个占位值，库也不会因此拒绝这次调用。
 
 ## 传输层
 
-默认传输层是 Spring 的 `RestClient`，在存在 Boot 自动配置的 `RestClient.Builder` 时基于它构建——因此
+默认传输层是 Spring 的 `RestClient`，当应用发布了 Boot 自动配置的 `RestClient.Builder` 时，就基于它构建——因此
 为应用其余部分配置的拦截器、可观测性、SSL bundle 和 `spring.http.client.*` 设置同样作用于 LLM 调用。
 `synapse4j.http-options.response-timeout` 会绑定，但在这个传输层上没有效果，因为 `RestClient` 没有
 按请求的超时；改用 `spring.http.client.read-timeout`。
