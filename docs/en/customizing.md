@@ -60,7 +60,8 @@ client.setDefaultOptions(defaults);
 ```
 
 The defaults fill in what a call leaves unstated: a field the call leaves `null` takes the default's
-value, and the two extras bags merge with the call's entries winning by key. Setting is
+value, the two extras bags merge with the call's entries winning by key, and the headers do the
+same — a standing header applies to every call, and a call naming the same header wins. Setting is
 configuration, meant for before the client is shared.
 
 Tools can stand on the client too — registered ones, and providers asked on every call:
@@ -114,13 +115,33 @@ options.setHttpOptions(http);
 options.getHeaders().put("X-Request-Id", id);
 ```
 
-`HttpOptions` holds the per-call HTTP settings: a timeout for the response headers (which does not
-bound reading the body), how a written body reaches a transport that cannot take one as it comes,
-and a server-sent event frame budget. The class's Javadoc names the fields and the values they take
-— the body-write mode, in particular, is the string `"streamed"` or `"buffered"`, not an enum.
+`HttpOptions` holds three per-call settings:
+
+- `responseTimeout` — how long to wait for the response to start arriving, as a `Duration`. The
+  JDK transport applies it per request and bounds only the wait for the response headers, never
+  reading the body. Apache applies it per request too, and its timer also covers a silent gap
+  while the body is read. The RestClient implementation cannot apply it — the `RestClient`
+  abstraction has no per-request timeout — and ignores it, saying so once as a warning that
+  points at the request factory's own read timeout. Left unset, no timer is set: the underlying
+  client's own configuration stands.
+- `bodyWriteMode` — how a written body reaches the transport, as a string naming one of the modes
+  the `BodyWriteMode` enum defines. `"auto"`, the default, lets each transport pick the mode it
+  does best — the JDK transport gathers the body, while Apache and the RestClient stream it.
+  `"streamed"` writes the body as it is produced, keeping it out of memory; the JDK transport
+  cannot take a body that way and refuses the request. `"buffered"` gathers the body into memory
+  before it is sent. A spelling that names no mode the library defines is refused.
+- `maxFrameBytes` — the most bytes one server-sent event frame may accumulate, counted on the wire
+  in UTF-8. The cap holds for every transport, and a frame that exceeds it fails the read rather
+  than being truncated.
+
+`HttpOptions.defaults()` answers `"auto"`, no response timeout of its own, and a 256 KiB frame
+budget. The class's Javadoc carries the rest.
 
 Each implementation carries its own `HttpOptions` too, passed as the second constructor argument —
-`new JdkHttpClient(delegate, options)` and its counterparts in the other HTTP modules. The request's
-settings merge with the implementation's by the same fill-in-what-is-null rule as the call options:
-a field the request leaves unset takes the implementation's value, and one the implementation never
-set falls back to `HttpOptions.defaults()`.
+`new JdkHttpClient(delegate, options)` and its counterparts in the other HTTP modules, where the
+first argument is that library's own client to send through (for `JdkHttpClient`, a
+`java.net.http.HttpClient`). The no-arg constructors build a default underlying client with
+`HttpOptions.defaults()`, so `new JdkHttpClient()` is the unconfigured case. The request's settings
+merge with the implementation's by the same fill-in-what-is-null rule as the call options: a field
+the request leaves unset takes the implementation's value, and one the implementation never set
+falls back to `HttpOptions.defaults()`.

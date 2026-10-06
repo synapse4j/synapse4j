@@ -26,6 +26,44 @@ exchange; a subclass supplies the exchange itself:
 - `doChat(ChatRequest)` — send the request, read the answer;
 - `doStream(ChatRequest)` — open a `ChatStream`.
 
+Everything below is one small class, `MyChatClient`, with its module's config beside it. The base
+class requires exactly two methods — `doChat` and `doStream`; its constructor takes nothing, and
+customizers, default options and tools attach after construction, through its methods:
+
+```java
+public final class MyChatClient extends AbstractChatClient {
+
+    private static final String ENDPOINT = "/v1/chat"; // the path this protocol sits at
+
+    private final HttpClient http;
+    private final JsonCodec codec;
+    private final MyConfig config;
+
+    public MyChatClient(HttpClient http, JsonCodec codec, MyConfig config) {
+        this.http = http;
+        this.codec = codec;
+        this.config = config;
+    }
+}
+```
+
+The config is a plain class of the module's own — the real ones, `OpenAiConfig` and
+`AnthropicConfig`, extend nothing — carrying at least the base URL and the API key:
+
+```java
+public class MyConfig {
+
+    private String baseUrl = "https://api.example.com";
+    private @Nullable String apiKey;
+
+    // getters and setters; the real configs are Lombok @Data classes
+}
+```
+
+The examples build the request URL as `config.getBaseUrl() + ENDPOINT`. When a family grows a
+second protocol, that path is the thing to promote into a hook — the OpenAI family's abstract base
+makes it an abstract `endpoint()` method each protocol answers.
+
 Before either hook runs, the base class has already prepared the request: it applies the client's
 own defaults and then every registered request customizer, in place on the very instance the caller
 passed, and hands that prepared request to `doChat` or `doStream`. A subclass never calls
@@ -45,12 +83,13 @@ the endpoint, the document and the shape of an answer as the hooks.
 
 ## Sending
 
-Build a `HttpRequest` (the library's own, not the JDK's), set its method, headers, body and
-per-call `HttpOptions`, and hand it to the `HttpClient`:
+Both hooks send the same request — only the document differs — so the construction is one helper
+the class shares. Build the library's own `HttpRequest` (not the JDK's), set its method, headers,
+body and per-call `HttpOptions`:
 
 ```java
-void send(ChatRequest request) throws IOException {
-    HttpRequest httpRequest = new HttpRequest(baseUrl + endpoint);
+HttpRequest buildRequest(ChatRequest request, boolean streaming) {
+    HttpRequest httpRequest = new HttpRequest(config.getBaseUrl() + ENDPOINT);
     httpRequest.setMethod(HttpRequest.POST);
     httpRequest.getHeaders().put("Content-Type", List.of("application/json"));
     if (config.getApiKey() != null && !config.getApiKey().isBlank()) {
@@ -62,18 +101,24 @@ void send(ChatRequest request) throws IOException {
     httpRequest.setOptions(request.getOptions().getHttpOptions());
     httpRequest.setBody(out -> {
         try (JsonWriter writer = codec.writer(out)) {
-            write(request, writer, false);
+            write(request, writer, streaming);
         }
     });
-
-    try (HttpResponse response = http.send(httpRequest)) {
-        // read the status before the body
-    }
+    return httpRequest;
 }
 ```
 
-The call's own `HttpOptions` — a response timeout, an SSE frame budget — travel to the transport on
-the request; unset, they are `null` and the transport's own defaults stand. Authentication is a
+Then sending is one call — hand the built request to the `HttpClient`:
+
+```java
+try (HttpResponse response = http.send(buildRequest(request, false))) {
+    // read the status before the body
+}
+```
+
+The call's own `HttpOptions` — its per-call HTTP settings: a response timeout, a body-write mode, an
+SSE frame budget — travel to the transport on the request; unset, they are `null` and the
+transport's own defaults stand. See [Per-call HTTP settings](customizing.md#per-call-http-settings). Authentication is a
 header like any other: the module sets it from the API key on its config when one is configured —
 unset or blank, no auth header goes out, which the servers that speak this protocol without
 authenticating rely on. The header name and scheme are the protocol's own (`Authorization` bearing
@@ -81,9 +126,13 @@ a `Bearer` token for OpenAI, `x-api-key` for Anthropic). The call's own headers 
 `request.getOptions().getHeaders()`: copied into the same header map, so a caller's entry replaces
 the module's and wins.
 
-The body is a `HttpBody`: a lambda that writes when the transport asks, so the document goes
-straight to the wire instead of being built as a tree first. A second write produces the same bytes,
-because the transport may write it again on a retry or a redirect.
+The body is a `HttpBody`: a lambda that writes when the transport asks, so the document is produced
+on demand instead of being built as a tree first. Whether the bytes are sent as they come or
+gathered first is the transport's choice, governed by the call's `bodyWriteMode` — `"auto"`, the
+default, lets each transport pick the mode it does best: the JDK transport gathers every written
+body and refuses `"streamed"`, while Apache and the RestClient stream it. A second write produces
+the same bytes, because the transport may write it again on a retry or a redirect. See
+[Per-call HTTP settings](customizing.md#per-call-http-settings) for the modes.
 
 Read the status before the body — the body is a stream and can be read once. A non-2xx answer is a
 refusal: read its detail and throw a `SynapseHttpException`. `http.send` itself answers unchecked: a
@@ -120,8 +169,8 @@ void write(ChatRequest request, JsonWriter writer, boolean streaming) {
 }
 ```
 
-This `write` is the one the two exchange examples below build their bodies around: `doChat` passes
-`false`, `doStream` passes `true`.
+This `write` is the one `buildRequest` writes the body with: `doChat` calls it with `false`,
+`doStream` with `true`.
 
 ## Reading the answer
 
@@ -159,9 +208,14 @@ ChatResponse readAnswer(JsonReader reader) {
 }
 ```
 
-That `default` branch is the whole pass-through rule: an unmodeled field survives a round trip
-because `captureValue()` keeps it on the way in and the extras merge of
-[Writing the document](#writing-the-document) writes it back out on the way out.
+That `default` branch is the pass-through rule, and it holds per node: `captureValue()` keeps an
+unmodeled field on the node it came from, and when that node goes out again its extras are merged
+over the members the writer emits. It is a real round trip for a message: `continueWith` archives
+the answered message into the conversation (see [Conversations](conversations.md)), and the next
+call's document walk merges the message's extras into its entry — the same merge the request
+options' own extras get in [Writing the document](#writing-the-document). A field kept on the response itself
+travels nowhere: a response is never sent, nothing copies its extras onward, and it is the caller's
+to read.
 
 The fragments of this page add up to one blocking exchange. The request `doChat` receives has
 already been through `prepare` — `AbstractChatClient` runs the defaults and the request
@@ -171,20 +225,7 @@ caller's answer:
 ```java
 @Override
 protected ChatResponse doChat(ChatRequest request) {
-    HttpRequest httpRequest = new HttpRequest(baseUrl + endpoint);
-    httpRequest.setMethod(HttpRequest.POST);
-    httpRequest.getHeaders().put("Content-Type", List.of("application/json"));
-    if (config.getApiKey() != null && !config.getApiKey().isBlank()) {
-        httpRequest.getHeaders().put("Authorization", List.of("Bearer " + config.getApiKey()));
-    }
-    request.getOptions().getHeaders().forEach((name, value) -> httpRequest.getHeaders()
-            .put(name, List.of(value)));
-    httpRequest.setOptions(request.getOptions().getHttpOptions());
-    httpRequest.setBody(out -> {
-        try (JsonWriter writer = codec.writer(out)) {
-            write(request, writer, false);
-        }
-    });
+    HttpRequest httpRequest = buildRequest(request, false);
 
     try (HttpResponse response = http.send(httpRequest)) {
         int status = response.getStatusCode();
@@ -217,22 +258,7 @@ to `DefaultChatStream`:
 ```java
 @Override
 protected ChatStream doStream(ChatRequest request) {
-    HttpRequest httpRequest = new HttpRequest(baseUrl + endpoint);
-    httpRequest.setMethod(HttpRequest.POST);
-    httpRequest.getHeaders().put("Content-Type", List.of("application/json"));
-    if (config.getApiKey() != null && !config.getApiKey().isBlank()) {
-        httpRequest.getHeaders().put("Authorization", List.of("Bearer " + config.getApiKey()));
-    }
-    request.getOptions().getHeaders().forEach((name, value) -> httpRequest.getHeaders()
-            .put(name, List.of(value)));
-    httpRequest.setOptions(request.getOptions().getHttpOptions());
-    httpRequest.setBody(out -> {
-        try (JsonWriter writer = codec.writer(out)) {
-            write(request, writer, true);
-        }
-    });
-
-    HttpResponse response = http.send(httpRequest);
+    HttpResponse response = http.send(buildRequest(request, true));
     try {
         int status = response.getStatusCode();
         if (status < 200 || status >= 300) {
@@ -240,11 +266,11 @@ protected ChatStream doStream(ChatRequest request) {
         }
         SseEventStream frames = response.sseEventStream();
         if (frames == null) {
-            throw new SynapseException(endpoint + " answered a streamed request without an event stream");
+            throw new SynapseException(ENDPOINT + " answered a streamed request without an event stream");
         }
         // On success the response stays open: the stream owns it, and closing the stream
         // is what cancels an answer still in flight.
-        return new DefaultChatStream(events(frames), eventPipeline(), MyClient::fold, response::close);
+        return new DefaultChatStream(events(frames), eventPipeline(), MyChatClient::fold, response::close);
     } catch (RuntimeException failure) {
         // Between the response arriving and the stream taking it over, nothing else holds the
         // connection: release it before the failure leaves.
@@ -253,6 +279,25 @@ protected ChatStream doStream(ChatRequest request) {
             failure.addSuppressed(closeFailure);
         }
         throw failure;
+    }
+}
+```
+
+`fold` is a plain merge of one event into the answer being assembled — static, so it can be a
+method reference:
+
+```java
+/** Folds one event into the answer being assembled. */
+private static void fold(ChatResponse answer, ChatStreamEvent event) {
+    if (event.getId() != null) {
+        answer.setId(event.getId());
+    }
+    if (event.getFinishReason() != null) {
+        answer.setFinishReason(event.getFinishReason());
+    }
+    answer.getExtras().putAll(event.getExtras());
+    if (event.getDelta() != null) {
+        // append the delta's parts to the answer's message, one part type at a time
     }
 }
 ```
@@ -268,7 +313,7 @@ The iterator's job is the frame-to-event map. `SseEventStream` is an `Iterator<S
 carries the frame's `event:` name (or `null`) and its joined `data:` lines:
 
 ```java
-private static Iterator<ChatStreamEvent> events(SseEventStream frames) {
+private Iterator<ChatStreamEvent> events(SseEventStream frames) {
     return new Iterator<>() {
         public boolean hasNext() {
             return frames.hasNext();
@@ -281,7 +326,7 @@ private static Iterator<ChatStreamEvent> events(SseEventStream frames) {
 }
 
 /** Maps one frame to its event. */
-private static ChatStreamEvent toEvent(SseEvent frame) {
+private ChatStreamEvent toEvent(SseEvent frame) {
     ChatStreamEvent event = new ChatStreamEvent();
     // null when the protocol names its events inside the payload instead
     event.setEventType(frame.getEvent());
@@ -301,7 +346,7 @@ instead — OpenAI chat completions name each chunk in an `object` member, for e
 there is what `setEventType` receives, kept as written.
 
 `DefaultChatStream` pulls from your iterator, and on each event runs `eventPipeline()` and then the
-fold — the `BiConsumer<ChatResponse, ChatStreamEvent>` (`MyClient::fold` above) that merges one
+fold — the `BiConsumer<ChatResponse, ChatStreamEvent>` (`MyChatClient::fold` above) that merges one
 event into the aggregated answer — so the stream-event customizers run between your source and your
 fold without either calling them. The last constructor argument is the close action,
 `response::close` here: it runs once, whether the stream is closed, exhausted or fails, and is what
