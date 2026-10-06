@@ -52,12 +52,12 @@ import lombok.extern.apachecommons.CommonsLog;
  * is streamed as it comes — its length unknown until it has been written — and
  * {@link BodyWriteMode#BUFFERED} trades that streaming for one copy of the body in memory, gathered
  * before the request goes out.</li>
- * <li>A {@link HttpOptions response timeout}, whether the request set it or
+ * <li>A {@link HttpOptions#getResponseTimeout() response timeout}, whether the request set it or
  * this client's own options carry it, is not applied — the {@code RestClient} abstraction has no
  * per-request timeout — and is reported once as a warning rather than on every call: the timer to
  * set is the request factory's, for example {@code JdkClientHttpRequestFactory.setReadTimeout},
  * which bounds the wait for the response headers and never the reading of the body.</li>
- * <li>A {@link HttpOptions bodyWriteMode} this implementation does not know is
+ * <li>A {@link HttpOptions#getBodyWriteMode() bodyWriteMode} this implementation does not know is
  * refused before the request is built and before the body is looked at: a caller who asked for one
  * thing must not silently get another. {@link BodyWriteMode#AUTO}, the default, resolves to
  * {@link BodyWriteMode#STREAMED}, the route this implementation does best.</li>

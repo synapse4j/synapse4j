@@ -62,7 +62,7 @@ import lombok.NonNull;
  * before the call, which then carries a {@code Content-Length}. Framing is the entity's: a request
  * that carries its own {@code Content-Length} or {@code Transfer-Encoding} header alongside a body is
  * refused by HttpClient 5's protocol layer rather than reconciled here.</li>
- * <li>A {@link HttpOptions response timeout}, whether the request set it or this
+ * <li>A {@link HttpOptions#getResponseTimeout() response timeout}, whether the request set it or this
  * client's own options carry it, is applied per request through HttpClient 5's {@link RequestConfig}.
  * HttpClient 5 implements it as the connection's read timeout for the whole exchange: it bounds the
  * wait for the response headers and any silent gap while the body is being read — stronger than the
@@ -71,7 +71,7 @@ import lombok.NonNull;
  * built, which is what {@link HttpOptions#defaults()} means by leaving that to the HTTP library.
  * Connect timeout, TLS, proxy and pool sizing are not modeled here in any case: they live on the
  * {@link CloseableHttpClient} handed to a constructor.</li>
- * <li>A {@link HttpOptions bodyWriteMode} this implementation does not know is
+ * <li>A {@link HttpOptions#getBodyWriteMode() bodyWriteMode} this implementation does not know is
  * refused before the request is built and before the body is looked at: a caller who asked for one
  * thing must not silently get another. {@link BodyWriteMode#AUTO}, the default, resolves to
  * {@link BodyWriteMode#STREAMED}, the route this implementation does best.</li>

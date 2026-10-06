@@ -8,7 +8,7 @@ import org.jspecify.annotations.Nullable;
 import lombok.Data;
 
 /**
- * One tool's overrides, keyed in {@link ToolsProperties} by the name the tool carries
+ * One tool's overrides, keyed in {@link ToolsProperties#getMethods()} by the name the tool carries
  * before this configuration applies.
  *
  * <p>
@@ -35,7 +35,7 @@ public class ToolMethodProperties {
     /**
      * Whether the provider must enforce the schema; {@code @ToolMethod#strict()}. Written, it replaces
      * the annotation's; unset, the annotation's stands, and where that too states none it falls to
-     * the strict setting on {@link ToolsProperties} and then to the protocol.
+     * {@link ToolsProperties#getStrict()} and then to the protocol.
      */
     private @Nullable String strict;
 

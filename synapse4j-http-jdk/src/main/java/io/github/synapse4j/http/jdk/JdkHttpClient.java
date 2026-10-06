@@ -39,7 +39,7 @@ import io.github.synapse4j.http.HttpResponse;
  * with its length. The JDK pulls the body through a thread of its own, so this transport does not stream
  * a written one: {@link BodyWriteMode#STREAMED} is refused, and {@link BodyWriteMode#AUTO}, the default,
  * gathers.</li>
- * <li>A {@link HttpOptions response timeout}, whether the request set it or this
+ * <li>A {@link HttpOptions#getResponseTimeout() response timeout}, whether the request set it or this
  * client's own options carry it, maps to the JDK request builder's {@code timeout}, which — verified
  * empirically — bounds only the wait for the response headers to start arriving, never the reading of
  * the body.</li>
