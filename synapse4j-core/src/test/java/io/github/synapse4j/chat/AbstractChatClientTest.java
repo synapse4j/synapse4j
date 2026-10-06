@@ -22,6 +22,7 @@ import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
+import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonSchemaBuilder;
 import io.github.synapse4j.tool.ManualTool;
 import io.github.synapse4j.tool.Tool;
@@ -841,6 +842,49 @@ class AbstractChatClientTest {
         // Registration records presence: the same source twice is still one source.
         assertEquals(1, asks.get());
         assertEquals(List.of("p"), names(client.seen.getTools()));
+    }
+
+    @Test
+    void schemaCustomizerReshapesToolAndResponseFormatSchemas() {
+        StubChatClient client = new StubChatClient();
+        JsonSchema reshaped = new JsonSchemaBuilder().build();
+        client.addJsonSchemaCustomizer(schema -> reshaped);
+
+        ChatRequest request = new ChatRequest();
+        request.getTools().add(tool("weather"));
+        request.getOptions().getResponseFormat().setSchema(new JsonSchemaBuilder().build());
+
+        client.chat(request);
+
+        Tool sent = client.seen.getTools().get(0);
+        assertSame(reshaped, sent.definition().getInputSchema());
+        assertEquals("weather", sent.name());
+        assertSame(reshaped, client.seen.getOptions().getResponseFormat().getSchema());
+    }
+
+    @Test
+    void schemaCustomizerRegisteredLaterReshapesNextCall() {
+        StubChatClient client = new StubChatClient();
+        JsonSchema shared = new JsonSchemaBuilder().build();
+        JsonSchema firstPass = new JsonSchemaBuilder().build();
+        JsonSchema secondPass = new JsonSchemaBuilder().build();
+        client.addJsonSchemaCustomizer(schema -> firstPass);
+        client.chat(carrying(shared));
+        assertSame(firstPass, client.seen.getTools().get(0).definition().getInputSchema());
+
+        client.addJsonSchemaCustomizer(schema -> secondPass);
+        client.chat(carrying(shared));
+
+        // The second call carries the very schema the first one cached, so it would answer from the
+        // cache had registering a customizer not dropped it.
+        assertSame(secondPass, client.seen.getTools().get(0).definition().getInputSchema());
+    }
+
+    /** A request carrying one tool whose argument schema is the given one. */
+    private static ChatRequest carrying(JsonSchema schema) {
+        ChatRequest request = new ChatRequest();
+        request.getTools().add(new ManualTool(new ToolDefinition("weather", "does things", schema)));
+        return request;
     }
 
     /** A declare-only tool carrying the given name — all the merge looks at. */

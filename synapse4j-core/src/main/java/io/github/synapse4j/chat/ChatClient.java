@@ -2,13 +2,15 @@ package io.github.synapse4j.chat;
 
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
-import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.json.JsonSchemaCustomizer;
+import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolProvider;
-import org.jspecify.annotations.Nullable;
 
 /**
  * The front door for one conversation turn with a model provider: send the whole request, get the
@@ -31,8 +33,11 @@ import org.jspecify.annotations.Nullable;
  * the endpoint — adjust an answer on its way back, adapt a stream's events before they are
  * folded; a set of default tools merged into every request's own, and tool providers whose
  * tools are fetched on every call instead; and default {@link ChatOptions} that fill in what a
- * request leaves unstated. {@link AbstractChatClient} implements these parts for an
- * implementation; a client that implements this interface directly carries the same obligation.
+ * request leaves unstated. A {@linkplain #addJsonSchemaCustomizer schema customizer} reshapes each
+ * outgoing JSON schema — a tool's arguments or a response format's — which a protocol often needs
+ * without wanting to touch the rest of the request. {@link AbstractChatClient} implements these
+ * parts for an implementation; a client that implements this interface directly carries the same
+ * obligation.
  *
  * <p>
  * The calls carry nothing between calls: every input arrives on the request, and there is no
@@ -126,6 +131,38 @@ public interface ChatClient {
      * @return the customizers, in execution order; never {@code null}
      */
     List<ChatCustomizer> chatCustomizers();
+
+    /**
+     * Adds a schema customizer: it runs over every JSON schema this client sends — each tool's
+     * argument schema and the response format's — each over the last one's answer, in the order
+     * they were added. Where a {@link ChatCustomizer} adapts a whole request or answer, this adapts
+     * the schema alone, the part a protocol most often has to reshape.
+     *
+     * <p>
+     * Registration is configuration, meant for the time before the client is shared; a call
+     * already in flight sees either set, never a half-written one.
+     *
+     * @param customizer the customizer to add; never {@code null}
+     */
+    void addJsonSchemaCustomizer(JsonSchemaCustomizer customizer);
+
+    /**
+     * Removes every registration of the given schema customizer. An instance removes only itself,
+     * so the caller has to keep the reference it added.
+     *
+     * @param customizer the customizer to remove; never {@code null}
+     * @return whether any was removed
+     */
+    boolean removeJsonSchemaCustomizer(JsonSchemaCustomizer customizer);
+
+    /**
+     * Answers the schema customizers this client runs, in the order they were added. The list is a
+     * snapshot: a customizer added or removed after it is taken joins or leaves no call already
+     * under way.
+     *
+     * @return the schema customizers, in execution order; never {@code null}
+     */
+    List<JsonSchemaCustomizer> jsonSchemaCustomizers();
 
     /**
      * Sets the options every call this client sends inherits from, so a standing model, temperature

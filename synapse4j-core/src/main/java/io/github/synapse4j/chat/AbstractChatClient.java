@@ -9,16 +9,24 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+import org.jspecify.annotations.Nullable;
 
 import io.github.synapse4j.data.ChatContext;
 import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
+import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ChatStreamEvent;
+import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonSchemaCustomizer;
+import io.github.synapse4j.tool.DelegatingTool;
 import io.github.synapse4j.tool.Tool;
+import io.github.synapse4j.tool.ToolDefinition;
 import io.github.synapse4j.tool.ToolProvider;
-import org.jspecify.annotations.Nullable;
-
+import io.github.synapse4j.util.BoundedConcurrentCache;
+import io.github.synapse4j.util.Cache;
 import lombok.NonNull;
 
 /**
@@ -83,7 +91,41 @@ public abstract class AbstractChatClient implements ChatClient {
      * writer publishes a whole instance through the reference in one step, and every call reads it
      * once into a local, so a call never sees two versions.
      */
-    private final AtomicReference<ChatOptions> defaultOptions = new AtomicReference<>();
+    private final AtomicReference<@Nullable ChatOptions> defaultOptions = new AtomicReference<>();
+
+    /**
+     * The schema customizers this client runs over every schema it sends, in the order they run —
+     * the list itself is the execution order. Copy-on-write, so a call walking it never sees a
+     * half-written one; adding or removing drops the cache of processed schemas below.
+     */
+    private final List<JsonSchemaCustomizer> schemaCustomizers = new CopyOnWriteArrayList<>();
+
+    /**
+     * How the processed-schema cache is made. Configuration, meant for before the client is shared:
+     * a caller who wants a differently-backed cache — a bounded one of another size, an unbounded
+     * one — hands in a factory for it, and the next need takes a cache from there.
+     */
+    private volatile Supplier<Cache<JsonSchema, JsonSchema>> schemaCacheFactory = BoundedConcurrentCache::new;
+
+    /**
+     * The cache in use, made from the factory on first need and dropped when the factory or the
+     * customizers change. Same pattern as the references above: a rare writer publishes a whole
+     * instance in one step, and every call reads it once.
+     */
+    private final AtomicReference<@Nullable Cache<JsonSchema, JsonSchema>> schemaCache = new AtomicReference<>();
+
+    /**
+     * Sets how the processed-schema cache is made, for a caller who wants their own. It is not on
+     * {@link ChatClient}: which cache backs the schema customizers is an implementation detail, and
+     * the default — a bounded one — is what most callers want. Setting is configuration, meant for
+     * before the client is shared.
+     *
+     * @param factory how to make a fresh cache; never {@code null}
+     */
+    public void setSchemaCacheFactory(@NonNull Supplier<Cache<JsonSchema, JsonSchema>> factory) {
+        this.schemaCacheFactory = factory;
+        schemaCache.set(null);
+    }
 
     @Override
     public void setDefaultOptions(@NonNull ChatOptions options) {
@@ -114,6 +156,29 @@ public abstract class AbstractChatClient implements ChatClient {
     @Override
     public List<ChatCustomizer> chatCustomizers() {
         return List.copyOf(customizers);
+    }
+
+    @Override
+    public void addJsonSchemaCustomizer(@NonNull JsonSchemaCustomizer customizer) {
+        schemaCustomizers.add(customizer);
+        schemaCache.set(null);
+    }
+
+    @Override
+    public boolean removeJsonSchemaCustomizer(@NonNull JsonSchemaCustomizer customizer) {
+        boolean removed = schemaCustomizers.removeIf(customizer::equals);
+        if (removed) {
+            schemaCache.set(null);
+        }
+        return removed;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public List<JsonSchemaCustomizer> jsonSchemaCustomizers() {
+        return List.copyOf(schemaCustomizers);
     }
 
     /**
@@ -321,6 +386,7 @@ public abstract class AbstractChatClient implements ChatClient {
      * @param request the request as the caller built it
      */
     protected void applyDefaults(ChatRequest request) {
+        @Nullable
         ChatOptions options = defaultOptions.get();
         if (options != null) {
             request.setOptions(ChatOptions.effective(request.getOptions(), options));
@@ -368,9 +434,11 @@ public abstract class AbstractChatClient implements ChatClient {
     }
 
     /**
-     * Applies this client's own defaults, then walks every request customizer in the order it was
-     * registered. The request goes out as the instance the caller passed: both steps change it in
-     * place rather than answer a replacement, so there is no result to hand back.
+     * Applies this client's own defaults, walks every request customizer in the order it was
+     * registered, and finally runs the schema customizers over the request's schemas — last, so they
+     * see whatever the customizers left. The request goes out as the instance the caller passed:
+     * every step changes it in place rather than answer a replacement, so there is no result to hand
+     * back.
      *
      * @param request the request as the caller built it
      */
@@ -379,6 +447,7 @@ public abstract class AbstractChatClient implements ChatClient {
         for (ChatCustomizer customizer : customizers) {
             customizer.customizeRequest(this, request);
         }
+        applySchemaCustomizers(request);
     }
 
     /**
@@ -396,6 +465,61 @@ public abstract class AbstractChatClient implements ChatClient {
      * @return the streaming answer; never {@code null}
      */
     protected abstract ChatStream doStream(ChatRequest request);
+
+    /**
+     * Runs the schema customizers over every schema the request will send — each tool's argument
+     * schema and the response format's — through the client's cache, so a schema already processed is
+     * answered from it rather than processed again. Does nothing when no customizer is registered: no
+     * customizer, no cache, no pass.
+     *
+     * @param request the request as it stands after the request customizers
+     */
+    private void applySchemaCustomizers(ChatRequest request) {
+        if (schemaCustomizers.isEmpty()) {
+            return;
+        }
+        Cache<JsonSchema, JsonSchema> cache = schemaCache();
+        List<Tool> tools = request.getTools();
+        for (int i = 0; i < tools.size(); i++) {
+            Tool tool = tools.get(i);
+            ToolDefinition definition = tool.definition();
+            JsonSchema schema = definition.getInputSchema();
+            if (schema != null) {
+                tools.set(i, DelegatingTool.withInputSchema(tool, processed(schema, cache)));
+            }
+        }
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
+        JsonSchema formatSchema = format.getSchema();
+        if (formatSchema != null) {
+            format.setSchema(processed(formatSchema, cache));
+        }
+    }
+
+    /** The schema's processed form, from the cache or computed now. */
+    private JsonSchema processed(JsonSchema schema, Cache<JsonSchema, JsonSchema> cache) {
+        return cache.get(schema, this::customizeSchema);
+    }
+
+    /** Runs the customizers over one schema, each over the last one's answer. */
+    private JsonSchema customizeSchema(JsonSchema schema) {
+        JsonSchema result = schema;
+        for (JsonSchemaCustomizer customizer : schemaCustomizers) {
+            result = customizer.customize(result);
+        }
+        return result;
+    }
+
+    /**
+     * The cache in use, made from the factory on first need. Published through an atomic update, as
+     * the containers above are, so callers racing the first request settle on one instance rather
+     * than one each; a call that took the old instance keeps using it after a change drops it, the
+     * "either set" a call in flight gets everywhere else here.
+     */
+    private Cache<JsonSchema, JsonSchema> schemaCache() {
+        // The lambda never answers null, so the update lands on a cache; requireNonNull only says so.
+        return Objects.requireNonNull(schemaCache
+                .updateAndGet(cache -> cache != null ? cache : schemaCacheFactory.get()));
+    }
 
     /**
      * A stream that finishes the exchange once it runs to its end: the aggregated answer is
