@@ -80,6 +80,8 @@ class Synapse4jJacksonModuleTest {
         // The module's name is its registration id, so the second add replaces the first rather than
         // registering a second: a mapper an application already taught about a JsonSchema still reads
         // and writes one as the document it describes.
+        assertEquals(1, twice.registeredModules().stream().filter(Synapse4jJacksonModule.class::isInstance)
+                .count());
         JsonSchema schema = objectSchema();
         assertEquals(schema, twice.readValue(twice.writeValueAsString(schema), JsonSchema.class));
     }

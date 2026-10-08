@@ -8,7 +8,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -149,18 +148,21 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
-    void noApacheTypesOnConfiguration() {
+    void contextStartsWithoutApacheLibrary() {
         // Spring introspects a configuration class's bean-method signatures before it evaluates any
-        // condition, so a bean method returning or taking an Apache type here fails every
-        // application that does not carry httpclient5 — during bean-factory post-processing, with
-        // an error that names neither the library nor the property. The Apache beans live in a
-        // nested configuration guarded by @ConditionalOnClass instead; this pins them there.
-        for (Method method : Synapse4jAutoConfiguration.class.getDeclaredMethods()) {
-            assertThat(method.getReturnType().getName()).doesNotStartWith("org.apache.hc");
-            for (Class<?> parameter : method.getParameterTypes()) {
-                assertThat(parameter.getName()).doesNotStartWith("org.apache.hc");
-            }
-        }
+        // condition, so a bean method returning or taking an Apache type in the top-level
+        // configuration would fail every application that does not carry httpclient5 — during
+        // bean-factory post-processing, with an error naming neither the library nor the property.
+        // The Apache beans live in a nested configuration guarded by @ConditionalOnClass, and a
+        // context with the library off the classpath is what says the guard holds.
+        new ApplicationContextRunner()
+                .withClassLoader(new FilteredClassLoader(CloseableHttpClient.class))
+                .withConfiguration(AutoConfigurations.of(Synapse4jAutoConfiguration.class))
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(HttpClient.class);
+                    assertThat(context.getBean(HttpClient.class)).isInstanceOf(RestClientHttpClient.class);
+                });
     }
 
     @Test

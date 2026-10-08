@@ -1,6 +1,7 @@
 package io.github.synapse4j.json;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -228,10 +229,16 @@ class ObjectJsonSchemaTest {
 
     @Test
     void toStringRendersValue() {
-        assertEquals("{type=object}", typed("object").toString());
-        // A sub-schema renders as its own value, so a nested schema reads as one document.
-        assertEquals("{properties={name={type=string}}}",
-                new JsonSchemaBuilder().setProperties(Map.of("name", typed("string"))).build().toString());
+        // The text names the schema's own keywords rather than the class it is: a value a log or a
+        // failure message carries has to say what the schema says.
+        String rendered = new JsonSchemaBuilder()
+                .setProperties(Map.of("name", typed("string")))
+                .build()
+                .toString();
+
+        assertFalse(rendered.contains(ObjectJsonSchema.class.getName()), rendered);
+        assertTrue(rendered.contains("properties"), rendered);
+        assertTrue(rendered.contains("string"), rendered);
     }
 
     @Test

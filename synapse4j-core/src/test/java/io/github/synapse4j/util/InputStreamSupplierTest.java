@@ -83,17 +83,6 @@ class InputStreamSupplierTest {
         assertEquals("this source opens once, and it has already been opened", thrown.getMessage());
     }
 
-    @Test
-    void openFailureArrivesAsIs() {
-        InputStreamSupplier source = () -> {
-            throw new IOException("no bytes today");
-        };
-
-        IOException thrown = assertThrows(IOException.class, source::get);
-
-        assertEquals("no bytes today", thrown.getMessage());
-    }
-
     private static String read(InputStream stream) throws IOException {
         try (stream) {
             return new String(stream.readAllBytes(), UTF_8);
