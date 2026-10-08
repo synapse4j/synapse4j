@@ -45,7 +45,7 @@ public class ReflectiveSpecToolFactory implements SpecToolFactory {
      */
     @Override
     public Tool create(ToolMethodSpec spec, JsonCodec codec) {
-        if (spec.getType().isEmpty()) {
+        if (spec.getType().isBlank()) {
             return defaultFactory.create(spec, codec);
         }
         String type = spec.getType();
