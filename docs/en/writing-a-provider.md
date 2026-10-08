@@ -270,7 +270,7 @@ protected ChatStream doStream(ChatRequest request) {
         }
         // On success the response stays open: the stream owns it, and closing the stream
         // is what cancels an answer still in flight.
-        return new DefaultChatStream(events(frames), eventPipeline(), MyChatClient::fold, response::close);
+        return new DefaultChatStream(events(frames), eventPipeline(), new Fold(), response::close);
     } catch (RuntimeException failure) {
         // Between the response arriving and the stream taking it over, nothing else holds the
         // connection: release it before the failure leaves.
@@ -283,21 +283,36 @@ protected ChatStream doStream(ChatRequest request) {
 }
 ```
 
-`fold` is a plain merge of one event into the answer being assembled — static, so it can be a
-method reference:
+`fold` merges one event into the answer being assembled, as a
+`BiConsumer<ChatResponse, ChatStreamEvent>`. A message is a value, so nothing is appended to the one
+already there: the fold holds the turn's pieces — the role, the parts so far, the extras bag — and
+rebuilds the message whenever one of them changes:
 
 ```java
-/** Folds one event into the answer being assembled. */
-private static void fold(ChatResponse answer, ChatStreamEvent event) {
-    if (event.getId() != null) {
-        answer.setId(event.getId());
-    }
-    if (event.getFinishReason() != null) {
-        answer.setFinishReason(event.getFinishReason());
-    }
-    answer.getExtras().putAll(event.getExtras());
-    if (event.getDelta() != null) {
-        // append the delta's parts to the answer's message, one part type at a time
+/** The turn behind one stream: its pieces, and the message they add up to. */
+private static final class Fold implements BiConsumer<ChatResponse, ChatStreamEvent> {
+
+    private final List<ContentPart> parts = new ArrayList<>();
+
+    private final ProviderExtras extras = new ProviderExtras();
+
+    private @Nullable String role;
+
+    @Override
+    public void accept(ChatResponse answer, ChatStreamEvent event) {
+        if (event.getId() != null) {
+            answer.setId(event.getId());
+        }
+        if (event.getFinishReason() != null) {
+            answer.setFinishReason(event.getFinishReason());
+        }
+        extras.putAll(event.getExtras());
+        if (event.getDelta() != null) {
+            // Fold the delta into the turn's pieces — a text chunk extends the part before it, a
+            // tool call merges with the call it continues — one part type at a time, then rebuild
+            // the message from the pieces.
+            answer.setMessage(new ChatMessage(role, null, parts, extras));
+        }
     }
 }
 ```
@@ -346,7 +361,7 @@ instead — OpenAI chat completions name each chunk in an `object` member, for e
 there is what `setEventType` receives, kept as written.
 
 `DefaultChatStream` pulls from your iterator, and on each event runs `eventPipeline()` and then the
-fold — the `BiConsumer<ChatResponse, ChatStreamEvent>` (`MyChatClient::fold` above) that merges one
+fold — the `BiConsumer<ChatResponse, ChatStreamEvent>` (`Fold` above) that merges one
 event into the aggregated answer — so the stream-event customizers run between your source and your
 fold without either calling them. The last constructor argument is the close action,
 `response::close` here: it runs once, whether the stream is closed, exhausted or fails, and is what

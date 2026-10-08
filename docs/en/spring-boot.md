@@ -26,8 +26,11 @@ HttpClient 5 itself; see [Transports](#transports).
 
 ## What it wires
 
-The default wiring is three beans, each backing off if you declare your own:
+The default wiring is four beans, each backing off if you declare your own:
 
+- **`Synapse4jJacksonModule`** — teaches Boot's `JsonMapper` to read and write a `JsonSchema` as the
+  document it describes, so a schema you serialize yourself comes out as the schema. It is applied
+  to the same mapper the codec is built over.
 - **`JsonCodec`** — a `JacksonJsonCodec`. It uses Boot's auto-configured `JsonMapper` when one
   exists, so `spring.jackson.*` and every `JsonMapperBuilderCustomizer` apply to the schemas sent
   to the model and to the JSON a model sends back.
@@ -35,7 +38,7 @@ The default wiring is three beans, each backing off if you declare your own:
 - **`ChatClient`** — the protocol `synapse4j.chat.client` names, wrapped in `ToolCallingChatClient`
   unless `synapse4j.chat.auto-tool-calling` is off.
 
-Selecting the Apache transport adds a fourth bean, the `CloseableHttpClient` holding the connection
+Selecting the Apache transport adds another bean, the `CloseableHttpClient` holding the connection
 pool. It steps aside when you declare a `CloseableHttpClient` or an `HttpClient` of your own.
 
 ## Configuration

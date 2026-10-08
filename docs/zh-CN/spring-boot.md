@@ -25,8 +25,10 @@ classpath 的那个库，是 Apache HttpClient 5 本身；见[传输层](#传输
 
 ## 它接了什么
 
-默认接线是三个 bean，你自己声明同类型 bean 时各自让位：
+默认接线是四个 bean，你自己声明同类型 bean 时各自让位：
 
+- **`Synapse4jJacksonModule`**——让 Boot 的 `JsonMapper` 能把 `JsonSchema` 当作它描述的那份文档来读写，
+  于是你自己序列化一个 schema，得到的就是那个 schema。它作用于编解码器所用的同一个 mapper。
 - **`JsonCodec`**——一个 `JacksonJsonCodec`。存在 Boot 自动配置的 `JsonMapper` 时就用它，因此
   `spring.jackson.*` 和每个 `JsonMapperBuilderCustomizer` 都作用于发给模型的 schema，以及模型发回
   的 JSON。
@@ -34,7 +36,7 @@ classpath 的那个库，是 Apache HttpClient 5 本身；见[传输层](#传输
 - **`ChatClient`**——`synapse4j.chat.client` 指定的协议；除非 `synapse4j.chat.auto-tool-calling`
   关掉，否则会用 `ToolCallingChatClient` 包装。
 
-选择 Apache 传输层会多出第四个 bean，即持有连接池的 `CloseableHttpClient`。你声明自己的
+选择 Apache 传输层还会多出一个 bean，即持有连接池的 `CloseableHttpClient`。你声明自己的
 `CloseableHttpClient` 或 `HttpClient` 时，它会退让。
 
 ## 配置

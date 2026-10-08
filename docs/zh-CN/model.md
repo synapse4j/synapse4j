@@ -44,11 +44,21 @@ ChatMessage.assistant("因为散射。");               // 手写的一轮模型
 
 `ContentPart` 不是 final：提供商或应用可以继承它，加入库没有建模的类别。
 
-多数消息只有一个文本部分，添加文本有简写：
+多数消息只有一个文本部分，上面的工厂方法已经覆盖这一情形。要表达更多内容、或携带文本以外类别部分的消息，
+是一次组装而成的——少数几个部分用 `ChatMessage.of`，更完整的用 builder：
 
 ```java
-ChatMessage.user("你好").addText("，世界");
+ChatMessage.of(ChatRole.USER, new TextPart("你好"), new TextPart("，世界"));
+
+ChatMessage.builder()
+        .role(ChatRole.USER)
+        .part(new TextPart("你好"))
+        .part(new TextPart("，世界"))
+        .build();
 ```
+
+消息和它的内容部分都是值：构建一次、之后永不改变，因此两者都可以放心保存、共享、原样再次发送。要改就是
+另一条消息——工具调用收到的答案通过 `toBuilder()` 变成下一个请求的消息——绝不是改动这一条。
 
 ## 选项
 
@@ -65,8 +75,16 @@ ChatMessage.user("你好").addText("，世界");
 映射：从点分路径到值，会原样合并进要发出的 JSON：
 
 ```java
-message.getOrCreateExtras().putRaw("thinking.budget_tokens", 2048);
+ChatMessage message = ChatMessage.builder()
+        .role(ChatRole.USER)
+        .part(new TextPart("你好"))
+        .mapExtras(extras -> extras.putRaw("thinking.budget_tokens", 2048))
+        .build();
 ```
+
+节点的映射随节点一起冻结，因此不可变节点的映射要在它被构建的过程中填写：消息的映射走 `mapExtras`，它
+交给你的是一份可变的映射——`toBuilder()` 带过来的那份，或者一份全新的——并收下你返回的内容。仍在组装
+中的节点，比如 `ChatOptions`，则直接交出它自己的映射。
 
 提供商发来的、库叫不出名字的字段，保留在它来自的那个节点上，节点再次发出时原样写回。透传的内容
 从不翻译——见[设计与取舍](design.md)。

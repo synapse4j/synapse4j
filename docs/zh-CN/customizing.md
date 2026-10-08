@@ -45,6 +45,28 @@ JsonCodec codec = new JacksonJsonCodec(mapper.rebuild(), new SchemaGenerator(bui
 设置类的 Javadoc 列出了每个选择及其默认行为；每个模块的 Javadoc 说明它贡献了什么。`settings` 传
 `null` 就是一个选择都不应用，把 victools 的纯净配置留给宁愿全部自己组装的人。
 
+## 为协议重塑 schema
+
+生成出来的是类型所表达的内容；而某个协议可能希望 schema 是另一种形状，或者不接受其中的一部分。
+`JsonSchemaCustomizer` 接收一个 schema，返回要用的那个；客户端会让已注册的 customizer 按顺序跑过
+请求要发出的每一个 schema——每个工具的入参 schema，以及响应格式的 schema：
+
+```java
+client.addJsonSchemaCustomizer(new InlineJsonSchemaCustomizer());
+```
+
+`InlineJsonSchemaCustomizer` 是库自带的那一个：它把每个指向 `$defs` 的 `$ref` 换成它所指定义的副本，
+于是结果读起来不需要 `$defs`——这是为不接受 `$ref` 的协议准备的那一步。你自己写一个，用 lambda 就够了：
+
+```java
+client.addJsonSchemaCustomizer(schema -> /* 这个协议要的 schema */);
+```
+
+每个结果都按 schema 缓存，所以一个 schema 只重塑一次，而不是每次调用重塑一次；新增或移除 customizer
+都会清掉缓存。`removeJsonSchemaCustomizer` 可以把某个撤下来，`jsonSchemaCustomizers()` 给出列表——这些
+都属于配置，应当在客户端被共享之前完成。schema 被重塑过的工具从客户端出来时是一个
+[`DelegatingTool`](tools.md)。
+
 ## 常驻在客户端上的配置
 
 模型、温度或响应格式如果每次调用都共用，就该放在客户端上：

@@ -249,7 +249,7 @@ protected ChatStream doStream(ChatRequest request) {
             throw new SynapseException(ENDPOINT + " 对流式请求作出了没有事件流的回答");
         }
         // 成功时响应保持打开：流拥有它，关闭流就是取消一个仍在途中的答案。
-        return new DefaultChatStream(events(frames), eventPipeline(), MyChatClient::fold, response::close);
+        return new DefaultChatStream(events(frames), eventPipeline(), new Fold(), response::close);
     } catch (RuntimeException failure) {
         // 从响应到达到流接管它之间，没有别的东西持有这个连接：在失败离开前释放它。
         try (HttpResponse closing = response) {
@@ -261,20 +261,34 @@ protected ChatStream doStream(ChatRequest request) {
 }
 ```
 
-`fold` 就是把单个事件合并进正在组装的答案——它是静态的，因此可以当作方法引用：
+`fold` 把单个事件合并进正在组装的答案，形状是 `BiConsumer<ChatResponse, ChatStreamEvent>`。消息是
+值，所以不会往已有的那条上追加：fold 持有这一轮的各个片段——角色、目前的内容部分、extras 映射——并在
+其中任何一样变化时重建消息：
 
 ```java
-/** 把单个事件合并进正在组装的答案。 */
-private static void fold(ChatResponse answer, ChatStreamEvent event) {
-    if (event.getId() != null) {
-        answer.setId(event.getId());
-    }
-    if (event.getFinishReason() != null) {
-        answer.setFinishReason(event.getFinishReason());
-    }
-    answer.getExtras().putAll(event.getExtras());
-    if (event.getDelta() != null) {
-        // 把 delta 的各个部分追加到答案的消息上，一次处理一种部分类型
+/** 一条流背后的这一轮：它的片段，以及片段合成的消息。 */
+private static final class Fold implements BiConsumer<ChatResponse, ChatStreamEvent> {
+
+    private final List<ContentPart> parts = new ArrayList<>();
+
+    private final ProviderExtras extras = new ProviderExtras();
+
+    private @Nullable String role;
+
+    @Override
+    public void accept(ChatResponse answer, ChatStreamEvent event) {
+        if (event.getId() != null) {
+            answer.setId(event.getId());
+        }
+        if (event.getFinishReason() != null) {
+            answer.setFinishReason(event.getFinishReason());
+        }
+        extras.putAll(event.getExtras());
+        if (event.getDelta() != null) {
+            // 把 delta 折进这一轮的片段里——文本块接在它前面那个部分之后，工具调用与它延续的那个
+            // 调用合并——一次处理一种部分类型，再用这些片段重建消息。
+            answer.setMessage(new ChatMessage(role, null, parts, extras));
+        }
     }
 }
 ```
@@ -321,7 +335,7 @@ private ChatStreamEvent toEvent(SseEvent frame) {
 
 `DefaultChatStream` 从你的迭代器拉取，每来一个事件就运行 `eventPipeline()`，然后再执行折叠——
 即把单个事件合并进聚合答案的 `BiConsumer<ChatResponse, ChatStreamEvent>`（上文中的
-`MyChatClient::fold`）——于是流事件 customizer 在你的源头与你的折叠之间运行，而两边都不需要
+`Fold`）——于是流事件 customizer 在你的源头与你的折叠之间运行，而两边都不需要
 调用它们。最后一个构造函数参数是关闭动作，这里是 `response::close`：它只运行一次，无论流是被
 关闭、耗尽还是失败，它就是取消连接的那个动作。
 

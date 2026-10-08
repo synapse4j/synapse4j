@@ -14,8 +14,8 @@ reads back. It can also carry `strict`, and provider-specific fields.
 ## A tool
 
 The `Tool` interface is `definition()` and `execute(arguments, context)`, plus `name()`, which
-defaults to the name on the declaration. Most tools are built from one of three classes; a fourth
-path reads them off your own annotated methods.
+defaults to the name on the declaration. Most tools are built from one of four classes; a fifth path
+reads them off your own annotated methods.
 
 **`FunctionTool`** — a typed lambda. The model's arguments decode into your type, the lambda runs,
 and its result is rendered back:
@@ -64,7 +64,9 @@ List<Tool> tools = new MethodTools(codec).from(service);
 
 `from(bean)` reads every annotated method the object has — the instance ones it runs on itself, and the
 static ones, which need no instance — while `from(WeatherService.class)` reads the static ones, the only
-ones a class can supply. Visibility makes no difference, and neither does where a method sits: protected
+ones a class can supply. `from(WeatherService.class, bean)` reads them off the given class and runs them
+on the given instance, which is how a bean the container wrapped in a proxy still yields its tools while
+the proxy stays what a call runs on. Visibility makes no difference, and neither does where a method sits: protected
 and private ones are read, so are the ones the class only inherits, and an override stands in for what
 it overrides. Two methods that would resolve to one tool name are refused, not left to collide.
 

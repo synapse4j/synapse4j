@@ -49,6 +49,31 @@ The settings' Javadoc names every choice and what its default does; each module'
 it contributes. `null` settings applies none of the choices, leaving victools' plain configuration
 for a caller who would rather compose everything.
 
+## Reshaping a schema for the protocol
+
+Generation answers what the type says; a protocol may want the schema shaped another way, or refuse
+part of it. A `JsonSchemaCustomizer` takes a schema and answers the one to use, and the client runs
+the registered ones, in order, over every schema a request sends — each tool's argument schema and
+the response format's:
+
+```java
+client.addJsonSchemaCustomizer(new InlineJsonSchemaCustomizer());
+```
+
+`InlineJsonSchemaCustomizer` is the one the library ships: it replaces every `$ref` into `$defs` with
+a copy of the definition it names, so the answer reads without `$defs` — the step for a protocol that
+takes no `$ref`. A customizer of your own is a lambda:
+
+```java
+client.addJsonSchemaCustomizer(schema -> /* the schema this protocol takes */);
+```
+
+Each answer is cached per schema, so a schema is reshaped once rather than on every call; adding or
+removing a customizer drops the cache. `removeJsonSchemaCustomizer` takes one back off, and
+`jsonSchemaCustomizers()` answers the list — all of it configuration, meant for before the client is
+shared. A tool whose schema was reshaped comes out of the client as a
+[`DelegatingTool`](tools.md).
+
 ## Standing configuration on the client
 
 A model, a temperature or a response format that every call shares belongs on the client:

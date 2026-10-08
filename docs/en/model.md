@@ -52,11 +52,23 @@ The content of a message is a list of parts, each one of:
 `ContentPart` is not final: a provider or an application adds a kind the library does not model by
 subclassing it.
 
-Most messages are a single text part, and there is a shorthand for adding one:
+Most messages are a single text part, which the factories above cover. A message that says more, or
+carries a kind of part other than text, is assembled once — `ChatMessage.of` for a handful of parts,
+the builder for a fuller one:
 
 ```java
-ChatMessage.user("Hello").addText(", world");
+ChatMessage.of(ChatRole.USER, new TextPart("Hello"), new TextPart(", world"));
+
+ChatMessage.builder()
+        .role(ChatRole.USER)
+        .part(new TextPart("Hello"))
+        .part(new TextPart(", world"))
+        .build();
 ```
+
+A message and its parts are values: built once and never changed, so both are safe to keep, share and
+send again as they stand. A change is another message — the one an answer came back for becomes the
+next request's through `toBuilder()` — never an edit to this one.
 
 ## Options
 
@@ -77,8 +89,17 @@ options — can carry a `ProviderExtras` bag, a map from a dotted path to a valu
 the outgoing JSON as it stands:
 
 ```java
-message.getOrCreateExtras().putRaw("thinking.budget_tokens", 2048);
+ChatMessage message = ChatMessage.builder()
+        .role(ChatRole.USER)
+        .part(new TextPart("Hello"))
+        .mapExtras(extras -> extras.putRaw("thinking.budget_tokens", 2048))
+        .build();
 ```
+
+A node's bag is frozen with the node, so an immutable node's bag is filled while that node is being
+built: a message's through `mapExtras`, which hands you a mutable bag — the one `toBuilder()` carried
+over, or a fresh one — and takes back what you return. A node that is still being assembled,
+`ChatOptions` say, hands its bag out to be written directly.
 
 A field a provider sent that the library has no name for is kept on the node it came from, and
 written back when that node goes out again. What travels through is never translated — see

@@ -13,7 +13,7 @@ schema 由你的编解码器生成，因此它描述的正是你的编解码器�
 ## 一个工具
 
 `Tool` 接口有 `definition()` 和 `execute(arguments, context)`，外加 `name()`，默认取声明上的名字。
-多数工具由下面三个类之一构建；还有第四条路，是从你自己带注解的方法上把它们读出来。
+多数工具由下面四个类之一构建；还有第五条路，是从你自己带注解的方法上把它们读出来。
 
 **`FunctionTool`**——一个带类型的 lambda。模型给出的入参会解码成你的类型，lambda 运行，结果再渲染回去：
 
@@ -40,6 +40,14 @@ Tool weather = new MethodTools(codec).of("get_weather", "查询天气", method, 
 
 **`ManualTool`**——只有声明。自己运行模型的调用时用它：它携带声明，并拒绝执行。
 
+**`DelegatingTool`**——替身工具：它给出自己的声明，同时原封不动地运行被代理的那个工具。
+`DelegatingTool.withInputSchema(delegate, inputSchema)` 呈现的是被代理者的声明，只是换掉了入参 schema；
+客户端重塑过 schema 的工具，出来时就是它：
+
+```java
+Tool strictWeather = DelegatingTool.withInputSchema(weather, stricterSchema);
+```
+
 ## 用自己的方法声明工具
 
 `@ToolMethod` 和 `@ToolParam` 把声明放到方法本身上，`MethodTools` 再把一个类读成工具：
@@ -57,7 +65,9 @@ List<Tool> tools = new MethodTools(codec).from(service);
 ```
 
 `from(bean)` 读出对象上所有带注解的方法——需要它自己来跑的实例方法，以及不需要实例的静态方法；而
-`from(WeatherService.class)` 只读静态方法，那是类唯一能提供的。可见性不影响结果，方法放在哪一层也不
+`from(WeatherService.class)` 只读静态方法，那是类唯一能提供的。`from(WeatherService.class, bean)` 则从给定
+的类上读出这些方法，并在给定的实例上运行——容器把 bean 包成代理时，工具照样读得出来，而调用仍落在代理上。
+可见性不影响结果，方法放在哪一层也不
 影响：protected 和 private 的照样读，类只是继承来的那些也读，覆盖方法则顶替它所覆盖的那个。两个方法
 如果会解析出同一个工具名，就直接拒绝，不会留到后面才撞上。
 
