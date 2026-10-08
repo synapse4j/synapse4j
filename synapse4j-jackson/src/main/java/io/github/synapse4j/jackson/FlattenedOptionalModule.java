@@ -1,6 +1,5 @@
 package io.github.synapse4j.jackson;
 
-import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
@@ -62,9 +61,7 @@ public class FlattenedOptionalModule implements Module {
      * @return whether the type is one whose value may be absent
      */
     protected boolean isOptional(ResolvedType type) {
-        Class<?> erased = type.getErasedType();
-        return erased == Optional.class || erased == OptionalInt.class || erased == OptionalLong.class
-                || erased == OptionalDouble.class;
+        return OptionalTypes.isOptional(type);
     }
 
     /**
