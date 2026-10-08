@@ -27,12 +27,12 @@ class ErrorHandlersTest {
     }
 
     @Test
-    void emptyMessageUsesExceptionText() throws Exception {
+    void silentFailureUsesExceptionText() throws Exception {
         ToolExecutor.ErrorHandler handler = ErrorHandlers.message("Error: ");
 
-        String answer = handler.handle(call, new NullPointerException());
-
-        assertEquals("Error: java.lang.NullPointerException", answer);
+        // Nothing to show either way: no message at all, and one of no length.
+        assertEquals("Error: java.lang.RuntimeException", handler.handle(call, new RuntimeException("")));
+        assertEquals("Error: java.lang.NullPointerException", handler.handle(call, new NullPointerException()));
     }
 
     @Test

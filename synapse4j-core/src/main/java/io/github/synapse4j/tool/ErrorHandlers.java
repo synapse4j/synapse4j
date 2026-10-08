@@ -20,8 +20,9 @@ public final class ErrorHandlers {
     /**
      * Answers with the exception's message, carrying the given prefix so the model reads a
      * failure as a failure — a bare message is all too easily taken at face value as tool
-     * output. A message already starting with the prefix comes back verbatim; an empty one
-     * falls back to the exception itself, prefix and all. An empty prefix answers the message
+     * output. A message already starting with the prefix comes back verbatim; one that says
+     * nothing, absent or of no length, falls back to the exception's own name, so the prefix is
+     * never left standing before an empty remainder. An empty prefix answers the message
      * untouched.
      *
      * @param prefix the text every answer carries, for example {@code "Error: "}; never
@@ -31,8 +32,8 @@ public final class ErrorHandlers {
     public static ToolExecutor.ErrorHandler message(@NonNull String prefix) {
         return (call, failure) -> {
             String message = failure.getMessage();
-            if (message == null) {
-                message = failure.toString();
+            if (message == null || message.isEmpty()) {
+                message = failure.getClass().getName();
             }
             return message.startsWith(prefix) ? message : prefix + message;
         };
