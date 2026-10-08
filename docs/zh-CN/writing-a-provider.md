@@ -64,7 +64,9 @@ public class MyConfig {
 
 任一钩子运行之前，基类已经把请求准备好：它先应用客户端自身的默认值，再依次把每一个已注册的请求
 customizer 就地应用到调用者传进来的那个实例上，然后把准备好的请求交给 `doChat` 或 `doStream`。
-子类绝不自己调用 `prepare`——再跑一遍会把 customizer 应用两次。对于钩子构建的流，
+所以填充这两个钩子的实现绝不自己调用 `prepare`——再跑一遍会把 customizer 应用两次——而覆盖
+`chat` 或 `stream` 来按自己的方式准备请求的客户端，才是调用它的那个，因为它取代了基类的那一遍。
+对于钩子构建的流，
 基类期望每个事件都从 `eventPipeline()` 穿过——把流事件 customizer 收在一个
 `Consumer<ChatStreamEvent>` 里——在它的源头与折叠之间：把它交给你的 `DefaultChatStream`，它就
 在那里运行，而不在你的迭代器里。

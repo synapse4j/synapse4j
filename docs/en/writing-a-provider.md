@@ -66,8 +66,10 @@ makes it an abstract `endpoint()` method each protocol answers.
 
 Before either hook runs, the base class has already prepared the request: it applies the client's
 own defaults and then every registered request customizer, in place on the very instance the caller
-passed, and hands that prepared request to `doChat` or `doStream`. A subclass never calls
-`prepare` itself — running it again would apply the customizers twice. For the stream a hook
+passed, and hands that prepared request to `doChat` or `doStream`. So a hook that fills in one of those
+two never calls `prepare` itself — running it again would apply the customizers twice — while a client
+that overrides `chat` or `stream` to prepare a request its own way is the one that calls it, having
+replaced the base class's pass. For the stream a hook
 builds, the base class expects every event to pass through `eventPipeline()` — the stream-event
 customizers as one `Consumer<ChatStreamEvent>` — between its source and its fold: hand it to your
 `DefaultChatStream` and it runs there, not in your iterator.
