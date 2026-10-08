@@ -188,7 +188,11 @@ class CompletionsWriter {
                     throw unsupportedPart(part);
                 }
             }
-            entry.put("content", content);
+            // A turn that only calls tools has nothing to put here, and the member is left out rather
+            // than sent empty — the same rule the text branch below keeps.
+            if (!content.isEmpty()) {
+                entry.put("content", content);
+            }
         } else {
             StringBuilder text = new StringBuilder();
             for (ContentPart part : message.getParts()) {

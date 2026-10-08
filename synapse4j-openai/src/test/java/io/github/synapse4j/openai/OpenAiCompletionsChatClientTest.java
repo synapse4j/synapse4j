@@ -1454,6 +1454,18 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
+    void toolCallOnlyTurnOmitsContent() {
+        stubCompletion();
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT,
+                new ToolCallPart("call_1", "get_weather", "{\"city\":\"Paris\"}")));
+
+        client.chat(request);
+
+        assertFalse(firstMessage(parseCaptured()).containsKey("content"));
+    }
+
+    @Test
     void parallelFragmentsMergeSeparately() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
