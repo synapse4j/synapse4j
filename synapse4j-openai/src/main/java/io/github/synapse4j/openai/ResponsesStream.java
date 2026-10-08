@@ -2,10 +2,12 @@ package io.github.synapse4j.openai;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import org.jspecify.annotations.Nullable;
@@ -42,7 +44,8 @@ import io.github.synapse4j.json.JsonReader;
  * The fold is what turns the frames back into a turn: the fragments are accumulated the way the
  * reader reads a single response, and the frames that carry the whole response replace what the
  * fragments built with the complete turn. So a turn that arrived as twenty text fragments ends up as
- * the one message a single response would have carried.
+ * the one message a single response would have carried. Because a message is a value, the fold keeps
+ * the turn's pieces and rebuilds the message whenever one of them changes.
  *
  * <p>
  * One instance per exchange, built by {@link OpenAiResponsesChatClient} while the response is open;
@@ -62,7 +65,7 @@ class ResponsesStream extends DefaultChatStream {
      */
     ResponsesStream(JsonCodec codec, SseEventStream sse, Consumer<ChatStreamEvent> eventPipeline,
             AutoCloseable closeAction) {
-        super(events(codec, sse, new ResponsesReader()), eventPipeline, ResponsesStream::aggregate, closeAction);
+        super(events(codec, sse, new ResponsesReader()), eventPipeline, new Aggregation(), closeAction);
     }
 
     /**
@@ -134,64 +137,157 @@ class ResponsesStream extends DefaultChatStream {
         }
     }
 
-    /** Folds one event into the answer being assembled. */
-    private static void aggregate(ChatResponse response, ChatStreamEvent event) {
-        if (event.getId() != null) {
-            response.setId(event.getId());
-        }
-        if (event.getModel() != null) {
-            response.setModel(event.getModel());
-        }
-        if (event.getFinishReason() != null) {
-            response.setFinishReason(event.getFinishReason());
-        }
-        if (event.getUsage() != null) {
-            // The answer owns its counts: a frame's usage is a snapshot an application may keep,
-            // and the answer must not be the same object under it.
-            response.setUsage(copyOf(event.getUsage()));
-        }
-        // The frames that carry the whole response are the only ones whose extras are the answer's:
-        // those hold the response's own unmodelled members. Any other frame's payload is stream
-        // bookkeeping — where in the stream it sat, the item it spoke for, the fragment's text —
-        // which is not a field of any answer. Naming the whole-response frames is also what keeps a
-        // kind of frame this module has never heard of from leaking its payload into the answer.
-        if (carriesWholeResponse(event.getEventType())) {
-            response.getExtras().putAll(event.getExtras());
-        }
-        ChatMessage delta = event.getDelta();
-        if (delta == null) {
-            return;
-        }
-        if (finishesAnswer(event.getEventType())) {
-            // The event carries the complete turn, so it takes the place of what the fragments built
-            // rather than being appended to it. The frames that open the answer also carry the whole
-            // response, but an empty one — appending those is harmless, replacing with them would
-            // wipe what the fragments already built.
-            // The complete turn is the answer's own, copied for the same reason a fragment is: a
-            // frame an application kept must not be the object the answer is built on.
-            response.setMessage(copyOf(delta));
-            return;
-        }
-        ChatMessage message = response.getMessage();
-        if (message.getRole() == null && delta.getRole() != null) {
-            // The role is named once, on the frame that opens the turn; the rest of the answer has
-            // nothing to say about it.
-            message.setRole(delta.getRole());
-        }
-        // A field the provider put on a fragment is a field of the answer's message, so it travels
-        // with it rather than staying behind on the event that happened to carry it.
-        ProviderExtras deltaExtras = delta.getExtras();
-        if (deltaExtras != null) {
-            message.getOrCreateExtras().putAll(deltaExtras);
-        }
-        for (ContentPart part : delta.getParts()) {
-            if (part instanceof TextPart text) {
-                appendText(message, text);
-            } else if (part instanceof ToolCallPart call) {
-                mergeToolCall(message, call);
-            } else if (part instanceof ReasoningPart reasoning) {
-                appendReasoning(message, reasoning);
+    /**
+     * The turn being assembled across the frames of one stream. The message is a value, so the fold
+     * holds the turn's pieces and rebuilds the message whenever one of them changes.
+     */
+    private static final class Aggregation implements BiConsumer<ChatResponse, ChatStreamEvent> {
+
+        private @Nullable String role;
+
+        private final List<ContentPart> parts = new ArrayList<>();
+
+        private final ProviderExtras extras = new ProviderExtras();
+
+        @Override
+        public void accept(ChatResponse response, ChatStreamEvent event) {
+            if (event.getId() != null) {
+                response.setId(event.getId());
             }
+            if (event.getModel() != null) {
+                response.setModel(event.getModel());
+            }
+            if (event.getFinishReason() != null) {
+                response.setFinishReason(event.getFinishReason());
+            }
+            if (event.getUsage() != null) {
+                // The answer owns its counts: a frame's usage is a snapshot an application may keep,
+                // and the answer must not be the same object under it.
+                response.setUsage(copyOf(event.getUsage()));
+            }
+            // The frames that carry the whole response are the only ones whose extras are the
+            // answer's: those hold the response's own unmodelled members. Any other frame's payload
+            // is stream bookkeeping — where in the stream it sat, the item it spoke for, the
+            // fragment's text — which is not a field of any answer. Naming the whole-response frames
+            // is also what keeps a kind of frame this module has never heard of from leaking its
+            // payload into the answer.
+            if (carriesWholeResponse(event.getEventType())) {
+                response.getExtras().putAll(event.getExtras());
+            }
+            ChatMessage delta = event.getDelta();
+            if (delta == null) {
+                return;
+            }
+            if (finishesAnswer(event.getEventType())) {
+                // The event carries the complete turn, so it takes the place of what the fragments
+                // built rather than being appended to it. The frames that open the answer also carry
+                // the whole response, but an empty one — appending those is harmless, replacing with
+                // them would wipe what the fragments already built.
+                response.setMessage(delta);
+                return;
+            }
+            boolean changed = false;
+            if (role == null && delta.getRole() != null) {
+                // The role is named once, on the frame that opens the turn; the rest of the answer
+                // has nothing to say about it.
+                role = delta.getRole();
+                changed = true;
+            }
+            // A field the provider put on a fragment is a field of the answer's message, so it
+            // travels with it rather than staying behind on the event that happened to carry it.
+            ProviderExtras deltaExtras = delta.getExtras();
+            if (deltaExtras != null) {
+                extras.putAll(deltaExtras);
+                changed = true;
+            }
+            for (ContentPart part : delta.getParts()) {
+                if (part instanceof TextPart text) {
+                    appendText(text);
+                    changed = true;
+                } else if (part instanceof ToolCallPart call) {
+                    mergeToolCall(call);
+                    changed = true;
+                } else if (part instanceof ReasoningPart reasoning) {
+                    appendReasoning(reasoning);
+                    changed = true;
+                }
+            }
+            if (changed) {
+                response.setMessage(new ChatMessage(role, null, parts, extras));
+            }
+        }
+
+        /** Appends a fragment to the turn's text, which is one part however many frames it took. */
+        private void appendText(TextPart fragment) {
+            if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof TextPart text) {
+                parts.set(parts.size() - 1, new TextPart(join(text.getText(), fragment.getText()), text.getExtras()));
+                return;
+            }
+            parts.add(fragment);
+        }
+
+        /**
+         * Appends a fragment to the turn's reasoning, which is one part however many frames it took —
+         * and, before that, what stops a multi-frame answer from keeping only the last fragment.
+         */
+        private void appendReasoning(ReasoningPart fragment) {
+            if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof ReasoningPart reasoning) {
+                parts.set(parts.size() - 1, new ReasoningPart(join(reasoning.getText(), fragment.getText()),
+                        ProviderExtras.merged(reasoning.getExtras(), fragment.getExtras())));
+                return;
+            }
+            parts.add(fragment);
+        }
+
+        /**
+         * Merges a fragment into the call it belongs to. A call is announced by one frame naming it
+         * and its arguments are then spelled by as many frames as they take, and what arrives is one
+         * part carrying the whole of what the provider said about that call.
+         */
+        private void mergeToolCall(ToolCallPart fragment) {
+            int index = toolCallIndex(fragment);
+            if (index < 0) {
+                parts.add(fragment);
+                return;
+            }
+            ToolCallPart call = (ToolCallPart) parts.get(index);
+            String callName = call.getName() != null ? call.getName() : fragment.getName();
+            parts.set(index, new ToolCallPart(call.getCallId(), callName,
+                    join(call.getArgumentsJson(), fragment.getArgumentsJson()),
+                    ProviderExtras.merged(call.getExtras(), fragment.getExtras())));
+        }
+
+        /**
+         * The call a fragment continues, as the position it occupies in the turn, or {@code -1} when
+         * it opens a new one.
+         */
+        private int toolCallIndex(ToolCallPart fragment) {
+            // The frame that announces a call and the frames that spell its arguments carry the item
+            // they belong to, and nothing else does: the shared model has no field for it, so it is
+            // read back out of the extras the fragment kept it in.
+            Object itemId = extra(fragment, ResponsesReader.ITEM_ID);
+            if (itemId != null) {
+                for (int i = 0; i < parts.size(); i++) {
+                    if (parts.get(i) instanceof ToolCallPart call
+                            && itemId.equals(extra(call, ResponsesReader.ITEM_ID))) {
+                        return i;
+                    }
+                }
+                return -1;
+            }
+            if (fragment.getCallId() != null) {
+                for (int i = 0; i < parts.size(); i++) {
+                    if (parts.get(i) instanceof ToolCallPart call && fragment.getCallId().equals(call.getCallId())) {
+                        return i;
+                    }
+                }
+                return -1;
+            }
+            // Nothing identifies the fragment, so it continues the call that was opened last.
+            if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof ToolCallPart) {
+                return parts.size() - 1;
+            }
+            return -1;
         }
     }
 
@@ -217,68 +313,6 @@ class ResponsesStream extends DefaultChatStream {
                 || finishesAnswer(eventType);
     }
 
-    /** Appends a fragment to the turn's text, which is one part however many frames it took. */
-    private static void appendText(ChatMessage message, TextPart fragment) {
-        List<ContentPart> parts = message.getParts();
-        if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof TextPart text) {
-            text.setText(join(text.getText(), fragment.getText()));
-            return;
-        }
-        parts.add(fragment.copy());
-    }
-
-    /**
-     * Appends a fragment to the turn's reasoning, which is one part however many frames it took —
-     * and, before that, what stops a multi-frame answer from keeping only the last fragment.
-     */
-    private static void appendReasoning(ChatMessage message, ReasoningPart fragment) {
-        List<ContentPart> parts = message.getParts();
-        if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof ReasoningPart reasoning) {
-            reasoning.setText(join(reasoning.getText(), fragment.getText()));
-            ProviderExtras fragmentExtras = fragment.getExtras();
-            if (fragmentExtras != null) {
-                reasoning.getOrCreateExtras().putAll(fragmentExtras);
-            }
-            return;
-        }
-        parts.add(fragment.copy());
-    }
-
-    /**
-     * Merges a fragment into the call it belongs to. A call is announced by one frame naming it and
-     * its arguments are then spelled by as many frames as they take, and what arrives is one part
-     * carrying the whole of what the provider said about that call.
-     */
-    private static void mergeToolCall(ChatMessage message, ToolCallPart fragment) {
-        ToolCallPart call = toolCallFor(message, fragment);
-        if (call == null) {
-            message.getParts().add(fragment.copy());
-            return;
-        }
-        if (call.getName() == null) {
-            call.setName(fragment.getName());
-        }
-        call.setArgumentsJson(join(call.getArgumentsJson(), fragment.getArgumentsJson()));
-        ProviderExtras fragmentExtras = fragment.getExtras();
-        if (fragmentExtras != null) {
-            call.getOrCreateExtras().putAll(fragmentExtras);
-        }
-    }
-
-    /** The turn the answer owns, copied so it never shares a part a frame handed out. */
-    private static ChatMessage copyOf(ChatMessage message) {
-        ChatMessage copy = new ChatMessage();
-        copy.setRole(message.getRole());
-        copy.setId(message.getId());
-        for (ContentPart part : message.getParts()) {
-            copy.getParts().add(part.copy());
-        }
-        if (message.getExtras() != null) {
-            copy.getOrCreateExtras().putAll(message.getExtras());
-        }
-        return copy;
-    }
-
     /**
      * An independent copy of a frame's counts, so the answer owns the usage it carries and a frame
      * an application kept does not change as later frames report more.
@@ -290,36 +324,6 @@ class ResponsesStream extends DefaultChatStream {
         copy.setCachedInputTokens(usage.getCachedInputTokens());
         copy.getExtras().putAll(usage.getExtras());
         return copy;
-    }
-
-    /** The call a fragment continues, or {@code null} when it opens a new one. */
-    private static @Nullable ToolCallPart toolCallFor(ChatMessage message, ToolCallPart fragment) {
-        List<ContentPart> parts = message.getParts();
-        // The frame that announces a call and the frames that spell its arguments carry the item they
-        // belong to, and nothing else does: the shared model has no field for it, so it is read back
-        // out of the extras the fragment kept it in.
-        Object itemId = extra(fragment, ResponsesReader.ITEM_ID);
-        if (itemId != null) {
-            for (ContentPart part : parts) {
-                if (part instanceof ToolCallPart call && itemId.equals(extra(call, ResponsesReader.ITEM_ID))) {
-                    return call;
-                }
-            }
-            return null;
-        }
-        if (fragment.getCallId() != null) {
-            for (ContentPart part : parts) {
-                if (part instanceof ToolCallPart call && fragment.getCallId().equals(call.getCallId())) {
-                    return call;
-                }
-            }
-            return null;
-        }
-        // Nothing identifies the fragment, so it continues the call that was opened last.
-        if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof ToolCallPart open) {
-            return open;
-        }
-        return null;
     }
 
     /** One member a part kept in its extras, or {@code null} when it carries no bag or not that one. */

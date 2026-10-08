@@ -241,12 +241,34 @@ class ProviderExtrasTest {
         ProviderExtras frozen = new ProviderExtras().put("temperature", 0.5).freeze();
 
         assertEquals(0.5, frozen.get("temperature"));
+        assertTrue(frozen.isFrozen());
         assertSame(frozen, frozen.freeze());
         assertThrows(UnsupportedOperationException.class, () -> frozen.put("top_p", 1.0));
         assertThrows(UnsupportedOperationException.class, () -> frozen.putRaw("raw", 1));
         assertThrows(UnsupportedOperationException.class, () -> frozen.remove("temperature"));
         assertThrows(UnsupportedOperationException.class,
                 () -> frozen.putAll(new ProviderExtras().put("top_p", 1.0)));
+    }
+
+    @Test
+    void mergedOverlayWinsFreshBag() {
+        ProviderExtras base = new ProviderExtras().put("a", 1);
+        ProviderExtras overlay = new ProviderExtras().put("a", 3).put("b", 2);
+
+        ProviderExtras merged = ProviderExtras.merged(base, overlay);
+
+        assertEquals(3, merged.get("a"));
+        assertEquals(2, merged.get("b"));
+        assertFalse(merged.isFrozen());
+        assertEquals(1, base.get("a"));
+    }
+
+    @Test
+    void mergedTreatsNullAsEmpty() {
+        ProviderExtras merged = ProviderExtras.merged(null, new ProviderExtras().put("a", 1));
+
+        assertEquals(1, merged.get("a"));
+        assertTrue(ProviderExtras.merged(null, null).isEmpty());
     }
 
     @Test

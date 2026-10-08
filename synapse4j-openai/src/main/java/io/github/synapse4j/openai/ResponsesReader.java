@@ -140,9 +140,9 @@ class ResponsesReader {
      */
     private ChatResponse readResponse(JsonReader reader) {
         ChatResponse response = new ChatResponse();
-        ChatMessage message = response.getMessage();
         // The turn is the model's wherever it is read from, and no item in the output has to say so.
-        message.setRole(ChatRole.ASSISTANT);
+        ChatMessage.Builder message = ChatMessage.builder().role(ChatRole.ASSISTANT);
+        ProviderExtras messageExtras = new ProviderExtras();
         String status = null;
         String incompleteReason = null;
         Object error = null;
@@ -153,7 +153,7 @@ class ResponsesReader {
             switch (field) {
                 case "id" -> response.setId(reader.string());
                 case "model" -> response.setModel(reader.string());
-                case "output" -> calledTool = readOutput(reader, response, message);
+                case "output" -> calledTool = readOutput(reader, response, message, messageExtras);
                 case "status" -> status = reader.string();
                 case "incomplete_details" -> incompleteReason = readIncompleteDetails(reader, response);
                 case "usage" -> response.setUsage(readUsage(reader));
@@ -166,6 +166,10 @@ class ResponsesReader {
             // give one, and the detail belongs in the message rather than in an extras bag.
             throw failed(error);
         }
+        if (!messageExtras.isEmpty()) {
+            message.extras(messageExtras);
+        }
+        response.setMessage(message.build());
         response.setFinishReason(finishReason(status, calledTool, incompleteReason));
         return response;
     }
@@ -176,7 +180,8 @@ class ResponsesReader {
      *
      * @return whether the output carried a tool call
      */
-    private static boolean readOutput(JsonReader reader, ChatResponse response, ChatMessage message) {
+    private static boolean readOutput(JsonReader reader, ChatResponse response, ChatMessage.Builder message,
+            ProviderExtras messageExtras) {
         if (reader.token() != JsonReader.Token.START_ARRAY) {
             reader.skipValue();
             return false;
@@ -189,7 +194,7 @@ class ResponsesReader {
                 position++;
                 continue;
             }
-            calledTool |= readItem(reader, response, message, position);
+            calledTool |= readItem(reader, response, message, messageExtras, position);
             position++;
         }
         return calledTool;
@@ -201,7 +206,8 @@ class ResponsesReader {
      *
      * @return whether the item was a tool call
      */
-    private static boolean readItem(JsonReader reader, ChatResponse response, ChatMessage message, int position) {
+    private static boolean readItem(JsonReader reader, ChatResponse response, ChatMessage.Builder message,
+            ProviderExtras messageExtras, int position) {
         String type = null;
         Map<String, Object> members = new LinkedHashMap<>();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
@@ -215,7 +221,7 @@ class ResponsesReader {
             }
         }
         if ("message".equals(type)) {
-            readMessageItem(members, message);
+            readMessageItem(members, message, messageExtras);
             return false;
         }
         if ("function_call".equals(type)) {
@@ -241,17 +247,19 @@ class ResponsesReader {
      * A message item: what it says becomes the turn's text, and the item's own identity and status
      * ride in the message's extras — which is what lets the turn be replayed as the item it was.
      */
-    private static void readMessageItem(Map<String, Object> members, ChatMessage message) {
+    private static void readMessageItem(Map<String, Object> members, ChatMessage.Builder message,
+            ProviderExtras messageExtras) {
         for (Map.Entry<String, Object> member : members.entrySet()) {
             if ("content".equals(member.getKey())) {
-                readMessageContent(member.getValue(), message);
+                readMessageContent(member.getValue(), message, messageExtras);
             } else {
-                message.getOrCreateExtras().put(member.getKey(), member.getValue());
+                messageExtras.put(member.getKey(), member.getValue());
             }
         }
     }
 
-    private static void readMessageContent(@Nullable Object value, ChatMessage message) {
+    private static void readMessageContent(@Nullable Object value, ChatMessage.Builder message,
+            ProviderExtras messageExtras) {
         if (!(value instanceof List<?> entries)) {
             return;
         }
@@ -268,37 +276,40 @@ class ResponsesReader {
                 // message-level cousins travel under, so an application reads one member however
                 // the protocol chose to deliver the words — and the walk goes on to the parts
                 // beside it instead of failing on it.
-                message.getOrCreateExtras().put("refusal", members.get("refusal"));
+                messageExtras.put("refusal", members.get("refusal"));
                 continue;
             }
             if (!"output_text".equals(type)) {
                 throw new SynapseException("unsupported content part in OpenAI Responses response: " + type);
             }
-            TextPart part = new TextPart(stringOf(members.get("text")));
+            ProviderExtras extras = new ProviderExtras();
             for (Map.Entry<?, ?> member : members.entrySet()) {
                 String name = String.valueOf(member.getKey());
                 if (!"type".equals(name) && !"text".equals(name)) {
                     // The citations and log-probabilities the entry carries belong to this text, so
                     // they stay on the part rather than on the message the part sits in.
-                    part.getOrCreateExtras().put(name, member.getValue());
+                    extras.put(name, member.getValue());
                 }
             }
-            message.getParts().add(part);
+            message.part(new TextPart(stringOf(members.get("text")), extras));
         }
     }
 
     /** A tool call item: this protocol keys it by {@code call_id}, and its id and status ride along. */
-    private static void readFunctionCallItem(Map<String, Object> members, ChatMessage message) {
-        ToolCallPart call = new ToolCallPart();
+    private static void readFunctionCallItem(Map<String, Object> members, ChatMessage.Builder message) {
+        String callId = null;
+        String callName = null;
+        String argumentsJson = null;
+        ProviderExtras extras = new ProviderExtras();
         for (Map.Entry<String, Object> member : members.entrySet()) {
             switch (member.getKey()) {
-                case "call_id" -> call.setCallId(stringOf(member.getValue()));
-                case "name" -> call.setName(stringOf(member.getValue()));
-                case "arguments" -> call.setArgumentsJson(stringOf(member.getValue()));
-                default -> call.getOrCreateExtras().put(member.getKey(), member.getValue());
+                case "call_id" -> callId = stringOf(member.getValue());
+                case "name" -> callName = stringOf(member.getValue());
+                case "arguments" -> argumentsJson = stringOf(member.getValue());
+                default -> extras.put(member.getKey(), member.getValue());
             }
         }
-        message.getParts().add(call);
+        message.part(new ToolCallPart(callId, callName, argumentsJson, extras));
     }
 
     /**
@@ -306,7 +317,7 @@ class ResponsesReader {
      * companion the provider attached ride in its extras — a provider that requires its reasoning
      * back will not take the next turn without them.
      */
-    private static void readReasoningItem(Map<String, Object> members, ChatMessage message) {
+    private static void readReasoningItem(Map<String, Object> members, ChatMessage.Builder message) {
         String text = null;
         ProviderExtras extras = new ProviderExtras();
         for (Map.Entry<String, Object> member : members.entrySet()) {
@@ -320,10 +331,7 @@ class ResponsesReader {
             // A reasoning item with nothing said and nothing to replay contributes nothing.
             return;
         }
-        ReasoningPart reasoning = new ReasoningPart();
-        reasoning.setText(text);
-        reasoning.getOrCreateExtras().putAll(extras);
-        message.getParts().add(reasoning);
+        message.part(new ReasoningPart(text, extras));
     }
 
     /** The summary's text, as the entries spell it; {@code null} when none of them says anything. */
@@ -415,10 +423,9 @@ class ResponsesReader {
         if (fragment == null) {
             return;
         }
-        ToolCallPart call = new ToolCallPart();
-        call.setArgumentsJson(fragment);
-        streamPosition(payload, call);
-        event.setDelta(delta(call));
+        ProviderExtras extras = new ProviderExtras();
+        streamPosition(payload, extras);
+        event.setDelta(delta(new ToolCallPart(null, null, fragment, extras)));
     }
 
     private static void reasoningDelta(ChatStreamEvent event, ProviderExtras payload) {
@@ -428,10 +435,9 @@ class ResponsesReader {
         if (fragment == null) {
             return;
         }
-        ReasoningPart reasoning = new ReasoningPart();
-        reasoning.setText(fragment);
-        streamPosition(payload, reasoning);
-        event.setDelta(delta(reasoning));
+        ProviderExtras extras = new ProviderExtras();
+        streamPosition(payload, extras);
+        event.setDelta(delta(new ReasoningPart(fragment, extras)));
     }
 
     /**
@@ -443,31 +449,28 @@ class ResponsesReader {
         // The frame belongs to the event; see textDelta.
         event.getExtras().putAll(payload);
         if (payload.get("item") instanceof Map<?, ?> item && "function_call".equals(item.get("type"))) {
-            ToolCallPart call = new ToolCallPart();
-            call.setName(stringOf(item.get("name")));
-            call.setCallId(stringOf(item.get("call_id")));
-            streamPosition(payload, call);
-            event.setDelta(delta(call));
+            ProviderExtras extras = new ProviderExtras();
+            streamPosition(payload, extras);
+            event.setDelta(delta(new ToolCallPart(stringOf(item.get("call_id")), stringOf(item.get("name")),
+                    null, extras)));
         }
     }
 
     /** Keeps the position a fragment came with on the part it produced, where the fold reads it back. */
-    private static void streamPosition(ProviderExtras payload, ContentPart part) {
+    private static void streamPosition(ProviderExtras payload, ProviderExtras partExtras) {
         Object itemId = payload.get(ITEM_ID);
         if (itemId != null) {
-            part.getOrCreateExtras().put(ITEM_ID, itemId);
+            partExtras.put(ITEM_ID, itemId);
         }
         Object outputIndex = payload.get(OUTPUT_INDEX);
         if (outputIndex != null) {
-            part.getOrCreateExtras().put(OUTPUT_INDEX, outputIndex);
+            partExtras.put(OUTPUT_INDEX, outputIndex);
         }
     }
 
     /** A fragment as the one-part turn it is folded through. */
     private static ChatMessage delta(ContentPart part) {
-        ChatMessage delta = new ChatMessage();
-        delta.getParts().add(part);
-        return delta;
+        return new ChatMessage(null, null, part);
     }
 
     /**

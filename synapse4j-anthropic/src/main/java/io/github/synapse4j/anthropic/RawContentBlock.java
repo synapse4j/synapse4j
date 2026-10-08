@@ -1,9 +1,13 @@
 package io.github.synapse4j.anthropic;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.ProviderExtras;
 import lombok.Getter;
 import lombok.NonNull;
 
@@ -21,6 +25,11 @@ import lombok.NonNull;
  * <p>
  * The members are the block exactly as it was read, keyed by the protocol's own names: this type
  * adds nothing to them and nothing may be added behind the protocol's back.
+ *
+ * <p>
+ * A block is a value: once built it never changes, so it is safe to share across calls and threads.
+ * Its members and its {@link ProviderExtras} bag are frozen on the way in; the members are copied
+ * shallowly, so a value the caller still holds and later changes is seen through the block too.
  */
 @Getter
 public class RawContentBlock extends ContentPart {
@@ -34,21 +43,22 @@ public class RawContentBlock extends ContentPart {
      * @param block the captured block; never {@code null}, always a JSON object
      */
     public RawContentBlock(@NonNull Map<?, ?> block) {
-        // A copy, not the caller's map: a streamed block is completed later, member by member, and
-        // the map the reader handed over belongs to the reader — one built on an immutable tree
-        // would refuse that write.
-        Map<String, Object> copy = new LinkedHashMap<>();
-        block.forEach((key, value) -> copy.put(String.valueOf(key), value));
-        this.members = copy;
+        this(block, null);
     }
 
-    @Override
-    public RawContentBlock copy() {
-        RawContentBlock copy = new RawContentBlock(members);
-        if (getExtras() != null) {
-            copy.getOrCreateExtras().putAll(getExtras());
-        }
-        return copy;
+    /**
+     * A block kept whole, with provider-specific fields.
+     *
+     * @param block  the captured block; never {@code null}, always a JSON object
+     * @param extras provider-specific fields, {@code null} for none; frozen on the way in
+     */
+    public RawContentBlock(@NonNull Map<?, ?> block, @Nullable ProviderExtras extras) {
+        super(extras);
+        // A copy, not the caller's map: the members are frozen with the block, and the map the
+        // reader handed over belongs to the reader.
+        Map<String, Object> copy = new LinkedHashMap<>();
+        block.forEach((key, value) -> copy.put(String.valueOf(key), value));
+        this.members = Collections.unmodifiableMap(copy);
     }
 
     /**

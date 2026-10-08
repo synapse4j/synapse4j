@@ -31,9 +31,9 @@ import lombok.ToString;
 @ToString
 public class ChatResponse {
 
-    /** The assistant's turn. Never {@code null}; its role is set by the adapter. */
+    /** The assistant's turn. Never {@code null}; the adapter sets the turn it assembled. */
     @NonNull
-    private ChatMessage message = new ChatMessage();
+    private ChatMessage message = new ChatMessage(null, null);
 
     /** Why generation stopped: a {@link ChatFinishReason} constant, or any other provider value. */
     private @Nullable String finishReason;

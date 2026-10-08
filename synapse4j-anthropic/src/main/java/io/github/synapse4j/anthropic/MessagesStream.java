@@ -2,8 +2,11 @@ package io.github.synapse4j.anthropic;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -146,7 +149,10 @@ class MessagesStream extends DefaultChatStream {
     }
 
     /**
-     * The fold: one instance per stream, assembling the answer as events are consumed. It tracks
+     * The fold: one instance per stream, assembling the answer as events are consumed. It holds the
+     * answer's parts, its role and its message-level fields as it goes, and rebuilds the aggregated
+     * message whenever one of them changes — a part is a value, so a fragment joining a block makes
+     * a new part in the old one's place rather than changing the one a frame handed out. It tracks
      * which part each block's bracket index named, because a delta belongs to the block its index
      * says — never to whichever part happened to be added last, which is how one block's input used
      * to leak into its neighbour's. The state lives exactly as long as the stream that owns it and
@@ -155,6 +161,15 @@ class MessagesStream extends DefaultChatStream {
     private static final class Fold implements BiConsumer<ChatResponse, ChatStreamEvent> {
 
         private final JsonCodec codec;
+
+        /** The answer's parts, in the order they arrived. */
+        private final List<ContentPart> parts = new ArrayList<>();
+
+        /** The role the frame that opened the turn named, or {@code null} until one does. */
+        private @Nullable String role;
+
+        /** Provider-specific fields lifted off fragments onto the answer's message. */
+        private final ProviderExtras messageExtras = new ProviderExtras();
 
         /** The part each open block opened, by the block's bracket index. */
         private final Map<Integer, ContentPart> openBlocks = new HashMap<>();
@@ -182,54 +197,63 @@ class MessagesStream extends DefaultChatStream {
             }
             foldExtras(response.getExtras(), event.getExtras());
             String eventType = event.getEventType();
+            boolean messageChanged = false;
             if (AnthropicEventTypes.CONTENT_BLOCK_STOP.equals(eventType)) {
-                closeBlock(event);
+                messageChanged = closeBlock(event);
             }
             if (AnthropicEventTypes.MESSAGE_STOP.equals(eventType)) {
                 // Every block has closed by now — or should have: any input whose stop frame never
                 // arrived still lands in its block rather than being dropped, and a call whose input
                 // never streamed means the empty object, which is what the protocol sends for a tool
                 // that takes no arguments.
-                writeUnmodeledInputs();
-                normalizeEmptyInputs(response.getMessage());
+                messageChanged = writeUnmodeledInputs() || messageChanged;
+                messageChanged = normalizeEmptyInputs() || messageChanged;
             }
             ChatMessage delta = event.getDelta();
-            if (delta == null) {
-                return;
-            }
-            ChatMessage message = response.getMessage();
-            if (message.getRole() == null && delta.getRole() != null) {
-                // The role is named once, on the frame that opens the turn; the rest of the answer has
-                // nothing to say about it.
-                message.setRole(delta.getRole());
-            }
-            // A field the provider put on a fragment is a field of the answer's message, so it travels
-            // with it rather than staying behind on the frame that happened to carry it.
-            ProviderExtras deltaExtras = delta.getExtras();
-            if (deltaExtras != null) {
-                message.getOrCreateExtras().putAll(deltaExtras);
-            }
-            Integer index = indexOf(event);
-            boolean opensBlock = AnthropicEventTypes.CONTENT_BLOCK_START.equals(eventType);
-            for (ContentPart part : delta.getParts()) {
-                if (opensBlock) {
-                    // The frame that opens a block is where the block becomes a part: one block is one
-                    // part, however many deltas follow, and a later block never merges into an
-                    // earlier one even when the two are of the same kind. The part is the answer's own,
-                    // copied from the frame's, so a frame an application kept does not grow under it.
-                    ContentPart owned = part.copy();
-                    message.getParts().add(owned);
-                    if (index != null) {
-                        openBlocks.put(index, owned);
-                    }
-                } else {
-                    mergeFragment(message, part, index);
+            if (delta != null) {
+                if (role == null && delta.getRole() != null) {
+                    // The role is named once, on the frame that opens the turn; the rest of the answer
+                    // has nothing to say about it.
+                    role = delta.getRole();
                 }
+                // A field the provider put on a fragment is a field of the answer's message, so it
+                // travels with it rather than staying behind on the frame that happened to carry it.
+                ProviderExtras deltaExtras = delta.getExtras();
+                if (deltaExtras != null) {
+                    messageExtras.putAll(deltaExtras);
+                }
+                Integer index = indexOf(event);
+                boolean opensBlock = AnthropicEventTypes.CONTENT_BLOCK_START.equals(eventType);
+                for (ContentPart part : delta.getParts()) {
+                    if (opensBlock) {
+                        // The frame that opens a block is where the block becomes a part: one block is
+                        // one part, however many deltas follow, and a later block never merges into an
+                        // earlier one even when the two are of the same kind.
+                        parts.add(part);
+                        if (index != null) {
+                            openBlocks.put(index, part);
+                        }
+                    } else {
+                        mergeFragment(part, index);
+                    }
+                }
+                messageChanged = true;
+            }
+            if (messageChanged) {
+                publish(response);
             }
         }
 
+        /**
+         * The aggregated message as the value it now is — the parts, role and fields the fold holds.
+         * An empty bag is no bag, so the constructor leaves an unconfigured message without one.
+         */
+        private void publish(ChatResponse response) {
+            response.setMessage(new ChatMessage(role, null, parts, messageExtras));
+        }
+
         /** Joins one fragment to the block its index names, or places it if that block is unknown. */
-        private void mergeFragment(ChatMessage message, ContentPart fragment, @Nullable Integer index) {
+        private void mergeFragment(ContentPart fragment, @Nullable Integer index) {
             ContentPart target = index == null ? null : openBlocks.get(index);
             if (target instanceof RawContentBlock) {
                 // The block keeps itself whole; only its input still streams, as fragments of JSON
@@ -243,7 +267,7 @@ class MessagesStream extends DefaultChatStream {
                 return;
             }
             if (target != null) {
-                mergeInto(target, fragment, message);
+                mergeInto(target, fragment);
                 return;
             }
             if (fragment instanceof ToolCallPart) {
@@ -252,45 +276,76 @@ class MessagesStream extends DefaultChatStream {
                 return;
             }
             // No opening frame was seen for this index — the fragment opens its own part, and the
-            // frames that follow find it here. The part is the answer's own, as above.
-            ContentPart owned = fragment.copy();
-            message.getParts().add(owned);
+            // frames that follow find it here.
+            parts.add(fragment);
             if (index != null) {
-                openBlocks.put(index, owned);
+                openBlocks.put(index, fragment);
             }
         }
 
-        /** Closes the block its index names: the part is done, and the input it spelled is written. */
-        private void closeBlock(ChatStreamEvent event) {
+        /**
+         * Closes the block its index names: the part is done, and the input it spelled is written.
+         *
+         * @return whether the block's part was rebuilt to carry the input it spelled
+         */
+        private boolean closeBlock(ChatStreamEvent event) {
             Integer index = indexOf(event);
             if (index == null) {
-                return;
+                return false;
             }
             ContentPart target = openBlocks.remove(index);
             StringBuilder input = unmodeledInput.remove(index);
             if (input != null && target instanceof RawContentBlock block) {
-                writeInput(block, input);
+                return writeInput(block, input);
             }
-        }
-
-        /** Writes every input still held — for a block whose stop frame never arrived. */
-        private void writeUnmodeledInputs() {
-            unmodeledInput.forEach((index, input) -> {
-                ContentPart target = openBlocks.get(index);
-                if (target instanceof RawContentBlock block) {
-                    writeInput(block, input);
-                }
-            });
-            unmodeledInput.clear();
+            return false;
         }
 
         /**
-         * Parses the input an unmodeled block spelled and sets it into the block itself, as the
-         * object the protocol expects when the block is sent back.
+         * Writes every input still held — for a block whose stop frame never arrived.
+         *
+         * @return whether any block's part was rebuilt to carry the input it spelled
          */
-        private void writeInput(RawContentBlock block, StringBuilder input) {
+        private boolean writeUnmodeledInputs() {
+            boolean written = false;
+            for (Map.Entry<Integer, StringBuilder> entry : unmodeledInput.entrySet()) {
+                ContentPart target = openBlocks.get(entry.getKey());
+                if (target instanceof RawContentBlock block && writeInput(block, entry.getValue())) {
+                    written = true;
+                }
+            }
+            unmodeledInput.clear();
+            return written;
+        }
+
+        /**
+         * Gives every assembled call the arguments it carries at the end: nothing said spells the
+         * empty object.
+         *
+         * @return whether any call's part was rebuilt to carry the empty object
+         */
+        private boolean normalizeEmptyInputs() {
+            boolean normalized = false;
+            for (ContentPart part : List.copyOf(parts)) {
+                if (part instanceof ToolCallPart call
+                        && (call.getArgumentsJson() == null || call.getArgumentsJson().isBlank())
+                        && replace(part, new ToolCallPart(call.getCallId(), call.getName(), "{}",
+                                call.getExtras()))) {
+                    normalized = true;
+                }
+            }
+            return normalized;
+        }
+
+        /**
+         * Parses the input an unmodeled block spelled and puts it into the block itself, as the
+         * object the protocol expects when the block is sent back.
+         *
+         * @return whether the block was rebuilt to carry the input
+         */
+        private boolean writeInput(RawContentBlock block, StringBuilder input) {
             if (input.isEmpty()) {
-                return;
+                return false;
             }
             Object parsed;
             try {
@@ -301,9 +356,12 @@ class MessagesStream extends DefaultChatStream {
                 // this module's pom carries no JSON library for a caller to catch it by.
                 throw new SynapseException("streamed block input is not valid JSON", failure);
             }
-            if (parsed != null) {
-                block.getMembers().put("input", parsed);
+            if (parsed == null) {
+                return false;
             }
+            Map<String, Object> members = new LinkedHashMap<>(block.getMembers());
+            members.put("input", parsed);
+            return replace(block, new RawContentBlock(members, block.getExtras()));
         }
 
         /** The bracket a frame carries for the block it speaks for, or {@code null} when it names none. */
@@ -314,30 +372,60 @@ class MessagesStream extends DefaultChatStream {
 
         /**
          * Merges a fragment into the part its block opened. The kinds are the block's own — a delta
-         * never changes what its block is — and a fragment whose kind disagrees with the part it
-         * names is kept as a part of its own rather than forced into a shape it does not fit.
+         * never changes what its block is — so the merged part is built as the same kind, carrying
+         * the joined value, and takes the old one's place.
          */
-        private static void mergeInto(ContentPart target, ContentPart fragment, ChatMessage message) {
+        private void mergeInto(ContentPart target, ContentPart fragment) {
             if (target instanceof TextPart text && fragment instanceof TextPart piece) {
-                text.setText(join(text.getText(), piece.getText()));
+                replace(target, new TextPart(join(text.getText(), piece.getText()), text.getExtras()));
             } else if (target instanceof ToolCallPart call && fragment instanceof ToolCallPart piece) {
-                if (call.getName() == null) {
-                    call.setName(piece.getName());
-                }
-                call.setArgumentsJson(join(call.getArgumentsJson(), piece.getArgumentsJson()));
-                ProviderExtras fragmentExtras = piece.getExtras();
-                if (fragmentExtras != null) {
-                    call.getOrCreateExtras().putAll(fragmentExtras);
-                }
+                String name = call.getName() != null ? call.getName() : piece.getName();
+                replace(target, new ToolCallPart(call.getCallId(), name,
+                        join(call.getArgumentsJson(), piece.getArgumentsJson()),
+                        merge(call.getExtras(), piece.getExtras())));
             } else if (target instanceof ReasoningPart reasoning && fragment instanceof ReasoningPart piece) {
-                reasoning.setText(join(reasoning.getText(), piece.getText()));
-                ProviderExtras fragmentExtras = piece.getExtras();
-                if (fragmentExtras != null) {
-                    reasoning.getOrCreateExtras().putAll(fragmentExtras);
-                }
+                replace(target, new ReasoningPart(join(reasoning.getText(), piece.getText()),
+                        merge(reasoning.getExtras(), piece.getExtras())));
             } else {
-                message.getParts().add(fragment.copy());
+                // A fragment whose kind disagrees with the part it names is kept as a part of its own
+                // rather than forced into a shape it does not fit.
+                parts.add(fragment);
             }
+        }
+
+        /**
+         * Puts a new instance of a part where the fold holds the old one, and points the block the
+         * old one belonged to at the new instance — so a later delta that names the same block finds
+         * the part it just built.
+         *
+         * @return whether the old part was one the fold held
+         */
+        private boolean replace(ContentPart current, ContentPart replacement) {
+            int position = parts.indexOf(current);
+            if (position < 0) {
+                return false;
+            }
+            parts.set(position, replacement);
+            openBlocks.replaceAll((index, part) -> part == current ? replacement : part);
+            return true;
+        }
+
+        /**
+         * The two bags as one, or whichever is present when the other is not; {@code null} when
+         * neither is, so a part nobody configured carries no bag at all.
+         */
+        private static @Nullable ProviderExtras merge(@Nullable ProviderExtras current,
+                @Nullable ProviderExtras addition) {
+            if (addition == null || addition.isEmpty()) {
+                return current;
+            }
+            if (current == null) {
+                return addition;
+            }
+            ProviderExtras merged = new ProviderExtras();
+            merged.putAll(current);
+            merged.putAll(addition);
+            return merged;
         }
     }
 
@@ -392,16 +480,6 @@ class MessagesStream extends DefaultChatStream {
         copy.setCachedInputTokens(usage.getCachedInputTokens());
         copy.getExtras().putAll(usage.getExtras());
         return copy;
-    }
-
-    /** The arguments every assembled call carries at the end: nothing said spells the empty object. */
-    private static void normalizeEmptyInputs(ChatMessage message) {
-        for (ContentPart part : message.getParts()) {
-            if (part instanceof ToolCallPart call
-                    && (call.getArgumentsJson() == null || call.getArgumentsJson().isBlank())) {
-                call.setArgumentsJson("{}");
-            }
-        }
     }
 
     /** The arguments as they arrive: a fragment is a piece of the JSON text, not a value. */

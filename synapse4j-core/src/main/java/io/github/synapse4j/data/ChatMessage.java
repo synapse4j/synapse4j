@@ -1,14 +1,15 @@
 package io.github.synapse4j.data;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 import org.jspecify.annotations.Nullable;
 
+import lombok.Builder;
+import lombok.Generated;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.NonNull;
-import lombok.Setter;
+import lombok.Singular;
 
 /**
  * One turn of a conversation: who is speaking, and what they contribute.
@@ -23,52 +24,72 @@ import lombok.Setter;
  * field belongs to the thing it applies to, not to the whole request. Each class declares its own bag
  * instead of inheriting one from a common base: no library surveyed models a universal node base
  * class, and the cost of not having one is a single field per class.
+ *
+ * <p>
+ * A message is a value: once built it never changes, so it is safe to share across calls and threads.
+ * Its parts and its {@link ProviderExtras} bag are frozen on the way in, and its own fields are
+ * nullable the way a part's are, because the shared model assumes nothing about what a protocol
+ * requires.
  */
 @Getter
-@Setter
-@NoArgsConstructor
+@Builder(builderClassName = "Builder", toBuilder = true)
 public class ChatMessage {
 
     /** Who contributes this message: a {@link ChatRole} constant, or any other value. */
-    private @Nullable String role;
+    private final @Nullable String role;
 
     /**
      * An identifier for this message, owned by the application — whatever value its persistence
-     * needs to tell one message from another across calls; {@code null} until someone sets one.
+     * needs to tell one message from another across calls; {@code null} when it has none.
      */
-    private @Nullable String id;
+    private final @Nullable String id;
 
     /** What the message contributes. Never {@code null}; empty is allowed. */
-    private final List<ContentPart> parts = new ArrayList<>();
+    @Singular
+    private final List<ContentPart> parts;
 
     /**
-     * Provider-specific fields to merge into this message when the request is sent. Absent until one
-     * is set: a message nobody configures carries no bag at all.
+     * Provider-specific fields to merge into this message when the request is sent, frozen; {@code null}
+     * when the message carries none. A message nobody configures carries no bag at all.
      */
-    private @Nullable ProviderExtras extras;
+    private final @Nullable ProviderExtras extras;
 
     /**
-     * The extras bag, created on first use — never {@code null}, unlike {@code getExtras()}.
-     * Only a node about to record something allocates; a message nobody configures still
-     * carries no bag until this is called.
+     * A message from the given speaker, saying whatever the given parts say.
      *
-     * @return this message's extras, existing or fresh; never {@code null}
+     * @param role  the {@link ChatRole} constant, or any other value; {@code null} leaves the role unset
+     * @param id    the application's identifier for this message, {@code null} when it has none
+     * @param parts what the message contributes; none at all is allowed
      */
-    public ProviderExtras getOrCreateExtras() {
-        if (extras == null) {
-            extras = new ProviderExtras();
-        }
-        return extras;
+    public ChatMessage(@Nullable String role, @Nullable String id, ContentPart... parts) {
+        this(role, id, List.of(parts), null);
     }
 
     /**
-     * A message from the given speaker, with nothing said yet.
+     * A message from the given speaker, saying what the given parts say.
      *
-     * @param role the {@link ChatRole} constant, or any other value; {@code null} leaves the role
-     *                 unset, as a message nobody has given one has it
+     * @param role  the {@link ChatRole} constant, or any other value; {@code null} leaves the role unset
+     * @param id    the application's identifier for this message, {@code null} when it has none
+     * @param parts what the message contributes; never {@code null}, empty allowed
      */
-    public ChatMessage(@Nullable String role) {
+    public ChatMessage(@Nullable String role, @Nullable String id, @NonNull List<? extends ContentPart> parts) {
+        this(role, id, parts, null);
+    }
+
+    /**
+     * Everything a message can carry. Hand-written, because varargs cannot follow the extras.
+     *
+     * @param role   the {@link ChatRole} constant, or any other value; {@code null} leaves the role unset
+     * @param id     the application's identifier for this message, {@code null} when it has none
+     * @param parts  what the message contributes; never {@code null}, empty allowed
+     * @param extras provider-specific fields, {@code null} or empty for none; frozen on the way in
+     */
+    public ChatMessage(@Nullable String role, @Nullable String id, @NonNull List<? extends ContentPart> parts,
+            @Nullable ProviderExtras extras) {
         this.role = role;
+        this.id = id;
+        this.parts = List.copyOf(parts);
+        this.extras = extras == null || extras.isEmpty() ? null : extras.freeze();
     }
 
     /**
@@ -79,7 +100,7 @@ public class ChatMessage {
      * @return the message
      */
     public static ChatMessage system(@NonNull String text) {
-        return new ChatMessage(ChatRole.SYSTEM).addText(text);
+        return new ChatMessage(ChatRole.SYSTEM, null, new TextPart(text));
     }
 
     /**
@@ -89,7 +110,7 @@ public class ChatMessage {
      * @return the message
      */
     public static ChatMessage user(@NonNull String text) {
-        return new ChatMessage(ChatRole.USER).addText(text);
+        return new ChatMessage(ChatRole.USER, null, new TextPart(text));
     }
 
     /**
@@ -100,29 +121,18 @@ public class ChatMessage {
      * @return the message
      */
     public static ChatMessage assistant(@NonNull String text) {
-        return new ChatMessage(ChatRole.ASSISTANT).addText(text);
+        return new ChatMessage(ChatRole.ASSISTANT, null, new TextPart(text));
     }
 
     /**
-     * Adds a part to what this message contributes.
+     * A message from the given speaker, carrying the given parts.
      *
-     * @param part the part to add
-     * @return this message
+     * @param role  the {@link ChatRole} constant, or any other value; {@code null} leaves the role unset
+     * @param parts what the message contributes; none at all is allowed
+     * @return the message
      */
-    public ChatMessage addPart(@NonNull ContentPart part) {
-        parts.add(part);
-        return this;
-    }
-
-    /**
-     * Adds a text part to what this message contributes — the shorthand for the one kind of part
-     * nearly every message carries.
-     *
-     * @param text the text to add
-     * @return this message
-     */
-    public ChatMessage addText(@NonNull String text) {
-        return addPart(new TextPart(text));
+    public static ChatMessage of(@Nullable String role, ContentPart... parts) {
+        return new ChatMessage(role, null, parts);
     }
 
     /**
@@ -155,6 +165,43 @@ public class ChatMessage {
     @Override
     public String toString() {
         return "ChatMessage(role=" + role + ", parts=" + parts.size() + ", extras=" + extras + ')';
+    }
+
+    /**
+     * Assembles a message, or a changed copy of one.
+     *
+     * <p>
+     * Declared here for one reason: to hold {@link #mapExtras}, which Lombok cannot add to a builder
+     * it writes itself. Every other member is still Lombok's, so the class carries the marker Lombok
+     * puts on a builder it writes whole — without it NullAway reads the generated no-argument
+     * constructor as leaving every field uninitialized, since they are assigned through the setters
+     * instead.
+     */
+    @Generated
+    public static class Builder {
+
+        /**
+         * Hands this builder's extras bag to the given function and takes back the bag it returns, so
+         * a caller adjusts a bag that is already there — the one a {@code toBuilder()} carried over,
+         * say — instead of assembling a replacement by hand.
+         *
+         * <p>
+         * The function receives a mutable bag: the one already here when it is mutable, otherwise a
+         * fresh copy of it, or an empty bag when there is none. It may change that instance and return
+         * it, or return one of its own. Whatever it returns becomes this builder's bag, so returning
+         * {@code null} leaves the message with none.
+         *
+         * @param mutate the function to apply; must not be {@code null}
+         * @return this builder
+         */
+        public Builder mapExtras(@NonNull UnaryOperator<ProviderExtras> mutate) {
+            if (extras == null || extras.isFrozen()) {
+                extras = ProviderExtras.merged(extras, null);
+            }
+            extras = mutate.apply(extras);
+            return this;
+        }
+
     }
 
 }

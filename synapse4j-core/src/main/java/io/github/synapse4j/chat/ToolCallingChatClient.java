@@ -226,11 +226,7 @@ public class ToolCallingChatClient extends AbstractChatClient {
 
     /** One message answering them all: the protocols pair each result with its call by id. */
     private static ChatMessage toolResults(List<ToolResultPart> results) {
-        ChatMessage message = new ChatMessage(ChatRole.TOOL);
-        for (ToolResultPart result : results) {
-            message.addPart(result);
-        }
-        return message;
+        return new ChatMessage(ChatRole.TOOL, null, results);
     }
 
     /**

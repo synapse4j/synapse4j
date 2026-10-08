@@ -1,15 +1,11 @@
 package io.github.synapse4j.data;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.jspecify.annotations.Nullable;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.NonNull;
-import lombok.Setter;
 
 /**
  * The application's answer to a {@link ToolCallPart}.
@@ -19,73 +15,72 @@ import lombok.Setter;
  * targets accept either form, and a tool may legitimately return an image or a document. Modelling
  * only the string form would push an adapter into flattening the rest, and flattening loses content
  * silently instead of failing loudly.
+ *
+ * <p>
+ * A result is a value: once built it never changes, so it is safe to share across calls and threads.
+ * Its parts and its {@link ProviderExtras} bag are frozen on the way in.
  */
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class ToolResultPart extends ContentPart {
 
     /** Identifier of the {@link ToolCallPart} being answered. */
-    private @Nullable String callId;
+    private final @Nullable String callId;
 
     /** Name of the tool that produced the result; not every protocol carries it. */
-    private @Nullable String name;
+    private final @Nullable String name;
 
     /** The result itself. Never {@code null}; empty is allowed. */
-    private final List<ContentPart> parts = new ArrayList<>();
+    private final List<ContentPart> parts;
 
     /**
      * Whether the tool failed. A protocol with a member for it — Anthropic's {@code is_error} —
      * carries the failure there; a protocol without one leaves it unsent, and the result reaches the
      * model as an ordinary result.
      */
-    private boolean error;
+    private final boolean error;
 
     /**
-     * A result answering the given call, not marked as a failure: the two things a result is usually
-     * built from, with the content added through {@link #addText(String)} or {@link #addPart}.
+     * A result answering the given call, carrying the content it is given and not marked as a
+     * failure.
      *
      * @param callId the id of the call being answered; may be {@code null}
      * @param name   the name of the tool that produced the result; may be {@code null}
+     * @param parts  the result itself; none at all is allowed
      */
-    public ToolResultPart(@Nullable String callId, @Nullable String name) {
+    public ToolResultPart(@Nullable String callId, @Nullable String name, ContentPart... parts) {
+        this(callId, name, List.of(parts), false, null);
+    }
+
+    /**
+     * A result with content and a failure flag, carrying no provider-specific fields.
+     *
+     * @param callId the id of the call being answered; may be {@code null}
+     * @param name   the name of the tool that produced the result; may be {@code null}
+     * @param parts  the result itself; never {@code null}, empty allowed
+     * @param error  whether the tool failed
+     */
+    public ToolResultPart(@Nullable String callId, @Nullable String name, @NonNull List<ContentPart> parts,
+            boolean error) {
+        this(callId, name, parts, error, null);
+    }
+
+    /**
+     * Everything this result can carry. Hand-written, because Lombok cannot generate a constructor
+     * that calls a super constructor with arguments.
+     *
+     * @param callId the id of the call being answered; may be {@code null}
+     * @param name   the name of the tool that produced the result; may be {@code null}
+     * @param parts  the result itself; never {@code null}, empty allowed
+     * @param error  whether the tool failed
+     * @param extras provider-specific fields, {@code null} for none; frozen on the way in
+     */
+    public ToolResultPart(@Nullable String callId, @Nullable String name, @NonNull List<ContentPart> parts,
+            boolean error, @Nullable ProviderExtras extras) {
+        super(extras);
         this.callId = callId;
         this.name = name;
-    }
-
-    /**
-     * Adds a part to the result.
-     *
-     * @param part the part to add
-     * @return this result
-     */
-    public ToolResultPart addPart(@NonNull ContentPart part) {
-        parts.add(part);
-        return this;
-    }
-
-    /**
-     * Adds a text part to the result — the shorthand for the one kind of part nearly every result
-     * carries.
-     *
-     * @param text the text to add
-     * @return this result
-     */
-    public ToolResultPart addText(@NonNull String text) {
-        return addPart(new TextPart(text));
-    }
-
-    @Override
-    public ToolResultPart copy() {
-        ToolResultPart copy = new ToolResultPart(callId, name, error);
-        for (ContentPart part : parts) {
-            copy.getParts().add(part.copy());
-        }
-        if (getExtras() != null) {
-            copy.getOrCreateExtras().putAll(getExtras());
-        }
-        return copy;
+        this.parts = List.copyOf(parts);
+        this.error = error;
     }
 
     /**

@@ -129,6 +129,17 @@ public class ProviderExtras {
     }
 
     /**
+     * Returns whether this bag is frozen: a frozen bag refuses every mutator and is safe to share,
+     * and freezing one again answers it as it is. A mutable bag is its opposite — the accumulating
+     * form a caller fills and then hands to a model constructor to freeze.
+     *
+     * @return {@code true} if this bag is frozen
+     */
+    public boolean isFrozen() {
+        return frozen;
+    }
+
+    /**
      * Returns the number of set paths.
      *
      * @return the number of entries
@@ -257,6 +268,28 @@ public class ProviderExtras {
             values.put(entry.getKey(), entry.getValue());
         }
         return this;
+    }
+
+    /**
+     * A new mutable bag holding {@code base}'s entries with {@code overlay} merged over them —
+     * overlay wins where the two set the same path, as {@link #putAll(ProviderExtras)} does. The
+     * result is always a new, mutable bag and never one of the inputs, so a frozen input stays
+     * frozen and the caller decides when to freeze the result; a {@code null} argument is an empty
+     * bag.
+     *
+     * @param base    the entries to start from; {@code null} for none
+     * @param overlay the entries that win where the two overlap; {@code null} for none
+     * @return a new mutable bag; never {@code null}
+     */
+    public static ProviderExtras merged(@Nullable ProviderExtras base, @Nullable ProviderExtras overlay) {
+        ProviderExtras merged = new ProviderExtras();
+        if (base != null) {
+            merged.putAll(base);
+        }
+        if (overlay != null) {
+            merged.putAll(overlay);
+        }
+        return merged;
     }
 
     /**

@@ -443,7 +443,7 @@ class ToolCallingChatClientTest {
     private static List<ToolResultPart> resultsFor(List<ToolCallPart> calls) {
         List<ToolResultPart> results = new ArrayList<>();
         for (ToolCallPart call : calls) {
-            results.add(new ToolResultPart(call.getCallId(), call.getName()).addText("A"));
+            results.add(new ToolResultPart(call.getCallId(), call.getName(), new TextPart("A")));
         }
         return results;
     }
@@ -460,7 +460,7 @@ class ToolCallingChatClientTest {
 
     private static ChatResponse toolCallResponse(String callId, String tool) {
         ChatResponse response = new ChatResponse();
-        response.setMessage(new ChatMessage(ChatRole.ASSISTANT).addPart(new ToolCallPart(callId, tool, "{}")));
+        response.setMessage(new ChatMessage(ChatRole.ASSISTANT, null, new ToolCallPart(callId, tool, "{}")));
         return response;
     }
 

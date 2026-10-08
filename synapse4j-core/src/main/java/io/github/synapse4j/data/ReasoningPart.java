@@ -4,8 +4,6 @@ import org.jspecify.annotations.Nullable;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 import lombok.ToString;
 
 /**
@@ -22,22 +20,23 @@ import lombok.ToString;
  * They therefore go in {@code getExtras()}, keyed by provider, rather than into a typed field here.
  */
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @ToString(callSuper = true)
+@AllArgsConstructor
 public class ReasoningPart extends ContentPart {
 
     /** The reasoning text. */
-    private @Nullable String text;
+    private final @Nullable String text;
 
-    @Override
-    public ReasoningPart copy() {
-        ReasoningPart copy = new ReasoningPart(text);
-        if (getExtras() != null) {
-            copy.getOrCreateExtras().putAll(getExtras());
-        }
-        return copy;
+    /**
+     * The reasoning text and the fields the part carries beside it. Hand-written, because Lombok
+     * cannot generate a constructor that calls a super constructor with arguments.
+     *
+     * @param text   the reasoning text
+     * @param extras provider-specific fields, {@code null} for none; frozen on the way in
+     */
+    public ReasoningPart(@Nullable String text, @Nullable ProviderExtras extras) {
+        super(extras);
+        this.text = text;
     }
 
 }

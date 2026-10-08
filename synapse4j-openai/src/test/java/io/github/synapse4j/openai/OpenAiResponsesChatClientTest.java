@@ -352,13 +352,12 @@ class OpenAiResponsesChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ChatMessage results = new ChatMessage(ChatRole.TOOL);
         // Marked as a failure, deliberately: this protocol has no member for it, so the flag is
         // left unsent and the item is exactly what a successful result would produce. Anthropic has
         // is_error for it; this protocol does not, and nothing else would notice the decision being
         // flipped.
-        results.addPart(new ToolResultPart("call_1", "get_weather", true).addText("sunny"));
-        request.addPendingMessage(results);
+        request.addPendingMessage(ChatMessage.of(ChatRole.TOOL,
+                new ToolResultPart("call_1", "get_weather", List.of(new TextPart("sunny")), true)));
 
         client.chat(request);
 

@@ -4,8 +4,6 @@ import org.jspecify.annotations.Nullable;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 import lombok.ToString;
 
 /**
@@ -17,22 +15,23 @@ import lombok.ToString;
  * to be replayed verbatim to the provider that produced it.
  */
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @ToString(callSuper = true)
+@AllArgsConstructor
 public class TextPart extends ContentPart {
 
     /** The text itself. */
-    private @Nullable String text;
+    private final @Nullable String text;
 
-    @Override
-    public TextPart copy() {
-        TextPart copy = new TextPart(text);
-        if (getExtras() != null) {
-            copy.getOrCreateExtras().putAll(getExtras());
-        }
-        return copy;
+    /**
+     * The text and the fields the part carries beside it. Hand-written, because Lombok cannot
+     * generate a constructor that calls a super constructor with arguments.
+     *
+     * @param text   the text itself
+     * @param extras provider-specific fields, {@code null} for none; frozen on the way in
+     */
+    public TextPart(@Nullable String text, @Nullable ProviderExtras extras) {
+        super(extras);
+        this.text = text;
     }
 
 }

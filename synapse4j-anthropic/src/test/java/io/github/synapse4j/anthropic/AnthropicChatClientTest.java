@@ -296,8 +296,8 @@ class AnthropicChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ChatMessage replay = new ChatMessage(ChatRole.ASSISTANT);
-        replay.addPart(new ToolCallPart("toolu_1", "get_weather", "{\"city\":\"Paris\"}"));
+        ChatMessage replay = ChatMessage.of(ChatRole.ASSISTANT,
+                new ToolCallPart("toolu_1", "get_weather", "{\"city\":\"Paris\"}"));
         request.addPendingMessage(replay);
 
         client.chat(request);
@@ -319,9 +319,9 @@ class AnthropicChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ChatMessage results = new ChatMessage(ChatRole.TOOL);
-        results.addPart(new ToolResultPart("toolu_1", "get_weather", false).addText("sunny"));
-        results.addPart(new ToolResultPart("toolu_2", "get_time", true).addText("boom"));
+        ChatMessage results = ChatMessage.of(ChatRole.TOOL,
+                new ToolResultPart("toolu_1", "get_weather", new TextPart("sunny")),
+                new ToolResultPart("toolu_2", "get_time", List.of(new TextPart("boom")), true));
         request.addPendingMessage(results);
 
         client.chat(request);
@@ -438,8 +438,8 @@ class AnthropicChatClientTest {
         stubCompletion();
 
         ChatRequest uriRequest = requestWithModel();
-        ChatMessage withUri = new ChatMessage(ChatRole.USER);
-        withUri.addPart(new MediaPart("image/png", "https://example.test/cat.png", null, null));
+        ChatMessage withUri = ChatMessage.of(ChatRole.USER,
+                new MediaPart("image/png", "https://example.test/cat.png"));
         uriRequest.addPendingMessage(withUri);
         client.chat(uriRequest);
 
@@ -451,8 +451,8 @@ class AnthropicChatClientTest {
         stubCompletion();
         byte[] bytes = { (byte) 0x89, 'P', 'N', 'G', 0, 1, 2, (byte) 0xff, 0x7f };
         ChatRequest inlineRequest = requestWithModel();
-        ChatMessage inlined = new ChatMessage(ChatRole.USER);
-        inlined.addPart(new MediaPart("image/png", null, InputStreamSupplier.of(bytes), null));
+        ChatMessage inlined = ChatMessage.of(ChatRole.USER,
+                new MediaPart("image/png", InputStreamSupplier.of(bytes)));
         inlineRequest.addPendingMessage(inlined);
         client.chat(inlineRequest);
 
@@ -469,24 +469,24 @@ class AnthropicChatClientTest {
         stubCompletion();
 
         ChatRequest audio = requestWithModel();
-        ChatMessage audioMessage = new ChatMessage(ChatRole.USER);
-        audioMessage.addPart(new MediaPart("audio/wav", null, InputStreamSupplier.of(new byte[] { 1 }), null));
+        ChatMessage audioMessage = ChatMessage.of(ChatRole.USER,
+                new MediaPart("audio/wav", InputStreamSupplier.of(new byte[] { 1 })));
         audio.addPendingMessage(audioMessage);
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(audio));
         assertTrue(thrown.getMessage().contains("audio/wav"), thrown.getMessage());
 
         stubCompletion();
         ChatRequest neither = requestWithModel();
-        ChatMessage neitherMessage = new ChatMessage(ChatRole.USER);
-        neitherMessage.addPart(new MediaPart("image/png", null, null, null));
+        ChatMessage neitherMessage = ChatMessage.of(ChatRole.USER,
+                new MediaPart("image/png", null, null, null, null));
         neither.addPendingMessage(neitherMessage);
         thrown = assertThrows(SynapseException.class, () -> client.chat(neither));
         assertTrue(thrown.getMessage().contains("neither uri nor source"), thrown.getMessage());
 
         stubCompletion();
         ChatRequest untyped = requestWithModel();
-        ChatMessage untypedMessage = new ChatMessage(ChatRole.USER);
-        untypedMessage.addPart(new MediaPart(null, null, InputStreamSupplier.of(new byte[] { 1 }), null));
+        ChatMessage untypedMessage = ChatMessage.of(ChatRole.USER,
+                new MediaPart(null, InputStreamSupplier.of(new byte[] { 1 })));
         untyped.addPendingMessage(untypedMessage);
         thrown = assertThrows(SynapseException.class, () -> client.chat(untyped));
         assertTrue(thrown.getMessage().contains("mediaType"), thrown.getMessage());
@@ -495,8 +495,7 @@ class AnthropicChatClientTest {
     @Test
     void unsupportedPartsFailLoudly() {
         ChatRequest request = requestWithModel();
-        ChatMessage message = new ChatMessage(ChatRole.USER);
-        message.addPart(new UnmodelledPart());
+        ChatMessage message = ChatMessage.of(ChatRole.USER, new UnmodelledPart());
         request.addPendingMessage(message);
 
         assertThrows(SynapseException.class, () -> client.chat(request));
@@ -1180,11 +1179,12 @@ class AnthropicChatClientTest {
         request.getOptions().setTemperature(0.5);
         request.getOptions().getExtras().put("temperature", 0.9);
         request.getOptions().getExtras().put("metadata", Map.of("user_id", "u-1"));
-        ChatMessage user = ChatMessage.user("Hello");
-        user.setExtras(new ProviderExtras().put("name", "roger"));
-        TextPart part = new TextPart("what is the weather?");
-        part.setExtras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
-        user.getParts().set(0, part);
+        ChatMessage user = ChatMessage.builder()
+                .role(ChatRole.USER)
+                .extras(new ProviderExtras().put("name", "roger"))
+                .part(new TextPart("what is the weather?",
+                        new ProviderExtras().put("cache_control", Map.of("type", "ephemeral"))))
+                .build();
         request.addPendingMessage(user);
 
         client.chat(request);
@@ -1210,9 +1210,8 @@ class AnthropicChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ChatMessage system = ChatMessage.system("You are helpful.");
-        system.getParts().get(0).setExtras(new ProviderExtras().put("cache_control",
-                Map.of("type", "ephemeral")));
+        ChatMessage system = ChatMessage.of(ChatRole.SYSTEM, new TextPart("You are helpful.",
+                new ProviderExtras().put("cache_control", Map.of("type", "ephemeral"))));
         request.setSystemMessage(system);
 
         client.chat(request);
@@ -1338,11 +1337,6 @@ class AnthropicChatClientTest {
 
     /** A part type this module has no wire shape for: the model is open, the protocol is not. */
     static class UnmodelledPart extends ContentPart {
-
-        @Override
-        public UnmodelledPart copy() {
-            return new UnmodelledPart();
-        }
     }
 
 }

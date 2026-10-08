@@ -141,18 +141,16 @@ public class DefaultToolExecutor implements ToolExecutor {
      */
     private ToolResultPart run(ToolCallPart call, List<Tool> available, @Nullable ChatContext context)
             throws Exception {
-        ToolResultPart result = new ToolResultPart();
-        result.setCallId(call.getCallId());
-        result.setName(call.getName());
+        List<ContentPart> parts;
+        boolean error = false;
         try {
             Tool tool = resolve(available, call.getName());
             if (tool == null) {
                 throw new ToolNotFoundException(call.getName());
             }
-            List<ContentPart> answer = Objects.requireNonNull(
+            parts = Objects.requireNonNull(
                     tool.execute(call.getArgumentsJson(), context),
                     "tool answered null");
-            result.getParts().addAll(answer);
         } catch (InterruptedException interruption) {
             // The caller's thread being told to stop is not this call's failure to report: the
             // status comes back and the interruption leaves, no handler seeing it — the way the
@@ -163,10 +161,10 @@ public class DefaultToolExecutor implements ToolExecutor {
             String text = Objects.requireNonNull(
                     failures.handle(call, failure),
                     "error handler answered null");
-            result.getParts().add(new TextPart(text));
-            result.setError(true);
+            parts = List.of(new TextPart(text));
+            error = true;
         }
-        return result;
+        return new ToolResultPart(call.getCallId(), call.getName(), parts, error);
     }
 
     /** The first tool carrying that name, or {@code null} when none does. */

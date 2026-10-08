@@ -155,7 +155,7 @@ class MessagesReader {
      */
     private ChatResponse readMessage(JsonReader reader) {
         ChatResponse response = new ChatResponse();
-        ChatMessage message = response.getMessage();
+        ChatMessage.Builder message = ChatMessage.builder();
         boolean contentRead = false;
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
             String field = name(reader);
@@ -163,9 +163,9 @@ class MessagesReader {
             switch (field) {
                 case "id" -> response.setId(reader.string());
                 case "model" -> response.setModel(reader.string());
-                case "role" -> message.setRole(reader.string());
+                case "role" -> message.role(reader.string());
                 case "content" -> {
-                    readContent(reader, response);
+                    readContent(reader, message);
                     contentRead = true;
                 }
                 case "stop_reason" -> response.setFinishReason(finishReason(reader.string()));
@@ -176,16 +176,17 @@ class MessagesReader {
         if (!contentRead) {
             throw new SynapseException("Anthropic Messages response contained no content");
         }
+        response.setMessage(message.build());
         return response;
     }
 
     /** The content array as the parts of the turn; a block with no part of its own keeps its place. */
-    private void readContent(JsonReader reader, ChatResponse response) {
+    private void readContent(JsonReader reader, ChatMessage.Builder message) {
         JsonReader.Token token = reader.token();
         if (token == JsonReader.Token.STRING) {
             String text = Objects.requireNonNull(reader.string(), "a string token carries a string");
             if (!text.isEmpty()) {
-                response.getMessage().getParts().add(new TextPart(text));
+                message.part(new TextPart(text));
             }
             return;
         }
@@ -208,7 +209,7 @@ class MessagesReader {
                 // part, it sits where it sat in the content array, so it travels with the turn
                 // when the conversation continues and goes back out exactly as it arrived.
                 ContentPart part = partOf(block);
-                response.getMessage().getParts().add(part != null ? part : new RawContentBlock(block));
+                message.part(part != null ? part : new RawContentBlock(block));
             }
         }
     }
@@ -226,38 +227,26 @@ class MessagesReader {
         }
         switch (type) {
             case "text" -> {
-                TextPart text = new TextPart(stringOf(block.get("text")));
-                copyRest(block, text, "type", "text");
-                return text;
+                return new TextPart(stringOf(block.get("text")), restOf(block, "type", "text"));
             }
             case "tool_use" -> {
-                ToolCallPart call = new ToolCallPart();
-                call.setCallId(stringOf(block.get("id")));
-                call.setName(stringOf(block.get("name")));
                 Object input = block.get("input");
-                if (input != null) {
-                    // The wire carries the arguments as an object; the shared model keeps them as
-                    // the JSON text they spell, so the codec the application chose writes them out.
-                    call.setArgumentsJson(codec.encode(input));
-                }
-                copyRest(block, call, "type", "id", "name", "input");
-                return call;
+                // The wire carries the arguments as an object; the shared model keeps them as
+                // the JSON text they spell, so the codec the application chose writes them out.
+                String argumentsJson = input != null ? codec.encode(input) : null;
+                return new ToolCallPart(stringOf(block.get("id")), stringOf(block.get("name")), argumentsJson,
+                        restOf(block, "type", "id", "name", "input"));
             }
             case "thinking" -> {
-                ReasoningPart reasoning = new ReasoningPart();
-                reasoning.setText(stringOf(block.get("thinking")));
                 // The signature stays out of the part's fields and lands in its extras: the shared
                 // model attaches no typed field to reasoning, and the next turn needs this one back.
-                copyRest(block, reasoning, "type", "thinking");
-                return reasoning;
+                return new ReasoningPart(stringOf(block.get("thinking")), restOf(block, "type", "thinking"));
             }
             case "redacted_thinking" -> {
                 // Safety-redacted reasoning with nothing readable in it. The whole block — its type
                 // included — rides in the part's extras, so the writer can spell the block back as
                 // itself: the endpoint refuses a continuation whose thinking blocks were lost.
-                ReasoningPart reasoning = new ReasoningPart();
-                copyRest(block, reasoning);
-                return reasoning;
+                return new ReasoningPart(null, restOf(block));
             }
             default -> {
                 return null;
@@ -266,14 +255,15 @@ class MessagesReader {
     }
 
     /**
-     * Moves every member of a content block the part does not model into the part's extras, under
-     * the name it came in.
+     * The members of a content block the part does not model, as the bag the part carries — or
+     * {@code null} when every member is modelled, so a block with nothing extra leaves its part
+     * with no bag at all.
      *
      * @param block   the block as the wire spelled it
-     * @param part    the part the block became
-     * @param modeled the member names the part models itself; they stay out of the extras
+     * @param modeled the member names the part models itself; they stay out of the bag
      */
-    private static void copyRest(Map<?, ?> block, ContentPart part, String... modeled) {
+    private static @Nullable ProviderExtras restOf(Map<?, ?> block, String... modeled) {
+        ProviderExtras extras = new ProviderExtras();
         for (Map.Entry<?, ?> member : block.entrySet()) {
             String key = String.valueOf(member.getKey());
             boolean taken = false;
@@ -283,9 +273,10 @@ class MessagesReader {
                 }
             }
             if (!taken) {
-                part.getOrCreateExtras().put(key, member.getValue());
+                extras.put(key, member.getValue());
             }
         }
+        return extras;
     }
 
     /**
@@ -312,8 +303,7 @@ class MessagesReader {
         if (part instanceof ToolCallPart call) {
             // The input the opening frame carries is the empty object the deltas then fill; the
             // arguments arrive as fragments from here on, so the placeholder is not kept as text.
-            call.setArgumentsJson(null);
-            event.setDelta(delta(call));
+            event.setDelta(delta(new ToolCallPart(call.getCallId(), call.getName(), null, call.getExtras())));
         } else if (part != null) {
             event.setDelta(delta(part));
         } else if (blockValue instanceof Map<?, ?> block) {
@@ -354,33 +344,20 @@ class MessagesReader {
                 // The arguments arrive as fragments of the JSON text, never as values: they are
                 // concatenated as they come and only complete when the block closes.
                 String fragment = stringOf(members.get("partial_json"));
-                if (fragment == null) {
-                    return null;
-                }
-                ToolCallPart call = new ToolCallPart();
-                call.setArgumentsJson(fragment);
-                return call;
+                return fragment != null ? new ToolCallPart(null, null, fragment) : null;
             }
             case "thinking_delta" -> {
                 String fragment = stringOf(members.get("thinking"));
-                if (fragment == null) {
-                    return null;
-                }
-                ReasoningPart reasoning = new ReasoningPart();
-                reasoning.setText(fragment);
-                return reasoning;
+                return fragment != null ? new ReasoningPart(fragment) : null;
             }
             case "signature_delta" -> {
                 // The signature closes the block it belongs to and lives in the part's extras, so
                 // the fold merges it into the reasoning the fragments built — one block, signature
                 // included, the way a blocking call reads it.
                 Object signature = members.get("signature");
-                if (signature == null) {
-                    return null;
-                }
-                ReasoningPart reasoning = new ReasoningPart();
-                reasoning.getOrCreateExtras().put("signature", signature);
-                return reasoning;
+                return signature != null
+                        ? new ReasoningPart(null, new ProviderExtras().put("signature", signature))
+                        : null;
             }
             default -> {
                 return null;
@@ -439,9 +416,7 @@ class MessagesReader {
 
     /** A fragment as the one-part turn it is folded through. */
     private static ChatMessage delta(ContentPart part) {
-        ChatMessage delta = new ChatMessage();
-        delta.getParts().add(part);
-        return delta;
+        return ChatMessage.of(null, part);
     }
 
     /**

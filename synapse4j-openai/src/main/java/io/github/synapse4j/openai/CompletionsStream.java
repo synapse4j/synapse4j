@@ -2,10 +2,12 @@ package io.github.synapse4j.openai;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import org.jspecify.annotations.Nullable;
@@ -42,7 +44,8 @@ import io.github.synapse4j.json.JsonReader;
  * <p>
  * The fold is what turns the fragments back into a turn: it sums them the way
  * {@link CompletionsReader} reads them, so a turn that arrived as twenty chunks ends up as the one
- * message, and the one tool call, a single response would have carried.
+ * message, and the one tool call, a single response would have carried. Because a message is a
+ * value, the fold keeps the turn's pieces and rebuilds the message whenever one of them changes.
  *
  * <p>
  * One instance per exchange, built by {@link OpenAiCompletionsChatClient} while the response is open; closing
@@ -71,8 +74,7 @@ class CompletionsStream extends DefaultChatStream {
      */
     CompletionsStream(JsonCodec codec, SseEventStream sse, Consumer<ChatStreamEvent> eventPipeline,
             AutoCloseable closeAction, OpenAiConfig config) {
-        super(events(codec, sse, new CompletionsReader(config)), eventPipeline, CompletionsStream::aggregate,
-                closeAction);
+        super(events(codec, sse, new CompletionsReader(config)), eventPipeline, new Aggregation(), closeAction);
     }
 
     /**
@@ -144,98 +146,147 @@ class CompletionsStream extends DefaultChatStream {
         }
     }
 
-    /** Folds one event into the answer being assembled. */
-    private static void aggregate(ChatResponse response, ChatStreamEvent event) {
-        if (event.getId() != null) {
-            response.setId(event.getId());
-        }
-        if (event.getModel() != null) {
-            response.setModel(event.getModel());
-        }
-        if (event.getFinishReason() != null) {
-            response.setFinishReason(event.getFinishReason());
-        }
-        if (event.getUsage() != null) {
-            // The answer owns its counts: a frame's usage is a snapshot an application may keep,
-            // and the answer must not be the same object under it.
-            response.setUsage(copyOf(event.getUsage()));
-        }
-        // The event's own unmodelled fields are the provider's own fields for the answer, folded in
-        // as they arrive, the last frame winning — which, for the fields that stay constant across a
-        // stream, is the value the answer ends up carrying.
-        response.getExtras().putAll(event.getExtras());
-        ChatMessage delta = event.getDelta();
-        if (delta == null) {
-            return;
-        }
-        ChatMessage message = response.getMessage();
-        if (message.getRole() == null && delta.getRole() != null) {
-            // The role is named once, on the chunk that opens the turn; the rest of the answer has
-            // nothing to say about it.
-            message.setRole(delta.getRole());
-        }
-        // A field the provider put on a delta is a field of the answer's message, so it travels
-        // with it rather than staying behind on the chunk that happened to carry it.
-        ProviderExtras deltaExtras = delta.getExtras();
-        if (deltaExtras != null) {
-            message.getOrCreateExtras().putAll(deltaExtras);
-        }
-        for (ContentPart part : delta.getParts()) {
-            if (part instanceof TextPart text) {
-                appendText(message, text);
-            } else if (part instanceof ToolCallPart call) {
-                mergeToolCall(message, call);
-            } else if (part instanceof ReasoningPart reasoning) {
-                appendReasoning(message, reasoning);
+    /**
+     * The turn being assembled across the frames of one stream. The message is a value, so the fold
+     * holds the turn's pieces and rebuilds the message whenever one of them changes.
+     */
+    private static final class Aggregation implements BiConsumer<ChatResponse, ChatStreamEvent> {
+
+        private @Nullable String role;
+
+        private final List<ContentPart> parts = new ArrayList<>();
+
+        private final ProviderExtras extras = new ProviderExtras();
+
+        @Override
+        public void accept(ChatResponse response, ChatStreamEvent event) {
+            if (event.getId() != null) {
+                response.setId(event.getId());
+            }
+            if (event.getModel() != null) {
+                response.setModel(event.getModel());
+            }
+            if (event.getFinishReason() != null) {
+                response.setFinishReason(event.getFinishReason());
+            }
+            if (event.getUsage() != null) {
+                // The answer owns its counts: a frame's usage is a snapshot an application may keep,
+                // and the answer must not be the same object under it.
+                response.setUsage(copyOf(event.getUsage()));
+            }
+            // The event's own unmodelled fields are the provider's own fields for the answer, folded
+            // in as they arrive, the last frame winning — which, for the fields that stay constant
+            // across a stream, is the value the answer ends up carrying.
+            response.getExtras().putAll(event.getExtras());
+            ChatMessage delta = event.getDelta();
+            if (delta == null) {
+                return;
+            }
+            boolean changed = false;
+            if (role == null && delta.getRole() != null) {
+                // The role is named once, on the chunk that opens the turn; the rest of the answer
+                // has nothing to say about it.
+                role = delta.getRole();
+                changed = true;
+            }
+            // A field the provider put on a delta is a field of the answer's message, so it travels
+            // with it rather than staying behind on the chunk that happened to carry it.
+            ProviderExtras deltaExtras = delta.getExtras();
+            if (deltaExtras != null) {
+                extras.putAll(deltaExtras);
+                changed = true;
+            }
+            for (ContentPart part : delta.getParts()) {
+                if (part instanceof TextPart text) {
+                    appendText(text);
+                    changed = true;
+                } else if (part instanceof ToolCallPart call) {
+                    mergeToolCall(call);
+                    changed = true;
+                } else if (part instanceof ReasoningPart reasoning) {
+                    appendReasoning(reasoning);
+                    changed = true;
+                }
+            }
+            if (changed) {
+                response.setMessage(new ChatMessage(role, null, parts, extras));
             }
         }
-    }
 
-    /**
-     * Appends a fragment to the turn's reasoning, which is one part however many chunks it took —
-     * and, before that, what stops a multi-chunk answer from keeping only the last fragment of it.
-     */
-    private static void appendReasoning(ChatMessage message, ReasoningPart fragment) {
-        List<ContentPart> parts = message.getParts();
-        if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof ReasoningPart reasoning) {
-            reasoning.setText(join(reasoning.getText(), fragment.getText()));
+        /**
+         * Appends a fragment to the turn's reasoning, which is one part however many chunks it took —
+         * and, before that, what stops a multi-chunk answer from keeping only the last fragment of it.
+         */
+        private void appendReasoning(ReasoningPart fragment) {
+            if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof ReasoningPart reasoning) {
+                parts.set(parts.size() - 1, new ReasoningPart(join(reasoning.getText(), fragment.getText()),
+                        ProviderExtras.merged(reasoning.getExtras(), fragment.getExtras())));
+                return;
+            }
+            parts.add(fragment);
+        }
+
+        /** Appends a fragment to the turn's text, which is one part however many chunks it took. */
+        private void appendText(TextPart fragment) {
+            if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof TextPart text) {
+                parts.set(parts.size() - 1,
+                        new TextPart(text.getText() + fragment.getText(), text.getExtras()));
+                return;
+            }
+            parts.add(fragment);
+        }
+
+        /**
+         * Merges a fragment into the call it belongs to. A call is sent as one chunk naming it and as
+         * many chunks as its arguments take to spell, and what arrives is one part carrying the whole
+         * of what the provider said about that call.
+         */
+        private void mergeToolCall(ToolCallPart fragment) {
+            int index = toolCallIndex(fragment);
+            if (index < 0) {
+                parts.add(fragment);
+                return;
+            }
+            ToolCallPart call = (ToolCallPart) parts.get(index);
+            String callName = call.getName() != null ? call.getName() : fragment.getName();
+            parts.set(index, new ToolCallPart(call.getCallId(), callName,
+                    join(call.getArgumentsJson(), fragment.getArgumentsJson()),
+                    ProviderExtras.merged(call.getExtras(), fragment.getExtras())));
+        }
+
+        /**
+         * The call a fragment continues, as the position it occupies in the turn, or {@code -1} when
+         * it opens a new one.
+         */
+        private int toolCallIndex(ToolCallPart fragment) {
+            if (fragment.getCallId() != null) {
+                for (int i = 0; i < parts.size(); i++) {
+                    if (parts.get(i) instanceof ToolCallPart call && fragment.getCallId().equals(call.getCallId())) {
+                        return i;
+                    }
+                }
+                return -1;
+            }
+            // A fragment without an id carries only the position it occupies in the chunk's array,
+            // which is what tells two calls being spelled at the same time apart. It is read back out
+            // of the extras the fragment kept it in: the shared model has no field for it, and the
+            // protocol's own way of saying which call is meant is worth more than the order the
+            // fragments arrive in.
             ProviderExtras fragmentExtras = fragment.getExtras();
-            if (fragmentExtras != null) {
-                reasoning.getOrCreateExtras().putAll(fragmentExtras);
+            Object position = fragmentExtras != null ? fragmentExtras.get(TOOL_CALL_POSITION) : null;
+            if (position != null) {
+                for (int i = 0; i < parts.size(); i++) {
+                    if (parts.get(i) instanceof ToolCallPart call && call.getExtras() != null
+                            && position.equals(call.getExtras().get(TOOL_CALL_POSITION))) {
+                        return i;
+                    }
+                }
             }
-            return;
-        }
-        parts.add(fragment.copy());
-    }
-
-    /** Appends a fragment to the turn's text, which is one part however many chunks it took. */
-    private static void appendText(ChatMessage message, TextPart fragment) {
-        List<ContentPart> parts = message.getParts();
-        if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof TextPart text) {
-            text.setText(text.getText() + fragment.getText());
-            return;
-        }
-        parts.add(fragment.copy());
-    }
-
-    /**
-     * Merges a fragment into the call it belongs to. A call is sent as one chunk naming it and as
-     * many chunks as its arguments take to spell, and what arrives is one part carrying the whole
-     * of what the provider said about that call.
-     */
-    private static void mergeToolCall(ChatMessage message, ToolCallPart fragment) {
-        ToolCallPart call = toolCallFor(message, fragment);
-        if (call == null) {
-            message.getParts().add(fragment.copy());
-            return;
-        }
-        if (call.getName() == null) {
-            call.setName(fragment.getName());
-        }
-        call.setArgumentsJson(join(call.getArgumentsJson(), fragment.getArgumentsJson()));
-        ProviderExtras fragmentExtras = fragment.getExtras();
-        if (fragmentExtras != null) {
-            call.getOrCreateExtras().putAll(fragmentExtras);
+            // Nothing identifies the fragment, so it continues the call that was opened last.
+            if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof ToolCallPart) {
+                return parts.size() - 1;
+            }
+            return -1;
         }
     }
 
@@ -250,38 +301,6 @@ class CompletionsStream extends DefaultChatStream {
         copy.setCachedInputTokens(usage.getCachedInputTokens());
         copy.getExtras().putAll(usage.getExtras());
         return copy;
-    }
-
-    /** The call a fragment continues, or {@code null} when it opens a new one. */
-    private static @Nullable ToolCallPart toolCallFor(ChatMessage message, ToolCallPart fragment) {
-        List<ContentPart> parts = message.getParts();
-        if (fragment.getCallId() != null) {
-            for (ContentPart part : parts) {
-                if (part instanceof ToolCallPart call && fragment.getCallId().equals(call.getCallId())) {
-                    return call;
-                }
-            }
-            return null;
-        }
-        // A fragment without an id carries only the position it occupies in the chunk's array, which
-        // is what tells two calls being spelled at the same time apart. It is read back out of the
-        // extras the fragment kept it in: the shared model has no field for it, and the protocol's
-        // own way of saying which call is meant is worth more than the order the fragments arrive in.
-        ProviderExtras fragmentExtras = fragment.getExtras();
-        Object position = fragmentExtras != null ? fragmentExtras.get(TOOL_CALL_POSITION) : null;
-        if (position != null) {
-            for (ContentPart part : parts) {
-                if (part instanceof ToolCallPart call && call.getExtras() != null
-                        && position.equals(call.getExtras().get(TOOL_CALL_POSITION))) {
-                    return call;
-                }
-            }
-        }
-        // Nothing identifies the fragment, so it continues the call that was opened last.
-        if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof ToolCallPart open) {
-            return open;
-        }
-        return null;
     }
 
     /** The arguments as they arrive: a fragment is a piece of the JSON text, not a value. */

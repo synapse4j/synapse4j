@@ -110,7 +110,7 @@ class CompletionsReader {
             reader.nextToken();
             switch (field) {
                 case "finish_reason" -> response.setFinishReason(reader.string());
-                case "message" -> readMessage(reader, response.getMessage());
+                case "message" -> response.setMessage(readMessage(reader));
                 // A choice field this module does not model keeps the path it came from, so a
                 // provider's addition stays readable even though it belongs to a choice.
                 default -> response.getExtras().put(List.of("choices", String.valueOf(position), field),
@@ -119,11 +119,18 @@ class CompletionsReader {
         }
     }
 
-    private void readMessage(JsonReader reader, ChatMessage message) {
+    /**
+     * Builds the assistant's turn, the one node whose parts are accumulated before it exists: the
+     * message is a value, and what the walk collects along the way is only known once the walk is
+     * over.
+     */
+    private ChatMessage readMessage(JsonReader reader) {
         if (reader.token() != JsonReader.Token.START_OBJECT) {
             reader.skipValue();
-            return;
+            return new ChatMessage(null, null);
         }
+        ChatMessage.Builder message = ChatMessage.builder();
+        ProviderExtras extras = new ProviderExtras();
         String reasoningField = config.getReasoningField();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
             String field = name(reader);
@@ -133,12 +140,16 @@ class CompletionsReader {
                 continue;
             }
             switch (field) {
-                case "role" -> message.setRole(reader.string());
-                case "content" -> readContent(reader, message);
+                case "role" -> message.role(reader.string());
+                case "content" -> readContent(reader, message, extras);
                 case "tool_calls" -> readToolCalls(reader, message);
-                default -> message.getOrCreateExtras().put(field, reader.captureValue());
+                default -> extras.put(field, reader.captureValue());
             }
         }
+        if (!extras.isEmpty()) {
+            message.extras(extras);
+        }
+        return message.build();
     }
 
     /**
@@ -151,30 +162,28 @@ class CompletionsReader {
      * name it came with, which is how an application sees that the configured name is the thing to
      * change.
      */
-    private static void readReasoning(JsonReader reader, ChatMessage message) {
+    private static void readReasoning(JsonReader reader, ChatMessage.Builder message) {
         if (reader.token() != JsonReader.Token.STRING) {
             reader.skipValue();
             return;
         }
         String text = Objects.requireNonNull(reader.string(), "a string token carries a string");
         if (!text.isEmpty()) {
-            ReasoningPart reasoning = new ReasoningPart();
-            reasoning.setText(text);
-            message.getParts().add(reasoning);
+            message.part(new ReasoningPart(text));
         }
     }
 
-    private static void readContent(JsonReader reader, ChatMessage message) {
+    private static void readContent(JsonReader reader, ChatMessage.Builder message, ProviderExtras extras) {
         JsonReader.Token token = reader.token();
         if (token == JsonReader.Token.STRING) {
             String text = Objects.requireNonNull(reader.string(), "a string token carries a string");
             if (!text.isEmpty()) {
-                message.getParts().add(new TextPart(text));
+                message.part(new TextPart(text));
             }
             return;
         }
         if (token == JsonReader.Token.START_ARRAY) {
-            readContentParts(reader, message);
+            readContentParts(reader, message, extras);
             return;
         }
         if (token == JsonReader.Token.NULL) {
@@ -184,7 +193,8 @@ class CompletionsReader {
         throw new SynapseException("unsupported content shape in OpenAI response: " + describe(token));
     }
 
-    private static void readContentParts(JsonReader reader, ChatMessage message) {
+    private static void readContentParts(JsonReader reader, ChatMessage.Builder message,
+            ProviderExtras extras) {
         while (reader.nextToken() != JsonReader.Token.END_ARRAY) {
             if (reader.token() != JsonReader.Token.START_OBJECT) {
                 // Not a typed part object — the previous binding cast blindly and died here. An
@@ -192,11 +202,12 @@ class CompletionsReader {
                 reader.skipValue();
                 continue;
             }
-            readContentPart(reader, message);
+            readContentPart(reader, message, extras);
         }
     }
 
-    private static void readContentPart(JsonReader reader, ChatMessage message) {
+    private static void readContentPart(JsonReader reader, ChatMessage.Builder message,
+            ProviderExtras extras) {
         String type = null;
         String text = null;
         ProviderExtras collected = new ProviderExtras();
@@ -217,19 +228,17 @@ class CompletionsReader {
                 // A refusal the provider spelled inside the content is kept as the member this
                 // protocol's message-level refusal already travels under, so an application reads
                 // one member however the provider chose to deliver the words.
-                message.getOrCreateExtras().put("refusal", collected.get("refusal"));
+                extras.put("refusal", collected.get("refusal"));
                 return;
             }
             throw new SynapseException("unsupported content part in OpenAI response: " + type);
         }
-        TextPart part = new TextPart(text);
         // The type that decides what the part is may come after the fields it does not model, so
-        // the part is built here and the fields collected on the way move into its own bag.
-        part.getOrCreateExtras().putAll(collected);
-        message.getParts().add(part);
+        // the part is built from what the walk collected on the way to it.
+        message.part(new TextPart(text, collected));
     }
 
-    private static void readToolCalls(JsonReader reader, ChatMessage message) {
+    private static void readToolCalls(JsonReader reader, ChatMessage.Builder message) {
         if (reader.token() != JsonReader.Token.START_ARRAY) {
             reader.skipValue();
             return;
@@ -243,35 +252,38 @@ class CompletionsReader {
         }
     }
 
-    private static void readToolCall(JsonReader reader, ChatMessage message) {
-        ToolCallPart call = new ToolCallPart();
+    private static void readToolCall(JsonReader reader, ChatMessage.Builder message) {
+        String callId = null;
+        String callName = null;
+        String argumentsJson = null;
+        ProviderExtras extras = new ProviderExtras();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
             String field = name(reader);
             reader.nextToken();
             switch (field) {
-                case "id" -> call.setCallId(reader.string());
-                case "function" -> readToolCallFunction(reader, call);
-                default -> call.getOrCreateExtras().put(field, reader.captureValue());
+                case "id" -> callId = reader.string();
+                case "function" -> {
+                    if (reader.token() == JsonReader.Token.START_OBJECT) {
+                        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
+                            String functionField = name(reader);
+                            reader.nextToken();
+                            switch (functionField) {
+                                case "name" -> callName = reader.string();
+                                case "arguments" -> argumentsJson = reader.string();
+                                // Kept under the path it came from, the way every other extras entry
+                                // is spelled.
+                                default -> extras.put(List.of("function", functionField),
+                                        reader.captureValue());
+                            }
+                        }
+                    } else {
+                        reader.skipValue();
+                    }
+                }
+                default -> extras.put(field, reader.captureValue());
             }
         }
-        message.getParts().add(call);
-    }
-
-    private static void readToolCallFunction(JsonReader reader, ToolCallPart call) {
-        if (reader.token() != JsonReader.Token.START_OBJECT) {
-            reader.skipValue();
-            return;
-        }
-        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = name(reader);
-            reader.nextToken();
-            switch (field) {
-                case "name" -> call.setName(reader.string());
-                case "arguments" -> call.setArgumentsJson(reader.string());
-                // Kept under the path it came from, the way every other extras entry is spelled.
-                default -> call.getOrCreateExtras().put(List.of("function", field), reader.captureValue());
-            }
-        }
+        message.part(new ToolCallPart(callId, callName, argumentsJson, extras));
     }
 
     /**
@@ -372,7 +384,8 @@ class CompletionsReader {
             reader.skipValue();
             return;
         }
-        ChatMessage delta = new ChatMessage();
+        ChatMessage.Builder delta = ChatMessage.builder();
+        ProviderExtras extras = new ProviderExtras();
         String reasoningField = config.getReasoningField();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
             String field = name(reader);
@@ -382,18 +395,21 @@ class CompletionsReader {
                 continue;
             }
             switch (field) {
-                case "role" -> delta.setRole(reader.string());
+                case "role" -> delta.role(reader.string());
                 case "content" -> readDeltaContent(reader, delta);
                 case "tool_calls" -> readDeltaToolCalls(reader, delta);
                 // Refusal and anything else the provider puts beside the content belongs to the
                 // message being built, so it stays on the delta rather than on the chunk.
-                default -> delta.getOrCreateExtras().put(field, reader.captureValue());
+                default -> extras.put(field, reader.captureValue());
             }
         }
-        event.setDelta(delta);
+        if (!extras.isEmpty()) {
+            delta.extras(extras);
+        }
+        event.setDelta(delta.build());
     }
 
-    private static void readDeltaContent(JsonReader reader, ChatMessage delta) {
+    private static void readDeltaContent(JsonReader reader, ChatMessage.Builder delta) {
         if (reader.token() != JsonReader.Token.STRING) {
             reader.skipValue();
             return;
@@ -402,11 +418,11 @@ class CompletionsReader {
         if (!fragment.isEmpty()) {
             // An empty fragment is the provider announcing a turn it has not started saying yet;
             // it adds nothing, and a part for it would outlive the chunks it came in.
-            delta.getParts().add(new TextPart(fragment));
+            delta.part(new TextPart(fragment));
         }
     }
 
-    private static void readDeltaToolCalls(JsonReader reader, ChatMessage delta) {
+    private static void readDeltaToolCalls(JsonReader reader, ChatMessage.Builder delta) {
         if (reader.token() != JsonReader.Token.START_ARRAY) {
             reader.skipValue();
             return;
@@ -420,35 +436,38 @@ class CompletionsReader {
         }
     }
 
-    private static void readDeltaToolCall(JsonReader reader, ChatMessage delta) {
-        ToolCallPart call = new ToolCallPart();
+    private static void readDeltaToolCall(JsonReader reader, ChatMessage.Builder delta) {
+        String callId = null;
+        String callName = null;
+        String argumentsJson = null;
+        ProviderExtras extras = new ProviderExtras();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
             String field = name(reader);
             reader.nextToken();
             switch (field) {
-                case "id" -> call.setCallId(reader.string());
-                case "function" -> readDeltaToolCallFunction(reader, call);
-                default -> call.getOrCreateExtras().put(field, reader.captureValue());
+                case "id" -> callId = reader.string();
+                case "function" -> {
+                    if (reader.token() == JsonReader.Token.START_OBJECT) {
+                        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
+                            String functionField = name(reader);
+                            reader.nextToken();
+                            switch (functionField) {
+                                case "name" -> callName = reader.string();
+                                case "arguments" -> argumentsJson = reader.string();
+                                // Kept under the path it came from, the way every other extras entry
+                                // is spelled.
+                                default -> extras.put(List.of("function", functionField),
+                                        reader.captureValue());
+                            }
+                        }
+                    } else {
+                        reader.skipValue();
+                    }
+                }
+                default -> extras.put(field, reader.captureValue());
             }
         }
-        delta.getParts().add(call);
-    }
-
-    private static void readDeltaToolCallFunction(JsonReader reader, ToolCallPart call) {
-        if (reader.token() != JsonReader.Token.START_OBJECT) {
-            reader.skipValue();
-            return;
-        }
-        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = name(reader);
-            reader.nextToken();
-            switch (field) {
-                case "name" -> call.setName(reader.string());
-                case "arguments" -> call.setArgumentsJson(reader.string());
-                // Kept under the path it came from, the way every other extras entry is spelled.
-                default -> call.getOrCreateExtras().put(List.of("function", field), reader.captureValue());
-            }
-        }
+        delta.part(new ToolCallPart(callId, callName, argumentsJson, extras));
     }
 
     /**
