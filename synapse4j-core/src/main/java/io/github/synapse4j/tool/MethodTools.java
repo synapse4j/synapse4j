@@ -115,6 +115,7 @@ public class MethodTools {
     public MethodTool of(@NonNull String name, @NonNull String description, @NonNull Method method,
             @Nullable Object target) {
         ToolMethodSpec spec = specOf(method, target);
+        readParameters(method, spec);
         spec.setName(name);
         spec.setDescription(description);
         customize(spec);
@@ -189,6 +190,9 @@ public class MethodTools {
             }
             if (!annotation.strict().isBlank()) {
                 spec.setStrict(annotation.strict());
+            }
+            if (!annotation.schema().isBlank()) {
+                spec.setSchema(annotation.schema());
             }
             readParameters(method, spec);
             customize(spec);

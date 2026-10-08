@@ -6,9 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -19,9 +21,13 @@ import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
+import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonSchemaBuilder;
 
 class MethodToolsTest {
+
+    /** The input schema the fixture writes out, as the document the annotation carries. */
+    private static final String WRITTEN_SCHEMA = "{\"type\":\"object\"}";
 
     /** Every resolution the reader handed to the factory, in the order it asked for one. */
     private final List<ToolMethodSpec> built = new ArrayList<>();
@@ -43,6 +49,7 @@ class MethodToolsTest {
     @BeforeEach
     void codecAnswersSchema() {
         when(codec.generateDecodeSchema(any())).thenReturn(new JsonSchemaBuilder().setType("string").build());
+        when(codec.decode(any(), eq(JsonSchema.class))).thenReturn(new JsonSchemaBuilder().setType("object").build());
     }
 
     @Test
@@ -53,11 +60,21 @@ class MethodToolsTest {
         assertEquals("What it does", written.getDescription());
         assertEquals("some.Tool", written.getType());
         assertEquals("true", written.getStrict());
+        assertEquals(WRITTEN_SCHEMA, written.getSchema());
         ToolParameterSpec told = written.getParameters().get(0);
         assertEquals("arg", told.getName());
         assertEquals("What it means", told.getDescription());
         assertEquals("false", told.getRequired());
-        assertEquals("some.Tool", specOf("renamed").getType());
+    }
+
+    @Test
+    void ofReadsParameterAnnotations() throws Exception {
+        Method method = Told.class.getMethod("call", String.class);
+
+        MethodTool tool = reader.of("told", "What it does", method, new Told());
+
+        JsonSchema property = tool.definition().getInputSchema().getProperties().get("arg");
+        assertEquals("What it means", property.getDescription());
     }
 
     @Test
@@ -188,7 +205,7 @@ class MethodToolsTest {
             return value;
         }
 
-        @ToolMethod(name = "renamed", description = "What it does", type = "some.Tool", strict = "true")
+        @ToolMethod(name = "renamed", description = "What it does", type = "some.Tool", strict = "true", schema = WRITTEN_SCHEMA)
         public String written(
                 @ToolParam(name = "arg", description = "What it means", required = "false") String value) {
             return value;
@@ -220,6 +237,15 @@ class MethodToolsTest {
         @ToolMethod
         public String only() {
             return "";
+        }
+    }
+
+    /** A method whose only annotation is on its parameter. */
+    public static class Told {
+
+        @ToolMethod
+        public String call(@ToolParam(name = "arg", description = "What it means") String value) {
+            return value;
         }
     }
 
