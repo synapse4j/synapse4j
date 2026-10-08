@@ -70,6 +70,21 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
+    void setKeywordTreatedAsArray() {
+        JsonSchema inner = typed("string");
+        JsonSchema schema = new JsonSchemaBuilder().put("anyOf", Set.of(inner)).build();
+
+        // A keyword whose value is a collection is the JSON array it stands for, whatever collection
+        // it arrived as: it reads as a list, is walked, is mapped and is frozen like any other array.
+        assertEquals(List.of(inner), schema.getList("anyOf", JsonSchema.class));
+        assertThrows(UnsupportedOperationException.class, () -> rawList(schema, "anyOf").add(inner));
+
+        JsonSchema mapped = schema.map(node -> node == inner ? typed("number") : node);
+
+        assertEquals(List.of(typed("number")), mapped.getList("anyOf", JsonSchema.class));
+    }
+
+    @Test
     void typeFormFollowsSetter() {
         // Set as a string, stored as a string; set as a list, stored as an array — a one-element
         // list is not folded into the string form, which is why the two schemas are not equal.

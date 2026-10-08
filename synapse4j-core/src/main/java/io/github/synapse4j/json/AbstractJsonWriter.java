@@ -3,7 +3,7 @@ package io.github.synapse4j.json;
 import java.io.Reader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
@@ -33,7 +33,8 @@ public abstract class AbstractJsonWriter implements JsonWriter {
      * {@inheritDoc}
      *
      * <p>
-     * Written over the tokens of {@link JsonWriter}: a map becomes an object and a list an array, and
+     * Written over the tokens of {@link JsonWriter}: a map becomes an object and a collection an array,
+     * and
      * a {@link Reader} as the string it yields, so a payload larger than memory still goes out, and
      * their members and elements come back through this method, so a type this library owns is
      * recognized wherever it sits rather than only at the top.
@@ -63,7 +64,7 @@ public abstract class AbstractJsonWriter implements JsonWriter {
             }
             return writeEndObject();
         }
-        if (value instanceof List<?> elements) {
+        if (value instanceof Collection<?> elements) {
             writeStartArray();
             for (Object element : elements) {
                 writeValue(element);

@@ -40,9 +40,9 @@ import lombok.NonNull;
  * {@link JsonSchemaBuilder} and read from then on; a change is a new schema, built from the old one.
  *
  * <p>
- * A keyword whose value is a sub-schema is kept as a {@link JsonSchema} (or a list or a map of them),
- * so {@link #visit(Consumer)} and {@link #map(UnaryOperator)} reach every sub-schema. Every other value
- * is raw JSON data.
+ * A keyword whose value is a sub-schema is kept as a {@link JsonSchema} (or a collection or a map of
+ * them), so {@link #visit(Consumer)} and {@link #map(UnaryOperator)} reach every sub-schema. Every
+ * other value is raw JSON data.
  *
  * <p>
  * The document shape — the maps, lists and scalars a JSON document is made of — is not this class's
@@ -219,10 +219,10 @@ public final class ObjectJsonSchema implements JsonSchema {
         if (value instanceof JsonSchema schema) {
             return schema.map(fn);
         }
-        if (value instanceof List<?> list) {
-            List<Object> mapped = new ArrayList<>(list.size());
+        if (value instanceof Collection<?> collection) {
+            List<Object> mapped = new ArrayList<>(collection.size());
             boolean changed = false;
-            for (Object element : list) {
+            for (Object element : collection) {
                 @Nullable
                 Object mappedElement = mapValue(element, fn);
                 mapped.add(mappedElement);
@@ -264,9 +264,9 @@ public final class ObjectJsonSchema implements JsonSchema {
             map.forEach((name, element) -> frozen.put(name, freezeValue(element)));
             return Collections.unmodifiableMap(frozen);
         }
-        if (value instanceof List<?> list) {
-            List<Object> frozen = new ArrayList<>(list.size());
-            list.forEach(element -> frozen.add(freezeValue(element)));
+        if (value instanceof Collection<?> collection) {
+            List<Object> frozen = new ArrayList<>(collection.size());
+            collection.forEach(element -> frozen.add(freezeValue(element)));
             return Collections.unmodifiableList(frozen);
         }
         return value;

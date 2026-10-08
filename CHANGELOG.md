@@ -5,6 +5,7 @@ version becomes the body of the GitHub Release created when that version's tag i
 
 ## [Unreleased]
 
+- A keyword whose value is any collection is treated as the array it stands for — read as a list, walked by `visit` and `map`, frozen, and written as an array — where only a `List` was, so a schema built with a `Set` kept a mutable, unwalked value
 - An argument the model does not produce stays out of the schema the model is shown, even where a customizer resolved a schema for it
 - A generated schema orders an inherited property the way the type it describes is written, where a subclass that reorders them used to be described in its parent's order
 - An Anthropic usage count the model has a field for keeps its name in the extras when it arrives spelled as something other than a number, where it used to be dropped
