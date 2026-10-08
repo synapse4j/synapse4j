@@ -75,7 +75,7 @@ import lombok.NonNull;
  * application's decision.
  */
 @EqualsAndHashCode(of = "values")
-public class ProviderExtras {
+public class ProviderExtras implements Effective<ProviderExtras> {
 
     private static final char SEPARATOR = '.';
     private static final char ESCAPE = '\\';
@@ -97,6 +97,15 @@ public class ProviderExtras {
      */
     public ProviderExtras() {
         this.values = new LinkedHashMap<>();
+        this.frozen = false;
+    }
+
+    /**
+     * A mutable copy of the given bag, whether or not that bag is frozen: the entries are its own,
+     * the values in it are the ones stored, by reference.
+     */
+    public ProviderExtras(ProviderExtras other) {
+        this.values = new LinkedHashMap<>(other.values);
         this.frozen = false;
     }
 
@@ -126,6 +135,14 @@ public class ProviderExtras {
      */
     public ProviderExtras freeze() {
         return frozen ? this : new ProviderExtras(new LinkedHashMap<>(values));
+    }
+
+    /**
+     * A mutable copy, whether or not this bag is frozen.
+     */
+    @Override
+    public ProviderExtras copy() {
+        return new ProviderExtras(this);
     }
 
     /**
@@ -271,6 +288,29 @@ public class ProviderExtras {
     }
 
     /**
+     * Takes into this bag the entries {@code other} sets that this one does not: a path this bag
+     * already sets, or one that sits above or below such a path, is left as it is. The mirror of
+     * {@link #putAll(ProviderExtras)}, where the other bag's entries win.
+     */
+    @Override
+    public void fillFrom(ProviderExtras other) {
+        if (other == this) {
+            return;
+        }
+        for (Map.Entry<String, Object> entry : other.values.entrySet()) {
+            String key = entry.getKey();
+            if (!values.containsKey(key) && values.keySet().stream().noneMatch(held -> nests(key, held))) {
+                values.put(key, entry.getValue());
+            }
+        }
+    }
+
+    /** Whether one of the two paths names a position inside the other. */
+    private static boolean nests(String one, String other) {
+        return one.startsWith(other + SEPARATOR) || other.startsWith(one + SEPARATOR);
+    }
+
+    /**
      * A new mutable bag holding {@code base}'s entries with {@code overlay} merged over them —
      * overlay wins where the two set the same path, as {@link #putAll(ProviderExtras)} does. The
      * result is always a new, mutable bag and never one of the inputs, so a frozen input stays
@@ -377,10 +417,7 @@ public class ProviderExtras {
      * than being refused for overlapping what is already there.
      */
     private void clearAround(String key) {
-        String descendants = key + SEPARATOR;
-        values.keySet()
-                .removeIf(other -> !other.equals(key)
-                        && (other.startsWith(descendants) || key.startsWith(other + SEPARATOR)));
+        values.keySet().removeIf(held -> nests(key, held));
     }
 
     private static String encode(String[] path) {

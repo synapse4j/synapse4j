@@ -389,7 +389,7 @@ public abstract class AbstractChatClient implements ChatClient {
         @Nullable
         ChatOptions options = defaultOptions.get();
         if (options != null) {
-            request.setOptions(ChatOptions.effective(request.getOptions(), options));
+            request.setOptions(request.getOptions().effective(options));
         }
         applyDefaultTools(request);
     }

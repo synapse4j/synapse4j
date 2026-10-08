@@ -205,6 +205,33 @@ class ProviderExtrasTest {
     }
 
     @Test
+    void fillFromTakesMissingEntries() {
+        ProviderExtras extras = new ProviderExtras().put("a", 1);
+        ProviderExtras other = new ProviderExtras().put("a", 9).put("b", 2);
+
+        extras.fillFrom(other);
+
+        assertEquals(Map.of("a", 1, "b", 2), extras.nestedMap());
+        assertEquals(Map.of("a", 9, "b", 2), other.nestedMap());
+    }
+
+    @Test
+    void fillFromKeepsCoveredPaths() {
+        ProviderExtras same = new ProviderExtras().put("a", 1);
+        ProviderExtras ancestor = new ProviderExtras().put("a", 1);
+        ProviderExtras descendant = new ProviderExtras().put(List.of("a", "b"), 1);
+
+        same.fillFrom(new ProviderExtras().put("a", 2));
+        ancestor.fillFrom(new ProviderExtras().put(List.of("a", "b"), 2));
+        descendant.fillFrom(new ProviderExtras().put("a", 2));
+
+        // The same path, a path above it, and a path below it are all left as this bag has them.
+        assertEquals(Map.of("a", 1), same.nestedMap());
+        assertEquals(Map.of("a", 1), ancestor.nestedMap());
+        assertEquals(Map.of("a", Map.of("b", 1)), descendant.nestedMap());
+    }
+
+    @Test
     void nestedMapFreshCopy() {
         ProviderExtras extras = new ProviderExtras().put(List.of("a", "b"), 1);
 

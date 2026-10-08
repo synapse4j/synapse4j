@@ -4,7 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import io.github.synapse4j.json.JsonSchema;
 import lombok.Getter;
-import lombok.NonNull;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
@@ -33,7 +33,8 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
-public class ChatResponseFormat {
+@NoArgsConstructor
+public class ChatResponseFormat implements Effective<ChatResponseFormat> {
 
     /** Answer in prose. The usual default, worth naming to override a default explicitly. */
     public static final String TYPE_TEXT = "text";
@@ -73,28 +74,38 @@ public class ChatResponseFormat {
     /** Provider-specific fields of this requirement. */
     private final ProviderExtras extras = new ProviderExtras();
 
-    /**
-     * The response format in effect for one call: what the call itself states, and the default for
-     * every part it leaves unstated — merged field by field like the options around it, so a call
-     * that changes only the schema keeps the default's mode, and the bag merges with the call's
-     * entries winning by key.
-     *
-     * @param format   the format the call carries; never {@code null}
-     * @param defaults the default format; never {@code null}
-     * @return a new instance holding the call's format with its gaps filled in from the default —
-     *         never {@code defaults} itself, so changing the answer touches neither
-     */
-    public static ChatResponseFormat effective(@NonNull ChatResponseFormat format,
-            @NonNull ChatResponseFormat defaults) {
-        ChatResponseFormat effective = new ChatResponseFormat();
-        effective.type = format.type != null ? format.type : defaults.type;
-        effective.name = format.name != null ? format.name : defaults.name;
-        effective.description = format.description != null ? format.description : defaults.description;
-        effective.schema = format.schema != null ? format.schema : defaults.schema;
-        effective.strict = format.strict != null ? format.strict : defaults.strict;
-        effective.extras.putAll(defaults.extras);
-        effective.extras.putAll(format.extras);
-        return effective;
+    public ChatResponseFormat(ChatResponseFormat other) {
+        this.type = other.type;
+        this.name = other.name;
+        this.description = other.description;
+        this.schema = other.schema;
+        this.strict = other.strict;
+        this.extras.putAll(other.extras);
+    }
+
+    @Override
+    public ChatResponseFormat copy() {
+        return new ChatResponseFormat(this);
+    }
+
+    @Override
+    public void fillFrom(ChatResponseFormat other) {
+        if (type == null) {
+            type = other.type;
+        }
+        if (name == null) {
+            name = other.name;
+        }
+        if (description == null) {
+            description = other.description;
+        }
+        if (schema == null) {
+            schema = other.schema;
+        }
+        if (strict == null) {
+            strict = other.strict;
+        }
+        extras.fillFrom(other.extras);
     }
 
 }

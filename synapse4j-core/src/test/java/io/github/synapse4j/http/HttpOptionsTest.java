@@ -63,7 +63,7 @@ class HttpOptionsTest {
     }
 
     @Test
-    void mergeLeavesBothSidesAlone() {
+    void effectiveLeavesBothSidesAlone() {
         HttpOptions defaults = new HttpOptions();
         defaults.setBodyWriteMode(BodyWriteMode.STREAMED.value());
         HttpOptions request = new HttpOptions();

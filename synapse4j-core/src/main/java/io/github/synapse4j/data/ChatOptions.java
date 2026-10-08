@@ -7,6 +7,7 @@ import org.jspecify.annotations.Nullable;
 
 import io.github.synapse4j.http.HttpOptions;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.NonNull;
 import lombok.Setter;
 import lombok.ToString;
@@ -34,7 +35,8 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
-public class ChatOptions {
+@NoArgsConstructor
+public class ChatOptions implements Effective<ChatOptions> {
 
     /** Do not reason. */
     public static final String REASONING_EFFORT_NONE = "none";
@@ -122,41 +124,58 @@ public class ChatOptions {
     /** Provider-specific fields to merge into this call's payload. */
     private final ProviderExtras extras = new ProviderExtras();
 
-    /**
-     * The options in effect for one call: what the call itself states, and the client's defaults
-     * for everything it does not. A field the call leaves {@code null} takes the default's value,
-     * the two bags merge with the call's entries winning by key, and the nested response format and
-     * HTTP options merge through their own {@code effective} the same way.
-     *
-     * @param options  the options the call carries; never {@code null}
-     * @param defaults the client's own options; never {@code null}
-     * @return a new instance holding the call's options with their gaps filled in from the
-     *         defaults — never {@code defaults} itself, so changing the answer touches neither
-     */
-    public static ChatOptions effective(@NonNull ChatOptions options, @NonNull ChatOptions defaults) {
-        ChatOptions effective = new ChatOptions();
-        effective.model = options.model != null ? options.model : defaults.model;
-        effective.temperature = options.temperature != null ? options.temperature : defaults.temperature;
-        effective.maxOutputTokens = options.maxOutputTokens != null ? options.maxOutputTokens
-                : defaults.maxOutputTokens;
-        effective.topP = options.topP != null ? options.topP : defaults.topP;
-        effective.reasoningEffort = options.reasoningEffort != null ? options.reasoningEffort
-                : defaults.reasoningEffort;
-        effective.toolChoice = options.toolChoice != null ? options.toolChoice : defaults.toolChoice;
-        effective.toolChoiceName = options.toolChoiceName != null ? options.toolChoiceName
-                : defaults.toolChoiceName;
-        effective.responseFormat = ChatResponseFormat.effective(options.responseFormat, defaults.responseFormat);
-        HttpOptions defaultHttpOptions = defaults.httpOptions;
-        if (defaultHttpOptions == null) {
-            effective.httpOptions = options.httpOptions;
-        } else {
-            effective.httpOptions = HttpOptions.effective(options.httpOptions, defaultHttpOptions);
+    public ChatOptions(ChatOptions other) {
+        this.model = other.model;
+        this.temperature = other.temperature;
+        this.maxOutputTokens = other.maxOutputTokens;
+        this.topP = other.topP;
+        this.reasoningEffort = other.reasoningEffort;
+        this.toolChoice = other.toolChoice;
+        this.toolChoiceName = other.toolChoiceName;
+        this.responseFormat = other.responseFormat.copy();
+        this.httpOptions = other.httpOptions != null ? other.httpOptions.copy() : null;
+        this.headers.putAll(other.headers);
+        this.extras.putAll(other.extras);
+    }
+
+    @Override
+    public ChatOptions copy() {
+        return new ChatOptions(this);
+    }
+
+    @Override
+    public void fillFrom(ChatOptions other) {
+        if (model == null) {
+            model = other.model;
         }
-        effective.headers.putAll(defaults.headers);
-        effective.headers.putAll(options.headers);
-        effective.extras.putAll(defaults.extras);
-        effective.extras.putAll(options.extras);
-        return effective;
+        if (temperature == null) {
+            temperature = other.temperature;
+        }
+        if (maxOutputTokens == null) {
+            maxOutputTokens = other.maxOutputTokens;
+        }
+        if (topP == null) {
+            topP = other.topP;
+        }
+        if (reasoningEffort == null) {
+            reasoningEffort = other.reasoningEffort;
+        }
+        if (toolChoice == null) {
+            toolChoice = other.toolChoice;
+        }
+        if (toolChoiceName == null) {
+            toolChoiceName = other.toolChoiceName;
+        }
+        responseFormat.fillFrom(other.responseFormat);
+        if (other.httpOptions != null) {
+            if (httpOptions == null) {
+                httpOptions = other.httpOptions.copy();
+            } else {
+                httpOptions.fillFrom(other.httpOptions);
+            }
+        }
+        other.headers.forEach(headers::putIfAbsent);
+        extras.fillFrom(other.extras);
     }
 
 }

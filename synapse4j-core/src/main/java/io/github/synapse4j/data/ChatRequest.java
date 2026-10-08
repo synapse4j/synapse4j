@@ -7,6 +7,7 @@ import org.jspecify.annotations.Nullable;
 
 import io.github.synapse4j.tool.Tool;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.NonNull;
 import lombok.Setter;
 
@@ -36,6 +37,7 @@ import lombok.Setter;
  */
 @Getter
 @Setter
+@NoArgsConstructor
 public class ChatRequest {
 
     /**
@@ -65,6 +67,19 @@ public class ChatRequest {
      * inside the library only and is never serialized.
      */
     private @Nullable ChatContext context;
+
+    /**
+     * A copy of another call: the same messages in this copy's own lists, the same context, and its
+     * own tools and options. Nothing the copy changes reaches back into the one it was copied from.
+     */
+    public ChatRequest(ChatRequest other) {
+        this.systemMessage = other.systemMessage;
+        this.historyMessages.addAll(other.historyMessages);
+        this.pendingMessages.addAll(other.pendingMessages);
+        this.tools.addAll(other.tools);
+        this.options = other.options.copy();
+        this.context = other.context;
+    }
 
     /**
      * Adds a message to what this call will send.

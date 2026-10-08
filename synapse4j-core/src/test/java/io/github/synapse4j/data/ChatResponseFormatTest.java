@@ -24,13 +24,13 @@ class ChatResponseFormatTest {
         defaults.setSchema(schema);
         defaults.getExtras().put("strict", false);
 
-        ChatResponseFormat effective = ChatResponseFormat.effective(call, defaults);
+        ChatResponseFormat effective = call.effective(defaults);
 
         assertEquals(ChatResponseFormat.TYPE_JSON_SCHEMA, effective.getType());
         assertEquals("answer", effective.getName());
         assertSame(schema, effective.getSchema());
         assertEquals(Boolean.TRUE, effective.getExtras().get("strict"));
-        // The merge answers a new instance; neither side is changed.
+        // The answer is a new instance; neither side is changed.
         assertNull(call.getName());
         assertEquals(ChatResponseFormat.TYPE_JSON, defaults.getType());
     }

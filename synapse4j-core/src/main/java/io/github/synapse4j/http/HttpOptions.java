@@ -4,7 +4,9 @@ import java.time.Duration;
 
 import org.jspecify.annotations.Nullable;
 
+import io.github.synapse4j.data.Effective;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.NonNull;
 
 /**
@@ -21,7 +23,8 @@ import lombok.NonNull;
  * a request asks for something it cannot do, says so rather than silently doing something else.
  */
 @Data
-public class HttpOptions {
+@NoArgsConstructor
+public class HttpOptions implements Effective<HttpOptions> {
 
     /**
      * How a request body reaches the implementation: one of the modes {@link BodyWriteMode} defines, or
@@ -69,6 +72,12 @@ public class HttpOptions {
      */
     static final int DEFAULT_MAX_FRAME_BYTES = 256 * 1024;
 
+    public HttpOptions(HttpOptions other) {
+        this.bodyWriteMode = other.bodyWriteMode;
+        this.responseTimeout = other.responseTimeout;
+        this.maxFrameBytes = other.maxFrameBytes;
+    }
+
     /**
      * The defaults every implementation starts from, written down once so that what this library does
      * when nobody configures anything is the same everywhere.
@@ -83,23 +92,34 @@ public class HttpOptions {
     }
 
     /**
-     * The options in effect for one request: what the request itself sets, and the implementation's
-     * defaults for everything it does not.
+     * The options in effect when the carried ones may be absent: {@code carried} over {@code base},
+     * or {@code base}'s own values when nothing is carried. The convenience for the common case where
+     * a request's options are optional and the implementation's are not.
      *
-     * @param options  the options the request carries; may be {@code null}
-     * @param defaults the implementation's own options; never {@code null}
-     * @return a new instance holding the request's options with their gaps filled in from the
-     *         defaults — never {@code defaults} itself or {@code options} itself, so the caller may
-     *         change the answer without touching either
+     * @param carried the options a request carries, or {@code null} for none
+     * @param base    the options to fall back to; never {@code null}
+     * @return the effective options; never {@code null}
      */
-    public static HttpOptions effective(@Nullable HttpOptions options, @NonNull HttpOptions defaults) {
-        HttpOptions carried = options == null ? new HttpOptions() : options;
-        HttpOptions effective = new HttpOptions();
-        effective.bodyWriteMode = carried.bodyWriteMode != null ? carried.bodyWriteMode : defaults.bodyWriteMode;
-        effective.responseTimeout = carried.responseTimeout != null ? carried.responseTimeout
-                : defaults.responseTimeout;
-        effective.maxFrameBytes = carried.maxFrameBytes != null ? carried.maxFrameBytes : defaults.maxFrameBytes;
-        return effective;
+    public static HttpOptions effective(@Nullable HttpOptions carried, @NonNull HttpOptions base) {
+        return (carried == null ? new HttpOptions() : carried).effective(base);
+    }
+
+    @Override
+    public HttpOptions copy() {
+        return new HttpOptions(this);
+    }
+
+    @Override
+    public void fillFrom(HttpOptions other) {
+        if (bodyWriteMode == null) {
+            bodyWriteMode = other.bodyWriteMode;
+        }
+        if (responseTimeout == null) {
+            responseTimeout = other.responseTimeout;
+        }
+        if (maxFrameBytes == null) {
+            maxFrameBytes = other.maxFrameBytes;
+        }
     }
 
 }
