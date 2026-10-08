@@ -268,6 +268,8 @@ public class MethodTools {
      */
     private static List<Method> runnableMethods(Class<?> type) {
         Map<String, Method> bySignature = new LinkedHashMap<>();
+        // Every class in the chain first, so a declaration beats a default method either way round
+        // Java resolves it: a class's own answer wins over what an interface it implements would say.
         for (Class<?> level = type; level != null && level != Object.class; level = level.getSuperclass()) {
             for (Method method : level.getDeclaredMethods()) {
                 if (method.isSynthetic() || method.isBridge() || Modifier.isAbstract(method.getModifiers())) {
@@ -275,6 +277,8 @@ public class MethodTools {
                 }
                 bySignature.putIfAbsent(signature(method), method);
             }
+        }
+        for (Class<?> level = type; level != null && level != Object.class; level = level.getSuperclass()) {
             for (Class<?> face : level.getInterfaces()) {
                 readDefaultMethods(face, bySignature);
             }

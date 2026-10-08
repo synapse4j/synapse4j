@@ -154,6 +154,13 @@ class MethodToolsTest {
     }
 
     @Test
+    void superclassMethodBeatsInterfaceDefault() {
+        reader.from(new Preferring());
+
+        assertEquals(Set.of("fromClass"), resolvedNames());
+    }
+
+    @Test
     void bridgeMethodNotSecondTool() {
         reader.from(new Narrowed());
 
@@ -302,6 +309,27 @@ class MethodToolsTest {
     }
 
     public static class Implementing implements Shared {
+    }
+
+    /** A default method a superclass already answers, which is the one Java runs. */
+    public interface Answered {
+
+        @ToolMethod(name = "fromInterface")
+        default String shared(String value) {
+            return value;
+        }
+    }
+
+    /** The answer a subclass's own chain carries before its interfaces are consulted. */
+    public static class Carrying {
+
+        @ToolMethod(name = "fromClass")
+        public String shared(String value) {
+            return value;
+        }
+    }
+
+    public static class Preferring extends Carrying implements Answered {
     }
 
     /** A generic superclass whose method a subclass narrows to one type. */
