@@ -48,6 +48,7 @@ import io.github.synapse4j.json.JsonSchemaBuilder;
 import io.github.synapse4j.openai.OpenAiCompletionsChatClient;
 import io.github.synapse4j.openai.OpenAiConfig;
 import io.github.synapse4j.openai.OpenAiResponsesChatClient;
+import io.github.synapse4j.spring.boot.tool.Synapse4jToolsAutoConfiguration;
 import io.github.synapse4j.tool.DefaultToolExecutor;
 import io.github.synapse4j.tool.ToolExecutor;
 import tools.jackson.databind.json.JsonMapper;
@@ -475,21 +476,20 @@ class Synapse4jAutoConfigurationTest {
 
     @Test
     void listedInAutoConfigurationImports() throws IOException {
-        // Every other test here registers the class directly and would stay green if the imports
-        // file went missing or misnamed — the file alone is what makes a real application see it.
-        String expected = Synapse4jAutoConfiguration.class.getName();
-        boolean found = false;
+        // Every other test here registers the classes directly and would stay green if the imports
+        // file went missing, misnamed or short a line — the file alone is what makes a real
+        // application see them, so every auto-configuration this starter carries has to be in it.
+        List<String> listed = new ArrayList<>();
         for (URL url : Collections.list(
                 getClass().getClassLoader().getResources(IMPORTS))) {
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(url.openStream(), StandardCharsets.UTF_8))) {
-                if (reader.lines().anyMatch(expected::equals)) {
-                    found = true;
-                    break;
-                }
+                reader.lines().filter(line -> !line.isBlank()).forEach(listed::add);
             }
         }
-        assertThat(found).as("listed in " + IMPORTS).isTrue();
+        assertThat(listed).as("listed in " + IMPORTS)
+                .contains(Synapse4jAutoConfiguration.class.getName(),
+                        Synapse4jToolsAutoConfiguration.class.getName());
     }
 
     /** Captures the outgoing request body and replays a canned completion. */
