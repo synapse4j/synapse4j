@@ -27,10 +27,10 @@ import lombok.ToString;
  * somebody wrote.
  *
  * <p>
- * The Java side is what the reader settled and does not change afterwards: the method, the instance
- * it runs on, and one entry per declared parameter, in signature order. The strings are written and
- * rewritten — the annotations write them, the customizers rewrite them, and the reader applies
- * whatever defaults are left over.
+ * The Java side is what the reader settled and does not change afterwards: the class the method was
+ * read from, the method, the instance it runs on, and one entry per declared parameter, in signature
+ * order. The strings are written and rewritten — the annotations write them, the customizers rewrite
+ * them, and the reader applies whatever defaults are left over.
  *
  * <p>
  * {@link #definition()} is where all of it is read back: it refuses a resolution that cannot become a
@@ -44,6 +44,16 @@ import lombok.ToString;
 @ToString(exclude = "target")
 @RequiredArgsConstructor
 public class ToolMethodSpec {
+
+    /**
+     * The class the reader was asked about, which is what this tool belongs to. Not always the one
+     * that declares the method — a reader reads what a class inherits — and not the instance's own
+     * class either, which is why the reader is handed the two apart: a bean the container wrapped in a
+     * proxy still yields the tools of the class it stands for. A resolution built without one carries
+     * the class the method is declared in.
+     */
+    @NonNull
+    private final Class<?> owner;
 
     /** The method the values were read from; the signature the declaration will be built from. */
     @NonNull
@@ -90,6 +100,11 @@ public class ToolMethodSpec {
      * {@link #definition()}.
      */
     private @Nullable JsonSchema resolvedSchema;
+
+    public ToolMethodSpec(@NonNull Method method, @Nullable Object target,
+            @NonNull List<ToolParameterSpec> parameters) {
+        this(method.getDeclaringClass(), method, target, parameters);
+    }
 
     /**
      * The declaration this resolution describes: the name and description it carries, the input schema

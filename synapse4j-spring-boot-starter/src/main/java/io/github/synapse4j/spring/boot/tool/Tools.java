@@ -12,13 +12,16 @@ import org.springframework.stereotype.Component;
 /**
  * Marks a class whose {@link io.github.synapse4j.tool.ToolMethod} methods are the application's tools
  * — and, through the {@link Component} it is meta-annotated with, makes the class a bean that component
- * scanning finds, so the tools are discovered without a scan of their own.
+ * scanning finds, so the tools are discovered without a scan of their own. The annotation belongs to
+ * the class the container registers, not to a method: a bean whose class inherits one from a superclass
+ * is marked too — the nearest one up the hierarchy is the one that counts — and a class nothing marks
+ * is left out, however many {@code @ToolMethod} methods it carries.
  *
  * <p>
- * {@link #prefix()} is written in front of the name of every tool the class declares, which is how two
- * classes may declare methods of one name without colliding. It is literal text: a separator, if one is
- * wanted, is part of it — {@code "weather_"} names a {@code forecast} method {@code weather_forecast}.
- * Blank, the default, writes nothing.
+ * {@link #prefix()} is written in front of the name of every tool read from that class, the ones it
+ * declares and the ones it inherits alike, which is how two classes may offer tools of one name without
+ * colliding. It is literal text: a separator, if one is wanted, is part of it — {@code "weather_"} names
+ * a {@code forecast} method {@code weather_forecast}. Blank, the default, writes nothing.
  *
  * <p>
  * {@link #client()} names the chat client these tools belong to, by its bean name, so an application

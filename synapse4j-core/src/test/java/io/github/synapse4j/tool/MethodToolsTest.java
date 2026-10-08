@@ -177,6 +177,14 @@ class MethodToolsTest {
     }
 
     @Test
+    void specOwnerIsReadClass() {
+        reader.from(new Child());
+
+        // The method is the superclass's; the tool belongs to the class the reader was asked about.
+        assertEquals(Child.class, specOf("inherited").getOwner());
+    }
+
+    @Test
     void unannotatedClassYieldsNoTools() {
         assertTrue(reader.from(Plain.class).isEmpty());
         assertTrue(reader.from(new Plain()).isEmpty());

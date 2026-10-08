@@ -35,6 +35,19 @@ class ToolsToolMethodSpecCustomizerTest {
         assertThat(unmarked.getName()).isEmpty();
     }
 
+    @Test
+    void inheritedMethodKeepsClassPrefix() {
+        // The method is the superclass's, the tool the marked subclass's: the prefix is read off the
+        // class the reader was asked about, not the one that declares the method.
+        Method inherited = method(Inheriting.class);
+        ToolMethodSpec spec = new ToolMethodSpec(Inheriting.class, inherited, null,
+                List.of(new ToolParameterSpec(inherited.getParameters()[0])));
+
+        new ToolsToolMethodSpecCustomizer().customize(spec);
+
+        assertThat(spec.getName()).isEqualTo("child-forecast");
+    }
+
     private static ToolMethodSpec specOf(Class<?> type) {
         Method method = method(type);
         return new ToolMethodSpec(method, null, List.of(new ToolParameterSpec(method.getParameters()[0])));
@@ -68,6 +81,19 @@ class ToolsToolMethodSpecCustomizerTest {
 
     /** A class no annotation marks. */
     public static class Unmarked {
+
+        public static String forecast(String city) {
+            return city;
+        }
+    }
+
+    /** A marked class whose tool method is one its unmarked superclass declares. */
+    @Tools("child-")
+    public static class Inheriting extends Declaring {
+    }
+
+    /** The unmarked class that declares the method the subclass only inherits. */
+    public static class Declaring {
 
         public static String forecast(String city) {
             return city;

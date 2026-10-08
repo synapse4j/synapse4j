@@ -103,7 +103,8 @@ public class MethodTools {
     /**
      * The tool {@code method} becomes under the given name and description: the same reading, the
      * same customizers and the same defaults as an annotated method, with the two strings supplied
-     * here instead of read off an annotation.
+     * here instead of read off an annotation. Nothing here names the class the tool belongs to, so it
+     * is the one that declares the method.
      *
      * @param name        the name the model calls the tool by; never {@code null}
      * @param description what the tool does; never {@code null}
@@ -114,7 +115,7 @@ public class MethodTools {
      */
     public MethodTool of(@NonNull String name, @NonNull String description, @NonNull Method method,
             @Nullable Object target) {
-        ToolMethodSpec spec = specOf(method, target);
+        ToolMethodSpec spec = specOf(method.getDeclaringClass(), method, target);
         readParameters(method, spec);
         spec.setName(name);
         spec.setDescription(description);
@@ -178,7 +179,7 @@ public class MethodTools {
             if (!statik && target == null) {
                 continue;
             }
-            ToolMethodSpec spec = specOf(method, statik ? null : target);
+            ToolMethodSpec spec = specOf(type, method, statik ? null : target);
             if (!annotation.name().isBlank()) {
                 spec.setName(annotation.name());
             }
@@ -208,23 +209,25 @@ public class MethodTools {
     }
 
     /**
-     * The resolution of one method before anything is written into it: its signature, the instance it
-     * runs on, and nothing else. Which parameters exist and which Java parameter each one stands for
-     * is settled here and cannot drift afterwards; an instance method needs the instance it runs on,
-     * and that pairing is this reader's business — the spec is handed two unrelated objects.
+     * The resolution of one method before anything is written into it: the class it was read from, its
+     * signature, the instance it runs on, and nothing else. Which parameters exist and which Java
+     * parameter each one stands for is settled here and cannot drift afterwards; an instance method
+     * needs the instance it runs on, and that pairing is this reader's business — the spec is handed
+     * two unrelated objects.
      *
+     * @param owner  the class whose tool set is being read; never {@code null}
      * @param method the method to read; never {@code null}
      * @param target the instance an instance method runs on, {@code null} for a static one
      * @return the empty resolution; never {@code null}
      * @throws SynapseException if the method is an instance method and no target is given
      */
-    private ToolMethodSpec specOf(Method method, @Nullable Object target) {
+    private ToolMethodSpec specOf(Class<?> owner, Method method, @Nullable Object target) {
         if (!Modifier.isStatic(method.getModifiers()) && target == null) {
             throw new SynapseException("no target for " + method + ", which is an instance method");
         }
         List<ToolParameterSpec> parameters = Arrays.stream(method.getParameters())
                 .map(ToolParameterSpec::new).toList();
-        return new ToolMethodSpec(method, target, parameters);
+        return new ToolMethodSpec(owner, method, target, parameters);
     }
 
     /** Writes onto the spec whatever each parameter's {@link ToolParam} actually said. */
