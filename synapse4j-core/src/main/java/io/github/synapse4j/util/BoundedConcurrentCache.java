@@ -7,8 +7,8 @@ import java.util.function.Function;
 import lombok.extern.java.Log;
 
 /**
- * A {@link Cache} over a {@link ConcurrentHashMap}, bounded: once it holds more than the given number
- * of entries, the next value to be stored starts over from an empty map.
+ * A {@link Cache} over a {@link ConcurrentHashMap}, bounded: once it holds the given number of entries,
+ * the next value to be stored starts over from an empty map.
  *
  * <p>
  * Dropping everything when full is crude on purpose. The keys here are a small, mostly fixed set, so
@@ -40,7 +40,7 @@ public class BoundedConcurrentCache<K, V> implements Cache<K, V> {
     }
 
     /**
-     * Creates a cache that starts over once it holds more than the given number of entries.
+     * Creates a cache that starts over once it holds the given number of entries.
      *
      * @param capacity the number of entries kept before the cache starts over; must be positive
      * @throws IllegalArgumentException if {@code capacity} is not positive

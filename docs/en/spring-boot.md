@@ -11,7 +11,7 @@ codec, a transport, and a chat client — with everything bound from `synapse4j.
 <dependency>
   <groupId>io.github.synapse4j</groupId>
   <artifactId>synapse4j-spring-boot-starter</artifactId>
-  <version>0.0.2</version>
+  <version>0.0.3</version>
 </dependency>
 ```
 
@@ -26,7 +26,7 @@ HttpClient 5 itself; see [Transports](#transports).
 
 ## What it wires
 
-The default wiring is four beans, each backing off if you declare your own:
+The default wiring is five beans, each backing off if you declare your own:
 
 - **`Synapse4jJacksonModule`** — teaches Boot's `JsonMapper` to read and write a `JsonSchema` as the
   document it describes, so a schema you serialize yourself comes out as the schema. It is applied
@@ -37,6 +37,8 @@ The default wiring is four beans, each backing off if you declare your own:
 - **`HttpClient`** — the transport `synapse4j.http-client` names.
 - **`ChatClient`** — the protocol `synapse4j.chat.client` names, wrapped in `ToolCallingChatClient`
   unless `synapse4j.chat.auto-tool-calling` is off.
+- **`ToolExecutor`** — a `DefaultToolExecutor`, running each round's tool calls inline and in order.
+  Declare your own for a worker pool, a cap on the rounds, or a different answer to a failed call.
 
 Selecting the Apache transport adds another bean, the `CloseableHttpClient` holding the connection
 pool. It steps aside when you declare a `CloseableHttpClient` or an `HttpClient` of your own.
@@ -73,10 +75,8 @@ binds `OpenAiConfig`, `synapse4j.anthropic.*` binds `AnthropicConfig` — and th
 `synapse4j.http-options.*` binds `HttpOptions` — sit at the root, because a capability shares them.
 The JSON implementation's settings sit under their own key — `synapse4j.jackson.*` binds
 `JacksonSchemaSettings`, the schema generator's choices — so a second implementation gets a group of
-its own. Everything only a chat call has sits together under `synapse4j.chat.*`: `synapse4j.chat.client`,
-`synapse4j.chat.auto-tool-calling`, `synapse4j.chat.system-message`, and `synapse4j.chat.options.*`.
-Each key is a field on the type it binds, documented there; the options group restates only the
-fields Spring can bind.
+its own. Everything only a chat call has sits together under `synapse4j.chat.*`. Each key is a field on
+the type it binds, documented there; the options group restates only the fields Spring can bind.
 `synapse4j.chat.options.extras` binds raw keys: a key is the provider's own wire name, and a dotted
 key addresses a nested member. A non-string value needs YAML — a `.properties` file yields a string
 for every value.

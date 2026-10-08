@@ -32,6 +32,13 @@ version becomes the body of the GitHub Release created when that version's tag i
 - A decode schema follows the mapper on additional properties: an object that lists properties is described as closed (`additionalProperties: false`) where the mapper refuses a property the JSON leaves undeclared, and left open where it accepts one — the encode schema is untouched
 - `JsonSchema` no longer answers `getItems`, which covered only one of the two forms `items` may take, and any keyword is read through `keys()`, `get(String, Class)`, `getList(...)` and `getMap(...)`, each answering only a value of the type asked for
 - `synapse4j.jackson.*` binds the Jackson module's schema choices, one key per `JacksonSchemaSettings` field, so a choice the module recommends can be turned off from configuration
+- `@ToolMethod(schema = …)` now reaches the declaration, as its javadoc said it did, and `MethodTools.of(...)` reads the `@ToolParam` annotations on the method's parameters the way `from(...)` does — `fromModel`, a renamed or described argument and `required` included, where an argument meant for the application used to be shown to the model
+- A tool method is resolved as Java resolves it: a class's own declaration, one inherited from a superclass included, now wins over an interface default method of the same signature, where the interface's answer used to stand
+- An assistant turn that only calls tools goes out without a `content` member rather than with an empty array, which OpenAI chat completions refuses
+- An encode schema answers requiredness from what writing does: `@JsonProperty(required = true)` no longer makes the encode side demand a property an inclusion setting may leave out, and the inclusion a class carries, `USE_DEFAULTS` included, is read as a property's own is
+- `InlineJsonSchemaCustomizer` expands a `$defs` entry in the boolean form too, where a `$ref` to one used to be kept
+- The starter declares a `ToolExecutor` bean — a `DefaultToolExecutor` — and hands the loop that one, so a round cap, a worker pool or a different answer to a failed call is an application bean's to set
+- `ErrorHandlers.message(prefix)` answers an exception whose message is empty, not only one that is absent, with the exception's own name, so the prefix is never left standing before nothing
 
 ## [0.0.2] - 2026-10-01
 

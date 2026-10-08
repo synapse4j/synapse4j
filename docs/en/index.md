@@ -17,6 +17,10 @@ config.setApiKey(System.getenv("OPENAI_API_KEY"));
 
 ChatClient client = new OpenAiCompletionsChatClient(http, codec, config);
 
+ChatOptions defaults = new ChatOptions();
+defaults.setModel("gpt-4o-mini");
+client.setDefaultOptions(defaults);
+
 ChatResponse response = client.chat(new ChatRequest()
         .addUserMessage("Why is the sky blue?"));
 

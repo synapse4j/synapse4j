@@ -24,7 +24,8 @@ import lombok.NonNull;
  * <p>
  * A keyword is carried exactly when it was set, {@code null} and all, so a keyword whose JSON value is
  * null (such as {@code "const": null}) survives. A modelled keyword is cleared by setting it to
- * {@code null}; {@link #put(String, Object)} keeps what it is given.
+ * {@code null}, except the ones that take no null — the types, the properties, the required names and
+ * the definitions — which refuse it; {@link #put(String, Object)} carries any keyword, null included.
  *
  * <p>
  * A keyword whose value is a sub-schema is kept as a {@link JsonSchema} (or a list or a map of them),

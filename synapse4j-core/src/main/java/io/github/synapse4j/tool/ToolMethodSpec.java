@@ -85,8 +85,9 @@ public class ToolMethodSpec {
 
     /**
      * The declaration's input schema as it stands: {@code null} while nothing has settled it, and
-     * everything the model is shown of this tool's arguments in one value. {@link MethodTools} writes
-     * it, {@link MethodTool} reads it.
+     * everything the model is shown of this tool's arguments in one value.
+     * {@link FinalToolMethodSpecCustomizer} settles it, and {@link MethodTool} reads it through
+     * {@link #definition()}.
      */
     private @Nullable JsonSchema resolvedSchema;
 

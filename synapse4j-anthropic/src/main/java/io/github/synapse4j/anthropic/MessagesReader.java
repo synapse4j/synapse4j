@@ -255,14 +255,13 @@ class MessagesReader {
     }
 
     /**
-     * The members of a content block the part does not model, as the bag the part carries — or
-     * {@code null} when every member is modelled, so a block with nothing extra leaves its part
-     * with no bag at all.
+     * The members of a content block the part does not model, as the bag the part carries — empty
+     * when every member is modelled.
      *
      * @param block   the block as the wire spelled it
      * @param modeled the member names the part models itself; they stay out of the bag
      */
-    private static @Nullable ProviderExtras restOf(Map<?, ?> block, String... modeled) {
+    private static ProviderExtras restOf(Map<?, ?> block, String... modeled) {
         ProviderExtras extras = new ProviderExtras();
         for (Map.Entry<?, ?> member : block.entrySet()) {
             String key = String.valueOf(member.getKey());

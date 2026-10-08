@@ -11,7 +11,7 @@
 <dependency>
   <groupId>io.github.synapse4j</groupId>
   <artifactId>synapse4j-spring-boot-starter</artifactId>
-  <version>0.0.2</version>
+  <version>0.0.3</version>
 </dependency>
 ```
 
@@ -25,7 +25,7 @@ classpath 的那个库，是 Apache HttpClient 5 本身；见[传输层](#传输
 
 ## 它接了什么
 
-默认接线是四个 bean，你自己声明同类型 bean 时各自让位：
+默认接线是五个 bean，你自己声明同类型 bean 时各自让位：
 
 - **`Synapse4jJacksonModule`**——让 Boot 的 `JsonMapper` 能把 `JsonSchema` 当作它描述的那份文档来读写，
   于是你自己序列化一个 schema，得到的就是那个 schema。它作用于编解码器所用的同一个 mapper。
@@ -35,6 +35,8 @@ classpath 的那个库，是 Apache HttpClient 5 本身；见[传输层](#传输
 - **`HttpClient`**——`synapse4j.http-client` 指定的传输层。
 - **`ChatClient`**——`synapse4j.chat.client` 指定的协议；除非 `synapse4j.chat.auto-tool-calling`
   关掉，否则会用 `ToolCallingChatClient` 包装。
+- **`ToolExecutor`**——一个 `DefaultToolExecutor`，把每一轮的工具调用按顺序就地跑完。想要线程池、
+  给轮数加上限、或换个方式答复失败的调用，就声明自己的。
 
 选择 Apache 传输层还会多出一个 bean，即持有连接池的 `CloseableHttpClient`。你声明自己的
 `CloseableHttpClient` 或 `HttpClient` 时，它会退让。
@@ -70,10 +72,8 @@ synapse4j:
 `synapse4j.anthropic.*` 绑定 `AnthropicConfig`——和传输层的设置——`synapse4j.http-options.*` 绑定
 `HttpOptions`——放在根上，因为同一项能力在各家之间共用这些设置。JSON 实现自己的设置放在它自己的键下
 ——`synapse4j.jackson.*` 绑定 `JacksonSchemaSettings`，即 schema 生成器的各项选择——这样将来换一个
-实现就有一组自己的键。只有 chat 调用才有的东西收在 `synapse4j.chat.*`
-下面：`synapse4j.chat.client`、`synapse4j.chat.auto-tool-calling`、`synapse4j.chat.system-message`，
-以及 `synapse4j.chat.options.*`。每个键都是它绑定的那个类型上的一个字段，含义在该类型上有文档；
-options 这一组只重述 Spring 能绑定的字段。
+实现就有一组自己的键。只有 chat 调用才有的东西收在 `synapse4j.chat.*` 下面。每个键都是它绑定的那个
+类型上的一个字段，含义在该类型上有文档；options 这一组只重述 Spring 能绑定的字段。
 `synapse4j.chat.options.extras` 按原始键绑定：键就是提供商在协议上所用的名字，点分键指向嵌套成员。
 非字符串的值需要 YAML——`.properties` 文件会把每个值都变成字符串。
 

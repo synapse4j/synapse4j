@@ -40,7 +40,8 @@ public class HttpOptions {
     /**
      * How long to wait for the response to start arriving (its headers), measured by the implementation
      * from when the request is sent. Does not bound reading the body — body stalls are the caller's or a
-     * higher layer's concern.
+     * higher layer's concern — though a transport may apply it more coarsely than that, which it says
+     * where it does.
      */
     private @Nullable Duration responseTimeout;
 

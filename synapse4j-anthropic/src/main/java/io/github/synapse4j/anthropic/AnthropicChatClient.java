@@ -124,9 +124,8 @@ public class AnthropicChatClient extends AbstractChatClient {
     }
 
     /**
-     * The configuration in effect. Read once per exchange by {@link #doChat} and
-     * {@link #doStream}: two reads could straddle a {@link #setConfig} and answer under two
-     * configurations.
+     * The configuration in effect. A subclass that reads it should read it once and keep it: two
+     * reads could straddle a {@link #setConfig} and answer under two configurations.
      *
      * @return the configuration in effect; never {@code null}
      */

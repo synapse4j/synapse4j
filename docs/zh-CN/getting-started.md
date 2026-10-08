@@ -15,7 +15,7 @@
     <dependency>
       <groupId>io.github.synapse4j</groupId>
       <artifactId>synapse4j-bom</artifactId>
-      <version>0.0.2</version>
+      <version>0.0.3</version>
       <type>pom</type>
       <scope>import</scope>
     </dependency>
@@ -46,7 +46,7 @@
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.synapse4j:synapse4j-bom:0.0.2"))
+    implementation(platform("io.github.synapse4j:synapse4j-bom:0.0.3"))
     implementation("io.github.synapse4j:synapse4j-core")
     implementation("io.github.synapse4j:synapse4j-jackson")
     implementation("io.github.synapse4j:synapse4j-http-jdk")
@@ -54,7 +54,7 @@ dependencies {
 }
 ```
 
-上面写的 `0.0.2` 是本文档编写时对应的版本；实际使用时请以 Maven Central 上的最新发布为准。
+上面写的 `0.0.3` 是本文档编写时对应的版本；实际使用时请以 Maven Central 上的最新发布为准。
 
 ## 2. 构建一个客户端
 

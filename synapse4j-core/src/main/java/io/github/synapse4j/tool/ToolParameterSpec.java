@@ -23,9 +23,9 @@ import lombok.ToString;
  * The two schema answers are deliberately different in kind. {@link #schema} is the configuration
  * surface: text, written by an annotation or by a customizer, blank when nobody supplied one. {@link
  * #resolvedSchema} is the conclusion: the schema of this one property as the declaration carries it,
- * which {@link MethodTools} settles and {@link MethodTool} reads. A customizer holding a
- * {@link JsonSchema} in hand writes the second and skips the round trip through text the first would
- * need.
+ * which {@link FinalToolMethodSpecCustomizer} settles out of the one above and reads back when the
+ * arguments schema is assembled. A customizer holding a {@link JsonSchema} in hand writes the second
+ * and skips the round trip through text the first would need.
  */
 @Getter
 @Setter
@@ -66,8 +66,9 @@ public class ToolParameterSpec {
 
     /**
      * The schema of this one property as the declaration carries it: {@code null} while nothing has
-     * settled it, and for a parameter that never reaches the model. {@link MethodTools} writes it and
-     * {@link MethodTool} reads it — it is how the arguments schema is put together.
+     * settled it, and for a parameter that never reaches the model.
+     * {@link FinalToolMethodSpecCustomizer} settles it, and it is how the arguments schema is put
+     * together.
      */
     private @Nullable JsonSchema resolvedSchema;
 

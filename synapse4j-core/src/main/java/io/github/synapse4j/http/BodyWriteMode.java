@@ -17,8 +17,9 @@ public enum BodyWriteMode {
     AUTO("auto"),
 
     /**
-     * The body is written as it comes, keeping it out of memory; an implementation that cannot take a
-     * written body on the caller's thread converts it on a thread of its own.
+     * The body is written as it comes, keeping it out of memory. An implementation that cannot take a
+     * written body on the caller's thread converts it on a thread of its own; one that can do neither
+     * refuses the mode rather than gathering a body the caller asked not to gather.
      */
     STREAMED("streamed"),
 

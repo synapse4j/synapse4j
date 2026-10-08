@@ -58,9 +58,10 @@ import lombok.RequiredArgsConstructor;
  *
  * <p>
  * What the protocol cannot express fails here rather than reaching the provider half expressed: a
- * part type with no block shape, media that is not an image, a tool-choice mode outside the set
- * the protocol fixes, a response format it has no member for — and, because {@code max_tokens} is
- * required with no server-side default, a call that states no limit at all.
+ * part type with no block shape, media that is not an image, a response format it has no member
+ * for — and, because {@code max_tokens} is required with no server-side default, a call that
+ * states no limit at all. A tool-choice mode outside the set the protocol fixes is not one of
+ * them: it is left unsent and the call goes on, as {@link #toolChoice} says.
  *
  * <p>
  * The {@link JsonWriter} is handed in, and where its bytes go is the caller's affair. This class

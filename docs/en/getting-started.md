@@ -16,7 +16,7 @@ Import the BOM once to align versions, then declare the modules you use.
     <dependency>
       <groupId>io.github.synapse4j</groupId>
       <artifactId>synapse4j-bom</artifactId>
-      <version>0.0.2</version>
+      <version>0.0.3</version>
       <type>pom</type>
       <scope>import</scope>
     </dependency>
@@ -47,7 +47,7 @@ The same four, in Gradle's Kotlin DSL:
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.synapse4j:synapse4j-bom:0.0.2"))
+    implementation(platform("io.github.synapse4j:synapse4j-bom:0.0.3"))
     implementation("io.github.synapse4j:synapse4j-core")
     implementation("io.github.synapse4j:synapse4j-jackson")
     implementation("io.github.synapse4j:synapse4j-http-jdk")
@@ -55,7 +55,7 @@ dependencies {
 }
 ```
 
-The `0.0.2` above is the version these docs were written against; take the current release from
+The `0.0.3` above is the version these docs were written against; take the current release from
 Maven Central.
 
 ## 2. Build a client

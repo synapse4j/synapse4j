@@ -108,8 +108,7 @@ public class FunctionTool<I, O> implements StagedTool {
 
     /**
      * A tool under a declaration the application assembled itself — the input type is not
-     * asked; keep the declaration consistent with what {@code inputType} decodes, the same
-     * promise {@link MethodTool} makes when handed a declaration.
+     * asked; keep the declaration consistent with what {@code inputType} decodes.
      *
      * @param definition the declaration to carry; never {@code null}
      * @param inputType  what the arguments decode into; never {@code null}

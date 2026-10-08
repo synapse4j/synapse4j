@@ -20,8 +20,9 @@ public final class JsonSchemas {
      * A form the value of a keyword takes: a sub-schema, a list of them, or a map of them by name.
      *
      * <p>
-     * Only the forms this library models appear here. More may be added — and more keywords given
-     * shapes — without {@link #shapesOf(String)} changing.
+     * An enum because JSON Schema fixes exactly these three and nothing extends them: a keyword's value
+     * is a schema, an array of schemas, or an object of them keyed by name. Which keywords carry one is
+     * a list of its own, and grows without {@link #shapesOf(String)} changing.
      */
     public enum Shape {
 

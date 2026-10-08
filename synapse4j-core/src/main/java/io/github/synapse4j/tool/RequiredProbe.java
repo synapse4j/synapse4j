@@ -18,9 +18,9 @@ import lombok.Setter;
  * <p>
  * JSON Schema declares {@code required} on the object that holds a property, never on the property's
  * own type, so a value that stands alone — a method parameter, say — cannot be asked about directly.
- * Placing it in a property's position makes the question answerable: {@link MethodTool} generates the
- * schema of {@code RequiredProbe<parameterType>} and reads whether {@code value} is listed as
- * required. Only the type is ever used; no instance is created.
+ * Placing it in a property's position makes the question answerable: {@link FinalToolMethodSpecCustomizer}
+ * generates the schema of {@code RequiredProbe<parameterType>} and reads whether {@code value} is
+ * listed as required. Only the type is ever used; no instance is created.
  */
 @Getter
 @Setter
