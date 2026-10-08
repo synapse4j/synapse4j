@@ -468,9 +468,9 @@ class MessagesReader {
         for (Map.Entry<?, ?> member : members.entrySet()) {
             String field = String.valueOf(member.getKey());
             switch (field) {
-                case "input_tokens" -> uncached = asInteger(member.getValue());
-                case "output_tokens" -> usage.setOutputTokens(asInteger(member.getValue()));
-                case "cache_read_input_tokens" -> cached = asInteger(member.getValue());
+                case "input_tokens" -> uncached = countOrExtras(usage, field, member.getValue());
+                case "output_tokens" -> usage.setOutputTokens(countOrExtras(usage, field, member.getValue()));
+                case "cache_read_input_tokens" -> cached = countOrExtras(usage, field, member.getValue());
                 case "cache_creation_input_tokens" -> {
                     written = asInteger(member.getValue());
                     // Already inside the summed input, but under no field of its own: the original
@@ -491,6 +491,19 @@ class MessagesReader {
 
     private static int total(@Nullable Integer count) {
         return count == null ? 0 : count;
+    }
+
+    /**
+     * A count this model carries under a name of its own: the number it spells, or {@code null} with
+     * the value kept in the extras under that name, so a count spelled some other way is still there
+     * to be read rather than dropped for not being a number.
+     */
+    private static @Nullable Integer countOrExtras(Usage usage, String field, @Nullable Object value) {
+        Integer count = asInteger(value);
+        if (count == null) {
+            usage.getExtras().put(field, value);
+        }
+        return count;
     }
 
     private static @Nullable Integer asInteger(@Nullable Object value) {

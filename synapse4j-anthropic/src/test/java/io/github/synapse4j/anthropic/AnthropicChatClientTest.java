@@ -515,6 +515,20 @@ class AnthropicChatClientTest {
     }
 
     @Test
+    void spelledCountKeptInExtras() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(message("\"msg_4\"", "[]", "end_turn",
+                "\"usage\":{\"input_tokens\":\"2048\",\"output_tokens\":4}").getBytes(UTF_8)));
+
+        ChatResponse response = client.chat(requestWithModel());
+
+        // A count this model carries under a name of its own but spelled as something other than a
+        // number keeps that name where every unmodelled count goes, rather than being dropped.
+        assertEquals(Integer.valueOf(4), response.getUsage().getOutputTokens());
+        assertEquals("2048", response.getUsage().getExtras().get("input_tokens"));
+    }
+
+    @Test
     void usageCountsNormalized() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(message("\"msg_3\"",
