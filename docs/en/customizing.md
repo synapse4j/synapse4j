@@ -154,7 +154,9 @@ options.getHeaders().put("X-Request-Id", id);
   does best — the JDK transport gathers the body, while Apache and the RestClient stream it.
   `"streamed"` writes the body as it is produced, keeping it out of memory; the JDK transport
   cannot take a body that way and refuses the request. `"buffered"` gathers the body into memory
-  before it is sent. A spelling that names no mode the library defines is refused.
+  before it is sent. A mode of your own outside this set is yours to define and to honor: a
+  transport that does not understand the mode it is handed — one of these three, or your own —
+  refuses the request rather than falling back to the default.
 - `maxFrameBytes` — the most bytes one server-sent event frame may accumulate, counted on the wire
   in UTF-8. The cap holds for every transport, and a frame that exceeds it fails the read rather
   than being truncated.

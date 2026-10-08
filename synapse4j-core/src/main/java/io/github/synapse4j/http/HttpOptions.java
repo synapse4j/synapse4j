@@ -25,15 +25,15 @@ public class HttpOptions {
 
     /**
      * How a request body reaches the implementation: one of the modes {@link BodyWriteMode} defines, or
-     * a mode an implementation of its own defines.
+     * a mode of the caller's own outside that set — which this library defines nothing for, and honors
+     * only where the caller's implementation honors it.
      *
      * <p>
-     * A string rather than the enum, like every value in this library that can grow: an implementation
-     * may define a mode of its own, which a closed type could not carry. One that does not know the mode
-     * it is handed must refuse the request rather than treat it as the default — a caller who asked for
-     * one thing must not silently get another. {@link BodyWriteMode#AUTO} is the one every
-     * implementation must take: it asks for the implementation's own choice, so refusing it would refuse
-     * the default.
+     * A string rather than the enum, like every value in this library that can grow: a mode of one's own
+     * is a value a closed type could not carry. An implementation that does not know the mode it is
+     * handed must refuse the request rather than treat it as the default — a caller who asked for one
+     * thing must not silently get another. {@link BodyWriteMode#AUTO} is the one every implementation
+     * must take: it asks for the implementation's own choice, so refusing it would refuse the default.
      */
     private @Nullable String bodyWriteMode;
 

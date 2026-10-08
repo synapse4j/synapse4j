@@ -3,13 +3,16 @@ package io.github.synapse4j.http;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A {@link HttpOptions#getBodyWriteMode() body-write mode} as a value an implementation can reason
- * about, rather than the string the option carries.
+ * The body-write modes this library itself supports, as values an implementation can reason about
+ * rather than the strings {@link HttpOptions#getBodyWriteMode()} carries.
  *
  * <p>
- * {@link #from(String)} is where the text becomes one of these: it answers the mode the text names or
- * refuses a value this library does not define, so the comparison is written once rather than spelled
- * out in every transport, and a spelling that differs only in case names the same mode.
+ * The set is closed: it holds the modes this library defines, and nothing else. A transport that
+ * supports a mode of its own carries that mode's text in {@link HttpOptions#getBodyWriteMode()} like
+ * any other and recognizes the text itself, before asking {@link #from(String)} — which answers for
+ * this set alone and refuses the rest. Writing the comparison here is what keeps it in one place
+ * instead of spelling it out in every transport, and what makes a spelling that differs only in case
+ * name the same mode.
  */
 public enum BodyWriteMode {
 
