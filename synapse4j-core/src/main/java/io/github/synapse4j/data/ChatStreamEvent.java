@@ -23,12 +23,11 @@ import lombok.ToString;
  * well-known ones are declared as constants by the provider module that produces them.
  *
  * <p>
- * An event's parts and usage are its own: the fold never mutates what a frame handed out, so an
- * event an application keeps does not change as later frames arrive. The answer's parts are the
- * fold's own, each made by asking the part to {@link ContentPart#copy()} itself — so a type the
- * library does not model copies itself too, and a subclass that adds fields keeps them by overriding
- * that method. The copy is shallow: as everywhere in this library, the values inside a
- * {@link ProviderExtras} bag are held by reference.
+ * An event's parts and usage are its own: a part is a value, so the fold keeps the frame's own parts
+ * and hands them back as they are, and an event an application keeps does not change as later frames
+ * arrive. A fragment that continues a part already held is folded into a new part that takes its
+ * place, never into the one an earlier frame handed out. The values inside a {@link ProviderExtras}
+ * bag are held by reference, as everywhere in this library.
  */
 @Getter
 @Setter
