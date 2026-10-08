@@ -113,7 +113,9 @@ class Assistant {
 
 The starter reads an application's tools from classes marked `@Tools`. The annotation carries
 `@Component`, so component scanning registers the class as a bean — no scan of its own — and its
-`@ToolMethod` methods become tools on the chat clients.
+`@ToolMethod` methods become tools on the chat clients, the ones it inherits from a superclass
+included. The marking is the bean class's: a class that has none, of its own or inherited, is left
+alone however many `@ToolMethod` methods it has.
 
 ```java
 @Tools(prefix = "weather_")
@@ -127,8 +129,8 @@ class WeatherTools {
 ```
 
 `prefix` — spelled `value` too, so `@Tools("weather_")` works — is written in front of every tool
-name the class declares, which is how two classes may declare a method of one name without
-colliding. It is literal text, so a separator is part of it; blank, the default, writes nothing.
+name read from the class, the ones it declares and the ones it inherits alike, which is how two
+classes may offer a tool of one name without colliding. It is literal text, so a separator is part of it; blank, the default, writes nothing.
 `client` names the chat-client bean these tools belong to; blank, the default, puts them on every
 chat client. A class naming a client no bean answers to fails startup.
 

@@ -39,6 +39,7 @@ version becomes the body of the GitHub Release created when that version's tag i
 - `InlineJsonSchemaCustomizer` expands a `$defs` entry in the boolean form too, where a `$ref` to one used to be kept
 - The starter declares a `ToolExecutor` bean — a `DefaultToolExecutor` — and hands the loop that one, so a round cap, a worker pool or a different answer to a failed call is an application bean's to set
 - `ErrorHandlers.message(prefix)` answers an exception whose message is empty, not only one that is absent, with the exception's own name, so the prefix is never left standing before nothing
+- `@Tools` is read off the class the container registers rather than off the class that declares a method: a `ToolMethodSpec` now carries that class as its `owner`, so the prefix and the client come from one class, and a tool a marked class only inherits — an interface default method included — carries that class's prefix instead of none
 
 ## [0.0.2] - 2026-10-01
 
