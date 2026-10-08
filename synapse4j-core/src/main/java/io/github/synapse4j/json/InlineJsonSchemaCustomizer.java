@@ -19,7 +19,8 @@ import org.jspecify.annotations.Nullable;
  * A {@link JsonSchemaCustomizer} that resolves a schema's references: every {@code $ref} into
  * {@code $defs} is replaced by a copy of the definition it names and {@code #} by the root schema, so
  * the answer reads without {@code $defs}. This is the step for a target whose protocol does not take
- * {@code $ref}.
+ * {@code $ref}. A definition in the boolean form is answered as that boolean itself: it carries no
+ * keyword, so a node that references one is answered as that boolean, whatever else the node says.
  *
  * <p>
  * The references it resolves are {@code #} and {@code #/$defs/Name}, the name looked up in the root's
@@ -47,34 +48,40 @@ public class InlineJsonSchemaCustomizer implements JsonSchemaCustomizer {
 
     /**
      * Inlines one schema. A boolean schema carries no sub-schema and no reference and is answered as it
-     * is; an object-form schema is copied with its sub-schemas inlined. {@code path} holds the schemas
-     * currently being expanded, by identity, so a reference back to one of them is recognised as a
-     * cycle.
+     * is; an object-form schema is copied with its sub-schemas inlined, which is where a reference is
+     * resolved. {@code path} holds the schemas currently being expanded, by identity, so a reference
+     * back to one of them is recognised as a cycle.
      */
     private static JsonSchema inlineSchema(JsonSchema node, JsonSchema root, Set<JsonSchema> path) {
-        return node.asBoolean() == null ? inlineObject(node, root, path).build() : node;
+        return node.asBoolean() == null ? inlineObject(node, root, path) : node;
     }
 
     /**
-     * Inlines an object-form schema into a new builder. A reference that resolves is replaced by the
-     * inlined definition it names, with this node's other keywords on top; otherwise the node is copied
-     * as it is, its {@code $ref} kept.
+     * Inlines an object-form schema into a new one. A reference that resolves is replaced by the
+     * expansion of the definition it names, with this node's other keywords on top; otherwise the node
+     * is copied as it is, its {@code $ref} kept.
      */
-    private static JsonSchemaBuilder inlineObject(JsonSchema node, JsonSchema root, Set<JsonSchema> path) {
+    private static JsonSchema inlineObject(JsonSchema node, JsonSchema root, Set<JsonSchema> path) {
         path.add(node);
         try {
             String ref = node.getRef();
             if (ref != null) {
                 JsonSchema target = resolve(ref, root);
-                if (target != null && target.asBoolean() == null && !path.contains(target)) {
-                    JsonSchemaBuilder inlined = inlineObject(target, root, path);
+                if (target != null && !path.contains(target)) {
+                    JsonSchema definition = inlineSchema(target, root, path);
+                    if (definition.asBoolean() != null) {
+                        // A boolean definition carries no keyword of its own, so there is none of its to
+                        // put this node's beside: the node is answered as that boolean.
+                        return definition;
+                    }
+                    JsonSchemaBuilder inlined = JsonSchemaBuilder.from(definition);
                     inlineKeywords(inlined, node, root, path, false);
-                    return inlined;
+                    return inlined.build();
                 }
             }
             JsonSchemaBuilder copy = new JsonSchemaBuilder();
             inlineKeywords(copy, node, root, path, true);
-            return copy;
+            return copy.build();
         } finally {
             path.remove(node);
         }

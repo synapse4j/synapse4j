@@ -48,6 +48,26 @@ class InlineJsonSchemaCustomizerTest {
     }
 
     @Test
+    void booleanDefinitionInlined() {
+        JsonSchema schema = new JsonSchemaBuilder()
+                .setType("object")
+                .setProperties(Map.of(
+                        "anything", ref("#/$defs/Any"),
+                        "nothing", ref("#/$defs/None")))
+                .setDefs(Map.of("Any", BooleanJsonSchema.TRUE, "None", BooleanJsonSchema.FALSE))
+                .build();
+
+        JsonSchema inlined = customizer.customize(schema);
+
+        JsonSchema expected = new JsonSchemaBuilder()
+                .setType("object")
+                .setProperties(Map.of("anything", BooleanJsonSchema.TRUE, "nothing", BooleanJsonSchema.FALSE))
+                .build();
+        assertEquals(expected, inlined);
+        assertNull(inlined.getDefs());
+    }
+
+    @Test
     void cycleClosingReferenceKept() {
         JsonSchema node = new JsonSchemaBuilder()
                 .setType("object")
