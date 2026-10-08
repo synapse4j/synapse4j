@@ -5,6 +5,7 @@ version becomes the body of the GitHub Release created when that version's tag i
 
 ## [Unreleased]
 
+- A generated schema orders an inherited property the way the type it describes is written, where a subclass that reorders them used to be described in its parent's order
 - An Anthropic usage count the model has a field for keeps its name in the extras when it arrives spelled as something other than a number, where it used to be dropped
 - An Anthropic stream keeps the input a block opened with: a `tool_use` block whose whole input arrives on the frame that opens it — rather than as the fragments an empty one is filled by — is no longer read as a tool that takes no arguments
 - A replayed OpenAI Responses turn keeps the order it was read in: the item the answer becomes stands where its first text or image sits, so the reasoning the model wrote before answering stays in front of it rather than after

@@ -85,6 +85,11 @@ class JacksonJsonCodecTest {
     }
 
     @Test
+    void inheritedPropertiesKeepTargetOrder() {
+        assertEquals(keysOf(codec.encode(new Subclass())), properties(codec.generateEncodeSchema(Subclass.class)));
+    }
+
+    @Test
     void configuredNamingStrategyDecidesNames() {
         JacksonJsonCodec snakeCaseCodec = new JacksonJsonCodec(
                 JsonMapper.builder().propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE));
@@ -339,6 +344,22 @@ class JacksonJsonCodecTest {
     static class Address {
 
         private String city;
+
+    }
+
+    /** A type whose properties are inherited, ordered by the class the schema is asked for. */
+    static class Base {
+
+        public String alpha;
+
+        public String beta;
+
+    }
+
+    @JsonPropertyOrder({ "beta", "alpha", "gamma" })
+    static class Subclass extends Base {
+
+        public String gamma;
 
     }
 

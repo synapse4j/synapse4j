@@ -90,7 +90,7 @@ final class PropertyDiscoveryModule implements Module {
     }
 
     private @Nullable String nameOf(MemberScope<?, ?> member) {
-        return propertiesOf(member.getDeclaringType().getErasedType()).names.get(rawMemberOf(member));
+        return propertiesOf(schemaTargetOf(member)).names.get(rawMemberOf(member));
     }
 
     private boolean isNotJacksonProperty(MemberScope<?, ?> member) {
@@ -98,8 +98,18 @@ final class PropertyDiscoveryModule implements Module {
     }
 
     private int positionOf(MemberScope<?, ?> member) {
-        Integer position = propertiesOf(member.getDeclaringType().getErasedType()).positions.get(rawMemberOf(member));
+        Integer position = propertiesOf(schemaTargetOf(member)).positions.get(rawMemberOf(member));
         return position == null ? Integer.MAX_VALUE : position;
+    }
+
+    /**
+     * The type the schema is being generated for, which is what Jackson introspects when it writes that
+     * type. It is not always the member's declaring type: an inherited member is moved by the subclass
+     * as the subclass's own introspection says, order included, and asking about the declaring type
+     * would describe the subclass the way its parent is written.
+     */
+    private static Class<?> schemaTargetOf(MemberScope<?, ?> member) {
+        return member.getDeclarationDetails().getSchemaTargetType().getErasedType();
     }
 
     private static Member rawMemberOf(MemberScope<?, ?> member) {
