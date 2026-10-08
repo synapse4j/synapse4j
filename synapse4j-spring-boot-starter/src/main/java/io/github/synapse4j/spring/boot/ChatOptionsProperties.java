@@ -52,7 +52,7 @@ public class ChatOptionsProperties {
     /** Which tools the model may call. */
     private @Nullable String toolChoice;
 
-    /** The tool {@link #toolChoice} names, and no other. */
+    /** The tool the toolChoice property names, and no other. */
     private @Nullable String toolChoiceName;
 
     /**
@@ -98,7 +98,7 @@ public class ChatOptionsProperties {
     @Setter
     public static class ResponseFormatProperties {
 
-        /** One of the {@code TYPE_*} constants of {@link ChatResponseFormat}, or a provider's own. */
+        /** One of the TYPE_* constants of ChatResponseFormat, or a provider's own. */
         private @Nullable String type;
 
         /** Name of the schema; the protocol that requires a name needs one. */

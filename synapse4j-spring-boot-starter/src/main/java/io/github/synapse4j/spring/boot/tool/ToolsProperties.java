@@ -41,8 +41,9 @@ public class ToolsProperties {
 
     /**
      * Whether every tool's schema has to be enforced by the provider rather than merely aimed at; the
-     * value a tool falls to when neither its annotation nor its entry under {@link #methods} states one.
-     * Absent leaves it to the annotation and then to the protocol, as it would without this starter.
+     * value a tool falls to when neither its annotation nor its entry in the per-tool overrides states
+     * one. Absent leaves it to the annotation and then to the protocol, as it would without this
+     * starter.
      */
     private @Nullable String strict;
 

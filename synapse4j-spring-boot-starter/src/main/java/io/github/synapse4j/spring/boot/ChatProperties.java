@@ -22,10 +22,10 @@ import lombok.Setter;
 public class ChatProperties {
 
     /**
-     * Which chat client the auto-configuration builds: {@link ChatClientType#COMPLETIONS} (the
-     * default), {@link ChatClientType#RESPONSES}, or {@link ChatClientType#ANTHROPIC}. The client
-     * bean reads it to pick the protocol, and the binding is what refuses a value this starter does
-     * not wire, naming the property at startup.
+     * Which chat client the auto-configuration builds: ChatClientType.COMPLETIONS (the default),
+     * ChatClientType.RESPONSES, or ChatClientType.ANTHROPIC. The client bean reads it to pick the
+     * protocol, and the binding is what refuses a value this starter does not wire, naming the
+     * property at startup.
      */
     private ChatClientType client = ChatClientType.COMPLETIONS;
 

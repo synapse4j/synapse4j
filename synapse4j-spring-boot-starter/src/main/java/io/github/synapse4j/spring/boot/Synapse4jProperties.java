@@ -45,12 +45,9 @@ import lombok.Data;
 public class Synapse4jProperties {
 
     /**
-     * Whether the synapse4j auto-configuration runs.
-     *
-     * <p>
-     * Read as a Spring condition rather than from this instance — a condition evaluates before any
-     * bean of this type exists — and declared here so the switch appears in the generated
-     * configuration metadata where an IDE can surface it.
+     * Whether the synapse4j auto-configuration runs. Read as a Spring condition rather than from this
+     * instance — a condition evaluates before any bean of this type exists — and declared here so the
+     * switch appears in the generated configuration metadata where an IDE can surface it.
      */
     private boolean enabled = true;
 
@@ -75,14 +72,11 @@ public class Synapse4jProperties {
     private final AnthropicConfig anthropic = new AnthropicConfig();
 
     /**
-     * Which HTTP transport the auto-configuration builds: {@link HttpClientType#RESTCLIENT} (the
-     * default) or {@link HttpClientType#APACHE}.
-     *
-     * <p>
-     * Read as a Spring condition rather than from this instance — a condition evaluates before any
-     * bean of this type exists — and declared here so the selector appears in the generated
-     * configuration metadata. The binding still matters: it is what refuses a value this starter
-     * does not wire, naming the property at startup.
+     * Which HTTP transport the auto-configuration builds: HttpClientType.RESTCLIENT (the default) or
+     * HttpClientType.APACHE. Read as a Spring condition rather than from this instance — a condition
+     * evaluates before any bean of this type exists — and declared here so the selector appears in the
+     * generated configuration metadata. The binding still matters: it is what refuses a value this
+     * starter does not wire, naming the property at startup.
      */
     private HttpClientType httpClient = HttpClientType.RESTCLIENT;
 

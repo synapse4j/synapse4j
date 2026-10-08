@@ -145,6 +145,10 @@ one would block extension by users and providers.
   takes, what it answers, what it refuses, the invariants a caller relies on — not the steps it takes or
   the pieces it applies. The body beside it already says that, and a second copy drifts; a private helper
   whose javadoc lists what it applies earns nothing a reader of the method cannot see.
+- **A configuration property's Javadoc is plain text.** The Spring metadata processor copies a bound
+  field's Javadoc into `spring-configuration-metadata.json` verbatim, so `{@link}`, `{@code}` and `<p>`
+  arrive at an IDE's completion exactly as written. Name the type in prose instead; class-level Javadoc,
+  which no metadata carries, keeps its markup.
 - **Use Lombok instead of hand-writing boilerplate**, and only its stable annotations — nothing from
   `lombok.experimental`. Constructors count: one that only assigns its parameters is
   `@RequiredArgsConstructor`/`@AllArgsConstructor`/`@NoArgsConstructor`, with `@NonNull` where a null
