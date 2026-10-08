@@ -150,7 +150,10 @@ one would block extension by users and providers.
   `@RequiredArgsConstructor`/`@AllArgsConstructor`/`@NoArgsConstructor`, with `@NonNull` where a null
   must be refused — hand-writing it is a defect to fix on sight. Hand-write one only for what Lombok
   cannot say: a `super` call with arguments, a derived value, validation beyond `@NonNull`,
-  delegation — never to carry javadoc, which goes on the class or the field.
+  delegation — never to carry javadoc, which goes on the class or the field. A builder class written
+  out by hand — the one way to add a method to a generated builder — carries `@lombok.Generated`, the
+  marker Lombok puts on a builder it writes whole: without it NullAway reads the generated
+  no-argument constructor as leaving every field uninitialized.
 - **Logging uses what the module already carries, and the logger is Lombok's to declare.** A module
   that does not depend on Spring logs through the JDK — `@Log`, over `java.util.logging` — so it adds
   no dependency; a module that already depends on Spring logs through Commons Logging — `@CommonsLog`,
