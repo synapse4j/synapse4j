@@ -300,9 +300,11 @@ class MessagesReader {
         Object blockValue = payload.get("content_block");
         ContentPart part = blockValue instanceof Map<?, ?> block ? partOf(block) : null;
         if (part instanceof ToolCallPart call) {
-            // The input the opening frame carries is the empty object the deltas then fill; the
-            // arguments arrive as fragments from here on, so the placeholder is not kept as text.
-            event.setDelta(delta(new ToolCallPart(call.getCallId(), call.getName(), null, call.getExtras())));
+            // The input the opening frame carries is the empty object the deltas then fill, and an
+            // empty object is not an input: what the frame already spelled is kept instead, for an
+            // endpoint that says the whole input there and spells no fragments after it.
+            event.setDelta(delta(new ToolCallPart(call.getCallId(), call.getName(),
+                    emptyInput(call.getArgumentsJson()) ? null : call.getArgumentsJson(), call.getExtras())));
         } else if (part != null) {
             event.setDelta(delta(part));
         } else if (blockValue instanceof Map<?, ?> block) {
@@ -312,6 +314,11 @@ class MessagesReader {
             event.setDelta(delta(new RawContentBlock(block)));
         }
         carryRest(event, payload, "content_block");
+    }
+
+    /** Whether the input a block opened with is the empty object the fragments fill, or nothing at all. */
+    private static boolean emptyInput(@Nullable String input) {
+        return input == null || input.isBlank() || "{}".equals(input.trim());
     }
 
     /** The piece a {@code content_block_delta} frame adds, as a one-part fragment of the turn. */

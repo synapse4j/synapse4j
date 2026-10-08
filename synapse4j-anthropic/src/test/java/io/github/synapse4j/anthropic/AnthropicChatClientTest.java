@@ -827,6 +827,43 @@ class AnthropicChatClientTest {
     }
 
     @Test
+    void openingFrameInputBecomesArguments() {
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                "message_start",
+                "{\"type\":\"message_start\",\"message\":{\"id\":\"msg_8\",\"type\":\"message\","
+                        + "\"role\":\"assistant\",\"content\":[],\"model\":\"claude-test\","
+                        + "\"stop_reason\":null,\"stop_sequence\":null,"
+                        + "\"usage\":{\"input_tokens\":10,\"output_tokens\":1}}}",
+                "content_block_start",
+                "{\"type\":\"content_block_start\",\"index\":0,\"content_block\":"
+                        + "{\"type\":\"tool_use\",\"id\":\"toolu_1\",\"name\":\"get_weather\","
+                        + "\"input\":{\"city\":\"Paris\"}}}",
+                "content_block_stop",
+                "{\"type\":\"content_block_stop\",\"index\":0}",
+                "message_delta",
+                "{\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\","
+                        + "\"stop_sequence\":null},\"usage\":{\"output_tokens\":5}}",
+                "message_stop",
+                "{\"type\":\"message_stop\"}").getBytes(UTF_8)));
+
+        ChatStream stream = client.stream(requestWithModel());
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        while (events.hasNext()) {
+            events.next();
+        }
+
+        // The frame that opens a block is where an endpoint may say the whole input, and spells no
+        // fragments after it: the input is the call's arguments, not the empty object a stream that
+        // fills its arguments by fragment would leave behind.
+        ToolCallPart call = assertInstanceOf(ToolCallPart.class,
+                stream.aggregatedResponse().getMessage().getParts().get(0));
+        assertEquals("toolu_1", call.getCallId());
+        assertEquals("{\"city\":\"Paris\"}", call.getArgumentsJson());
+    }
+
+    @Test
     void serverToolInputOwnBlock() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
