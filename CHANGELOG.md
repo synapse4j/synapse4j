@@ -5,6 +5,7 @@ version becomes the body of the GitHub Release created when that version's tag i
 
 ## [Unreleased]
 
+- A streamed tool call is assembled from the frames that spell it: the frame that opens a call names the item it announces, so the argument frames that name the same item now join it instead of arriving as nameless calls of their own, and a fragment that names no item is matched by the position it reports
 - A generated schema now states what the types ask for instead of nothing: a decode schema requires every property except one the type makes optional, and an `Optional` is nullable in every position — a method parameter, a property, a list item, a map value — where it used to come out as a bare object at the root and as its value type alone inside a list or a map
 - An encode schema lists every property as required while the mapper writes every property and drops one an inclusion setting may leave out, and a decode schema demands every property once the mapper is set to refuse a missing creator property
 - An API key is optional: leaving it unset sends no auth header, so an OpenAI-compatible server that authenticates nothing — a local runtime, say — is called as it stands instead of refused with `apiKey is required`

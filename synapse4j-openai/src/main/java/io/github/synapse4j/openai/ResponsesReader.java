@@ -49,9 +49,9 @@ import io.github.synapse4j.json.JsonReader;
 class ResponsesReader {
 
     /**
-     * The payload member naming the item a streamed fragment belongs to. This module does not model
-     * it, so it stays in the part's extras — and is read back from there when a fragment has to be
-     * matched to its call.
+     * The payload member naming the item a streamed fragment belongs to, and the name the item
+     * announces itself under. This module does not model either, so the item stays in the part's
+     * extras — and is read back from there when a fragment has to be matched to its call.
      */
     static final String ITEM_ID = "item_id";
 
@@ -442,7 +442,7 @@ class ResponsesReader {
 
     /**
      * The item a frame announces, when it is a tool call. The call is named once, on the frame that
-     * opens it, and the frames that spell its arguments follow: the position kept here is what ties
+     * opens it, and the frames that spell its arguments follow: the identity kept here is what ties
      * the two together, since this module has no field for it.
      */
     private static void addedItem(ChatStreamEvent event, ProviderExtras payload) {
@@ -451,6 +451,13 @@ class ResponsesReader {
         if (payload.get("item") instanceof Map<?, ?> item && "function_call".equals(item.get("type"))) {
             ProviderExtras extras = new ProviderExtras();
             streamPosition(payload, extras);
+            // The frame that opens a call sits outside the item, so the item names itself only here —
+            // while the frames that spell its arguments name it by the very same id, which is what
+            // makes the two halves one call rather than several.
+            String itemId = stringOf(item.get("id"));
+            if (itemId != null && !extras.contains(ITEM_ID)) {
+                extras.put(ITEM_ID, itemId);
+            }
             event.setDelta(delta(new ToolCallPart(stringOf(item.get("call_id")), stringOf(item.get("name")),
                     null, extras)));
         }

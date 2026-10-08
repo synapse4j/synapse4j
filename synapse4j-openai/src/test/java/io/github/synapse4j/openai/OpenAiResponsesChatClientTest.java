@@ -31,6 +31,7 @@ import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ChatStreamEvent;
+import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -613,6 +614,72 @@ class OpenAiResponsesChatClientTest {
         assertEquals("Hi",
                 assertInstanceOf(TextPart.class, stream.aggregatedResponse().getMessage().getParts().get(0))
                         .getText());
+    }
+
+    @Test
+    void deltasFoldIntoAnnouncedCall() {
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                // The frame that announces a call names it; the frames that spell its arguments
+                // name the item instead, which is the only thing that ties the two together.
+                namedFrame(OpenAiResponsesEventTypes.OUTPUT_ITEM_ADDED,
+                        "{\"output_index\":0,\"item\":{\"id\":\"fc_1\",\"type\":\"function_call\","
+                                + "\"call_id\":\"call_1\",\"name\":\"get_weather\",\"arguments\":\"\"}}"),
+                namedFrame(OpenAiResponsesEventTypes.FUNCTION_CALL_ARGUMENTS_DELTA,
+                        "{\"item_id\":\"fc_1\",\"output_index\":0,\"delta\":\"{\\\"city\\\":\"}"),
+                namedFrame(OpenAiResponsesEventTypes.FUNCTION_CALL_ARGUMENTS_DELTA,
+                        "{\"item_id\":\"fc_1\",\"output_index\":0,\"delta\":\"\\\"SF\\\"}\"}"))
+                .getBytes(UTF_8)));
+
+        ChatStream stream = client.stream(requestWithModel());
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        events.next();
+        events.next();
+        events.next();
+
+        List<ContentPart> parts = stream.aggregatedResponse().getMessage().getParts();
+        assertEquals(1, parts.size(), parts.toString());
+        ToolCallPart call = assertInstanceOf(ToolCallPart.class, parts.get(0));
+        assertEquals("call_1", call.getCallId());
+        assertEquals("get_weather", call.getName());
+        assertEquals("{\"city\":\"SF\"}", call.getArgumentsJson());
+    }
+
+    @Test
+    void positionMatchesDeltasWithoutId() {
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                // Two calls are announced, so a fragment that says only where its item sits has to
+                // be matched by that position: the call it belongs to is not the one opened last.
+                namedFrame(OpenAiResponsesEventTypes.OUTPUT_ITEM_ADDED,
+                        "{\"output_index\":0,\"item\":{\"id\":\"fc_1\",\"type\":\"function_call\","
+                                + "\"call_id\":\"call_1\",\"name\":\"get_weather\",\"arguments\":\"\"}}"),
+                namedFrame(OpenAiResponsesEventTypes.OUTPUT_ITEM_ADDED,
+                        "{\"output_index\":1,\"item\":{\"id\":\"fc_2\",\"type\":\"function_call\","
+                                + "\"call_id\":\"call_2\",\"name\":\"lookup\",\"arguments\":\"\"}}"),
+                // An endpoint that spells its arguments without saying which item they belong to
+                // still says where the item sits, and that is what they are matched by.
+                namedFrame(OpenAiResponsesEventTypes.FUNCTION_CALL_ARGUMENTS_DELTA,
+                        "{\"output_index\":0,\"delta\":\"{\\\"city\\\":\"}"),
+                namedFrame(OpenAiResponsesEventTypes.FUNCTION_CALL_ARGUMENTS_DELTA,
+                        "{\"output_index\":0,\"delta\":\"\\\"SF\\\"}\"}"))
+                .getBytes(UTF_8)));
+
+        ChatStream stream = client.stream(requestWithModel());
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        events.next();
+        events.next();
+        events.next();
+        events.next();
+
+        List<ContentPart> parts = stream.aggregatedResponse().getMessage().getParts();
+        assertEquals(2, parts.size(), parts.toString());
+        ToolCallPart first = assertInstanceOf(ToolCallPart.class, parts.get(0));
+        assertEquals("call_1", first.getCallId());
+        assertEquals("{\"city\":\"SF\"}", first.getArgumentsJson());
+        assertEquals("lookup", assertInstanceOf(ToolCallPart.class, parts.get(1)).getName());
     }
 
     /** A canned completed response, for the tests that only care about the request. */

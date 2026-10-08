@@ -275,6 +275,18 @@ class ResponsesStream extends DefaultChatStream {
                 }
                 return -1;
             }
+            // Where the item sits names it too, for an endpoint that spells its arguments without
+            // saying which item they belong to: a fragment matching no announced call falls through
+            // to the names below rather than opening a call of its own.
+            Object outputIndex = extra(fragment, ResponsesReader.OUTPUT_INDEX);
+            if (outputIndex != null) {
+                for (int i = 0; i < parts.size(); i++) {
+                    if (parts.get(i) instanceof ToolCallPart call
+                            && outputIndex.equals(extra(call, ResponsesReader.OUTPUT_INDEX))) {
+                        return i;
+                    }
+                }
+            }
             if (fragment.getCallId() != null) {
                 for (int i = 0; i < parts.size(); i++) {
                     if (parts.get(i) instanceof ToolCallPart call && fragment.getCallId().equals(call.getCallId())) {
