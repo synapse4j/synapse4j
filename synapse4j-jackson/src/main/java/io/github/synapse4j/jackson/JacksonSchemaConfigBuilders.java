@@ -1,5 +1,9 @@
 package io.github.synapse4j.jackson;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.jspecify.annotations.Nullable;
 
 import com.github.victools.jsonschema.generator.Module;
@@ -100,8 +104,17 @@ public final class JacksonSchemaConfigBuilders {
         if (settings == null) {
             return configBuilder;
         }
-        if (!settings.getJacksonOptions().isEmpty()) {
-            configBuilder.with(new JacksonSchemaModule(settings.getJacksonOptions().toArray(JacksonOption[]::new)));
+        Set<JacksonOption> jacksonOptions = settings.getJacksonOptions();
+        if (encoding) {
+            // RESPECT_JSONPROPERTY_REQUIRED is a marker the reader consults: @JsonProperty(required =
+            // true) says what binding insists on, not what writing produces. The encode side leaves it
+            // out and answers requiredness through EncodeRequiredPropertiesModule instead.
+            jacksonOptions = jacksonOptions.stream()
+                    .filter(option -> option != JacksonOption.RESPECT_JSONPROPERTY_REQUIRED)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+        }
+        if (!jacksonOptions.isEmpty()) {
+            configBuilder.with(new JacksonSchemaModule(jacksonOptions.toArray(JacksonOption[]::new)));
         }
         if (settings.isDiscoverProperties()) {
             configBuilder.with(new PropertyDiscoveryModule(jsonMapper, encoding));

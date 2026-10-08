@@ -49,8 +49,31 @@ class EncodeRequiredPropertiesModuleTest {
                 SchemaFixtures.required(generate(PerProperty.class, SchemaFixtures.MAPPER)));
     }
 
+    @Test
+    void classInclusionKeepsPrimitiveOnly() {
+        // The setting is the class's, and it omits the one property writing can leave out.
+        assertEquals(List.of("count"),
+                SchemaFixtures.required(generate(OmittingNulls.class, SchemaFixtures.MAPPER)));
+    }
+
+    @Test
+    void useDefaultsFallsToMapper() {
+        // USE_DEFAULTS names no inclusion of its own, so the mapper's answer is the one that stands.
+        assertEquals(List.of("count"),
+                SchemaFixtures.required(generate(Deferring.class, omitting(JsonInclude.Include.NON_NULL))));
+    }
+
     /** A record whose first property carries its own inclusion and whose second carries none. */
     record PerProperty(@JsonInclude(JsonInclude.Include.NON_NULL) String maybeNull, String always) {
+    }
+
+    /** A class that omits nulls for every property it carries. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    record OmittingNulls(String maybeNull, int count) {
+    }
+
+    /** A property that asks for the mapper's answer rather than naming an inclusion of its own. */
+    record Deferring(@JsonInclude(JsonInclude.Include.USE_DEFAULTS) String maybeNull, int count) {
     }
 
     private static JsonMapper omitting(JsonInclude.Include inclusion) {

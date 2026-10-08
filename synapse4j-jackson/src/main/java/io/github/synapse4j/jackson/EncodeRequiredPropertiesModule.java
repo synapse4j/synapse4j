@@ -15,10 +15,10 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>
  * The answer reads a property's own inclusion, which {@link #isAlwaysWritten} holds, and falls back to
- * the mapper's default when the property carries none. A setting that omits values leaves a primitive
- * alone, which can be neither null nor empty, while a setting that omits defaults takes a primitive
- * with it. A member an annotation demands is demanded all the same, by the Jackson module rather than
- * here.
+ * what the class it sits in asks for and then to the mapper's default when the property carries none. A
+ * setting that omits values leaves a primitive alone, which can be neither null nor empty, while a
+ * setting that omits defaults takes a primitive with it. A member an annotation demands is demanded all
+ * the same, by the Jackson module rather than here.
  */
 @RequiredArgsConstructor
 public class EncodeRequiredPropertiesModule implements Module {
@@ -47,15 +47,31 @@ public class EncodeRequiredPropertiesModule implements Module {
      * @return whether the property is always written out
      */
     protected boolean isAlwaysWritten(MemberScope<?, ?> member) {
-        JsonInclude annotation = member.getAnnotationConsideringFieldAndGetterIfSupported(JsonInclude.class);
-        JsonInclude.Include inclusion = annotation != null
-                ? annotation.value()
-                : jsonMapper.serializationConfig().getDefaultPropertyInclusion().getValueInclusion();
-        return switch (inclusion) {
+        return switch (inclusionOf(member)) {
             case NON_DEFAULT -> false;
             case NON_NULL, NON_ABSENT, NON_EMPTY -> member.getDeclaredType().getErasedType().isPrimitive();
             default -> true;
         };
+    }
+
+    /**
+     * The inclusion this property is written by: what it says itself, then what the class it sits in
+     * says, then the mapper's default — the order Jackson resolves them in, where {@code USE_DEFAULTS}
+     * asks for the next one down rather than naming an inclusion of its own.
+     *
+     * @param member the property being described; must not be {@code null}
+     * @return the inclusion writing applies to it; never {@code null}
+     */
+    private JsonInclude.Include inclusionOf(MemberScope<?, ?> member) {
+        JsonInclude own = member.getAnnotationConsideringFieldAndGetterIfSupported(JsonInclude.class);
+        if (own != null && own.value() != JsonInclude.Include.USE_DEFAULTS) {
+            return own.value();
+        }
+        JsonInclude onType = member.getDeclaringType().getErasedType().getAnnotation(JsonInclude.class);
+        if (onType != null && onType.value() != JsonInclude.Include.USE_DEFAULTS) {
+            return onType.value();
+        }
+        return jsonMapper.serializationConfig().getDefaultPropertyInclusion().getValueInclusion();
     }
 
 }

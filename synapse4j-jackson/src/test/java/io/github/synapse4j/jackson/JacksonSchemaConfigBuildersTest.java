@@ -76,6 +76,11 @@ class JacksonSchemaConfigBuildersTest {
             @JsonProperty(required = false) String loosened) {
     }
 
+    /** A member its reader-side annotation demands while the inclusion it carries can leave it out. */
+    record Demanded(@JsonProperty(required = true) @JsonInclude(JsonInclude.Include.NON_NULL) String maybeWritten,
+            String always) {
+    }
+
     /** A document with every property present, the nullable one as null. */
     private static final String EVERYTHING = "{\"text\":\"x\",\"number\":1,\"boxed\":2,\"optional\":null,"
             + "\"list\":[\"a\"],\"optionals\":[null,\"a\"],\"map\":{\"k\":\"v\"},\"open\":{\"k\":1},"
@@ -222,6 +227,15 @@ class JacksonSchemaConfigBuildersTest {
         // Only the decode schema answers the binder's refusal of an undeclared property; what this
         // library writes names exactly the properties the schema lists.
         assertNull(codec.generateEncodeSchema(Kitchen.class).getAdditionalProperties());
+    }
+
+    @Test
+    void encodeSchemaOmitsDemandedProperty() {
+        // @JsonProperty(required = true) is a marker the binder reads; writing can still leave the
+        // property out, so the schema must not demand it in this direction.
+        JsonSchema schema = codec.generateEncodeSchema(Demanded.class);
+
+        assertEquals(List.of("always"), List.copyOf(schema.getRequired()));
     }
 
     @Test

@@ -25,7 +25,9 @@ public class JacksonSchemaSettings {
     /**
      * The options handed to victools' Jackson module, which is what makes it read Jackson's
      * annotations. Defaults to {@link JacksonOption#RESPECT_JSONPROPERTY_REQUIRED}, so that
-     * {@code @JsonProperty(required = true)} is honoured. Empty means the module is not applied at all.
+     * {@code @JsonProperty(required = true)} is honoured — where it means something, which is what
+     * binding insists on and not what writing produces: the encode side leaves that option out. Empty
+     * means the module is not applied at all.
      */
     private final Set<JacksonOption> jacksonOptions = new LinkedHashSet<>(
             Set.of(JacksonOption.RESPECT_JSONPROPERTY_REQUIRED));
