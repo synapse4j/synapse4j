@@ -40,6 +40,8 @@ import io.github.synapse4j.jackson.Synapse4jJacksonModule;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.openai.OpenAiCompletionsChatClient;
 import io.github.synapse4j.openai.OpenAiResponsesChatClient;
+import io.github.synapse4j.tool.DefaultToolExecutor;
+import io.github.synapse4j.tool.ToolExecutor;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -255,6 +257,18 @@ public class Synapse4jAutoConfiguration {
     }
 
     /**
+     * The executor each round's batch of tool calls goes to: a {@link DefaultToolExecutor}, running the
+     * batch inline and in order, with no cap on the round. Declared so that the policy an application
+     * needs — a pool, a way out of a round that runs away, a failure answered differently — is its own
+     * bean's to set: this one backs off the moment one is declared, and the loop takes whichever stands.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public ToolExecutor toolExecutor() {
+        return new DefaultToolExecutor();
+    }
+
+    /**
      * The chat client the application talks to: the protocol {@code synapse4j.chat.client} names —
      * the default completions one, Responses, or Anthropic's — wrapped in the tool-calling loop
      * unless {@code synapse4j.chat.auto-tool-calling} is off.
@@ -267,6 +281,7 @@ public class Synapse4jAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public ChatClient chatClient(HttpClient http, JsonCodec codec, Synapse4jProperties properties,
+            ToolExecutor toolExecutor,
             ObjectProvider<ChatCustomizer> chatCustomizers,
             ObjectProvider<ChatClientCustomizer> clientCustomizers) {
         ChatProperties chat = properties.getChat();
@@ -276,7 +291,7 @@ public class Synapse4jAutoConfiguration {
             case ANTHROPIC -> new AnthropicChatClient(http, codec, properties.getAnthropic());
         };
         if (chat.isAutoToolCalling()) {
-            client = new ToolCallingChatClient(client);
+            client = new ToolCallingChatClient(client, toolExecutor);
         }
         return assemble(client, properties, codec, chatCustomizers, clientCustomizers);
     }

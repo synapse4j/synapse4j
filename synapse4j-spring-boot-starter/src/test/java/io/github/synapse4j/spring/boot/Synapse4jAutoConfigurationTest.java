@@ -48,12 +48,23 @@ import io.github.synapse4j.json.JsonSchemaBuilder;
 import io.github.synapse4j.openai.OpenAiCompletionsChatClient;
 import io.github.synapse4j.openai.OpenAiConfig;
 import io.github.synapse4j.openai.OpenAiResponsesChatClient;
+import io.github.synapse4j.tool.DefaultToolExecutor;
+import io.github.synapse4j.tool.ToolExecutor;
 import tools.jackson.databind.json.JsonMapper;
 
 class Synapse4jAutoConfigurationTest {
 
     /** The one registration the whole starter rests on: the classpath file the container reads. */
     private static final String IMPORTS = "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports";
+
+    /** An answer that calls one tool, so the loop has a batch to hand to an executor. */
+    private static final String TOOL_CALL_ANSWER = "{\"choices\":[{\"index\":0,\"finish_reason\":\"tool_calls\","
+            + "\"message\":{\"role\":\"assistant\",\"tool_calls\":[{\"id\":\"call_1\",\"type\":\"function\","
+            + "\"function\":{\"name\":\"noop\",\"arguments\":\"{}\"}}]}}]}";
+
+    /** A plain answer, the shape most of these tests need. */
+    private static final String PLAIN_ANSWER = "{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
+            + "\"message\":{\"role\":\"assistant\",\"content\":\"hi\"}}]}";
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(Synapse4jAutoConfiguration.class));
@@ -69,6 +80,9 @@ class Synapse4jAutoConfigurationTest {
             assertThat(context.getBean(JsonCodec.class)).isInstanceOf(JacksonJsonCodec.class);
             assertThat(context).hasSingleBean(HttpClient.class);
             assertThat(context.getBean(HttpClient.class)).isInstanceOf(RestClientHttpClient.class);
+            // The loop runs the application's executor when it declares one; with none declared, the
+            // starter's own stands so that the policy is a bean's to set rather than hard-wired.
+            assertThat(context.getBean(ToolExecutor.class)).isInstanceOf(DefaultToolExecutor.class);
             // No property named a base URL, so the starter must leave the library's own default
             // alone — the failure mode is a null guard dropped and a blank URL going out.
             assertThat(context.getBean(Synapse4jProperties.class).getOpenai().getBaseUrl())
@@ -416,6 +430,23 @@ class Synapse4jAutoConfigurationTest {
     }
 
     @Test
+    void applicationExecutorRunsBatch() {
+        List<String> runs = new ArrayList<>();
+        runner.withPropertyValues(
+                "synapse4j.openai.api-key=sk-test",
+                "synapse4j.chat.options.model=gpt-4o")
+                .withBean(HttpClient.class, () -> new StubHttpClient(TOOL_CALL_ANSWER, PLAIN_ANSWER))
+                .withBean(ToolExecutor.class, () -> (calls, available, context) -> {
+                    runs.add("ran");
+                    return null;
+                })
+                .run(context -> {
+                    context.getBean(ChatClient.class).chat(new ChatRequest().addUserMessage("hi"));
+                    assertThat(runs).containsExactly("ran");
+                });
+    }
+
+    @Test
     void applicationBeansWinOverDefaults() {
         JsonCodec codec = new JacksonJsonCodec();
         HttpClient http = new RestClientHttpClient();
@@ -466,6 +497,19 @@ class Synapse4jAutoConfigurationTest {
 
         String capturedBody;
 
+        /** What each answer carries, taken in turn, the last one repeating. */
+        private final List<String> answers;
+
+        private int sent;
+
+        StubHttpClient() {
+            this(PLAIN_ANSWER);
+        }
+
+        StubHttpClient(String... answers) {
+            this.answers = List.of(answers);
+        }
+
         @Override
         public HttpResponse send(HttpRequest request) {
             ByteArrayOutputStream body = new ByteArrayOutputStream();
@@ -475,12 +519,11 @@ class Synapse4jAutoConfigurationTest {
                 throw new SynapseException("the request body could not be written", e);
             }
             capturedBody = body.toString(StandardCharsets.UTF_8);
+            String answer = answers.get(sent < answers.size() ? sent : answers.size() - 1);
+            sent++;
             DefaultHttpResponse canned = new DefaultHttpResponse();
             canned.setStatusCode(200);
-            canned.setBody(new ByteArrayInputStream(
-                    ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":"
-                            + "{\"role\":\"assistant\",\"content\":\"hi\"}}]}")
-                            .getBytes(StandardCharsets.UTF_8)));
+            canned.setBody(new ByteArrayInputStream(answer.getBytes(StandardCharsets.UTF_8)));
             canned.setOptions(HttpOptions.effective(request.getOptions(), HttpOptions.defaults()));
             return canned;
         }
