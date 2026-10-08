@@ -133,6 +133,11 @@ public class FinalToolMethodSpecCustomizer implements ToolMethodSpecCustomizer {
         Map<String, JsonSchema> properties = new LinkedHashMap<>();
         List<String> required = new ArrayList<>();
         for (ToolParameterSpec entry : spec.getParameters()) {
+            if (!entry.fromModel()) {
+                // An argument the model does not produce is no property of the schema the model is
+                // shown, whatever schema a customizer resolved for it.
+                continue;
+            }
             JsonSchema property = entry.getResolvedSchema();
             if (property == null) {
                 continue;

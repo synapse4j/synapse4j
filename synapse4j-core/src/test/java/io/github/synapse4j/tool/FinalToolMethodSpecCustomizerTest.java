@@ -95,6 +95,21 @@ class FinalToolMethodSpecCustomizerTest {
         assertSame(read, greeting.getResolvedSchema());
     }
 
+    @Test
+    void schemaKeepsModelArgumentsOnly() {
+        ToolMethodSpec spec = specOf();
+        ToolParameterSpec context = spec.getParameters().get(2);
+        context.setFromModel("false");
+        context.setResolvedSchema(new JsonSchemaBuilder().setType("string").build());
+
+        customizer.customize(spec);
+
+        // An argument the model does not produce is no property of the schema the model is shown,
+        // whatever schema a customizer resolved for it.
+        assertNull(spec.getResolvedSchema().getProperties().get("context"));
+        assertEquals(List.of("name", "greeting"), List.copyOf(spec.getResolvedSchema().getProperties().keySet()));
+    }
+
     private static ToolMethodSpec specOf() {
         Method method = method("greet");
         List<ToolParameterSpec> parameters = Arrays.stream(method.getParameters())
