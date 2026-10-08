@@ -16,16 +16,18 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A {@link JsonSchemaCustomizer} that resolves a schema's references: every {@code $ref} into
- * {@code $defs} is replaced by a copy of the definition it names and {@code #} by the root schema, so
- * the answer reads without {@code $defs}. This is the step for a target whose protocol does not take
- * {@code $ref}. A definition in the boolean form is answered as that boolean itself: it carries no
- * keyword, so a node that references one is answered as that boolean, whatever else the node says.
+ * A {@link JsonSchemaCustomizer} that resolves a schema's references: a {@code $ref} into {@code $defs}
+ * is replaced by a copy of the definition it names, so the answer reads without {@code $defs}. This is
+ * the step for a target whose protocol does not take {@code $ref}. A definition in the boolean form is
+ * answered as that boolean itself: it carries no keyword, so a node that references one is answered as
+ * that boolean, whatever else the node says.
  *
  * <p>
- * The references it resolves are {@code #} and {@code #/$defs/Name}, the name looked up in the root's
- * {@code $defs}. A reference in any other form — into a nested {@code $defs}, into {@code definitions},
- * or one an {@code $id} would re-base — is not resolved, nor is a name the root's {@code $defs} does
+ * The reference it resolves is {@code #/$defs/Name}, the name looked up in the root's {@code $defs}.
+ * {@code #} names the root itself, which every path runs through, so it is one of the cycles left
+ * standing below rather than expanded. A reference in any other form — into a nested {@code $defs},
+ * into {@code definitions}, or one an {@code $id} would re-base — is not resolved, nor is a name the
+ * root's {@code $defs} does
  * not hold. Such a reference is left as it stands: this step resolves what it recognises and never
  * fails on a schema it does not, handing on what it cannot expand.
  *
@@ -36,8 +38,9 @@ import org.jspecify.annotations.Nullable;
  * reference still names, so a definition that was fully inlined is dropped.
  *
  * <p>
- * The schema handed in is untouched: the answer is always a new schema, whether or not a reference was
- * found.
+ * The schema handed in is untouched: an object-form schema is answered as a new one, whether or not a
+ * reference was found, and a boolean one — which carries no keyword a copy could change — is answered
+ * as it stands.
  */
 public class InlineJsonSchemaCustomizer implements JsonSchemaCustomizer {
 
