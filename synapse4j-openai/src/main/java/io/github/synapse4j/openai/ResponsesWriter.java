@@ -218,7 +218,10 @@ class ResponsesWriter {
         // which is what a turn of tool results is — has nowhere else for them to go, so the items it
         // does become carry them instead.
         ProviderExtras messageExtras = content.isEmpty() && !carriesRefusal ? message.getExtras() : null;
-        if (!content.isEmpty() || carriesRefusal) {
+        // A message that becomes an item for a reason no part of it accounts for — one that carries a
+        // refusal and no text — has no part to place it, so it stands where the turn begins.
+        boolean messageAdded = content.isEmpty() && carriesRefusal;
+        if (messageAdded) {
             input.add(messageItem(message, content));
         }
         for (ContentPart part : message.getParts()) {
@@ -228,7 +231,15 @@ class ResponsesWriter {
                 input.add(functionCallOutput(result, messageExtras));
             } else if (part instanceof ReasoningPart reasoning) {
                 input.add(reasoningItem(reasoning, messageExtras));
-            } else if (!(part instanceof TextPart) && !(part instanceof MediaPart)) {
+            } else if (part instanceof TextPart || part instanceof MediaPart) {
+                // Text and images make no item of their own: they are the message's own item, which
+                // stands where the first of them sits — so a part the model wrote before it answered,
+                // its reasoning, keeps the place the turn gives it.
+                if (!messageAdded) {
+                    input.add(messageItem(message, content));
+                    messageAdded = true;
+                }
+            } else {
                 throw unsupportedPart(part);
             }
         }

@@ -467,6 +467,24 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
+    void reasoningItemPrecedesReplayedAnswer() {
+        ChatRequest replay = requestWithModel();
+        replay.addPendingMessage(new ChatMessage(ChatRole.ASSISTANT, null,
+                List.of(new ReasoningPart("weighing it up"), new TextPart("Hi there"))));
+        stubCompletion();
+
+        client.chat(replay);
+
+        // The answer is one item however many text parts it took, and it stands where its first part
+        // sits: a replay that put it in front of the reasoning would hand the model a turn in an order
+        // it never wrote one in.
+        List<Map<String, Object>> input = inputOf(parseCaptured());
+        assertEquals(2, input.size(), input.toString());
+        assertEquals("reasoning", input.get(0).get("type"));
+        assertEquals("assistant", input.get(1).get("role"));
+    }
+
+    @Test
     void refusalTurnReplaysInContent() {
         stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\","
                 + "\"output\":[{\"type\":\"message\",\"id\":\"msg_9\",\"status\":\"completed\","
