@@ -10,7 +10,7 @@ import lombok.Data;
 import lombok.NonNull;
 
 /**
- * One HTTP request: method, URL, headers, body bytes, and an optional per-request timeout.
+ * One HTTP request: method, URL, headers, body bytes, and its own HTTP-level options.
  *
  * <p>
  * Nothing here is nullable except {@link #body} and {@link #options}, whose {@code null} means "no body"
