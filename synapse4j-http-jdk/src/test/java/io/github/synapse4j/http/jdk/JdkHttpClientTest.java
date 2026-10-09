@@ -166,7 +166,7 @@ class JdkHttpClientTest {
     }
 
     @Test
-    void unsupportedBodyWriteModeRefused() {
+    void unknownBodyWriteModeRefused() {
         HttpOptions options = HttpOptions.defaults();
         options.setBodyWriteMode("spooled");
         HttpRequest request = new HttpRequest(baseUrl + "/nowhere");
@@ -177,11 +177,38 @@ class JdkHttpClientTest {
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
                 () -> client.send(request));
         assertTrue(thrown.getMessage().contains("spooled"), thrown::toString);
+    }
 
-        // A mode the library defines but this transport does not take is refused the same way: every
-        // written body is gathered, so streaming is not on offer.
+    @Test
+    void streamedTakenUnlessBodyWritten() throws Exception {
+        server.createContext("/scoped", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            exchange.sendResponseHeaders(200, -1);
+            exchange.close();
+        });
+        HttpOptions options = HttpOptions.defaults();
         options.setBodyWriteMode(BodyWriteMode.STREAMED.value());
-        assertThrows(IllegalArgumentException.class, () -> client.send(request));
+
+        // Nothing to stream: a body already in hand, and a request with none, both go out as they are.
+        // The refusal belongs to a body this transport would have to gather and write itself.
+        HttpRequest held = new HttpRequest(baseUrl + "/scoped");
+        held.setMethod(HttpRequest.POST);
+        held.setOptions(options);
+        held.setBody(HttpBody.of("ping"));
+        try (HttpResponse response = client.send(held)) {
+            assertEquals(200, response.getStatusCode());
+        }
+        HttpRequest none = new HttpRequest(baseUrl + "/scoped");
+        none.setOptions(options);
+        try (HttpResponse response = client.send(none)) {
+            assertEquals(200, response.getStatusCode());
+        }
+
+        HttpRequest written = new HttpRequest(baseUrl + "/scoped");
+        written.setMethod(HttpRequest.POST);
+        written.setOptions(options);
+        written.setBody(out -> out.write("ping".getBytes(UTF_8)));
+        assertThrows(IllegalArgumentException.class, () -> client.send(written));
     }
 
     @Test

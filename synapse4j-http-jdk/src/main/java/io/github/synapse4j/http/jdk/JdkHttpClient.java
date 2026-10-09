@@ -37,12 +37,13 @@ import io.github.synapse4j.http.HttpResponse;
  * <li>A request body is handed over the way {@link HttpBody} describes it: bytes the body already holds
  * go out without being written, and a body that can only be written is gathered into memory and sent
  * with its length. The JDK pulls the body through a thread of its own, so this transport does not stream
- * a written one: {@link BodyWriteMode#STREAMED} is refused, and {@link BodyWriteMode#AUTO}, the default,
- * gathers.</li>
+ * a body it has to write: {@link BodyWriteMode#STREAMED} is refused for one, while a body already in
+ * hand — and a request with none at all — is handed over as it is, and {@link BodyWriteMode#AUTO}, the
+ * default, gathers.</li>
  * <li>A request with no body and one with an empty body are the same exchange here: the JDK's
- * {@code noBody()} publisher sends {@code Content-Length: 0} for a method that carries a body, so the
- * distinction {@link HttpRequest#getBody()} draws between the two cannot be expressed on this
- * transport.</li>
+ * {@code noBody()} publisher puts {@code Content-Length: 0} on the request whatever the method and
+ * whether or not a body was given, so the distinction {@link HttpRequest#getBody()} draws between the
+ * two cannot be expressed on this transport.</li>
  * <li>A {@link HttpOptions#getResponseTimeout() response timeout}, whether the request set it or this
  * client's own options carry it, maps to the JDK request builder's {@code timeout}, which — verified
  * empirically — bounds only the wait for the response headers to start arriving, never the reading of
@@ -163,11 +164,15 @@ public class JdkHttpClient implements HttpClient {
      * it already holds go out without being written, and a body that has to be written is gathered.
      *
      * <p>
-     * {@link #requireMode} refuses a mode this transport does not take before the body is looked at, so a
-     * request that asked for one thing is not quietly sent another way.
+     * A mode this library does not define is refused however the request is shaped, because
+     * {@link BodyWriteMode#from} is what reads it. {@link BodyWriteMode#STREAMED} is refused only where
+     * there is a body to write — this transport gathers a written one rather than streaming it, since the
+     * JDK pulls the body through a thread of its own — so a body already in hand, or none at all, goes
+     * out as it is. {@link BodyWriteMode#AUTO} and {@link BodyWriteMode#BUFFERED} both take the gathered
+     * route.
      */
     private static BodyPublisher bodyPublisher(HttpRequest request, @Nullable String mode) {
-        requireMode(mode);
+        BodyWriteMode known = BodyWriteMode.from(mode);
         HttpBody body = request.getBody();
         if (body == null) {
             return BodyPublishers.noBody();
@@ -176,22 +181,11 @@ public class JdkHttpClient implements HttpClient {
         if (buffer != null) {
             return readyBytes(buffer);
         }
-        return gathered(request, body);
-    }
-
-    /**
-     * Refuses a mode this transport does not take: the one the string names, {@link BodyWriteMode#from}
-     * refusing a value this library does not define, and {@link BodyWriteMode#STREAMED} refused because
-     * this transport gathers every written body rather than streaming it — the JDK pulls the body through
-     * a thread of its own, so streaming would add a thread of ours and a lock around it.
-     * {@link BodyWriteMode#AUTO} and {@link BodyWriteMode#BUFFERED} both take the gathered route.
-     */
-    private static void requireMode(@Nullable String mode) {
-        BodyWriteMode known = BodyWriteMode.from(mode);
         if (known == BodyWriteMode.STREAMED) {
             throw new IllegalArgumentException("unsupported bodyWriteMode '" + mode
                     + "': this transport gathers the request body");
         }
+        return gathered(request, body);
     }
 
     /**
