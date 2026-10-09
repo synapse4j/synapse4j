@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -97,11 +98,10 @@ public class ToolsProcessor implements SmartInitializingSingleton {
      */
     private Map<String, List<Tool>> toolsByClient() {
         Map<String, List<Tool>> byClient = new LinkedHashMap<>();
-        beanFactory.getBeansWithAnnotation(Tools.class).forEach((beanName, bean) -> {
-            Class<?> type = beanFactory.getType(beanName);
-            if (type == null) {
-                type = bean.getClass();
-            }
+        beanFactory.getBeansWithAnnotation(Tools.class).values().forEach(bean -> {
+            // The target class, not the bean's own: a bean the container wrapped in a proxy would
+            // otherwise be read as the proxy, whose generated overrides carry no annotations.
+            Class<?> type = AopUtils.getTargetClass(bean);
             Tools tools = AnnotatedElementUtils.findMergedAnnotation(type, Tools.class);
             if (tools == null) {
                 return;

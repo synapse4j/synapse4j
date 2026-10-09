@@ -3,6 +3,8 @@ package io.github.synapse4j.spring.boot.tool;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -46,6 +48,16 @@ class Synapse4jToolsAutoConfigurationTest {
     }
 
     @Test
+    void proxiedToolBeanKeepsItsTools() {
+        runner.withUserConfiguration(ProxyWrappingPostProcessor.class).run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(ChatClient.class).defaultTools())
+                    .extracting(Tool::name)
+                    .containsExactly("test_greet");
+        });
+    }
+
+    @Test
     void duplicateToolNameFailsStartup() {
         runner.withUserConfiguration(RivalToolBean.class).run(context -> {
             assertThat(context).hasFailed();
@@ -72,6 +84,15 @@ class Synapse4jToolsAutoConfigurationTest {
         @ToolMethod
         public String greet(String who) {
             return who;
+        }
+    }
+
+    /** Wraps the marked bean the way the container does, so reading it has to see through the proxy. */
+    static class ProxyWrappingPostProcessor implements BeanPostProcessor {
+
+        @Override
+        public Object postProcessAfterInitialization(Object bean, String beanName) {
+            return bean instanceof ToolBean ? new ProxyFactory(bean).getProxy() : bean;
         }
     }
 }

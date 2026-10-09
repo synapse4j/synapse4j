@@ -93,6 +93,13 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-jackson</artifactId>
     </dependency>
+    <!-- The proxy-aware target lookup the tools processor reads marked beans through: a bean the
+         container wrapped in a proxy has to be read as its target class. spring-context already
+         brings this in, but the import is ours, so the dependency is stated rather than borrowed. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-aop</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
