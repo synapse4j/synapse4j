@@ -687,10 +687,12 @@ class AbstractChatClientTest {
     @Test
     void registeringNameAgainReplacesTool() {
         StubChatClient client = new StubChatClient();
-        client.addDefaultTool(tool("a"));
+        Tool first = tool("a");
+        client.addDefaultTool(first);
         client.addDefaultTool(tool("b"));
         Tool upgraded = tool("a");
-        client.addDefaultTool(upgraded);
+
+        assertSame(first, client.addDefaultTool(upgraded));
 
         client.chat(new ChatRequest());
 

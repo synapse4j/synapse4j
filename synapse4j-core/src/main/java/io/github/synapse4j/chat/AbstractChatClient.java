@@ -210,12 +210,16 @@ public abstract class AbstractChatClient implements ChatClient {
      * insertion order — so upgrading a tool never shuffles the rest.
      */
     @Override
-    public void addDefaultTool(@NonNull Tool tool) {
-        defaultTools.updateAndGet(registered -> {
+    public @Nullable Tool addDefaultTool(@NonNull Tool tool) {
+        while (true) {
+            LinkedHashMap<String, Tool> registered = defaultTools.get();
             LinkedHashMap<String, Tool> next = new LinkedHashMap<>(registered);
-            next.put(tool.name(), tool);
-            return next;
-        });
+            @Nullable
+            Tool replaced = next.put(tool.name(), tool);
+            if (defaultTools.compareAndSet(registered, next)) {
+                return replaced;
+            }
+        }
     }
 
     /**

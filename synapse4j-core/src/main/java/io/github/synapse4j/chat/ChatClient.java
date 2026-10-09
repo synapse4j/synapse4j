@@ -197,7 +197,8 @@ public interface ChatClient {
      *
      * <p>
      * A name is unique among the defaults: registering a name that is already registered replaces
-     * that tool where it sits, so upgrading an implementation does not shuffle the rest.
+     * that tool where it sits, so upgrading an implementation does not shuffle the rest. The tool
+     * the name carried before is answered back, {@code null} where it carried none.
      *
      * <p>
      * The defaults meet the request's own tools at the client's defaults step of every call, in
@@ -208,8 +209,10 @@ public interface ChatClient {
      *
      * @param tool the tool to register; never {@code null}, and its definition's name must not be
      *                 {@code null}
+     * @return the tool the name was registered with before, or {@code null} when the name was free
      */
-    void addDefaultTool(Tool tool);
+    @Nullable
+    Tool addDefaultTool(Tool tool);
 
     /**
      * Removes the default tool registered under the given name, so requests no longer carry it.

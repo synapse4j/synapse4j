@@ -90,8 +90,8 @@ public class DelegatingChatClient implements ChatClient {
     }
 
     @Override
-    public void addDefaultTool(Tool tool) {
-        delegate.addDefaultTool(tool);
+    public @Nullable Tool addDefaultTool(Tool tool) {
+        return delegate.addDefaultTool(tool);
     }
 
     @Override

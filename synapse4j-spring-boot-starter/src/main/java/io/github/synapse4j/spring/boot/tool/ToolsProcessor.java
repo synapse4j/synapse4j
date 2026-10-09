@@ -1,9 +1,11 @@
 package io.github.synapse4j.spring.boot.tool;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
@@ -30,8 +32,9 @@ import lombok.extern.apachecommons.CommonsLog;
  *
  * <p>
  * A class naming a chat client no bean answers to fails the startup, rather than leaving its tools
- * silently nowhere. What the tools are — the codec and the customizers behind them — is the
- * {@link MethodTools} handed in, not this class's business.
+ * silently nowhere — and so does a tool name two marked classes declare for one client, since which of
+ * the two would stand is nothing either of them settles. What the tools are — the codec and the
+ * customizers behind them — is the {@link MethodTools} handed in, not this class's business.
  *
  * <p>
  * What it places is logged: each chat client and the tools that landed on it at info, and each class
@@ -59,8 +62,9 @@ public class ToolsProcessor implements SmartInitializingSingleton {
         clients.forEach((name, client) -> {
             List<Tool> tools = new ArrayList<>(shared);
             tools.addAll(byClient.getOrDefault(name, List.of()));
+            requireDistinctNames(tools);
             tools.forEach(client::addDefaultTool);
-            log.info("synapse4j: registered " + tools.size() + " tool(s) on chat client '" + name + "'");
+            log.info("Registered " + tools.size() + " tool(s) on chat client '" + name + "'");
         });
         byClient.keySet().stream()
                 .filter(name -> !name.isEmpty() && !clients.containsKey(name))
@@ -68,6 +72,23 @@ public class ToolsProcessor implements SmartInitializingSingleton {
                 .ifPresent(name -> {
                     throw new SynapseException("no chat client bean named '" + name + "', which a @Tools class names");
                 });
+    }
+
+    /**
+     * Refuses a tool name one client is offered twice: the second would replace the first, and which of
+     * the two stands would follow the order the container happened to hand the beans over in, which
+     * nothing in the application decides.
+     *
+     * @param tools the tools one client is offered; never {@code null}
+     * @throws SynapseException if a name is declared more than once for it
+     */
+    private static void requireDistinctNames(List<Tool> tools) {
+        Set<String> declared = new HashSet<>();
+        for (Tool tool : tools) {
+            if (!declared.add(tool.name())) {
+                throw new SynapseException("@Tools declares the tool '" + tool.name() + "' more than once");
+            }
+        }
     }
 
     /**

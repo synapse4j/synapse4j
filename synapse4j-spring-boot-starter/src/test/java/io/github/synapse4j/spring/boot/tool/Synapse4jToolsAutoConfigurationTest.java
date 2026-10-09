@@ -45,9 +45,29 @@ class Synapse4jToolsAutoConfigurationTest {
                 .containsExactly("test_greet"));
     }
 
+    @Test
+    void duplicateToolNameFailsStartup() {
+        runner.withUserConfiguration(RivalToolBean.class).run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(context.getStartupFailure())
+                    .hasMessageContaining("test_greet")
+                    .hasMessageContaining("more than once");
+        });
+    }
+
     /** A marked bean the processor has to read, so discovery runs and not only the wiring. */
     @Tools(prefix = "test_")
     static class ToolBean {
+
+        @ToolMethod
+        public String greet(String who) {
+            return who;
+        }
+    }
+
+    /** A second marked bean declaring a name the first one already declares. */
+    @Tools(prefix = "test_")
+    static class RivalToolBean {
 
         @ToolMethod
         public String greet(String who) {
