@@ -86,8 +86,11 @@ client.setDefaultOptions(defaults);
 
 The defaults fill in what a call leaves unstated: a field the call leaves `null` takes the default's
 value, the two extras bags merge with the call's entries winning by key, and the headers do the
-same — a standing header applies to every call, and a call naming the same header wins. Setting is
-configuration, meant for before the client is shared.
+same — a standing header applies to every call, and a call naming the same header wins.
+
+They are layered onto the copy the client sends, after your `customizeRequest` hooks have run on
+your own request: the request you hold keeps only what you set, and the copy goes out with the
+defaults filling its gaps. Setting is configuration, meant for before the client is shared.
 
 Tools can stand on the client too — registered ones, and providers asked on every call:
 
@@ -96,11 +99,18 @@ client.addDefaultTool(weather);
 client.addToolProvider((c, request) -> List.of(weather));
 ```
 
+They join the same copy, and the request's own list is left as it was: a request tool of the same
+name stands in the default's slot for that call.
+
 ## Hooks around an exchange
 
 A `ChatCustomizer` runs at one or more steps of an exchange: `customizeRequest` before the request
 goes out, `customizeResponse` on the way back, `customizeStreamEvent` on each event of a stream.
-Each hook is handed the value the client already holds and changes it in place.
+Each hook is handed the value the client already holds and changes it in place — for
+`customizeRequest` that is the request you passed, so what the hook writes stays on it and goes out
+again the next time you call with that same request. The client's own defaults are not part of that
+value: they are layered on afterwards, onto the copy that is sent. A hook that needs them reads
+`defaultOptions()`, `defaultTools()` and `toolProviders()`.
 
 ```java
 client.addChatCustomizer(new ChatCustomizer() {

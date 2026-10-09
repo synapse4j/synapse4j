@@ -79,7 +79,10 @@ client.setDefaultOptions(defaults);
 
 默认值补上调用没有言明的东西：调用留作 `null` 的字段取用默认值；两个 extras 映射合并，调用的条目
 按键胜出；请求头也是如此——常驻请求头对每次调用都生效，调用指定了同名请求头时以调用为准。
-设置属于配置，应在客户端共享之前完成。
+
+它们叠加在客户端要发送的那份副本上，在你自己的 `customizeRequest` 钩子跑过之后：你手里那份请求
+只保留你自己设的东西，出去的是那份没言明之处被默认值补齐的副本。设置属于配置，应在客户端共享之前
+完成。
 
 工具也可以常驻客户端——已注册的工具，以及每次调用都会询问的工具提供者：
 
@@ -88,11 +91,16 @@ client.addDefaultTool(weather);
 client.addToolProvider((c, request) -> List.of(weather));
 ```
 
+它们并入同一份副本，请求自己的工具列表原样不动：同名工具在这一次调用里站上默认工具的槽位。
+
 ## 一次往来前后的钩子
 
 `ChatCustomizer` 在一次往来的一个或多个步骤上运行：`customizeRequest` 在请求发出之前，
 `customizeResponse` 在响应回来的途中，`customizeStreamEvent` 在流的每个事件上。每个钩子拿到客户端
-已经持有的那个值，并就地修改它。
+已经持有的那个值，并就地修改它——对 `customizeRequest` 来说那就是你传进来的请求，所以它写进去的
+东西留在这份请求上，下次你用同一份请求调用时还会随它一起出去。客户端自身的默认值不在这个值里：
+它们在那之后才叠加到要发送的副本上；钩子若需要，从 `defaultOptions()`、`defaultTools()` 和
+`toolProviders()` 读取。
 
 ```java
 client.addChatCustomizer(new ChatCustomizer() {

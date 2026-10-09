@@ -64,15 +64,16 @@ The examples build the request URL as `config.getBaseUrl() + ENDPOINT`. When a f
 second protocol, that path is the thing to promote into a hook — the OpenAI family's abstract base
 makes it an abstract `endpoint()` method each protocol answers.
 
-Before either hook runs, the base class has already prepared the request: it applies the client's
-own defaults and then every registered request customizer, in place on the very instance the caller
-passed, and hands that prepared request to `doChat` or `doStream`. So a hook that fills in one of those
-two never calls `prepare` itself — running it again would apply the customizers twice — while a client
-that overrides `chat` or `stream` to prepare a request its own way is the one that calls it, having
-replaced the base class's pass. For the stream a hook
-builds, the base class expects every event to pass through `eventPipeline()` — the stream-event
-customizers as one `Consumer<ChatStreamEvent>` — between its source and its fold: hand it to your
-`DefaultChatStream` and it runs there, not in your iterator.
+Before either hook runs, the base class has answered the form to send — `prepare(ChatRequest)` — and
+hands that to `doChat` or `doStream`. The request customizers change the caller's own request in
+place; the form is then a copy of it carrying the client's own defaults and the schemas its schema
+customizers rewrote, so nothing the client adds reaches back into the request the caller holds. So a
+hook that fills in one of those two never calls `prepare` itself — running it again would apply the
+customizers twice — while a client that overrides `chat` or `stream` to prepare a request its own way
+is the one that calls it, having replaced the base class's pass. For the stream a hook builds, the
+base class expects every event to pass through `eventPipeline()` — the stream-event customizers as
+one `Consumer<ChatStreamEvent>` — between its source and its fold: hand it to your `DefaultChatStream`
+and it runs there, not in your iterator.
 
 A protocol that stores the conversation server-side — the OpenAI Responses API, for example —
 changes one more thing: the client overrides `continueWith` to record what its next call needs
@@ -219,10 +220,10 @@ options' own extras get in [Writing the document](#writing-the-document). A fiel
 travels nowhere: a response is never sent, nothing copies its extras onward, and it is the caller's
 to read.
 
-The fragments of this page add up to one blocking exchange. The request `doChat` receives has
-already been through `prepare` — `AbstractChatClient` runs the defaults and the request
-customizers before the subclass sees the request — and the `ChatResponse` it returns is the
-caller's answer:
+The fragments of this page add up to one blocking exchange. The request `doChat` receives is the
+form to send, already through `prepare` — the request customizers have changed the caller's own
+request, and this copy carries the client's defaults and its rewritten schemas — and the
+`ChatResponse` it returns is the caller's answer:
 
 ```java
 @Override

@@ -5,6 +5,9 @@ version becomes the body of the GitHub Release created when that version's tag i
 
 ## [Unreleased]
 
+- A client sends a copy of the request rather than the request itself: your `customizeRequest` hooks change the request you passed — in place, and carried into every later call you make with it — while the client's defaults (`setDefaultOptions`, `addDefaultTool`, `addToolProvider`) and its schema rewriting land on the copy that goes out and that the context records, so nothing the client layers on reaches back into your request and a tool round no longer grows the request the client sent; the request hooks run before those defaults, so a hook sees your own options and tools rather than the merged ones
+- `DelegatingChatClient` stands in for another client and hands it every call and registration, and `ToolCallingChatClient` is one: its rounds go to the client it wraps, so defaults, providers and schema customizers are that client's and no round is prepared twice
+- `AbstractChatClient.prepare(ChatRequest)` answers the request to send rather than changing the one it is given, so a subclass's `doChat`/`doStream` receives the form that goes out — the copy the registered `applyDefaults` hook fills
 - A keyword whose value is any collection is treated as the array it stands for — read as a list, walked by `visit` and `map`, frozen, and written as an array — where only a `List` was, so a schema built with a `Set` kept a mutable, unwalked value
 - An argument the model does not produce stays out of the schema the model is shown, even where a customizer resolved a schema for it
 - A generated schema orders an inherited property the way the type it describes is written, where a subclass that reorders them used to be described in its parent's order

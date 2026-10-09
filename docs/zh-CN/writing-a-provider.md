@@ -62,11 +62,12 @@ public class MyConfig {
 为钩子的正是这段路径——OpenAI 的抽象基类把它做成一个抽象方法 `endpoint()`，由每种协议各自
 作答。
 
-任一钩子运行之前，基类已经把请求准备好：它先应用客户端自身的默认值，再依次把每一个已注册的请求
-customizer 就地应用到调用者传进来的那个实例上，然后把准备好的请求交给 `doChat` 或 `doStream`。
-所以填充这两个钩子的实现绝不自己调用 `prepare`——再跑一遍会把 customizer 应用两次——而覆盖
-`chat` 或 `stream` 来按自己的方式准备请求的客户端，才是调用它的那个，因为它取代了基类的那一遍。
-对于钩子构建的流，
+任一钩子运行之前，基类已经把要发送的那份表单准备好——`prepare(ChatRequest)`——并把它交给
+`doChat` 或 `doStream`。请求 customizer 就地改的是调用者自己那份请求；随后基类发送的是它的副本，
+客户端自身的默认值与 schema customizer 重写过的 schema 都落在这份副本上，所以客户端加的东西
+不会回流到调用者手里那份请求。因此填充这两个钩子的实现绝不自己调用 `prepare`——再跑一遍会把
+customizer 应用两次——而覆盖 `chat` 或 `stream` 来按自己的方式准备请求的客户端，才是调用它的那个，
+因为它取代了基类的那一遍。对于钩子构建的流，
 基类期望每个事件都从 `eventPipeline()` 穿过——把流事件 customizer 收在一个
 `Consumer<ChatStreamEvent>` 里——在它的源头与折叠之间：把它交给你的 `DefaultChatStream`，它就
 在那里运行，而不在你的迭代器里。
@@ -203,9 +204,9 @@ ChatResponse readAnswer(JsonReader reader) {
 [写出文档](#写出文档)里得到的合并相同。留在响应自身上的字段哪儿也去不了：响应从不发送，
 没有任何东西把它的 extras 复制出去，只能由调用者自己读取。
 
-本页的这些片段合起来就是一次阻塞式往来。`doChat` 收到的请求已经过了 `prepare`——
-`AbstractChatClient` 在子类看到请求之前运行默认值与请求 customizer——它返回的 `ChatResponse`
-就是调用者的答案：
+本页的这些片段合起来就是一次阻塞式往来。`doChat` 收到的是要发送的那份表单，已经过了
+`prepare`——请求 customizer 改过调用者自己那份请求，而这份副本带着客户端自身的默认值与重写后的
+schema——它返回的 `ChatResponse` 就是调用者的答案：
 
 ```java
 @Override
