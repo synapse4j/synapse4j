@@ -69,7 +69,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void everyRoundSeesSameRequest() {
+    void roundsCarrySameConversation() {
         inner.script.add(toolCallResponse("c1", "alpha"));
         inner.script.add(textResponse("done"));
         ToolCallingChatClient client = new ToolCallingChatClient(inner);
@@ -79,9 +79,12 @@ class ToolCallingChatClientTest {
 
         client.chat(request);
 
+        // Each round goes out as its own form, but the conversation is the caller's own: the
+        // second round's copy already carries the first round's answer.
         assertEquals(2, inner.seen.size());
-        assertSame(request, inner.seen.get(0));
-        assertSame(request, inner.seen.get(1));
+        assertNotSame(request, inner.seen.get(0));
+        assertEquals(0, inner.seen.get(0).getHistoryMessages().size());
+        assertEquals(request.getHistoryMessages(), inner.seen.get(1).getHistoryMessages());
     }
 
     @Test
@@ -109,7 +112,7 @@ class ToolCallingChatClientTest {
         // Created for the round, attached so every trip can find it — unlike a bare client's.
         assertNotNull(request.getContext());
         assertSame(request.getContext(), response.getContext());
-        assertSame(request, response.getContext().getRequest());
+        assertSame(inner.seen.get(0), response.getContext().getRequest());
         assertEquals(1, response.getContext().getTurn());
     }
 
@@ -193,7 +196,7 @@ class ToolCallingChatClientTest {
     }
 
     @Test
-    void innerPerRoundDecoratorOnce() {
+    void decoratorProvidersAskedEachRound() {
         inner.script.add(toolCallResponse("c1", "alpha"));
         inner.script.add(textResponse("done"));
         AtomicInteger innerAsks = new AtomicInteger();
@@ -212,10 +215,10 @@ class ToolCallingChatClientTest {
 
         client.chat(request);
 
-        // Registration decides the frequency: the inner client prepares every round, the
-        // decorator once for the whole call.
+        // The decorator hands its registrations to the client it wraps, so both are that
+        // client's and both are asked once per round.
         assertEquals(2, innerAsks.get());
-        assertEquals(1, decoratorAsks.get());
+        assertEquals(2, decoratorAsks.get());
     }
 
     @Test

@@ -294,23 +294,23 @@ public abstract class AbstractChatClient implements ChatClient {
      * {@inheritDoc}
      *
      * <p>
-     * The request goes through {@link #prepare(ChatRequest)} first — in place, on the very
-     * instance the caller passed, so there is no second request to keep track of — and the
-     * subclass then sees it in {@link #doChat(ChatRequest)}. A context is resolved for the
-     * exchange — the request's own when it carries one, a fresh call-scoped one otherwise, never
-     * attached back to the request — and it records the request as sent and the response as
-     * received before the answer is handed back on it. Nothing is recorded on the request here:
-     * the conversation is recorded when the answer is folded in, through
-     * {@link ChatClient#continueWith(ChatRequest, ChatResponse)}, so a call that fails never
-     * produces an answer to fold and leaves its pending messages where a retry finds them. The
-     * response customizers run last, on the exchange's own answer, and it is that instance the
-     * caller receives.
+     * The request goes through {@link #prepare(ChatRequest)} first, which answers the form to
+     * send: the request customizers change the caller's own request in place, and this client's
+     * defaults and schema customizers are layered onto a copy of it. The subclass sees that form
+     * in {@link #doChat(ChatRequest)}. A context is resolved for the exchange — the form's own
+     * when it carries one, a fresh call-scoped one otherwise, never attached back to the form —
+     * and it records the form as sent and the response as received before the answer is handed
+     * back on it. Nothing is recorded on the request here: the conversation is recorded when the
+     * answer is folded in, through {@link ChatClient#continueWith(ChatRequest, ChatResponse)}, so
+     * a call that fails never produces an answer to fold and leaves its pending messages where a
+     * retry finds them. The response customizers run last, on the exchange's own answer, and it
+     * is that instance the caller receives.
      */
     @Override
     public ChatResponse chat(ChatRequest request) {
-        prepare(request);
-        ChatContext context = resolveContext(request);
-        ChatResponse response = doChat(request);
+        ChatRequest sent = prepare(request);
+        ChatContext context = resolveContext(sent);
+        ChatResponse response = doChat(sent);
         carryContext(context, response);
         for (ChatCustomizer customizer : customizers) {
             customizer.customizeResponse(this, response);
@@ -322,35 +322,37 @@ public abstract class AbstractChatClient implements ChatClient {
      * {@inheritDoc}
      *
      * <p>
-     * The request goes through {@link #prepare(ChatRequest)} first — in place, as for
-     * {@link #chat(ChatRequest)} — and the subclass then sees it in {@link #doStream(ChatRequest)}.
-     * The context is resolved, the request recorded, and the aggregated answer stamped with that
-     * context — what {@link ChatClient#continueWith(ChatRequest, ChatResponse)} reads off an answer.
-     * That stamping and the response customizers' pass both wait for the stream to run to its end,
-     * on the wrapper every stream is handed back in — the customizer list is snapshotted when the
-     * stream opens, so one registered mid-flight joins neither this stream nor its pass. A stream closed before its
-     * last event runs neither: it holds a partial answer, and nothing is recorded for it — the
-     * conversation is recorded when the answer is folded in through
+     * The request goes through {@link #prepare(ChatRequest)} first, answering the form to send —
+     * the request customizers change the caller's own request, this client's defaults and schema
+     * customizers a copy of it — and the subclass sees that form in
+     * {@link #doStream(ChatRequest)}. The context is resolved, the form recorded, and the
+     * aggregated answer stamped with that context — what
+     * {@link ChatClient#continueWith(ChatRequest, ChatResponse)} reads off an answer. That
+     * stamping and the response customizers' pass both wait for the stream to run to its end, on
+     * the wrapper every stream is handed back in — the customizer list is snapshotted when the
+     * stream opens, so one registered mid-flight joins neither this stream nor its pass. A stream
+     * closed before its last event runs neither: it holds a partial answer, and nothing is
+     * recorded for it — the conversation is recorded when the answer is folded in through
      * {@link ChatClient#continueWith(ChatRequest, ChatResponse)}.
      */
     @Override
     public ChatStream stream(ChatRequest request) {
-        prepare(request);
-        ChatContext context = resolveContext(request);
-        ChatStream stream = doStream(request);
+        ChatRequest sent = prepare(request);
+        ChatContext context = resolveContext(sent);
+        ChatStream stream = doStream(sent);
         carryContext(context, stream.aggregatedResponse());
         // The list is already in execution order; the copy is the snapshot across the stream's life.
         return new RecordingStream(stream, List.copyOf(customizers), context);
     }
 
     /**
-     * The context this exchange runs on: the request's own when it carries one — the
-     * application's, carrying its attributes — and otherwise a fresh call-scoped one. Either
-     * way the request is recorded on it as it went out.
+     * The context this exchange runs on: the form's own when it carries one — the application's,
+     * carrying its attributes — and otherwise a fresh call-scoped one. Either way the form is
+     * recorded on it as it went out.
      *
      * <p>
-     * A subclass that must reach the context through the request itself — a loop driving
-     * several exchanges under one — attaches what this method would leave call-scoped.
+     * A subclass that must reach the context through the request itself — a loop driving several
+     * exchanges under one — attaches what this method would leave call-scoped.
      */
     protected ChatContext resolveContext(ChatRequest sent) {
         ChatContext context = sent.getContext() != null ? sent.getContext() : new ChatContext();
@@ -373,17 +375,38 @@ public abstract class AbstractChatClient implements ChatClient {
     }
 
     /**
-     * Applies this client's own defaults to the request — first, before any customizer runs, so
-     * every customizer sees them applied and has the last word on what goes out. Runs exactly once
-     * per call. The base fills the request's options from the default options set through
-     * {@link #setDefaultOptions(ChatOptions)}, then assembles the request's tool set from three
-     * sources in this order: the default tools registered through {@link #addDefaultTool(Tool)},
-     * what each registered {@link ToolProvider} answers for this call, and the request's own tools
-     * — a later source wins by name at the slot the name first took, a new name appends. A subclass
-     * with defaults of its own overrides this and must call {@code super.applyDefaults(request)} to
-     * keep that work. The request is changed where it stands: there is no other instance to change.
+     * Answers the form one call sends: first the request customizers, each changing the caller's
+     * own request in place — what one leaves there rides on into every later call the caller makes
+     * with that request, so a hook that must not leave a trace undoes its own change — and then a
+     * copy of the request carrying this client's own layers: its defaults, and last the rewritten
+     * schemas. The caller's request keeps only what its own customizers wrote; everything the
+     * client adds lands on the copy.
      *
      * @param request the request as the caller built it
+     * @return the form to send; never {@code null}
+     */
+    protected ChatRequest prepare(ChatRequest request) {
+        for (ChatCustomizer customizer : customizers) {
+            customizer.customizeRequest(this, request);
+        }
+        ChatRequest sent = new ChatRequest(request);
+        applyDefaults(sent);
+        applySchemaCustomizers(sent);
+        return sent;
+    }
+
+    /**
+     * Applies this client's own defaults to the form about to be sent — the request customizers
+     * have already run on the caller's request, so a default fills only what the form still leaves
+     * unstated. The base fills the form's options from the default options set through
+     * {@link #setDefaultOptions(ChatOptions)}, then assembles its tool set from three sources in
+     * this order: the default tools registered through {@link #addDefaultTool(Tool)}, what each
+     * registered {@link ToolProvider} answers for this call, and the form's own tools — a later
+     * source wins by name at the slot the name first took, a new name appends. A subclass with
+     * defaults of its own overrides this and must call {@code super.applyDefaults(request)} to keep
+     * that work.
+     *
+     * @param request the form about to be sent
      */
     protected void applyDefaults(ChatRequest request) {
         @Nullable
@@ -395,11 +418,11 @@ public abstract class AbstractChatClient implements ChatClient {
     }
 
     /**
-     * Merges the standing tool set into the request's own: a later source wins by name at the slot
+     * Merges the standing tool set into the form's own: a later source wins by name at the slot
      * the name first took, and a new name appends. Default tools come first, then each provider's
-     * answer, then the request's own.
+     * answer, then the form's own.
      *
-     * @param request the request as the caller built it
+     * @param request the form about to be sent
      */
     private void applyDefaultTools(ChatRequest request) {
         // One get each, held in a local: a second read could land after a registration and
@@ -434,26 +457,9 @@ public abstract class AbstractChatClient implements ChatClient {
     }
 
     /**
-     * Applies this client's own defaults, walks every request customizer in the order it was
-     * registered, and finally runs the schema customizers over the request's schemas — last, so they
-     * see whatever the customizers left. The request goes out as the instance the caller passed:
-     * every step changes it in place rather than answer a replacement, so there is no result to hand
-     * back.
-     *
-     * @param request the request as the caller built it
-     */
-    protected void prepare(ChatRequest request) {
-        applyDefaults(request);
-        for (ChatCustomizer customizer : customizers) {
-            customizer.customizeRequest(this, request);
-        }
-        applySchemaCustomizers(request);
-    }
-
-    /**
      * Sends one chat request that has already been through {@link #prepare(ChatRequest)}.
      *
-     * @param request the request to send, prepared in place; never {@code null}
+     * @param request the form to send; never {@code null}
      * @return the provider's complete answer
      */
     protected abstract ChatResponse doChat(ChatRequest request);
@@ -461,18 +467,18 @@ public abstract class AbstractChatClient implements ChatClient {
     /**
      * Answers one chat request that has already been through {@link #prepare(ChatRequest)}.
      *
-     * @param request the request to answer, prepared in place; never {@code null}
+     * @param request the form to send; never {@code null}
      * @return the streaming answer; never {@code null}
      */
     protected abstract ChatStream doStream(ChatRequest request);
 
     /**
-     * Runs the schema customizers over every schema the request will send — each tool's argument
+     * Runs the schema customizers over every schema the form will send — each tool's argument
      * schema and the response format's — through the client's cache, so a schema already processed is
      * answered from it rather than processed again. Does nothing when no customizer is registered: no
      * customizer, no cache, no pass.
      *
-     * @param request the request as it stands after the request customizers
+     * @param request the form about to be sent, after the request customizers and the defaults
      */
     private void applySchemaCustomizers(ChatRequest request) {
         if (schemaCustomizers.isEmpty()) {

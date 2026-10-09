@@ -168,8 +168,9 @@ public interface ChatClient {
      * Sets the options every call this client sends inherits from, so a standing model, temperature
      * or response format need not be repeated on each request. The defaults fill in what the call
      * leaves unstated: a field the call leaves {@code null} takes the default's value, and the two
-     * bags merge with the call's entries winning by key. They are applied before any customizer
-     * runs, so a customizer sees the merged options and still has the last word on what goes out.
+     * bags merge with the call's entries winning by key. They are layered onto the form about to be
+     * sent, after the request customizers have run, so a customizer changes the caller's own options
+     * and a default fills only what the form still leaves unstated.
      *
      * <p>
      * Setting is configuration, meant for the time before the client is shared: to change it while

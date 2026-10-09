@@ -24,10 +24,13 @@ import io.github.synapse4j.data.ChatStreamEvent;
 public interface ChatCustomizer {
 
     /**
-     * Adjusts the request before it is validated and sent.
+     * Adjusts the request before it is validated and sent — the caller's own request, changed in
+     * place, so what this leaves there rides on when the caller carries that same request into the
+     * next call; a hook that must leave no trace for later calls undoes its own change. This runs
+     * before the client layers on its own defaults, so those are not visible here.
      *
      * @param client  the client running this hook; never {@code null}
-     * @param request the request as it reached this step; never {@code null}
+     * @param request the caller's request, as it reached this step; never {@code null}
      */
     default void customizeRequest(ChatClient client, ChatRequest request) {
     }

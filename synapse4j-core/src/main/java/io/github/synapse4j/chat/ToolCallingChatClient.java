@@ -19,124 +19,85 @@ import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.tool.DefaultToolExecutor;
+import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolExecutor;
 import lombok.NonNull;
 
 /**
- * A {@link ChatClient} that runs the tool-calling loop its inner client leaves to the caller:
- * a response carrying tool calls is executed against the request's tools, the calls and their
- * results are appended to the request, and it goes around again — until a response asks for no
- * tools, or the executor declines the batch.
+ * A {@link ChatClient} that runs the tool-calling loop its delegate leaves to the caller: a
+ * response carrying tool calls is executed against the tools the round went out with, the calls
+ * and their results are appended to the request, and it goes around again — until a response asks
+ * for no tools, or the executor declines the batch.
  *
  * <p>
- * Everything else passes through: the rounds all go to the inner client, so its defaults run
- * per turn while this class's own apply at the round's start. A customizer registered on this
- * decorator is handed to the inner client whole: every round runs it, and its streams are where
- * the events fold, so that is where the chain has to run.
- * {@link #stream} loops too: the rounds' streams are spliced into one sequence of events, and
- * the loop advances inside the pull — a round that runs out with calls outstanding executes
- * its batch there and opens the next round before the next event arrives.
+ * Every round goes to the delegate whole, and the conversation grows on the very request the
+ * caller passed: the loop calls {@link ChatClient#continueWith} on that request and appends the
+ * batch's results to it, so what the caller holds when the call returns is the conversation with
+ * the rounds in it. This class prepares nothing and carries no defaults — whichever client is
+ * wrapped owns both, and a registration made here is handed straight to it, so it applies to
+ * every round.
  *
  * <p>
- * The request fills in place, across its two lists. The loop folds each answer it consumes in
- * through {@link ChatClient#continueWith}, and that same call also moves the round the answer
- * answered — input and answer are recorded together, and which list they land in is the client's
- * to decide (the default puts both in {@code historyMessages}). The batch's results go into
- * {@code pendingMessages}, where the next round picks them up. The last answer of a round is
- * never folded in by the loop: that {@link ChatClient#continueWith} call belongs to the caller,
- * the same obligation it had before this method existed.
- * The context rides along on the request, attached when this decorator had to create one, and
- * carries the turn: 1 when the round starts, one up per trip around — which is what an executor's
- * turn cap reads.
+ * The context rides along on the request, attached when this client had to create one, and carries
+ * the turn: 1 when the round starts, one up per trip around — which is what an executor's turn cap
+ * reads. A batch resolves against the tools the round actually went out with, read off the request
+ * the delegate recorded on that context: the request's own tools with whatever defaults went with
+ * them.
  *
  * <p>
- * One consequence of that growth is worth stating: same-named tools settle the same way
- * outward — the decorator's defaults are on the request before the inner client merges its own,
- * and the request has the last word there too, so an outer default stands in the inner one's slot.
+ * {@link #stream} loops too: the rounds' streams are spliced into one sequence of events, and the
+ * loop advances inside the pull — a round that runs out with calls outstanding executes its batch
+ * there and opens the next round before the next event arrives.
  *
  * <p>
- * A decline ends the round with the response that asked for the calls, them unanswered; a
- * failure the executor throws comes straight out — of {@link #chat(ChatRequest)}, or of the
- * pull on a stream — a checked one under a {@link SynapseException}, the only form either
- * carries.
+ * A decline ends the round with the response that asked for the calls, them unanswered; a failure
+ * the executor throws comes straight out — of {@link #chat(ChatRequest)}, or of the pull on a
+ * stream — a checked one under a {@link SynapseException}, the only form either carries.
  */
-public class ToolCallingChatClient extends AbstractChatClient {
-
-    private final ChatClient inner;
+public class ToolCallingChatClient extends DelegatingChatClient {
 
     private final ToolExecutor executor;
 
     /**
-     * @param inner the client every round actually goes to; never {@code null}
+     * @param delegate the client every round actually goes to; never {@code null}
      */
-    public ToolCallingChatClient(ChatClient inner) {
-        this(inner, null);
+    public ToolCallingChatClient(ChatClient delegate) {
+        this(delegate, null);
     }
 
     /**
-     * @param inner    the client every round actually goes to; never {@code null}
+     * @param delegate the client every round actually goes to; never {@code null}
      * @param executor runs each batch of calls; {@code null} for a
      *                     {@link DefaultToolExecutor} — inline, in order, prefixed failure text,
      *                     no turn cap
      */
-    public ToolCallingChatClient(@NonNull ChatClient inner, @Nullable ToolExecutor executor) {
-        this.inner = inner;
+    public ToolCallingChatClient(@NonNull ChatClient delegate, @Nullable ToolExecutor executor) {
+        super(delegate);
         this.executor = executor != null ? executor : new DefaultToolExecutor();
     }
 
-    /** The context the loop attached before the round ran; a request reaching a round carries one. */
-    private static ChatContext contextOf(ChatRequest request) {
-        return Objects.requireNonNull(request.getContext(), "the loop attaches the context before a round runs");
+    /**
+     * The tools the round that carried the calls went out with — the request the delegate recorded
+     * on the context, defaults and all. The batch resolves against these, not the conversation's
+     * own list, so a tool the client lends is one the loop can run.
+     */
+    private static List<Tool> sentTools(ChatContext context) {
+        ChatRequest sent = Objects.requireNonNull(context.getRequest(),
+                "the client records the request it sent on the exchange's context");
+        return sent.getTools();
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * <p>
-     * Handed straight to the inner client whole: which hooks a composite overrides is not this
-     * class's to ask, the loop's streams draw their events from the inner client, and the rounds
-     * went there too — so it joins the inner client's chains and every round runs it: the request
-     * hook on each round's request as that round prepares it, the response hook on each round's
-     * answer, the stream hook on each event of each round's stream.
+     * The context this exchange runs on, attached to the request so every round finds it: the
+     * loop reaches its context through the request, and every round resolves its own anew.
      */
-    @Override
-    public void addChatCustomizer(ChatCustomizer customizer) {
-        inner.addChatCustomizer(customizer);
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * <p>
-     * The registration was handed to the inner client, and it comes off there.
-     */
-    @Override
-    public boolean removeChatCustomizer(ChatCustomizer customizer) {
-        return inner.removeChatCustomizer(customizer);
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * <p>
-     * The registrations were handed to the inner client, so the list is answered from there.
-     */
-    @Override
-    public List<ChatCustomizer> chatCustomizers() {
-        return inner.chatCustomizers();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * <p>
-     * Handed straight to the inner client: what an answer means for the conversation next is the
-     * protocol's business, and every round of the loop went there too, so answering here would
-     * leave the decorator's own continuation a step behind the rounds'.
-     */
-    @Override
-    public void continueWith(ChatRequest request, ChatResponse answer) {
-        inner.continueWith(request, answer);
+    private static ChatContext attachContext(ChatRequest request) {
+        ChatContext context = request.getContext();
+        if (context == null) {
+            context = new ChatContext();
+            request.setContext(context);
+        }
+        return context;
     }
 
     /**
@@ -149,20 +110,20 @@ public class ToolCallingChatClient extends AbstractChatClient {
      * the calls is returned unanswered.
      */
     @Override
-    protected ChatResponse doChat(ChatRequest request) {
-        ChatContext context = contextOf(request);
+    public ChatResponse chat(ChatRequest request) {
+        ChatContext context = attachContext(request);
         context.setTurn(1);
-        ChatResponse response = inner.chat(request);
+        ChatResponse response = getDelegate().chat(request);
         List<ToolCallPart> calls = toolCalls(response);
         while (!calls.isEmpty()) {
-            List<ToolResultPart> results = execute(calls, request, context);
+            List<ToolResultPart> results = execute(calls, sentTools(context), context);
             if (results == null) {
                 return response;
             }
-            inner.continueWith(request, response);
+            getDelegate().continueWith(request, response);
             request.getPendingMessages().add(toolResults(results));
             context.setTurn(context.getTurn() + 1);
-            response = inner.chat(request);
+            response = getDelegate().chat(request);
             calls = toolCalls(response);
         }
         return response;
@@ -173,9 +134,10 @@ public class ToolCallingChatClient extends AbstractChatClient {
      * they are, checked ones arrive under a {@link SynapseException} — {@code chat()} carries
      * nothing else.
      */
-    private @Nullable List<ToolResultPart> execute(List<ToolCallPart> calls, ChatRequest request, ChatContext context) {
+    private @Nullable List<ToolResultPart> execute(List<ToolCallPart> calls, List<Tool> available,
+            ChatContext context) {
         try {
-            return executor.execute(calls, request.getTools(), context);
+            return executor.execute(calls, available, context);
         } catch (RuntimeException | Error e) {
             throw e;
         } catch (Exception e) {
@@ -184,33 +146,21 @@ public class ToolCallingChatClient extends AbstractChatClient {
     }
 
     /**
-     * The same loop, answered as one stream: every round goes to the inner client and hands
-     * its events on in one sequence, the loop advancing inside the pull — a round that runs
-     * out with calls outstanding has its batch executed there, grows the request, counts the
-     * turn up, and opens the next round before the next event is handed out. The first round
-     * opens here, so a provider refusing the request still fails this call; a later round's
-     * refusal fails the pull. An executor answering {@code null} ends the stream where it
-     * stands, the calls unanswered; closing releases the round in progress and starts no
-     * further one.
+     * {@inheritDoc}
+     *
+     * <p>
+     * The same loop, answered as one stream: every round goes to the delegate and hands its events
+     * on in one sequence, the loop advancing inside the pull — a round that runs out with calls
+     * outstanding has its batch executed there, grows the request, counts the turn up, and opens
+     * the next round before the next event is handed out. The first round opens here, so a
+     * delegate refusing the request still fails this call; a later round's refusal fails the pull.
+     * An executor answering {@code null} ends the stream where it stands, the calls unanswered;
+     * closing releases the round in progress and starts no further one.
      */
     @Override
-    protected ChatStream doStream(ChatRequest request) {
-        contextOf(request).setTurn(1);
+    public ChatStream stream(ChatRequest request) {
+        attachContext(request).setTurn(1);
         return new LoopingStream(request);
-    }
-
-    /**
-     * The loop reaches its context through the request — every inner round runs through
-     * {@link ChatClient#chat(ChatRequest)} or {@link ChatClient#stream(ChatRequest)} and
-     * resolves anew — so what the base would keep call-scoped is attached here.
-     */
-    @Override
-    protected ChatContext resolveContext(ChatRequest sent) {
-        ChatContext context = super.resolveContext(sent);
-        if (sent.getContext() == null) {
-            sent.setContext(context);
-        }
-        return context;
     }
 
     /** The calls the answer carries, in the order it carries them; empty when it asks for none. */
@@ -233,9 +183,8 @@ public class ToolCallingChatClient extends AbstractChatClient {
      * The loop as a stream: the rounds' events arrive as one sequence, and the loop runs inside
      * the pull — a round that runs out with calls outstanding has its batch executed right there,
      * grows the request, counts the turn up, and opens the next round before the next event is
-     * handed out. The events themselves are the inner streams' own, passed through unchanged;
-     * this class decides only when the next round starts and which round's answer the caller
-     * is shown.
+     * handed out. The events themselves are the delegate's own, passed through unchanged; this
+     * class decides only when the next round starts and which round's answer the caller is shown.
      */
     private final class LoopingStream implements ChatStream {
 
@@ -263,9 +212,9 @@ public class ToolCallingChatClient extends AbstractChatClient {
 
         private LoopingStream(ChatRequest request) {
             this.request = request;
-            // The first round opens now, so a provider refusing the request fails where
+            // The first round opens now, so a delegate refusing the request fails where
             // stream() itself fails; a later round's refusal fails the pull instead.
-            this.current = inner.stream(request);
+            this.current = getDelegate().stream(request);
             this.events = current.iterator();
         }
 
@@ -335,7 +284,8 @@ public class ToolCallingChatClient extends AbstractChatClient {
                         exhausted = true;
                         return false;
                     }
-                    List<ToolResultPart> results = execute(calls, request, contextOf(request));
+                    ChatContext context = attachContext(request);
+                    List<ToolResultPart> results = execute(calls, sentTools(context), context);
                     if (results == null) {
                         // The executor declined: the round ends where it stands, calls unanswered.
                         exhausted = true;
@@ -346,11 +296,10 @@ public class ToolCallingChatClient extends AbstractChatClient {
                         // no further round starts.
                         throw new IllegalStateException("this stream is closed");
                     }
-                    inner.continueWith(request, round);
+                    getDelegate().continueWith(request, round);
                     request.getPendingMessages().add(toolResults(results));
-                    ChatContext context = contextOf(request);
                     context.setTurn(context.getTurn() + 1);
-                    ChatStream next = inner.stream(request);
+                    ChatStream next = getDelegate().stream(request);
                     current = next;
                     events = next.iterator();
                     if (cancelled) {

@@ -72,13 +72,18 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void untouchedRequestHandedOnUnchanged() {
+    void requestCopiedBeforeSending() {
         StubChatClient client = new StubChatClient();
         ChatRequest request = new ChatRequest();
+        request.addPendingMessage(ChatMessage.user("hi"));
 
         client.chat(request);
 
-        assertSame(request, client.seen);
+        // The caller's request is never what goes out: the form is a copy carrying the same
+        // conversation, so nothing the client layers on can reach back into it.
+        assertNotSame(request, client.seen);
+        assertEquals(request.getPendingMessages(), client.seen.getPendingMessages());
+        assertEquals(request.getTools(), client.seen.getTools());
     }
 
     @Test
@@ -325,13 +330,15 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void contextCarriesSentRequest() {
+    void contextCarriesSentForm() {
         StubChatClient client = new StubChatClient();
         ChatRequest request = new ChatRequest();
 
         ChatResponse response = client.chat(request);
 
-        assertSame(request, response.getContext().getRequest());
+        // The context records the form that went out — the copy — not the caller's request.
+        assertSame(client.seen, response.getContext().getRequest());
+        assertNotSame(request, response.getContext().getRequest());
     }
 
     @Test
@@ -346,7 +353,7 @@ class AbstractChatClientTest {
 
         ChatResponse response = client.chat(second);
 
-        assertSame(second, context.getRequest());
+        assertSame(client.seen, context.getRequest());
         assertSame(response, context.getResponse());
     }
 
@@ -577,7 +584,7 @@ class AbstractChatClientTest {
     }
 
     @Test
-    void defaultsApplyBeforeCustomizers() {
+    void customizersRunBeforeDefaults() {
         List<String> ran = new ArrayList<>();
         DefaultsChatClient client = new DefaultsChatClient();
         client.addChatCustomizer(new ChatCustomizer() {
@@ -595,8 +602,11 @@ class AbstractChatClientTest {
 
         client.chat(new ChatRequest());
 
-        assertEquals(List.of("first:inherited", "second:inherited"), ran);
+        // The customizers run first, on the caller's own options; the client's defaults fill the
+        // copy afterwards, so a customizer sees what the call left rather than what they brought.
+        assertEquals(List.of("first:null", "second:null"), ran);
         assertEquals(1, client.defaultsApplied);
+        assertEquals("inherited", client.seen.getOptions().getModel());
     }
 
     @Test
@@ -665,11 +675,13 @@ class AbstractChatClientTest {
         request.addTool(tool("c"));
 
         client.chat(request);
-        List<String> first = names(request.getTools());
+        List<String> first = names(client.seen.getTools());
         client.chat(request);
 
         assertEquals(List.of("a", "b", "c"), first);
-        assertEquals(first, names(request.getTools()));
+        assertEquals(first, names(client.seen.getTools()));
+        // The defaults go out with the form, never into the caller's own tool list.
+        assertEquals(List.of("c"), names(request.getTools()));
     }
 
     @Test
@@ -716,12 +728,14 @@ class AbstractChatClientTest {
         client.chat(request);
 
         assertEquals(List.of("asked"), asked);
-        assertSame(request, handed.get(0));
+        // The provider sees the form being prepared — this client copied the request to merge the
+        // provider's tools into it — never the caller's own request.
+        assertSame(client.seen, handed.get(0));
         assertEquals(List.of("p"), names(client.seen.getTools()));
     }
 
     @Test
-    void customizersSeeProviderAnswers() {
+    void customizersRunBeforeProviders() {
         StubChatClient client = new StubChatClient();
         client.addToolProvider((it, request) -> List.of(tool("p")));
         List<String> seen = new ArrayList<>();
@@ -734,7 +748,9 @@ class AbstractChatClientTest {
 
         client.chat(new ChatRequest());
 
-        assertEquals(List.of("p"), seen);
+        // A customizer sees the caller's own tools: the provider's answer is merged afterwards.
+        assertTrue(seen.isEmpty());
+        assertEquals(List.of("p"), names(client.seen.getTools()));
     }
 
     @Test
