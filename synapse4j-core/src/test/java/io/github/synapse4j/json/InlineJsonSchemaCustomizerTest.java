@@ -68,6 +68,29 @@ class InlineJsonSchemaCustomizerTest {
     }
 
     @Test
+    void booleanDefinitionKeepsNodeKeywords() {
+        JsonSchema schema = new JsonSchemaBuilder()
+                .setType("object")
+                .setProperties(Map.of(
+                        "named", new JsonSchemaBuilder().setRef("#/$defs/Any").setType("string").build(),
+                        "none", new JsonSchemaBuilder().setRef("#/$defs/None").setType("string").build()))
+                .setDefs(Map.of("Any", BooleanJsonSchema.TRUE, "None", BooleanJsonSchema.FALSE))
+                .build();
+
+        JsonSchema inlined = customizer.customize(schema);
+
+        // A true definition adds nothing, so the node keeps what it says itself — dropping the
+        // reference must not widen it into the anything that definition allowed; a false one makes the
+        // node unsatisfiable, so nothing beside it can lift that.
+        JsonSchema expected = new JsonSchemaBuilder()
+                .setType("object")
+                .setProperties(Map.of("named", typed("string"), "none", BooleanJsonSchema.FALSE))
+                .build();
+        assertEquals(expected, inlined);
+        assertNull(inlined.getDefs());
+    }
+
+    @Test
     void cycleClosingReferenceKept() {
         JsonSchema node = new JsonSchemaBuilder()
                 .setType("object")

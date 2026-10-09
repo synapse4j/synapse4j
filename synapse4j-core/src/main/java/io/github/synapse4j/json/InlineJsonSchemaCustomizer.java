@@ -18,9 +18,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * A {@link JsonSchemaCustomizer} that resolves a schema's references: a {@code $ref} into {@code $defs}
  * is replaced by a copy of the definition it names, so the answer reads without {@code $defs}. This is
- * the step for a target whose protocol does not take {@code $ref}. A definition in the boolean form is
- * answered as that boolean itself: it carries no keyword, so a node that references one is answered as
- * that boolean, whatever else the node says.
+ * the step for a target whose protocol does not take {@code $ref}. A definition in the boolean form
+ * contributes only what it says: {@code false} makes the node unsatisfiable and is answered as itself,
+ * while {@code true} adds nothing, so the node keeps whatever else it says — and is answered as that
+ * boolean when it says nothing else.
  *
  * <p>
  * The reference it resolves is {@code #/$defs/Name}, the name looked up in the root's {@code $defs}.
@@ -72,10 +73,19 @@ public class InlineJsonSchemaCustomizer implements JsonSchemaCustomizer {
                 JsonSchema target = resolve(ref, root);
                 if (target != null && !path.contains(target)) {
                     JsonSchema definition = inlineSchema(target, root, path);
-                    if (definition.asBoolean() != null) {
-                        // A boolean definition carries no keyword of its own, so there is none of its to
-                        // put this node's beside: the node is answered as that boolean.
-                        return definition;
+                    Boolean constant = definition.asBoolean();
+                    if (constant != null) {
+                        if (!constant) {
+                            // A false definition makes the node unsatisfiable; no keyword beside it
+                            // can lift that.
+                            return definition;
+                        }
+                        JsonSchemaBuilder rest = new JsonSchemaBuilder();
+                        inlineKeywords(rest, node, root, path, false);
+                        JsonSchema remaining = rest.build();
+                        // A true definition says nothing of its own, so the node is what it says once
+                        // the reference is gone — which, with nothing else on it, is that boolean.
+                        return remaining.keys().isEmpty() ? definition : remaining;
                     }
                     JsonSchemaBuilder inlined = JsonSchemaBuilder.from(definition);
                     inlineKeywords(inlined, node, root, path, false);
