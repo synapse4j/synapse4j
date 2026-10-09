@@ -73,7 +73,14 @@ library gets a module of its own.
 
 A schema is generated from a Java type, and the shape it takes is the generator's. What this library
 aims at, and steers it toward, is one direction: whatever the schema allows, the codec accepts. It may
-allow less — the schema you send to a model deliberately does — and it must never allow more.
+allow less — the schema you send to a model deliberately does — and it aims not to allow more.
+
+That is an aim rather than a guarantee, and one gap is worth naming: an object whose type declares no
+properties at all is left open rather than closed, so a producer reading that schema may send members
+the binder then refuses. It stays open because a node with no `properties` is also how a type the
+generator cannot enumerate — an interface, a type your own code settles — is written, and closing one
+of those would say a type that takes properties admits none. Where a schema has to be exact, compose it
+with the generator itself: [Customizing](customizing.md#the-generated-schema) shows how.
 
 That aim runs in a direction. The schema you hand to whoever produces JSON — the arguments of a
 tool the model calls, the shape of a structured answer — is the decode schema: what the codec is
