@@ -105,6 +105,10 @@ public final class JacksonSchemaConfigBuilders {
             return configBuilder;
         }
         Set<JacksonOption> jacksonOptions = settings.getJacksonOptions();
+        // The module carries more than its options — it is what reads @JsonUnwrapped, @JsonIgnore and the
+        // rest — so whether it is applied follows what the settings hold, not what survives the filter
+        // below. The encode side turns one option off, not the module.
+        boolean jacksonModule = !jacksonOptions.isEmpty();
         if (encoding) {
             // RESPECT_JSONPROPERTY_REQUIRED is a marker the reader consults: @JsonProperty(required =
             // true) says what binding insists on, not what writing produces. The encode side leaves it
@@ -113,7 +117,7 @@ public final class JacksonSchemaConfigBuilders {
                     .filter(option -> option != JacksonOption.RESPECT_JSONPROPERTY_REQUIRED)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
         }
-        if (!jacksonOptions.isEmpty()) {
+        if (jacksonModule) {
             configBuilder.with(new JacksonSchemaModule(jacksonOptions.toArray(JacksonOption[]::new)));
         }
         if (settings.isDiscoverProperties()) {
