@@ -227,10 +227,11 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
-    void truncatedBomPushedBack() throws IOException {
-        // EF BB without the third byte is not a BOM. Pushed back, the two bytes decode to
-        // replacement characters that corrupt the first field name — which is exactly how the
-        // test observes they were not dropped: a dropped pair would leave "data: real" intact.
+    void truncatedBomKeptAsText() throws IOException {
+        // EF BB without the third byte is not a BOM, so the bytes stay where they are and become the
+        // first line's text: they decode to replacement characters that corrupt the field name —
+        // exactly how the test observes they were not dropped, since a dropped pair would leave
+        // "data: real" intact.
         byte[] head = new byte[] { (byte) 0xEF, (byte) 0xBB };
         byte[] text = "data: real\n\n".getBytes(UTF_8);
         byte[] framed = new byte[head.length + text.length];

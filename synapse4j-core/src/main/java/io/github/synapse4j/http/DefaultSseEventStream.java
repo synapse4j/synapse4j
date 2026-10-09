@@ -3,7 +3,6 @@ package io.github.synapse4j.http;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PushbackInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -32,7 +31,10 @@ import io.github.synapse4j.exception.SynapseIOException;
  */
 public class DefaultSseEventStream implements SseEventStream {
 
-    private final PushbackInputStream source;
+    /** The bytes a UTF-8 byte-order mark occupies; the first fill stops there to look for one. */
+    private static final int BOM_LENGTH = 3;
+
+    private final InputStream source;
 
     /** How many bytes one frame may accumulate before the read fails. */
     private final int maxFrameBytes;
@@ -40,8 +42,8 @@ public class DefaultSseEventStream implements SseEventStream {
     /** Bytes accumulated for the frame in progress; every blank line starts the next one back at zero. */
     private int frameBytes;
 
-    /** Whether the stream's first bytes have been peeked at for a BOM. */
-    private boolean bomChecked;
+    /** Whether the body has been read from at all; the first fill is the one that looks for a BOM. */
+    private boolean started;
 
     /**
      * Bytes read ahead from the body, so a line is assembled from a fill rather than a read per
@@ -84,7 +86,7 @@ public class DefaultSseEventStream implements SseEventStream {
         if (maxFrameBytes <= 0) {
             throw new IllegalArgumentException("maxFrameBytes must be positive: " + maxFrameBytes);
         }
-        this.source = new PushbackInputStream(body, 3);
+        this.source = body;
         this.maxFrameBytes = maxFrameBytes;
     }
 
@@ -183,7 +185,6 @@ public class DefaultSseEventStream implements SseEventStream {
      * @return the line without its terminator, or {@code null} at the end of the body
      */
     private @Nullable String readLine() {
-        skipLeadingBom();
         line.reset();
         int next = nextByte();
         if (skipLf) {
@@ -216,51 +217,60 @@ public class DefaultSseEventStream implements SseEventStream {
         }
     }
 
-    /**
-     * The body's next byte, {@code -1} at its end. An {@link IOException} from the transport
-     * travels as the library's own rather than being left raw.
-     */
+    /** The body's next byte, {@code -1} at its end. */
     private int nextByte() {
-        if (position >= limit) {
-            try {
-                limit = source.read(buffer);
-            } catch (IOException failure) {
-                throw new SynapseIOException("Reading the event stream failed", failure);
-            }
-            position = 0;
-            if (limit < 0) {
-                return -1;
-            }
+        if (position >= limit && !fill()) {
+            return -1;
         }
         return buffer[position++] & 0xFF;
     }
 
     /**
-     * The format's grammar begins with an optional BOM, and decoding is supposed to drop it;
-     * charset decoding alone would keep it as a stray character glued to the first line's field
-     * name. The first three bytes are peeked at before the first line is read, and only a complete
-     * {@code EF BB BF} is consumed — anything else, including a truncated sequence at the start
-     * of a very short body, is pushed back unread. Deferred to the first pull so that constructing
-     * a reader never touches the body.
+     * Refills the buffer, answering whether it holds a byte: the first fill is the one that looks for a
+     * BOM, and every later one takes whatever the body has.
+     *
+     * @return whether the buffer holds a byte
      */
-    private void skipLeadingBom() {
-        if (bomChecked) {
-            return;
-        }
-        bomChecked = true;
-        byte[] head = new byte[3];
-        try {
-            int read = 0;
-            while (read < 3) {
-                int count = source.read(head, read, 3 - read);
-                if (count < 0) {
-                    break;
-                }
-                read += count;
+    private boolean fill() {
+        position = 0;
+        limit = started ? read(buffer, 0, buffer.length) : firstFill();
+        started = true;
+        return position < limit;
+    }
+
+    /**
+     * Fills the front of the buffer with whatever the body starts with, stopping at the three bytes a
+     * BOM would occupy: the format's grammar begins with an optional mark and decoding is supposed to
+     * drop it, where charset decoding alone would keep it glued to the first line's field name. Only a
+     * complete {@code EF BB BF} is read past — it is not text, so what follows becomes the first line's
+     * start — and anything else, a truncated sequence at the start of a very short body included, stays
+     * as the line it begins.
+     *
+     * @return how many bytes the buffer holds; {@code -1} when the body is empty
+     */
+    private int firstFill() {
+        int read = 0;
+        while (read < BOM_LENGTH) {
+            int count = read(buffer, read, BOM_LENGTH - read);
+            if (count < 0) {
+                break;
             }
-            boolean bom = read == 3 && (head[0] & 0xFF) == 0xEF && (head[1] & 0xFF) == 0xBB
-                    && (head[2] & 0xFF) == 0xBF;
-            source.unread(head, 0, bom ? 0 : read);
+            read += count;
+        }
+        if (read == BOM_LENGTH && (buffer[0] & 0xFF) == 0xEF && (buffer[1] & 0xFF) == 0xBB
+                && (buffer[2] & 0xFF) == 0xBF) {
+            return read(buffer, 0, buffer.length);
+        }
+        return read == 0 ? -1 : read;
+    }
+
+    /**
+     * The body's next bytes into the given place, an {@link IOException} from the transport travelling
+     * as the library's own rather than being left raw.
+     */
+    private int read(byte[] sink, int offset, int length) {
+        try {
+            return source.read(sink, offset, length);
         } catch (IOException failure) {
             throw new SynapseIOException("Reading the event stream failed", failure);
         }
