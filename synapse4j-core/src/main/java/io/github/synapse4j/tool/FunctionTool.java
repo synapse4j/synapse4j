@@ -1,5 +1,6 @@
 package io.github.synapse4j.tool;
 
+import java.lang.reflect.Type;
 import java.util.List;
 
 import org.jspecify.annotations.Nullable;
@@ -20,9 +21,11 @@ import lombok.NonNull;
  *
  * <p>
  * The type comes from a token handed in at construction: a lambda carries no signature to
- * introspect, so {@code inputType} is where the knowledge lives. It has to describe an object,
- * because the protocol's arguments are an object — a scalar input type is refused at the
- * factory, with a pointer to wrap the parameters in a record.
+ * introspect, so {@code inputType} is where the knowledge lives. It is a {@link Type} rather than
+ * a {@link Class}, so a generic input arrives with its arguments — {@code Page<Order>} describes
+ * orders, not anything. It has to describe an object, because the protocol's arguments are an
+ * object — a scalar input type is refused at the factory, with a pointer to wrap the parameters
+ * in a record.
  */
 public class FunctionTool<I, O> implements StagedTool {
 
@@ -55,7 +58,7 @@ public class FunctionTool<I, O> implements StagedTool {
     private final ToolDefinition definition;
 
     /** What the model's arguments decode into. */
-    private final Class<I> inputType;
+    private final Type inputType;
 
     /** The middle stage. */
     private final Executor<I, O> executor;
@@ -71,7 +74,7 @@ public class FunctionTool<I, O> implements StagedTool {
      * @param executor   the middle stage; never {@code null}
      * @param codec      the codec for both directions; never {@code null}
      */
-    protected FunctionTool(@NonNull ToolDefinition definition, @NonNull Class<I> inputType,
+    protected FunctionTool(@NonNull ToolDefinition definition, @NonNull Type inputType,
             @NonNull Executor<I, O> executor, @NonNull JsonCodec codec) {
         this.definition = definition;
         this.inputType = inputType;
@@ -84,8 +87,7 @@ public class FunctionTool<I, O> implements StagedTool {
      *
      * @param name        the name the model calls the tool by; never {@code null}
      * @param description what the tool does; never {@code null}
-     * @param inputType   what the arguments decode into; never {@code null}, and it has to
-     *                        describe an object
+     * @param inputType   what the arguments decode into; never {@code null}
      * @param executor    the middle stage; never {@code null}
      * @param codec       the codec for both directions; never {@code null}
      * @param <I>         the type the arguments decode into
@@ -96,6 +98,32 @@ public class FunctionTool<I, O> implements StagedTool {
      */
     public static <I, O> FunctionTool<I, O> of(@NonNull String name, @NonNull String description,
             @NonNull Class<I> inputType, @NonNull Executor<I, O> executor, @NonNull JsonCodec codec) {
+        return of(name, description, (Type) inputType, executor, codec);
+    }
+
+    /**
+     * A tool whose declaration comes from the input type, the type arguments included: {@code
+     * Page<Order>} describes orders rather than anything. The declaration is one object schema,
+     * the type's.
+     *
+     * <p>
+     * The token is what the declaration and the decoding are built from; the lambda's own type
+     * parameter is erased and is the application's to keep honest.
+     *
+     * @param name        the name the model calls the tool by; never {@code null}
+     * @param description what the tool does; never {@code null}
+     * @param inputType   what the arguments decode into, type arguments included; never
+     *                        {@code null}, and it has to describe an object
+     * @param executor    the middle stage; never {@code null}
+     * @param codec       the codec for both directions; never {@code null}
+     * @param <I>         the type the arguments decode into
+     * @param <O>         the type the executor returns
+     * @return the assembled tool
+     * @throws IllegalArgumentException if the input type does not describe an object — wrap
+     *                                      the parameters in a record or a class
+     */
+    public static <I, O> FunctionTool<I, O> of(@NonNull String name, @NonNull String description,
+            @NonNull Type inputType, @NonNull Executor<I, O> executor, @NonNull JsonCodec codec) {
         JsonSchema schema = codec.generateDecodeSchema(inputType);
         List<String> types = schema.getType();
         if (types == null || !types.contains("object")) {
@@ -119,6 +147,25 @@ public class FunctionTool<I, O> implements StagedTool {
      * @return the assembled tool
      */
     public static <I, O> FunctionTool<I, O> of(@NonNull ToolDefinition definition, @NonNull Class<I> inputType,
+            @NonNull Executor<I, O> executor, @NonNull JsonCodec codec) {
+        return of(definition, (Type) inputType, executor, codec);
+    }
+
+    /**
+     * A tool under a declaration the application assembled itself, the input type's arguments
+     * included — the input type is not asked; keep the declaration consistent with what
+     * {@code inputType} decodes.
+     *
+     * @param definition the declaration to carry; never {@code null}
+     * @param inputType  what the arguments decode into, type arguments included; never
+     *                       {@code null}
+     * @param executor   the middle stage; never {@code null}
+     * @param codec      the codec for both directions; never {@code null}
+     * @param <I>        the type the arguments decode into
+     * @param <O>        the type the executor returns
+     * @return the assembled tool
+     */
+    public static <I, O> FunctionTool<I, O> of(@NonNull ToolDefinition definition, @NonNull Type inputType,
             @NonNull Executor<I, O> executor, @NonNull JsonCodec codec) {
         return new FunctionTool<>(definition, inputType, executor, codec);
     }
@@ -164,12 +211,15 @@ public class FunctionTool<I, O> implements StagedTool {
      * @throws Exception        if the lambda fails — carried openly
      */
     @Override
+    @SuppressWarnings("unchecked")
     public @Nullable Object call(@Nullable Object[] values, @Nullable ChatContext context) throws Exception {
         Object input = values[0];
         if (input == null) {
             throw new SynapseException("tool '" + definition.getName() + "' was called with a null document");
         }
-        return executor.execute(inputType.cast(input), context);
+        // The codec decoded into the input type already; erasing that back to the lambda's own
+        // type parameter checks nothing, which is the point — only the codec knows the type.
+        return executor.execute((I) input, context);
     }
 
     /**

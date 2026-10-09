@@ -10,6 +10,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Type;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +56,22 @@ class FunctionToolTest {
                 () -> FunctionTool.of("len", "Counts", String.class, (input, context) -> "x", codec));
 
         assertTrue(failure.getMessage().contains("record"));
+    }
+
+    @Test
+    void genericInputKeepsArguments() {
+        Type pageOfInputs = new TypeToken<List<Input>>() {
+        }.getClass().getGenericSuperclass();
+
+        FunctionTool<Object, String> tool = FunctionTool.of("page", "Reads a page", pageOfInputs,
+                (input, context) -> "ok", codec);
+
+        verify(codec).generateDecodeSchema(pageOfInputs);
+        assertEquals("page", tool.definition().getName());
+    }
+
+    /** The type a subclass stands for — the JDK-only way to hand a generic type to a token. */
+    private abstract static class TypeToken<T> {
     }
 
     @Test
