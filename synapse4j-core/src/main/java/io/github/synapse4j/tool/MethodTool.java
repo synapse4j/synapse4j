@@ -123,7 +123,7 @@ public class MethodTool implements StagedTool {
     /**
      * One value per declared parameter: the model's for the parameters it produces, the parameter's
      * own {@link ToolParameterValueProvider}'s for the rest. Keys the method does not declare are
-     * ignored; a missing key for a primitive is an error rather than a null.
+     * ignored; a value the codec refuses fails the call, naming the parameter.
      *
      * @param arguments the arguments the model produced, as JSON text; {@code null} or blank
      *                      means the model produced none
@@ -209,14 +209,18 @@ public class MethodTool implements StagedTool {
         return decoded == null ? Map.of() : decoded;
     }
 
+    /**
+     * A value the codec refuses is answered with the parameter named: the codec's own message says what
+     * the value was not, and nothing of what it was meant for.
+     */
     private @Nullable Object bind(ToolParameterSpec entry, @Nullable Object raw) {
         Parameter parameter = entry.getParameter();
-        if (raw == null && parameter.getType().isPrimitive()) {
-            throw new IllegalArgumentException("parameter '" + entry.getName() + "' of "
-                    + method.getDeclaringClass().getSimpleName() + "." + method.getName()
-                    + " is required, but the model produced no value for it");
+        try {
+            return codec.convert(raw, parameter.getParameterizedType());
+        } catch (RuntimeException failure) {
+            throw new SynapseException("cannot read the value for parameter '" + entry.getName() + "' of "
+                    + method.getDeclaringClass().getSimpleName() + "." + method.getName(), failure);
         }
-        return codec.convert(raw, parameter.getParameterizedType());
     }
 
 }

@@ -119,11 +119,12 @@ class MethodToolTest {
     }
 
     @Test
-    void missingPrimitiveNamesParameter() {
+    void refusedValueNamesParameter() {
         when(codec.decode(any(), any())).thenReturn(Map.of());
+        when(codec.convert(null, int.class)).thenThrow(new IllegalArgumentException("no value"));
         MethodTool tool = reader.of("save", "Saves an id", method("save", int.class), null);
 
-        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+        SynapseException failure = assertThrows(SynapseException.class,
                 () -> tool.resolveArguments("{}", null));
         assertTrue(failure.getMessage().contains("'id'"));
         assertTrue(failure.getMessage().contains("save"));
