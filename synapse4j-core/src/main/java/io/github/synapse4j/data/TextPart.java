@@ -1,10 +1,12 @@
 package io.github.synapse4j.data;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.jspecify.annotations.Nullable;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.ToString;
 
 /**
  * Text sent to the model, or produced by it.
@@ -15,7 +17,6 @@ import lombok.ToString;
  * to be replayed verbatim to the provider that produced it.
  */
 @Getter
-@ToString(callSuper = true)
 @AllArgsConstructor
 public class TextPart extends ContentPart {
 
@@ -32,6 +33,15 @@ public class TextPart extends ContentPart {
     public TextPart(@Nullable String text, @Nullable ProviderExtras extras) {
         super(extras);
         this.text = text;
+    }
+
+    @Override
+    public String toString() {
+        Map<String, String> members = new LinkedHashMap<>();
+        if (text != null) {
+            members.put("text", text);
+        }
+        return toString(members);
     }
 
 }

@@ -11,6 +11,7 @@ import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.RawPart;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -209,7 +210,7 @@ class MessagesReader {
                 // part, it sits where it sat in the content array, so it travels with the turn
                 // when the conversation continues and goes back out exactly as it arrived.
                 ContentPart part = partOf(block);
-                message.part(part != null ? part : new RawContentBlock(block));
+                message.part(part != null ? part : RawPart.of(block));
             }
         }
     }
@@ -311,7 +312,7 @@ class MessagesReader {
             // A block type with no part of its own is born the same way the blocking walk keeps
             // it: whole, as itself, in the place it holds in the turn — so both ways of asking
             // read the same document, and the input the deltas spell joins it when it closes.
-            event.setDelta(delta(new RawContentBlock(block)));
+            event.setDelta(delta(RawPart.of(block)));
         }
         carryRest(event, payload, "content_block");
     }

@@ -1,6 +1,8 @@
 package io.github.synapse4j.data;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
 
@@ -83,16 +85,18 @@ public class ToolResultPart extends ContentPart {
         this.error = error;
     }
 
-    /**
-     * The parts are counted rather than printed: they carry the tool's answer, and a printout that
-     * carried it would be as long as the result.
-     *
-     * @return this result, in brief
-     */
     @Override
     public String toString() {
-        return "ToolResultPart(super=" + super.toString() + ", callId=" + callId + ", name=" + name + ", parts="
-                + parts.size() + ", error=" + error + ')';
+        Map<String, String> members = new LinkedHashMap<>();
+        if (callId != null) {
+            members.put("callId", callId);
+        }
+        if (name != null) {
+            members.put("name", name);
+        }
+        members.put("parts", parts.toString());
+        members.put("error", String.valueOf(error));
+        return toString(members);
     }
 
 }

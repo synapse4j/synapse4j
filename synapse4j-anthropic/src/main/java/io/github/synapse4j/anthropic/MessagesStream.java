@@ -21,6 +21,7 @@ import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.RawPart;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -255,7 +256,7 @@ class MessagesStream extends DefaultChatStream {
         /** Joins one fragment to the block its index names, or places it if that block is unknown. */
         private void mergeFragment(ContentPart fragment, @Nullable Integer index) {
             ContentPart target = index == null ? null : openBlocks.get(index);
-            if (target instanceof RawContentBlock) {
+            if (target instanceof RawPart) {
                 // The block keeps itself whole; only its input still streams, as fragments of JSON
                 // text that are parsed into the block when it closes — where a blocking walk
                 // captured the input whole with the block itself.
@@ -295,7 +296,7 @@ class MessagesStream extends DefaultChatStream {
             }
             ContentPart target = openBlocks.remove(index);
             StringBuilder input = unmodeledInput.remove(index);
-            if (input != null && target instanceof RawContentBlock block) {
+            if (input != null && target instanceof RawPart block) {
                 return writeInput(block, input);
             }
             return false;
@@ -310,7 +311,7 @@ class MessagesStream extends DefaultChatStream {
             boolean written = false;
             for (Map.Entry<Integer, StringBuilder> entry : unmodeledInput.entrySet()) {
                 ContentPart target = openBlocks.get(entry.getKey());
-                if (target instanceof RawContentBlock block && writeInput(block, entry.getValue())) {
+                if (target instanceof RawPart block && writeInput(block, entry.getValue())) {
                     written = true;
                 }
             }
@@ -343,7 +344,7 @@ class MessagesStream extends DefaultChatStream {
          *
          * @return whether the block was rebuilt to carry the input
          */
-        private boolean writeInput(RawContentBlock block, StringBuilder input) {
+        private boolean writeInput(RawPart block, StringBuilder input) {
             if (input.isEmpty()) {
                 return false;
             }
@@ -359,9 +360,9 @@ class MessagesStream extends DefaultChatStream {
             if (parsed == null) {
                 return false;
             }
-            Map<String, Object> members = new LinkedHashMap<>(block.getMembers());
+            Map<String, Object> members = new LinkedHashMap<>(block.members());
             members.put("input", parsed);
-            return replace(block, new RawContentBlock(members, block.getExtras()));
+            return replace(block, new RawPart(members));
         }
 
         /** The bracket a frame carries for the block it speaks for, or {@code null} when it names none. */

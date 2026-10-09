@@ -1,10 +1,12 @@
 package io.github.synapse4j.data;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.jspecify.annotations.Nullable;
 
 import io.github.synapse4j.util.InputStreamSupplier;
 import lombok.Getter;
-import lombok.ToString;
 
 /**
  * A media payload: an image, an audio clip, a video or a document.
@@ -29,7 +31,6 @@ import lombok.ToString;
  * whether it wants a {@link #mediaType} spelled out, are the protocol's to decide.
  */
 @Getter
-@ToString(callSuper = true)
 public class MediaPart extends ContentPart {
 
     /** MIME type of the payload, for example {@code image/png}. */
@@ -81,6 +82,26 @@ public class MediaPart extends ContentPart {
         this.uri = uri;
         this.source = source;
         this.name = name;
+    }
+
+    @Override
+    public String toString() {
+        Map<String, String> members = new LinkedHashMap<>();
+        if (mediaType != null) {
+            members.put("mediaType", mediaType);
+        }
+        if (uri != null) {
+            members.put("uri", uri);
+        }
+        if (source != null) {
+            // Where the bytes come from is a supplier, and printing one would say nothing about the
+            // payload; that it is supplied at all is what the printout is for.
+            members.put("source", "<stream>");
+        }
+        if (name != null) {
+            members.put("name", name);
+        }
+        return toString(members);
     }
 
 }

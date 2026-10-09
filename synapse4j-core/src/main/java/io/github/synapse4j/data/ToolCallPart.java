@@ -1,10 +1,12 @@
 package io.github.synapse4j.data;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.jspecify.annotations.Nullable;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.ToString;
 
 /**
  * The model asking for a tool to be run.
@@ -14,7 +16,6 @@ import lombok.ToString;
  * so turning them into the application's own type is the job of the codec the application chose.
  */
 @Getter
-@ToString(callSuper = true)
 @AllArgsConstructor
 public class ToolCallPart extends ContentPart {
 
@@ -42,6 +43,21 @@ public class ToolCallPart extends ContentPart {
         this.callId = callId;
         this.name = name;
         this.argumentsJson = argumentsJson;
+    }
+
+    @Override
+    public String toString() {
+        Map<String, String> members = new LinkedHashMap<>();
+        if (callId != null) {
+            members.put("callId", callId);
+        }
+        if (name != null) {
+            members.put("name", name);
+        }
+        if (argumentsJson != null) {
+            members.put("argumentsJson", argumentsJson);
+        }
+        return toString(members);
     }
 
 }

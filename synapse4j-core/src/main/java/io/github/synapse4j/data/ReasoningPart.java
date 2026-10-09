@@ -1,10 +1,12 @@
 package io.github.synapse4j.data;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.jspecify.annotations.Nullable;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.ToString;
 
 /**
  * The model's reasoning about its answer, kept apart from the answer itself.
@@ -20,7 +22,6 @@ import lombok.ToString;
  * They therefore go in {@code getExtras()}, keyed by provider, rather than into a typed field here.
  */
 @Getter
-@ToString(callSuper = true)
 @AllArgsConstructor
 public class ReasoningPart extends ContentPart {
 
@@ -37,6 +38,15 @@ public class ReasoningPart extends ContentPart {
     public ReasoningPart(@Nullable String text, @Nullable ProviderExtras extras) {
         super(extras);
         this.text = text;
+    }
+
+    @Override
+    public String toString() {
+        Map<String, String> members = new LinkedHashMap<>();
+        if (text != null) {
+            members.put("text", text);
+        }
+        return toString(members);
     }
 
 }

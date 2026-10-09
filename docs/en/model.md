@@ -50,7 +50,9 @@ The content of a message is a list of parts, each one of:
   with a URI or a stream of bytes and an optional file name.
 
 `ContentPart` is not final: a provider or an application adds a kind the library does not model by
-subclassing it.
+subclassing it. A kind a provider sends and this library has no class for — a server tool's call, a
+search result — arrives as a `RawPart`: the element exactly as it was read, holding the place it
+held in the turn, so the conversation continues and goes back out with it there.
 
 Most messages are a single text part, which the factories above cover. A message that says more, or
 carries a kind of part other than text, is assembled once — `ChatMessage.of` for a handful of parts,

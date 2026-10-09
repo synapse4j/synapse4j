@@ -16,6 +16,7 @@ import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.RawPart;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -206,7 +207,7 @@ class ResponsesWriter {
     private void addMessage(List<Map<String, Object>> input, ChatMessage message) {
         List<ContentPart> content = new ArrayList<>();
         for (ContentPart part : message.getParts()) {
-            if (part instanceof TextPart || part instanceof MediaPart) {
+            if (part instanceof TextPart || part instanceof MediaPart || part instanceof RawPart) {
                 content.add(part);
             }
         }
@@ -231,10 +232,10 @@ class ResponsesWriter {
                 input.add(functionCallOutput(result, messageExtras));
             } else if (part instanceof ReasoningPart reasoning) {
                 input.add(reasoningItem(reasoning, messageExtras));
-            } else if (part instanceof TextPart || part instanceof MediaPart) {
-                // Text and images make no item of their own: they are the message's own item, which
-                // stands where the first of them sits — so a part the model wrote before it answered,
-                // its reasoning, keeps the place the turn gives it.
+            } else if (part instanceof TextPart || part instanceof MediaPart || part instanceof RawPart) {
+                // Text, images and a part this module does not model make no item of their own: they
+                // are the message's own item, which stands where the first of them sits — so a part
+                // the model wrote before it answered, its reasoning, keeps the place the turn gives it.
                 if (!messageAdded) {
                     input.add(messageItem(message, content));
                     messageAdded = true;
@@ -266,6 +267,10 @@ class ResponsesWriter {
                     if (text != null) {
                         entries.add(text);
                     }
+                } else if (part instanceof RawPart raw) {
+                    // The part goes back out as it arrived: its members were read whole off the
+                    // wire, so the protocol spells them again untouched, where this part sits.
+                    entries.add(raw.members());
                 } else {
                     entries.add(mediaEntry((MediaPart) part));
                 }
@@ -314,6 +319,7 @@ class ResponsesWriter {
      */
     private static boolean arrayContent(List<ContentPart> content) {
         return content.stream().anyMatch(part -> part instanceof MediaPart
+                || part instanceof RawPart
                 || (part instanceof TextPart && part.getExtras() != null && !part.getExtras().isEmpty()));
     }
 

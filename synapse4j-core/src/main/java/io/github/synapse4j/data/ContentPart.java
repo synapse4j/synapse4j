@@ -1,9 +1,13 @@
 package io.github.synapse4j.data;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import org.jspecify.annotations.Nullable;
 
 import lombok.Getter;
-import lombok.ToString;
+import lombok.NonNull;
 
 /**
  * One element of a message's content: a piece of text, the model's reasoning, a tool call, a tool
@@ -29,11 +33,11 @@ import lombok.ToString;
  * needs back. A part is read through its extras as much as through its fields.
  *
  * <p>
- * Subclasses must pass {@code callSuper = true} to {@code @ToString}, so a part's printout carries
- * the inherited {@code extras} along with its own fields.
+ * A part prints as its kind and the fields its subclass states, then, when it carries any, its
+ * extras: a subclass with fields of its own answers {@link #toString()} by handing them to
+ * {@link #toString(Map)}, stating the ones it has and leaving out the ones it does not.
  */
 @Getter
-@ToString
 public abstract class ContentPart {
 
     /**
@@ -48,11 +52,33 @@ public abstract class ContentPart {
     }
 
     /**
-     * @param extras provider-specific fields to merge into this part when the request is sent,
-     *                   {@code null} or empty for none; frozen on the way in
+     * @param extras provider-specific fields, {@code null} or empty for none; frozen on the way in
      */
     protected ContentPart(@Nullable ProviderExtras extras) {
         this.extras = extras == null || extras.isEmpty() ? null : extras.freeze();
+    }
+
+    /**
+     * The printout a subclass answers {@link #toString()} with: this part's kind, the fields the
+     * subclass states, and last, when the part carries any, its extras. The kind is the subclass's
+     * own name, so nothing has to repeat itself, and a field the subclass leaves out stays out.
+     *
+     * @param members the subclass's own fields, named as they are, in the order to print them; never
+     *                    {@code null}
+     * @return the printout; never {@code null}
+     */
+    protected String toString(@NonNull Map<String, String> members) {
+        List<String> stated = new ArrayList<>();
+        members.forEach((name, value) -> stated.add(name + "=" + value));
+        if (extras != null) {
+            stated.add("extras=" + extras);
+        }
+        return getClass().getSimpleName() + "(" + String.join(", ", stated) + ")";
+    }
+
+    @Override
+    public String toString() {
+        return toString(Map.of());
     }
 
 }

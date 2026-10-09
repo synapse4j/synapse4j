@@ -36,6 +36,7 @@ import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.RawPart;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -347,7 +348,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void unsupportedResponsePartFailsLoudly() {
+    void unmodeledResponsePartKeptWhole() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
                 + "\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"visible\"},"
@@ -355,8 +356,36 @@ class OpenAiCompletionsChatClientTest {
 
         ChatRequest request = requestWithModel();
 
-        SynapseException thrown = assertThrows(SynapseException.class, () -> client.chat(request));
-        assertTrue(thrown.getMessage().contains("audio"), thrown.getMessage());
+        ChatResponse response = client.chat(request);
+
+        // The shared model has no part for the element, so it rides as itself: it keeps its place in
+        // the turn — after the text, where it sat in the content array — and goes back out whole.
+        assertEquals(2, response.getMessage().getParts().size());
+        RawPart kept = assertInstanceOf(RawPart.class, response.getMessage().getParts().get(1));
+        assertEquals("audio", kept.members().get("type"));
+        assertEquals("a_1", kept.members().get("id"));
+    }
+
+    @Test
+    void unmodeledResponsePartReplayedWhole() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
+                + "\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"visible\"},"
+                + "{\"type\":\"audio\",\"id\":\"a_1\"}]}}]}").getBytes(UTF_8)));
+        ChatResponse response = client.chat(requestWithModel());
+
+        // The turn continues the way a conversation continues: the answer's message joins the
+        // history and the next request sends it back — the element read whole must arrive on the
+        // wire whole, in the place it held, or the provider is told a turn that never happened.
+        stubCompletion();
+        ChatRequest next = requestWithModel();
+        client.continueWith(next, response);
+        client.chat(next);
+
+        List<Map<String, Object>> content = contentOf(parseCaptured());
+        assertEquals(2, content.size());
+        assertEquals(Map.of("type", "text", "text", "visible"), content.get(0));
+        assertEquals(Map.of("type", "audio", "id", "a_1"), content.get(1));
     }
 
     @Test

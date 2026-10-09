@@ -14,6 +14,7 @@ import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.RawPart;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -280,7 +281,11 @@ class ResponsesReader {
                 continue;
             }
             if (!"output_text".equals(type)) {
-                throw new SynapseException("unsupported content part in OpenAI Responses response: " + type);
+                // A part type this module does not model is kept whole rather than refused: the
+                // shared model has no name for it, but its members have to arrive and go back out
+                // with the turn, as an unmodeled output item already is a level above.
+                message.part(RawPart.of(members));
+                continue;
             }
             ProviderExtras extras = new ProviderExtras();
             for (Map.Entry<?, ?> member : members.entrySet()) {

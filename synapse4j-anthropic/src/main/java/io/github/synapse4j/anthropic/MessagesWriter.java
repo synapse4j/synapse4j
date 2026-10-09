@@ -16,6 +16,7 @@ import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.RawPart;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -274,10 +275,10 @@ class MessagesWriter {
                 blocks.add(toolResult(toolResult));
             } else if (part instanceof ReasoningPart reasoning) {
                 blocks.add(thinking(reasoning));
-            } else if (part instanceof RawContentBlock raw) {
+            } else if (part instanceof RawPart raw) {
                 // The block goes back out as it arrived: its members were read whole off the wire,
                 // so the protocol spells them again untouched, in the place this part holds.
-                blocks.add(raw.getMembers());
+                blocks.add(raw.members());
             } else {
                 throw unsupportedPart(part);
             }

@@ -9,6 +9,7 @@ import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.RawPart;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -231,7 +232,15 @@ class CompletionsReader {
                 extras.put("refusal", collected.get("refusal"));
                 return;
             }
-            throw new SynapseException("unsupported content part in OpenAI response: " + type);
+            // A part type this module does not model is kept whole rather than refused: the shared
+            // model has no name for it, but its members have to arrive and go back out with the
+            // turn, as an unmodeled block is kept whole on the Anthropic side.
+            collected.put("type", type);
+            if (text != null) {
+                collected.put("text", text);
+            }
+            message.part(new RawPart(collected.nestedMap()));
+            return;
         }
         // The type that decides what the part is may come after the fields it does not model, so
         // the part is built from what the walk collected on the way to it.

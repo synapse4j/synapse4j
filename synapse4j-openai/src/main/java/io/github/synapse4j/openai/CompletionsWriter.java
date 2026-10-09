@@ -15,6 +15,7 @@ import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.RawPart;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -184,6 +185,10 @@ class CompletionsWriter {
                     // A tool call is a member of the message rather than an entry of its content,
                     // so it is held back and written beside the array.
                     toolCalls.add(toolCall(toolCall));
+                } else if (part instanceof RawPart raw) {
+                    // The part goes back out as it arrived: its members were read whole off the
+                    // wire, so the protocol spells them again untouched, where this part sits.
+                    content.add(raw.members());
                 } else if (!(part instanceof ReasoningPart)) {
                     throw unsupportedPart(part);
                 }
@@ -250,6 +255,7 @@ class CompletionsWriter {
     private static boolean arrayContent(ChatMessage message) {
         return message.getParts().stream().anyMatch(part -> part instanceof MediaPart
                 || part instanceof ToolCallPart
+                || part instanceof RawPart
                 || (part instanceof TextPart && part.getExtras() != null && !part.getExtras().isEmpty()));
     }
 

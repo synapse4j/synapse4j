@@ -34,6 +34,7 @@ import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.data.RawPart;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -596,10 +597,10 @@ class AnthropicChatClientTest {
         // The shared model has no part for the block, so it rides as itself: it keeps its place in
         // the turn — after the text, where it sat in the content array — and goes back out whole.
         assertEquals(2, response.getMessage().getParts().size());
-        RawContentBlock kept = assertInstanceOf(RawContentBlock.class,
+        RawPart kept = assertInstanceOf(RawPart.class,
                 response.getMessage().getParts().get(1));
-        assertEquals("server_tool_use", kept.getMembers().get("type"));
-        assertEquals(Map.of("query", "weather"), kept.getMembers().get("input"));
+        assertEquals("server_tool_use", kept.members().get("type"));
+        assertEquals(Map.of("query", "weather"), kept.members().get("input"));
         // The fields after it were still read, so the walk stayed in step.
         assertEquals(Integer.valueOf(7), response.getUsage().getInputTokens());
     }
@@ -928,10 +929,10 @@ class AnthropicChatClientTest {
         assertEquals("{\"city\":\"Paris\"}", call.getArgumentsJson());
         // The server tool's block arrives as itself, carrying the input its fragments spelled —
         // the answer a blocking walk gives it.
-        RawContentBlock kept = assertInstanceOf(RawContentBlock.class,
+        RawPart kept = assertInstanceOf(RawPart.class,
                 aggregated.getMessage().getParts().get(1));
-        assertEquals("server_tool_use", kept.getMembers().get("type"));
-        assertEquals(Map.of("query", "weather"), kept.getMembers().get("input"));
+        assertEquals("server_tool_use", kept.members().get("type"));
+        assertEquals(Map.of("query", "weather"), kept.members().get("input"));
     }
 
     @Test
