@@ -11,7 +11,8 @@ import lombok.NonNull;
 
 /**
  * One element of a message's content: a piece of text, the model's reasoning, a tool call, a tool
- * result or a media payload.
+ * result or a media payload — or a {@link RawPart}, for an element a protocol carries and this
+ * library has no shape for.
  *
  * <p>
  * This class is abstract, and deliberately neither {@code final} nor {@code sealed}: adding a part

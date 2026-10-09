@@ -348,7 +348,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void unmodeledResponsePartKeptWhole() {
+    void rawPartKeptWhole() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
                 + "\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"visible\"},"
@@ -367,7 +367,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void unmodeledResponsePartReplayedWhole() {
+    void rawPartReplayedWhole() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\","
                 + "\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"visible\"},"

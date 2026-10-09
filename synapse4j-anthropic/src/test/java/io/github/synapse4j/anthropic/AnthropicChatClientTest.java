@@ -582,7 +582,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void unmodeledContentBlockKeptWhole() {
+    void rawBlockKeptWhole() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(message("\"msg_5\"",
                 "[{\"type\":\"text\",\"text\":\"hi\"},"

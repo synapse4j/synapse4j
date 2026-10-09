@@ -32,6 +32,7 @@ import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.RawPart;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
 import io.github.synapse4j.data.ToolCallPart;
@@ -393,6 +394,45 @@ class OpenAiResponsesChatClientTest {
         assertEquals(List.of(Map.of("type", "reasoning",
                 "summary", List.of(Map.of("type", "summary_text", "text", "weighing it up")),
                 "id", "rs_1", "encrypted_content", "opaque", "status", "completed")),
+                inputOf(parseCaptured()));
+    }
+
+    @Test
+    void rawPartKeptWhole() {
+        stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":["
+                + "{\"type\":\"message\",\"id\":\"msg_1\",\"role\":\"assistant\",\"status\":\"completed\","
+                + "\"content\":[{\"type\":\"output_text\",\"text\":\"visible\"},"
+                + "{\"type\":\"audio\",\"id\":\"a_1\"}]}]}");
+
+        ChatResponse answer = client.chat(requestWithModel());
+
+        // The shared model has no part for the element, so it rides as itself, in the place it held
+        // among the content entries.
+        assertEquals(2, answer.getMessage().getParts().size());
+        RawPart kept = assertInstanceOf(RawPart.class, answer.getMessage().getParts().get(1));
+        assertEquals("audio", kept.members().get("type"));
+        assertEquals("a_1", kept.members().get("id"));
+    }
+
+    @Test
+    void rawPartReplayedWhole() {
+        stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":["
+                + "{\"type\":\"message\",\"id\":\"msg_1\",\"role\":\"assistant\",\"status\":\"completed\","
+                + "\"content\":[{\"type\":\"output_text\",\"text\":\"visible\"},"
+                + "{\"type\":\"audio\",\"id\":\"a_1\"}]}]}");
+        ChatResponse answer = client.chat(requestWithModel());
+
+        ChatRequest replay = requestWithModel();
+        replay.addPendingMessage(answer.getMessage());
+        stubCompletion();
+        client.chat(replay);
+
+        // The turn goes back as the item it was, the element read whole included, in the place it
+        // held — or the provider is told a turn that never happened.
+        assertEquals(List.of(Map.of("role", "assistant",
+                "content", List.of(Map.of("type", "output_text", "text", "visible"),
+                        Map.of("type", "audio", "id", "a_1")),
+                "id", "msg_1", "status", "completed")),
                 inputOf(parseCaptured()));
     }
 
