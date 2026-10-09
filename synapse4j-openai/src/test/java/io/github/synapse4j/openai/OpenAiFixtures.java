@@ -2,6 +2,7 @@ package io.github.synapse4j.openai;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.util.List;
 import java.util.Map;
 
 import io.github.synapse4j.data.ChatRequest;
@@ -33,9 +34,20 @@ final class OpenAiFixtures {
         return ((TextPart) event.getDelta().getParts().get(0)).getText();
     }
 
-    /** Fails on a wire document that carried a member serialized as null. */
+    /** Fails on a wire document that carried a member serialized as null, at any depth. */
     static void assertNoNullValues(Map<String, Object> map) {
-        map.forEach((key, value) -> assertNotNull(value, "wire field '" + key + "' was serialized as null"));
+        assertNoNullValues((Object) map);
+    }
+
+    private static void assertNoNullValues(Object node) {
+        if (node instanceof Map<?, ?> members) {
+            members.forEach((key, value) -> {
+                assertNotNull(value, "wire field '" + key + "' was serialized as null");
+                assertNoNullValues(value);
+            });
+        } else if (node instanceof List<?> items) {
+            items.forEach(OpenAiFixtures::assertNoNullValues);
+        }
     }
 
 }

@@ -370,6 +370,19 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
+    void functionCallOmitsUnsetMembers() {
+        stubCompletion();
+        ChatRequest request = requestWithModel();
+        // A call whose members the provider left out: what is not set is not written, so nothing goes
+        // out as a JSON null for the endpoint to refuse.
+        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT, new ToolCallPart(null, null, null)));
+
+        client.chat(request);
+
+        assertNoNullValues(parseCaptured());
+    }
+
+    @Test
     void reasoningKeepsSummaryEncrypted() {
         stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":["
                 + "{\"type\":\"reasoning\",\"id\":\"rs_1\",\"encrypted_content\":\"opaque\","

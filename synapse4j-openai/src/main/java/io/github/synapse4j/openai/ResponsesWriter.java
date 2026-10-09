@@ -388,9 +388,9 @@ class ResponsesWriter {
     private static Map<String, Object> functionCall(ToolCallPart part, @Nullable ProviderExtras messageExtras) {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("type", "function_call");
-        entry.put("call_id", part.getCallId());
-        entry.put("name", part.getName());
-        entry.put("arguments", part.getArgumentsJson());
+        putIfSet(entry, "call_id", part.getCallId());
+        putIfSet(entry, "name", part.getName());
+        putIfSet(entry, "arguments", part.getArgumentsJson());
         // The message's extras first, the part's own after: the more specific node is merged last,
         // so it wins where both set the same path.
         if (messageExtras != null) {
@@ -411,7 +411,7 @@ class ResponsesWriter {
             @Nullable ProviderExtras messageExtras) {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("type", "function_call_output");
-        entry.put("call_id", result.getCallId());
+        putIfSet(entry, "call_id", result.getCallId());
         entry.put("output", output(result.getParts()));
         if (messageExtras != null) {
             messageExtras.mergeInto(entry);

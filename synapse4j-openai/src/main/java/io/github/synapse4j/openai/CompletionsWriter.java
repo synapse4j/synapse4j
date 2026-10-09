@@ -318,7 +318,7 @@ class CompletionsWriter {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("role", "tool");
         entry.put("content", textOf(result.getParts()));
-        entry.put("tool_call_id", result.getCallId());
+        putIfSet(entry, "tool_call_id", result.getCallId());
         // The message's extras first, the result's own after: the more specific node is merged last,
         // so it wins where both set the same path.
         if (messageExtras != null) {
@@ -333,11 +333,11 @@ class CompletionsWriter {
 
     private Map<String, Object> toolCall(ToolCallPart part) {
         Map<String, Object> entry = new LinkedHashMap<>();
-        entry.put("id", part.getCallId());
+        putIfSet(entry, "id", part.getCallId());
         entry.put("type", "function");
         Map<String, Object> function = new LinkedHashMap<>();
-        function.put("name", part.getName());
-        function.put("arguments", part.getArgumentsJson());
+        putIfSet(function, "name", part.getName());
+        putIfSet(function, "arguments", part.getArgumentsJson());
         entry.put("function", function);
         // A field the response carried inside the function object comes back to the same path —
         // except the chunk's association index, which the fold kept only long enough to match
