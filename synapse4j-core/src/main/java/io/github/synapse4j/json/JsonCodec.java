@@ -32,15 +32,15 @@ import org.jspecify.annotations.Nullable;
  * what a call returns, a caller shown a tool's result.
  *
  * <p>
- * A schema is worth generating only if it describes JSON the codec really moves, so the guarantee runs
- * one way: the schema never allows what the codec would refuse. {@link #decode(String, Type)} accepts
- * every document {@link #generateDecodeSchema(Type)} allows, and {@link #encode(Object)} produces
- * nothing {@link #generateEncodeSchema(Type)} forbids. A schema may be stricter than the codec — it is
- * a contract for whoever produces that JSON, so demanding more than a lenient binder would need is the
- * point, not a mistake. The two directions answer the binder's questions the same way — which
- * properties exist, what they are called, in what order — and may differ only in how much they demand;
- * an asymmetric binder is why they are separate, and one schema covering both would describe one of
- * them wrongly.
+ * A schema is worth generating only if it describes JSON the codec really moves, so one thing is what
+ * an implementation aims at: a schema that never allows what the codec would refuse —
+ * {@link #decode(String, Type)} taking every document {@link #generateDecodeSchema(Type)} allows, and
+ * {@link #encode(Object)} producing nothing {@link #generateEncodeSchema(Type)} forbids. A schema may be
+ * stricter than the codec — it is a contract for whoever produces that JSON, so demanding more than a
+ * lenient binder would need is the point, not a mistake. The two directions answer the binder's
+ * questions the same way — which properties exist, what they are called, in what order — and may differ
+ * only in how much they demand; an asymmetric binder is why they are separate, and one schema covering
+ * both would describe one of them wrongly.
  *
  * <p>
  * Generating a schema is best-effort, because a type is not the whole story: a serializer or

@@ -71,11 +71,11 @@ library gets a module of its own.
 
 ## What a generated schema promises
 
-A schema is generated from a Java type, and it makes one promise: whatever the schema allows, the
-codec accepts. It may promise less — the schema you send to a model deliberately does — but never
-more.
+A schema is generated from a Java type, and the shape it takes is the generator's. What this library
+aims at, and steers it toward, is one direction: whatever the schema allows, the codec accepts. It may
+allow less — the schema you send to a model deliberately does — and it must never allow more.
 
-That promise runs in a direction. The schema you hand to whoever produces JSON — the arguments of a
+That aim runs in a direction. The schema you hand to whoever produces JSON — the arguments of a
 tool the model calls, the shape of a structured answer — is the decode schema: what the codec is
 willing to read. The schema describing what this library produced — a model told what a call returns
 — is the encode schema. The two can differ, and where a binder is asymmetric they do.
