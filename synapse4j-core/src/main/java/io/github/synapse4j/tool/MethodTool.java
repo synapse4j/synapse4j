@@ -29,9 +29,9 @@ import lombok.NonNull;
  * carrying blanks is refused rather than quietly completed.
  *
  * <p>
- * Every field is final and set in the constructor, so an instance is immutable once it exists and its
- * methods may be called from any thread. The target, if it has state, is the application's to make
- * thread-safe.
+ * Every field is final and set in the constructor, and the resolution is never written to — so an
+ * instance does not change once it exists and its methods may be called from any thread. The target,
+ * if it has state, is the application's to make thread-safe.
  */
 public class MethodTool implements StagedTool {
 
