@@ -1,25 +1,16 @@
 package io.github.synapse4j.anthropic;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.jspecify.annotations.Nullable;
 
-import io.github.synapse4j.chat.AbstractChatClient;
+import io.github.synapse4j.chat.AbstractHttpChatClient;
 import io.github.synapse4j.chat.ChatStream;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponse;
-import io.github.synapse4j.exception.SynapseException;
-import io.github.synapse4j.exception.SynapseHttpException;
-import io.github.synapse4j.http.HttpBody;
 import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpRequest;
-import io.github.synapse4j.http.HttpResponse;
 import io.github.synapse4j.http.SseEventStream;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
@@ -28,31 +19,24 @@ import lombok.NonNull;
 
 /**
  * The Anthropic Messages client: speaks {@code POST /v1/messages} and answers in the shared chat
- * model, with blocking chat and streaming as equal citizens over one request model.
+ * model, with blocking chat and streaming as equal citizens over one request model. The exchange
+ * itself — one URL below a base URL, one set of headers, one validation before anything goes out,
+ * the status read before the body, one refusal path — is the transport flow every provider shares,
+ * in {@link AbstractHttpChatClient}; what this class settles is the Anthropic side of it.
  *
  * <p>
- * The transport flow is the OpenAI module's, concretized for the one protocol this module speaks:
- * one endpoint below a base URL, one set of headers, one validation before anything goes out, one
- * way of reading the status before the body, one refusal path, one way of streaming what an
- * accepted answer carries. The request is written straight into the codec's {@link JsonWriter} and
- * the response is walked token by token through its {@link JsonReader}: neither direction builds
- * the document as a structure first, and a member whose value is not set is never emitted. A field
- * this module does not model is kept in the extras of the node it came from rather than dropped.
- * The status is read before the body is touched, because the body is a stream and reaches the
- * caller once: a non-2xx answer is buffered for the detail it carries, a 2xx one is streamed into
- * the reader.
+ * The request is written straight into the codec's {@link JsonWriter} and the response is walked
+ * token by token through its {@link JsonReader}: neither direction builds the document as a
+ * structure first, and a member whose value is not set is never emitted. A field this module does
+ * not model is kept in the extras of the node it came from rather than dropped.
  *
  * <p>
  * A streamed answer is the same exchange with a different response body: the request asks for it
  * with a {@code stream} member, the frames arrive as {@code text/event-stream} and become events
  * one for one, and the connection stays open until the caller is done with it — closing the
- * {@link ChatStream} is what cancels an answer still in flight. A refusal is read exactly as it is
- * for a blocking call, before the stream exists at all. The conversation itself is never continued
- * here: the protocol keeps no state, so history and pending messages both go out on every call,
- * and {@link io.github.synapse4j.chat.ChatClient#continueWith} needs no override.
- *
- * <p>
- * The client is stateless apart from the configuration and safe to share across threads.
+ * {@link ChatStream} is what cancels an answer still in flight. The conversation itself is never
+ * continued here: the protocol keeps no state, so history and pending messages both go out on
+ * every call, and {@link io.github.synapse4j.chat.ChatClient#continueWith} needs no override.
  *
  * <p>
  * Header precedence is deliberate: the module sets {@code Content-Type}, {@code x-api-key} — only
@@ -64,40 +48,7 @@ import lombok.NonNull;
  *
  * @see io.github.synapse4j.chat.ChatClient
  */
-public class AnthropicChatClient extends AbstractChatClient {
-
-    /** The name every failure this exchange can produce is spelled under. */
-    private static final String FAILED = "Anthropic Messages request failed";
-
-    /** Raw-body snippet kept in the message when the error body is not parseable JSON. */
-    private static final int SNIPPET_LIMIT = 500;
-
-    /**
-     * The most bytes a refusal may spend reading its body: enough for any conventional error
-     * document, and enough for a snippet when it is not one — a gateway that answers a failure with
-     * an endless body is not paid for past this.
-     */
-    private static final int ERROR_BODY_LIMIT = 64 * 1024;
-
-    @NonNull
-    private final HttpClient http;
-
-    /**
-     * The application's codec. It stays reachable because every document this exchange touches —
-     * the request, the response, one stream frame, one error body — is bound through it: one codec
-     * serves them all.
-     */
-    @NonNull
-    protected final JsonCodec codec;
-
-    /**
-     * The configuration in effect, replaceable while the client is in use. The reference follows
-     * the same pattern as the tool containers in {@link AbstractChatClient}: a rare writer publishes
-     * a whole new instance through it in one step, and every exchange reads it once into a local —
-     * two reads could straddle two versions, and a request must not go out partly under one
-     * configuration and partly under another.
-     */
-    private final AtomicReference<AnthropicConfig> config;
+public class AnthropicChatClient extends AbstractHttpChatClient<AnthropicConfig> {
 
     /**
      * Creates the client.
@@ -108,253 +59,47 @@ public class AnthropicChatClient extends AbstractChatClient {
      */
     public AnthropicChatClient(@NonNull HttpClient http, @NonNull JsonCodec codec,
             @NonNull AnthropicConfig config) {
-        this.http = http;
-        this.codec = codec;
-        this.config = new AtomicReference<>(config);
-    }
-
-    /**
-     * Replaces the configuration this client sends with. In flight exchanges keep the instance they
-     * started with; the next one sees the new value.
-     *
-     * @param config the new configuration; must not be {@code null}
-     */
-    public void setConfig(@NonNull AnthropicConfig config) {
-        this.config.set(config);
-    }
-
-    /**
-     * The configuration in effect. A subclass that reads it should read it once and keep it: two
-     * reads could straddle a {@link #setConfig} and answer under two configurations.
-     *
-     * @return the configuration in effect; never {@code null}
-     */
-    protected final AnthropicConfig config() {
-        return config.get();
+        super(http, codec, config);
     }
 
     @Override
-    protected ChatResponse doChat(ChatRequest request) {
-        // One snapshot for the whole exchange: a setConfig landing mid-call must not send this
-        // request partly under the old configuration and partly under the new.
-        AnthropicConfig config = this.config.get();
-        requireCallable(request);
-
-        HttpRequest httpRequest = httpRequest(config, request, out -> {
-            // The body is written when the transport asks for it, and written again on every retry
-            // or redirect: the document goes into whatever sink the implementation hands over, so it
-            // never exists as bytes here.
-            try (JsonWriter writer = codec.writer(out)) {
-                new MessagesWriter(codec).write(request, writer);
-            }
-        });
-
-        try (HttpResponse httpResponse = http.send(httpRequest)) {
-            // The body is a stream and can be read once, so the status decides how it is read
-            // before anything is consumed.
-            int status = httpResponse.getStatusCode();
-            if (status >= 200 && status < 300) {
-                try (JsonReader reader = codec.reader(httpResponse.getBody())) {
-                    ChatResponse response = new MessagesReader(codec).read(reader);
-                    copyHeaders(response, httpResponse.getHeaders());
-                    return response;
-                }
-            }
-            throw failure(status, readBody(httpResponse));
-        } catch (IOException e) {
-            throw new SynapseException(FAILED + ": response could not be read", e);
-        }
+    protected String url(AnthropicConfig config) {
+        return withoutTrailingSlash(config.getBaseUrl()) + "/v1/messages";
     }
 
     @Override
-    protected ChatStream doStream(ChatRequest request) {
-        // The same once-per-exchange snapshot the blocking path takes.
-        AnthropicConfig config = this.config.get();
-        requireCallable(request);
-
-        HttpRequest httpRequest = httpRequest(config, request, out -> {
-            try (JsonWriter writer = codec.writer(out)) {
-                new MessagesWriter(codec).writeStreaming(request, writer);
-            }
-        });
-
-        HttpResponse httpResponse = http.send(httpRequest);
-        int status = httpResponse.getStatusCode();
-        if (status >= 200 && status < 300) {
-            try {
-                // The response decides whether it carries an event stream, and frames it with the budget
-                // the call asked for: the transport merged the options, so nothing here merges again.
-                SseEventStream events = httpResponse.sseEventStream();
-                if (events == null) {
-                    throw new SynapseException("Anthropic answered " + status
-                            + " to a streamed request, but not with a text/event-stream");
-                }
-                // The response is deliberately left open on success: the stream owns it from here,
-                // and closing the stream is what cancels an answer that is still in flight.
-                ChatStream stream = new MessagesStream(codec, events, eventPipeline(), httpResponse::close);
-                // The headers arrive with the response, before any frame does, so they go onto the
-                // answer now: aggregatedResponse() carries them the moment the stream exists, the
-                // same way the answer of a blocking call does.
-                copyHeaders(stream.aggregatedResponse(), httpResponse.getHeaders());
-                return stream;
-            } catch (RuntimeException failure) {
-                // Between the response arriving and the stream taking ownership of it, nothing else
-                // holds the connection: whatever broke here would leave it held by a response no one
-                // has, so release it before the failure leaves.
-                try (HttpResponse closing = httpResponse) {
-                    // The close is what this path owes; the comment is what it is owed for.
-                } catch (IOException closeFailure) {
-                    failure.addSuppressed(closeFailure);
-                }
-                throw failure;
-            }
-        }
-        throw refusal(httpResponse, status);
-    }
-
-    /**
-     * The base URL as an endpoint path is appended to it: a trailing slash is dropped, so a
-     * configured {@code https://host/} does not put a doubled slash in the path.
-     *
-     * @param baseUrl the configured base URL; never {@code null}
-     * @return the base URL without a trailing slash
-     */
-    private static String withoutTrailingSlash(String baseUrl) {
-        int end = baseUrl.length();
-        while (end > 0 && baseUrl.charAt(end - 1) == '/') {
-            end--;
-        }
-        return baseUrl.substring(0, end);
-    }
-
-    /**
-     * The HTTP request both ways of asking share: one endpoint, one set of headers, the caller's
-     * applied last. Only the body differs between them, so it is the one thing handed in beside the
-     * path.
-     */
-    private HttpRequest httpRequest(AnthropicConfig config,
-            ChatRequest request, HttpBody body) {
-        HttpRequest httpRequest = new HttpRequest(
-                withoutTrailingSlash(config.getBaseUrl()) + "/v1/messages");
-        httpRequest.setMethod(HttpRequest.POST);
-        httpRequest.getHeaders().put("Content-Type", List.of("application/json"));
+    protected void headers(HttpRequest request, AnthropicConfig config) {
         if (config.getApiKey() != null && !config.getApiKey().isBlank()) {
-            httpRequest.getHeaders().put("x-api-key", List.of(config.getApiKey()));
+            request.getHeaders().put("x-api-key", List.of(config.getApiKey()));
         }
         // The protocol version this call declares; the endpoint answers only to versions it knows.
-        httpRequest.getHeaders().put("anthropic-version", List.of(config.getAnthropicVersion()));
-        // Applied last, so a caller's header wins over any of the module's own.
-        request.getOptions().getHeaders().forEach((name, value) -> httpRequest.getHeaders()
-                .put(name, List.of(value)));
-        // The call's HTTP-level opinions travel with the request; what it does not set, the
-        // transport fills in from its own options.
-        httpRequest.setOptions(request.getOptions().getHttpOptions());
-        httpRequest.setBody(body);
-        return httpRequest;
+        request.getHeaders().put("anthropic-version", List.of(config.getAnthropicVersion()));
     }
 
-    /**
-     * Reads the refusal off a response that never became a stream, and closes it — the stream was
-     * not opened, so there is nothing to hand it to. The exception is the same one a refused
-     * blocking call gets, since the provider's refusal is the same document either way.
-     */
-    private SynapseException refusal(HttpResponse httpResponse, int status) {
-        try (HttpResponse refused = httpResponse) {
-            return failure(status, readBody(refused));
-        } catch (IOException e) {
-            throw new SynapseException(FAILED + ": response could not be read", e);
+    @Override
+    protected void write(ChatRequest request, JsonWriter writer, AnthropicConfig config, boolean streaming) {
+        MessagesWriter document = new MessagesWriter(codec);
+        if (streaming) {
+            document.writeStreaming(request, writer);
+        } else {
+            document.write(request, writer);
         }
     }
 
-    /** A call the provider cannot even be asked: the caller's mistake, found before anything goes out. */
-    private static void requireCallable(ChatRequest request) {
-        require(request.getOptions().getModel() != null && !request.getOptions().getModel().isBlank(),
-                "options.model is required");
+    @Override
+    protected ChatResponse read(JsonReader reader, AnthropicConfig config) {
+        return new MessagesReader(codec).read(reader);
     }
 
-    private static byte[] readBody(HttpResponse httpResponse) throws IOException {
-        // Bounded: a refusal needs enough of the body to parse the error document or show a
-        // snippet of it, and no hostile or broken gateway gets paid for more. What lies past the
-        // limit is never read — the caller's try-with-resources closes the response, connection
-        // and all, which is what stops it.
-        return httpResponse.getBody().readNBytes(ERROR_BODY_LIMIT);
+    @Override
+    protected ChatStream openStream(SseEventStream events, AutoCloseable closeAction, AnthropicConfig config) {
+        return new MessagesStream(codec, events, eventPipeline(), closeAction);
     }
 
-    /**
-     * The exception for a call the provider refused: the status always, the provider's own detail
-     * when the body parses as the conventional error document, a snippet of the raw body when it
-     * does not. A walk that fails is not a second failure — it was only ever a chance to say more
-     * than the status already says.
-     *
-     * @param status the HTTP status the answer carried
-     * @param body   the refusal's body, as far as the caller was allowed to read it
-     * @return the exception to throw
-     */
-    private SynapseHttpException failure(int status, byte[] body) {
-        try (JsonReader reader = codec.reader(new ByteArrayInputStream(body))) {
-            String detail = readError(reader);
-            if (detail != null) {
-                return new SynapseHttpException(FAILED + " with HTTP " + status + detail, status);
-            }
-        } catch (RuntimeException ignored) {
-            // Not a JSON document at all — a proxy's HTML, say. The snippet below says what came.
-        }
-        return new SynapseHttpException(FAILED + " with HTTP " + status + ": " + snippet(body), status);
-    }
-
-    /**
-     * Reads the provider's error document into the detail a failure message carries — the part
-     * after the caller's own prefix, spelled by the same helper a stream's in-frame failure
-     * renders that document with, so both paths say it identically. A document that carries no
-     * error object answers {@code null}: what to say then belongs to the caller, as does
-     * everything about how the body reached a reader in the first place.
-     *
-     * @param reader the reader, before its first token; the caller owns it
-     * @return the detail after the caller's own prefix, or {@code null} when there is none to read
-     */
-    private static @Nullable String readError(JsonReader reader) {
-        if (reader.nextToken() != JsonReader.Token.START_OBJECT) {
-            return null;
-        }
-        while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
-            String field = Objects.requireNonNull(reader.name(), "the reader is not on a property name");
-            reader.nextToken();
-            if ("error".equals(field)) {
-                if (reader.token() != JsonReader.Token.START_OBJECT) {
-                    // A scalar where the conventional object belongs says less than the raw body does.
-                    reader.skipValue();
-                    return null;
-                }
-                Object error = reader.captureValue();
-                return error instanceof Map<?, ?> members ? MessagesReader.errorDetail(members) : null;
-            }
-            reader.skipValue();
-        }
-        return null;
-    }
-
-    /**
-     * Copies the HTTP response headers onto the shared response. The shared model holds one value
-     * per name, so several values of a header are joined the way a blocking call joins them — the
-     * transport metadata of an answer must not depend on which way it was asked for.
-     *
-     * @param response    the response to carry the headers
-     * @param httpHeaders the response headers, as the transport reports them
-     */
-    private static void copyHeaders(ChatResponse response, Map<String, List<String>> httpHeaders) {
-        httpHeaders.forEach((name, values) -> response.getHeaders().put(name, String.join(", ", values)));
-    }
-
-    private static String snippet(byte[] body) {
-        // One long line (a proxy's HTML, say) would otherwise fill the log; a prefix is enough.
-        String raw = new String(body, StandardCharsets.UTF_8);
-        return raw.length() <= SNIPPET_LIMIT ? raw : raw.substring(0, SNIPPET_LIMIT) + "...";
-    }
-
-    private static void require(boolean condition, String message) {
-        if (!condition) {
-            throw new IllegalArgumentException(message);
-        }
+    @Override
+    protected @Nullable String errorDetail(JsonReader reader) {
+        Object error = reader.captureValue();
+        return error instanceof Map<?, ?> members ? MessagesReader.errorDetail(members) : null;
     }
 
 }

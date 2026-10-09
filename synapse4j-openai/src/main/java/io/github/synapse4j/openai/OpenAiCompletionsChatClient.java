@@ -12,8 +12,9 @@ import io.github.synapse4j.json.JsonWriter;
 /**
  * The OpenAI chat-completions client: speaks {@code POST /chat/completions} and answers in the
  * shared chat model. The transport flow it shares with {@link OpenAiResponsesChatClient} — the
- * headers, the validation, the configuration snapshot, the refusal path — lives in
- * {@link AbstractOpenAiChatClient}; what is left here is this protocol's own wire.
+ * headers, the validation, the configuration snapshot, the refusal path — is not here: both
+ * endpoints take it from the transport base they extend. What is left here is this protocol's own
+ * wire.
  *
  * <p>
  * The wire shape is pinned by literal names — no codec-level setting, a naming strategy among
@@ -46,11 +47,6 @@ public class OpenAiCompletionsChatClient extends AbstractOpenAiChatClient {
     @Override
     protected String endpoint() {
         return "/chat/completions";
-    }
-
-    @Override
-    protected String protocol() {
-        return "chat completion";
     }
 
     @Override
