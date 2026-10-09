@@ -163,8 +163,14 @@ public class ChatOptions implements Effective<ChatOptions> {
         if (toolChoice == null) {
             toolChoice = other.toolChoice;
         }
-        if (toolChoiceName == null) {
-            toolChoiceName = other.toolChoiceName;
+        if (ChatOptions.TOOL_CHOICE_TOOL.equals(toolChoice)) {
+            if (toolChoiceName == null) {
+                toolChoiceName = other.toolChoiceName;
+            }
+        } else {
+            // The name belongs to the one mode that names a tool; beside any other it has nowhere to
+            // go, and a writer refuses the pair rather than sending it.
+            toolChoiceName = null;
         }
         responseFormat.fillFrom(other.responseFormat);
         if (other.httpOptions != null) {

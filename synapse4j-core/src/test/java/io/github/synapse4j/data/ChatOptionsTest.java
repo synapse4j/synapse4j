@@ -46,6 +46,31 @@ class ChatOptionsTest {
     }
 
     @Test
+    void toolNameFollowsItsMode() {
+        ChatOptions defaults = new ChatOptions();
+        defaults.setToolChoice(ChatOptions.TOOL_CHOICE_TOOL);
+        defaults.setToolChoiceName("get_weather");
+
+        // A call that turns tools off says nothing about which tool: the default's name belongs to the
+        // one mode that names a tool, and every writer refuses the pair rather than sending it.
+        ChatOptions none = new ChatOptions();
+        none.setToolChoice(ChatOptions.TOOL_CHOICE_NONE);
+        ChatOptions turnedOff = none.effective(defaults);
+        assertEquals(ChatOptions.TOOL_CHOICE_NONE, turnedOff.getToolChoice());
+        assertNull(turnedOff.getToolChoiceName());
+
+        // A call naming its own tool keeps that name; one naming only a tool takes the default's mode.
+        ChatOptions named = new ChatOptions();
+        named.setToolChoice(ChatOptions.TOOL_CHOICE_TOOL);
+        named.setToolChoiceName("lookup");
+        assertEquals("lookup", named.effective(defaults).getToolChoiceName());
+        ChatOptions onlyName = new ChatOptions();
+        onlyName.setToolChoiceName("lookup");
+        assertEquals(ChatOptions.TOOL_CHOICE_TOOL, onlyName.effective(defaults).getToolChoice());
+        assertEquals("lookup", onlyName.effective(defaults).getToolChoiceName());
+    }
+
+    @Test
     void optionsBagsNotShared() {
         ChatOptions one = new ChatOptions();
         ChatOptions two = new ChatOptions();
