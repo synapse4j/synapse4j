@@ -63,6 +63,19 @@ class EncodeRequiredPropertiesModuleTest {
                 SchemaFixtures.required(generate(Deferring.class, omitting(JsonInclude.Include.NON_NULL))));
     }
 
+    @Test
+    void subclassInclusionAnswersInheritedMember() {
+        // The member is the parent's, but it is the subclass that gets written, so its inclusion is the
+        // one that decides whether the null reaches the JSON.
+        assertEquals(List.of(), SchemaFixtures.required(generate(Narrowing.class, SchemaFixtures.MAPPER)));
+    }
+
+    @Test
+    void customInclusionNotAlwaysWritten() {
+        // A value filter decides per value, so the property may be left out of what is written.
+        assertEquals(List.of(), SchemaFixtures.required(generate(Filtered.class, SchemaFixtures.MAPPER)));
+    }
+
     /** A record whose first property carries its own inclusion and whose second carries none. */
     record PerProperty(@JsonInclude(JsonInclude.Include.NON_NULL) String maybeNull, String always) {
     }
@@ -74,6 +87,31 @@ class EncodeRequiredPropertiesModuleTest {
 
     /** A property that asks for the mapper's answer rather than naming an inclusion of its own. */
     record Deferring(@JsonInclude(JsonInclude.Include.USE_DEFAULTS) String maybeNull, int count) {
+    }
+
+    /** Where the parent declares the member, whose inclusion says nothing. */
+    static class Parent {
+
+        public String maybeNull;
+    }
+
+    /** Where the subclass does the writing, and so brings the inclusion that applies. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    static class Narrowing extends Parent {
+    }
+
+    /** A property whose inclusion a filter decides rather than a fixed rule. */
+    record Filtered(
+            @JsonInclude(value = JsonInclude.Include.CUSTOM, valueFilter = OmittingNullsFilter.class) String text) {
+    }
+
+    /** The filter a {@code CUSTOM} inclusion names; the schema never runs it. */
+    static class OmittingNullsFilter {
+
+        @Override
+        public boolean equals(Object other) {
+            return other == null;
+        }
     }
 
     private static JsonMapper omitting(JsonInclude.Include inclusion) {
