@@ -31,7 +31,10 @@ Tool weather = FunctionTool.of(
         codec);
 ```
 
-The input type has to describe an object, because the protocol's arguments are an object.
+The input type has to describe an object, because the protocol's arguments are an object. A generic
+one is handed over as a `Type` rather than a `Class` — whatever token your JSON library has for one,
+Jackson's `TypeReference` for example — and the schema then describes its arguments too: `Page<Order>`
+describes orders, not anything.
 
 **`MethodTool`** — an existing Java method. Its signature becomes the declaration: each parameter the
 model provides becomes a property of the argument schema. A `ChatContext` parameter is filled with the

@@ -80,9 +80,14 @@ changes one more thing: the client overrides `continueWith` to record what its n
 instead of archiving the transcript. See
 [Server-side conversations](conversations.md#server-side-conversations).
 
-When two protocols of one family share their transport flow — the headers, the status handling, the
-refusal path — factor it into an abstract base, the way `AbstractOpenAiChatClient` does, and leave
-the endpoint, the document and the shape of an answer as the hooks.
+A provider that speaks a JSON-over-HTTP protocol can take those steps from the core rather than write
+them: `AbstractHttpChatClient` carries the flow — one URL below a base URL, one set of headers, the
+status read before the body, one refusal that reads a bounded body, one way of streaming an accepted
+answer, and one configuration snapshot per exchange — and leaves the protocol the URL, the headers its
+configuration adds, the document each way, and the stream. Two more hooks have a default: how the error
+document reads, and what makes a call unaskable. The walkthrough below writes the flow by hand, which
+is what a protocol whose exchange is another shape needs; a client extending the base is the
+protocol's five hooks and nothing more.
 
 ## Sending
 

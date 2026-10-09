@@ -28,7 +28,9 @@ Tool weather = FunctionTool.of(
         codec);
 ```
 
-输入类型必须描述一个对象，因为协议的入参就是一个对象。
+输入类型必须描述一个对象，因为协议的入参就是一个对象。泛型类型交给它的是 `Type` 而不是 `Class`
+——用你的 JSON 库表达泛型类型的那种 token，比如 Jackson 的 `TypeReference`——schema 也会连类型参数一起描述：
+`Page<Order>` 描述的是订单，而不是什么都可以。
 
 **`MethodTool`**——一个现成的 Java 方法。它的签名成为声明：模型提供的每个参数成为入参 schema 里的一个
 属性。类型为 `ChatContext` 的参数由对话填充，不会发给模型。把方法变成 `MethodTool` 的是 `MethodTools`
