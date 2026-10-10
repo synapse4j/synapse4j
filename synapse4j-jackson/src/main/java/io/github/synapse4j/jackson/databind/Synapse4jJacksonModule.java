@@ -8,29 +8,16 @@ import io.github.synapse4j.json.JsonSource;
 import tools.jackson.databind.module.SimpleModule;
 
 /**
- * Teaches a Jackson {@code JsonMapper} to read and write the values this library hands it as the JSON
- * they stand for rather than as the shape of their classes — anywhere in the object graph, a field of a
+ * A Jackson module that carries the values this library reads and writes through a {@code JsonMapper} as
+ * the JSON each stands for rather than as the shape of its class, so a value that sits inside something
+ * the mapper binds is read and written like any other member — anywhere in the object graph, a field of a
  * record included.
  *
  * <p>
- * This is a Jackson module, not one of the victools schema-generation modules: it registers the
- * (de)serializers that carry them — a {@link JsonSchema} as the schema itself, a {@link Reader} as the
- * string it yields, the rest as they are modelled — so a value that sits inside something the mapper
- * binds is written and read like any other member. Add it to the mapper before the codec is built; a
- * mapper is immutable once built, so the module cannot be added later.
- *
- * <p>
- * A type is registered under the interface it is reached by, so a {@link JsonSchema} is covered in both
- * its object and boolean forms, and by any implementation of it.
- *
- * <p>
- * The name it is built with doubles as its registration id: Jackson keys modules by that id and, when
- * one is added again, removes the earlier instance before appending this one, so adding this module
- * twice leaves a single registration. A module of the application's own that registers a serializer for
- * {@link JsonSchema} carries a different id and stays in the mapper's module list, but this module is
- * appended after it and its registration wins, silently overriding the application's. The name is
- * load-bearing: an unnamed {@code SimpleModule} would be given a fresh id per instance and would
- * register twice.
+ * Add it to the mapper before the codec is built: a mapper is immutable once built, so the module cannot
+ * be added later. Its name is its registration id, so adding it twice leaves a single registration; and
+ * where an application registered a serializer of its own for a value this module covers, this module's
+ * registration wins, being appended after it.
  */
 public class Synapse4jJacksonModule extends SimpleModule {
 
