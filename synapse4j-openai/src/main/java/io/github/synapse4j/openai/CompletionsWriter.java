@@ -317,7 +317,7 @@ class CompletionsWriter {
     private Map<String, Object> toolResult(ToolResultPart result, @Nullable ProviderExtras messageExtras) {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("role", "tool");
-        entry.put("content", textOf(result.getParts()));
+        entry.put("content", textOf(result.getSubParts()));
         putIfSet(entry, "tool_call_id", result.getCallId());
         // The message's extras first, the result's own after: the more specific node is merged last,
         // so it wins where both set the same path.

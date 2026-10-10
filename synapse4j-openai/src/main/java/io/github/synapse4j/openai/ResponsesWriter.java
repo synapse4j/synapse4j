@@ -412,7 +412,7 @@ class ResponsesWriter {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("type", "function_call_output");
         putIfSet(entry, "call_id", result.getCallId());
-        entry.put("output", output(result.getParts()));
+        entry.put("output", output(result.getSubParts()));
         if (messageExtras != null) {
             messageExtras.mergeInto(entry);
         }

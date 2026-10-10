@@ -323,7 +323,7 @@ class DefaultToolExecutorTest {
     }
 
     private static String text(ToolResultPart result) {
-        return ((TextPart) result.getParts().get(0)).getText();
+        return ((TextPart) result.getSubParts().get(0)).getText();
     }
 
     /** A tool whose execution runs the given body against the raw arguments. */

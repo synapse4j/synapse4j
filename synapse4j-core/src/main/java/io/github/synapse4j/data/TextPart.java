@@ -12,9 +12,9 @@ import lombok.Getter;
  * Text sent to the model, or produced by it.
  *
  * <p>
- * The model's reasoning is not text in this sense and is modelled separately by
- * {@link ReasoningPart}: applications routinely hide it or render it differently, and it may have
- * to be replayed verbatim to the provider that produced it.
+ * The model's reasoning is not text in this sense and is modelled separately by its own part type:
+ * applications routinely hide it or render it differently, and it may have to be replayed verbatim
+ * to the provider that produced it.
  */
 @Getter
 @AllArgsConstructor

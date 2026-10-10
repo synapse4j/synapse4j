@@ -478,7 +478,7 @@ class ToolCallingChatClientTest {
     }
 
     private static String text(ToolResultPart result) {
-        return ((TextPart) result.getParts().get(0)).getText();
+        return ((TextPart) result.getSubParts().get(0)).getText();
     }
 
     /** A declare-only tool whose execution runs the given body. */

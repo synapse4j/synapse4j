@@ -12,7 +12,7 @@ import lombok.Getter;
  * The model's reasoning about its answer, kept apart from the answer itself.
  *
  * <p>
- * A separate type rather than a flag on {@link TextPart} because the distinction is not cosmetic:
+ * A separate type rather than a flag on the text part because the distinction is not cosmetic:
  * reasoning is usually hidden from end users while the answer is shown, it is billed and counted
  * separately, and some providers require it to be sent back unchanged on the next turn.
  *

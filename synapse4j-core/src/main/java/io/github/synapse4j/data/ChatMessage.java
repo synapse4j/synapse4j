@@ -1,7 +1,9 @@
 package io.github.synapse4j.data;
 
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
 
@@ -136,8 +138,46 @@ public class ChatMessage {
     }
 
     /**
-     * The text this message says: every {@link TextPart}'s text, joined in the order the parts
-     * appear, with the parts of every other kind left out.
+     * Walks this message's parts and every part below them, the message's own parts first, and
+     * answers the parts the walk reaches.
+     *
+     * <p>
+     * A part is always handed over; the predicate decides only whether the walk opens it, so a part
+     * the predicate refuses appears without the parts it contains. Refusing a tool result, say,
+     * reaches the message's own content and leaves the tool's answer behind.
+     *
+     * @param descend which parts to open; must not be {@code null}
+     * @return the parts reached, in document order; never {@code null}
+     */
+    public Stream<ContentPart> walk(@NonNull Predicate<ContentPart> descend) {
+        return parts.stream().flatMap(part -> walk(part, descend));
+    }
+
+    /**
+     * Walks this message's parts and every part below them, opening every part.
+     *
+     * @return the parts reached, in document order; never {@code null}
+     */
+    public Stream<ContentPart> walk() {
+        return walk(part -> true);
+    }
+
+    private static Stream<ContentPart> walk(ContentPart part, Predicate<ContentPart> descend) {
+        Stream<ContentPart> stream = Stream.of(part);
+        if (!descend.test(part)) {
+            return stream;
+        }
+        return Stream.concat(stream, part.getSubParts().stream().flatMap(sub -> walk(sub, descend)));
+    }
+
+    /**
+     * The text this message says: every {@link TextPart}'s text at any depth, joined in the order
+     * the parts appear, with the parts of every other kind left out.
+     *
+     * <p>
+     * The walk opens every part, so text a part holds is included — a tool result's answer, for
+     * instance. A caller that wants only what the message says itself walks with
+     * {@link #walk(Predicate)} and reads the {@link TextPart}s it reaches.
      *
      * <p>
      * No separator is inserted — the parts are consecutive pieces of one piece of writing — and a
@@ -148,11 +188,11 @@ public class ChatMessage {
      */
     public String getText() {
         StringBuilder text = new StringBuilder();
-        for (ContentPart part : parts) {
+        walk().forEach(part -> {
             if (part instanceof TextPart textPart && textPart.getText() != null) {
                 text.append(textPart.getText());
             }
-        }
+        });
         return text.toString();
     }
 

@@ -87,4 +87,23 @@ class ChatMessageTest {
         assertEquals("on", derived.getExtras().get("flag"));
     }
 
+    @Test
+    void getTextReachesNestedParts() {
+        ChatMessage message = ChatMessage.of(ChatRole.TOOL,
+                new ToolResultPart("call_1", "weather", new TextPart("sunny")));
+
+        assertEquals("sunny", message.getText());
+    }
+
+    @Test
+    void walkRefusesSubtree() {
+        ChatMessage message = ChatMessage.of(ChatRole.ASSISTANT, new TextPart("hello"),
+                new ToolResultPart("call_1", "weather", new TextPart("sunny")));
+
+        assertEquals(List.of("hello", "sunny"), message.walk()
+                .filter(TextPart.class::isInstance).map(part -> ((TextPart) part).getText()).toList());
+        assertEquals(List.of("hello"), message.walk(part -> !(part instanceof ToolResultPart))
+                .filter(TextPart.class::isInstance).map(part -> ((TextPart) part).getText()).toList());
+    }
+
 }

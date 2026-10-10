@@ -9,7 +9,7 @@ import io.github.synapse4j.util.InputStreamSupplier;
 import lombok.Getter;
 
 /**
- * A media payload: an image, an audio clip, a video or a document.
+ * A media payload of any kind — an image, for example.
  *
  * <p>
  * One type carrying the concrete kind in {@link #mediaType} rather than a type per kind: the kinds

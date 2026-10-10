@@ -32,7 +32,7 @@ public class ToolResultPart extends ContentPart {
     private final @Nullable String name;
 
     /** The result itself. Never {@code null}; empty is allowed. */
-    private final List<ContentPart> parts;
+    private final List<ContentPart> subParts;
 
     /**
      * Whether the tool failed. A protocol with a member for it — Anthropic's {@code is_error} —
@@ -45,43 +45,43 @@ public class ToolResultPart extends ContentPart {
      * A result answering the given call, carrying the content it is given and not marked as a
      * failure.
      *
-     * @param callId the id of the call being answered; may be {@code null}
-     * @param name   the name of the tool that produced the result; may be {@code null}
-     * @param parts  the result itself; none at all is allowed
+     * @param callId   the id of the call being answered; may be {@code null}
+     * @param name     the name of the tool that produced the result; may be {@code null}
+     * @param subParts the result itself; none at all is allowed
      */
-    public ToolResultPart(@Nullable String callId, @Nullable String name, ContentPart... parts) {
-        this(callId, name, List.of(parts), false, null);
+    public ToolResultPart(@Nullable String callId, @Nullable String name, ContentPart... subParts) {
+        this(callId, name, List.of(subParts), false, null);
     }
 
     /**
      * A result with content and a failure flag, carrying no provider-specific fields.
      *
-     * @param callId the id of the call being answered; may be {@code null}
-     * @param name   the name of the tool that produced the result; may be {@code null}
-     * @param parts  the result itself; never {@code null}, empty allowed
-     * @param error  whether the tool failed
+     * @param callId   the id of the call being answered; may be {@code null}
+     * @param name     the name of the tool that produced the result; may be {@code null}
+     * @param subParts the result itself; never {@code null}, empty allowed
+     * @param error    whether the tool failed
      */
-    public ToolResultPart(@Nullable String callId, @Nullable String name, @NonNull List<ContentPart> parts,
+    public ToolResultPart(@Nullable String callId, @Nullable String name, @NonNull List<ContentPart> subParts,
             boolean error) {
-        this(callId, name, parts, error, null);
+        this(callId, name, subParts, error, null);
     }
 
     /**
      * Everything this result can carry. Hand-written, because Lombok cannot generate a constructor
      * that calls a super constructor with arguments.
      *
-     * @param callId the id of the call being answered; may be {@code null}
-     * @param name   the name of the tool that produced the result; may be {@code null}
-     * @param parts  the result itself; never {@code null}, empty allowed
-     * @param error  whether the tool failed
-     * @param extras provider-specific fields, {@code null} for none; frozen on the way in
+     * @param callId   the id of the call being answered; may be {@code null}
+     * @param name     the name of the tool that produced the result; may be {@code null}
+     * @param subParts the result itself; never {@code null}, empty allowed
+     * @param error    whether the tool failed
+     * @param extras   provider-specific fields, {@code null} for none; frozen on the way in
      */
-    public ToolResultPart(@Nullable String callId, @Nullable String name, @NonNull List<ContentPart> parts,
+    public ToolResultPart(@Nullable String callId, @Nullable String name, @NonNull List<ContentPart> subParts,
             boolean error, @Nullable ProviderExtras extras) {
         super(extras);
         this.callId = callId;
         this.name = name;
-        this.parts = List.copyOf(parts);
+        this.subParts = List.copyOf(subParts);
         this.error = error;
     }
 
@@ -94,7 +94,7 @@ public class ToolResultPart extends ContentPart {
         if (name != null) {
             members.put("name", name);
         }
-        members.put("parts", parts.toString());
+        members.put("subParts", subParts.toString());
         members.put("error", String.valueOf(error));
         return toString(members);
     }

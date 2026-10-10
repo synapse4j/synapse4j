@@ -141,10 +141,25 @@ one would block extension by users and providers.
   `.vscode/settings.json`, so the editor's organize-imports and the build agree.
 - **All comments are in English** — Javadoc (including on private members), inline comments and
   TODOs. Comments explain *why*; do not restate what the code does.
-- **Javadoc states the contract, not the implementation.** Say what a type or method promises — what it
-  takes, what it answers, what it refuses, the invariants a caller relies on — not the steps it takes or
-  the pieces it applies. The body beside it already says that, and a second copy drifts; a private helper
-  whose javadoc lists what it applies earns nothing a reader of the method cannot see.
+- **Javadoc states the contract of the declaration it sits on.** Say what a type or method promises —
+  what it takes, what it answers, what it refuses, the invariants a caller relies on — not the steps it
+  takes or the pieces it applies. The body beside it already says that, and a second copy drifts; a
+  private helper whose javadoc lists what it applies earns nothing a reader of the method cannot see.
+  A note that says *why* the declaration is the way it is — why a constructor is hand-written rather
+  than generated, why a value is copied — is a reason, not a restatement, and earns its place.
+- **A declaration speaks for itself, and for nothing else.** A type's javadoc says what the type is —
+  why it exists, what holds of it as a whole — never a summary of what its members do; a member's promise
+  goes on the member, and a new member rarely owes the class a sentence.
+- **Never let a javadoc read as a complete inventory of an open set.** The kinds a type may take, the
+  values a space holds — users, providers and applications extend them, so a list in a javadoc drifts and
+  a reader takes it for the whole of it. Illustrate with an example where one helps, and state the space
+  as open; only a set genuinely fixed by a specification may be listed, as principle 7 lets a closed form
+  exist.
+- **A `{@link}` earns its place by being needed to read this declaration.** Link a type the declaration
+  is about — a parameter, a return, a field, a supertype, or a type its promise is stated in terms of — so
+  the reader cannot follow the contract without knowing which type is meant. Any other link is a reading
+  list and belongs in prose: a type of the same family, an illustration of a rule, or a method on another
+  class.
 - **A configuration property's Javadoc is plain text.** The Spring metadata processor copies a bound
   field's Javadoc into `spring-configuration-metadata.json` verbatim, so `{@link}`, `{@code}` and `<p>`
   arrive at an IDE's completion exactly as written. Name the type in prose instead; class-level Javadoc,

@@ -389,7 +389,7 @@ class MessagesWriter {
         Map<String, Object> block = new LinkedHashMap<>();
         block.put("type", "tool_result");
         putIfSet(block, "tool_use_id", result.getCallId());
-        block.put("content", resultContent(result.getParts()));
+        block.put("content", resultContent(result.getSubParts()));
         if (result.isError()) {
             // Only a failure is stated: false is the protocol's own default, and emitting it would
             // be a value the caller never chose.
