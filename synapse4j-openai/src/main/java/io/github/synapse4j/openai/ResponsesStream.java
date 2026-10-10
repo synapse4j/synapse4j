@@ -17,6 +17,7 @@ import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.ListPart;
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
@@ -217,13 +218,61 @@ class ResponsesStream extends DefaultChatStream {
             }
         }
 
-        /** Appends a fragment to the turn's text, which is one part however many frames it took. */
+        /**
+         * Appends a fragment to the message item it belongs to, which is one part however many frames
+         * it took. Text arrives as a piece of an output item's content, so it is folded into that
+         * item rather than left beside it: the assembled answer then has the shape a blocking one
+         * would have given it.
+         */
         private void appendText(TextPart fragment) {
-            if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof TextPart text) {
-                parts.set(parts.size() - 1, new TextPart(join(text.getText(), fragment.getText()), text.getExtras()));
+            int index = messageItemIndex(fragment);
+            if (index < 0) {
+                parts.add(new ListPart(List.of(new TextPart(fragment.getText())), fragment.getExtras()));
                 return;
             }
-            parts.add(fragment);
+            ListPart item = (ListPart) parts.get(index);
+            List<ContentPart> subParts = new ArrayList<>(item.getSubParts());
+            if (!subParts.isEmpty() && subParts.get(subParts.size() - 1) instanceof TextPart text) {
+                subParts.set(subParts.size() - 1,
+                        new TextPart(join(text.getText(), fragment.getText()), text.getExtras()));
+            } else {
+                subParts.add(new TextPart(fragment.getText()));
+            }
+            parts.set(index, new ListPart(subParts, item.getExtras()));
+        }
+
+        /**
+         * The message item a text fragment belongs to, as the position it occupies in the turn, or
+         * {@code -1} when it opens a new one. The frame that carries a fragment names the item it
+         * speaks for, and nothing else does: the shared model has no field for it, so it is read back
+         * out of the extras the fragment kept it in.
+         */
+        private int messageItemIndex(TextPart fragment) {
+            Object itemId = extra(fragment, ResponsesReader.ITEM_ID);
+            if (itemId != null) {
+                for (int i = 0; i < parts.size(); i++) {
+                    if (parts.get(i) instanceof ListPart item
+                            && itemId.equals(extra(item, ResponsesReader.ITEM_ID))) {
+                        return i;
+                    }
+                }
+                return -1;
+            }
+            Object outputIndex = extra(fragment, ResponsesReader.OUTPUT_INDEX);
+            if (outputIndex != null) {
+                for (int i = 0; i < parts.size(); i++) {
+                    if (parts.get(i) instanceof ListPart item
+                            && outputIndex.equals(extra(item, ResponsesReader.OUTPUT_INDEX))) {
+                        return i;
+                    }
+                }
+                return -1;
+            }
+            // Nothing identifies the fragment, so it continues the item that was opened last.
+            if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof ListPart) {
+                return parts.size() - 1;
+            }
+            return -1;
         }
 
         /**

@@ -14,6 +14,7 @@ import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.ListPart;
 import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.RawPart;
@@ -207,37 +208,37 @@ class ResponsesWriter {
     private void addMessage(List<Map<String, Object>> input, ChatMessage message) {
         List<ContentPart> content = new ArrayList<>();
         for (ContentPart part : message.getParts()) {
-            if (part instanceof TextPart || part instanceof MediaPart || part instanceof RawPart) {
+            if (part instanceof TextPart || part instanceof MediaPart) {
                 content.add(part);
             }
         }
-        // A refusal this protocol spells inside content: it is what makes a message that carries
-        // nothing else still an item, so it is weighed here as well as where the content is built.
-        boolean carriesRefusal = refusalOf(message) != null;
         // A field set on the message belongs to the item the message becomes. A message that becomes
         // no item of its own — one that carries nothing but the parts this protocol hoists out of it,
         // which is what a turn of tool results is — has nowhere else for them to go, so the items it
         // does become carry them instead.
-        ProviderExtras messageExtras = content.isEmpty() && !carriesRefusal ? message.getExtras() : null;
-        // A message that becomes an item for a reason no part of it accounts for — one that carries a
-        // refusal and no text — has no part to place it, so it stands where the turn begins.
-        boolean messageAdded = content.isEmpty() && carriesRefusal;
-        if (messageAdded) {
-            input.add(messageItem(message, content));
-        }
+        ProviderExtras messageExtras = content.isEmpty() ? message.getExtras() : null;
+        boolean messageAdded = false;
         for (ContentPart part : message.getParts()) {
-            if (part instanceof ToolCallPart call) {
+            if (part instanceof ListPart item) {
+                // The part holds one item whole — its content entries and its own members — so it
+                // goes back out as that item, in the place it held.
+                input.add(messageItem(item, message.getRole()));
+            } else if (part instanceof RawPart raw) {
+                // A part kept whole at the top of a message is an item this module does not model:
+                // its members are the item, so they go out exactly as they were read.
+                input.add(raw.members());
+            } else if (part instanceof ToolCallPart call) {
                 input.add(functionCall(call, messageExtras));
             } else if (part instanceof ToolResultPart result) {
                 input.add(functionCallOutput(result, messageExtras));
             } else if (part instanceof ReasoningPart reasoning) {
                 input.add(reasoningItem(reasoning, messageExtras));
-            } else if (part instanceof TextPart || part instanceof MediaPart || part instanceof RawPart) {
-                // Text, images and a part this module does not model make no item of their own: they
-                // are the message's own item, which stands where the first of them sits — so a part
-                // the model wrote before it answered, its reasoning, keeps the place the turn gives it.
+            } else if (part instanceof TextPart || part instanceof MediaPart) {
+                // Text and images make no item of their own: they are the message's own item, which
+                // stands where the first of them sits — so a part the model wrote before it answered,
+                // its reasoning, keeps the place the turn gives it.
                 if (!messageAdded) {
-                    input.add(messageItem(message, content));
+                    input.add(messageItem(message.getRole(), content, message.getExtras()));
                     messageAdded = true;
                 }
             } else {
@@ -248,42 +249,19 @@ class ResponsesWriter {
 
     /**
      * What a message says as the item it becomes. A message that is text alone takes the plain-string
-     * content form; anything else — an image, a refusal, a part carrying a field this module does not
-     * model — takes the array form, which is the only one that can hold it.
+     * content form; anything else — an image, a part carrying a field this module does not model —
+     * takes the array form, which is the only one that can hold it.
      */
-    private static Map<String, Object> messageItem(ChatMessage message, List<ContentPart> content) {
+    private static Map<String, Object> messageItem(@Nullable String role, List<ContentPart> content,
+            @Nullable ProviderExtras extras) {
         Map<String, Object> entry = new LinkedHashMap<>();
-        entry.put("role", message.getRole());
-        Object refusal = refusalOf(message);
-        if (arrayContent(content) || refusal != null) {
+        entry.put("role", role);
+        if (arrayContent(content)) {
             // What the assistant said is this protocol's own kind of content entry, and what anyone
             // else says is the input kind: an assistant turn replayed as an item has to look like the
             // item it was, or the endpoint reads it as something the model did not say.
-            String textType = ChatRole.ASSISTANT.equals(message.getRole()) ? "output_text" : "input_text";
-            List<Map<String, Object>> entries = new ArrayList<>();
-            for (ContentPart part : content) {
-                if (part instanceof TextPart textPart) {
-                    Map<String, Object> text = textEntry(textPart, textType);
-                    if (text != null) {
-                        entries.add(text);
-                    }
-                } else if (part instanceof RawPart raw) {
-                    // The part goes back out as it arrived: its members were read whole off the
-                    // wire, so the protocol spells them again untouched, where this part sits.
-                    entries.add(raw.members());
-                } else {
-                    entries.add(mediaEntry((MediaPart) part));
-                }
-            }
-            if (refusal != null) {
-                // This protocol spells a refusal as a content entry, not as a member of the message:
-                // it goes here, where the read side put it back under the same key.
-                Map<String, Object> refusalEntry = new LinkedHashMap<>();
-                refusalEntry.put("type", "refusal");
-                refusalEntry.put("refusal", refusal);
-                entries.add(refusalEntry);
-            }
-            entry.put("content", entries);
+            String textType = ChatRole.ASSISTANT.equals(role) ? "output_text" : "input_text";
+            entry.put("content", contentEntries(content, textType));
         } else {
             StringBuilder text = new StringBuilder();
             for (ContentPart part : content) {
@@ -296,20 +274,55 @@ class ResponsesWriter {
                 entry.put("content", text.toString());
             }
         }
-        ProviderExtras messageExtras = message.getExtras();
-        if (messageExtras != null) {
-            messageExtras.mergeInto(entry);
-            // The refusal is content here, not a member of the item: it was written into the content
-            // above, so it must not also ride out as a top-level member the endpoint would reject.
-            entry.remove("refusal");
+        if (extras != null) {
+            extras.mergeInto(entry);
         }
         return entry;
     }
 
-    /** The refusal a message carries, under the key the read side stores it, or {@code null}. */
-    private static @Nullable Object refusalOf(ChatMessage message) {
-        ProviderExtras extras = message.getExtras();
-        return extras == null ? null : extras.get("refusal");
+    /**
+     * A group at the top of a message as the item it becomes: this protocol answers with a flat array
+     * of items, and a {@code message} item is what a group stands for. Its content is written in the
+     * array form whatever it holds, because that is the form its entries were read from and the only
+     * one that can carry an entry's type and the fields beside it.
+     */
+    private static Map<String, Object> messageItem(ListPart part, @Nullable String role) {
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("role", role);
+        String textType = ChatRole.ASSISTANT.equals(role) ? "output_text" : "input_text";
+        entry.put("content", contentEntries(part.getSubParts(), textType));
+        ProviderExtras extras = part.getExtras();
+        if (extras != null) {
+            extras.mergeInto(entry);
+        }
+        return entry;
+    }
+
+    /**
+     * The content entries a group of parts becomes, in the order the parts sit: a text part as the
+     * entry this position takes, a part kept whole as its own members, an image as the protocol's
+     * image shape. Anything else is not a content entry, and is refused rather than written half
+     * expressed.
+     */
+    private static List<Map<String, Object>> contentEntries(List<ContentPart> parts, String textType) {
+        List<Map<String, Object>> entries = new ArrayList<>();
+        for (ContentPart part : parts) {
+            if (part instanceof TextPart textPart) {
+                Map<String, Object> text = textEntry(textPart, textType);
+                if (text != null) {
+                    entries.add(text);
+                }
+            } else if (part instanceof RawPart raw) {
+                // The part goes back out as it arrived: its members were read whole off the wire, so
+                // the protocol spells them again untouched, where this part sits.
+                entries.add(raw.members());
+            } else if (part instanceof MediaPart mediaPart) {
+                entries.add(mediaEntry(mediaPart));
+            } else {
+                throw unsupportedPart(part);
+            }
+        }
+        return entries;
     }
 
     /**

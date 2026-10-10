@@ -1,5 +1,6 @@
 package io.github.synapse4j.openai;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,7 @@ import io.github.synapse4j.data.ChatResponse;
 import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.ListPart;
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.RawPart;
 import io.github.synapse4j.data.ReasoningPart;
@@ -32,9 +34,10 @@ import io.github.synapse4j.json.JsonReader;
  * instead of twice.
  *
  * <p>
- * The response is a flat array of items rather than a message with everything in it, so an item that
- * carries nothing this module models — a built-in tool's call, a search result — is kept whole in the
- * response's extras under its own path instead of stopping the walk.
+ * The response is a flat array of items rather than a message with everything in it. An item this
+ * module models becomes the part it stands for — a {@code message} item one part holding its content
+ * entries — and an item it does not model is kept whole as a part of the turn, in the place it held,
+ * instead of stopping the walk.
  *
  * <p>
  * The reader is handed in, and where its bytes come from is not this class's business and must not
@@ -143,7 +146,6 @@ class ResponsesReader {
         ChatResponse response = new ChatResponse();
         // The turn is the model's wherever it is read from, and no item in the output has to say so.
         ChatMessage.Builder message = ChatMessage.builder().role(ChatRole.ASSISTANT);
-        ProviderExtras messageExtras = new ProviderExtras();
         String status = null;
         String incompleteReason = null;
         Object error = null;
@@ -154,7 +156,7 @@ class ResponsesReader {
             switch (field) {
                 case "id" -> response.setId(reader.string());
                 case "model" -> response.setModel(reader.string());
-                case "output" -> calledTool = readOutput(reader, response, message, messageExtras);
+                case "output" -> calledTool = readOutput(reader, message);
                 case "status" -> status = reader.string();
                 case "incomplete_details" -> incompleteReason = readIncompleteDetails(reader, response);
                 case "usage" -> response.setUsage(readUsage(reader));
@@ -167,9 +169,6 @@ class ResponsesReader {
             // give one, and the detail belongs in the message rather than in an extras bag.
             throw failed(error);
         }
-        if (!messageExtras.isEmpty()) {
-            message.extras(messageExtras);
-        }
         response.setMessage(message.build());
         response.setFinishReason(finishReason(status, calledTool, incompleteReason));
         return response;
@@ -181,22 +180,18 @@ class ResponsesReader {
      *
      * @return whether the output carried a tool call
      */
-    private static boolean readOutput(JsonReader reader, ChatResponse response, ChatMessage.Builder message,
-            ProviderExtras messageExtras) {
+    private static boolean readOutput(JsonReader reader, ChatMessage.Builder message) {
         if (reader.token() != JsonReader.Token.START_ARRAY) {
             reader.skipValue();
             return false;
         }
         boolean calledTool = false;
-        int position = 0;
         while (reader.nextToken() != JsonReader.Token.END_ARRAY) {
             if (reader.token() != JsonReader.Token.START_OBJECT) {
                 reader.skipValue();
-                position++;
                 continue;
             }
-            calledTool |= readItem(reader, response, message, messageExtras, position);
-            position++;
+            calledTool |= readItem(reader, message);
         }
         return calledTool;
     }
@@ -207,8 +202,7 @@ class ResponsesReader {
      *
      * @return whether the item was a tool call
      */
-    private static boolean readItem(JsonReader reader, ChatResponse response, ChatMessage.Builder message,
-            ProviderExtras messageExtras, int position) {
+    private static boolean readItem(JsonReader reader, ChatMessage.Builder message) {
         String type = null;
         Map<String, Object> members = new LinkedHashMap<>();
         while (reader.nextToken() != JsonReader.Token.END_OBJECT) {
@@ -222,7 +216,7 @@ class ResponsesReader {
             }
         }
         if ("message".equals(type)) {
-            readMessageItem(members, message, messageExtras);
+            message.part(readMessageItem(members));
             return false;
         }
         if ("function_call".equals(type)) {
@@ -234,33 +228,34 @@ class ResponsesReader {
             return false;
         }
         // An item this module does not model — a built-in tool's call, a search result — is kept
-        // whole under the path it came from rather than dropped: the shared model has no part for it,
-        // but its words still have to arrive. It stays on the response, because the message's extras
-        // are what a request replays, and this item is not a member of a message.
+        // whole as a part of the turn, in the place it held: the shared model has no name for it,
+        // but its words still have to arrive and go back out with the turn.
         Map<String, Object> whole = new LinkedHashMap<>();
         whole.put("type", type);
         whole.putAll(members);
-        response.getExtras().put(List.of("output", String.valueOf(position)), whole);
+        message.part(RawPart.of(whole));
         return false;
     }
 
     /**
-     * A message item: what it says becomes the turn's text, and the item's own identity and status
-     * ride in the message's extras — which is what lets the turn be replayed as the item it was.
+     * A message item as the one part it becomes: what it says are the part's sub-parts, and the
+     * item's own members — its identity and status — ride in the part's extras, which is what keeps
+     * a turn of two message items two items and lets each be replayed as the item it was.
      */
-    private static void readMessageItem(Map<String, Object> members, ChatMessage.Builder message,
-            ProviderExtras messageExtras) {
+    private static ListPart readMessageItem(Map<String, Object> members) {
+        List<ContentPart> content = new ArrayList<>();
+        ProviderExtras extras = new ProviderExtras();
         for (Map.Entry<String, Object> member : members.entrySet()) {
             if ("content".equals(member.getKey())) {
-                readMessageContent(member.getValue(), message, messageExtras);
+                readMessageContent(member.getValue(), content);
             } else {
-                messageExtras.put(member.getKey(), member.getValue());
+                extras.put(member.getKey(), member.getValue());
             }
         }
+        return new ListPart(content, extras);
     }
 
-    private static void readMessageContent(@Nullable Object value, ChatMessage.Builder message,
-            ProviderExtras messageExtras) {
+    private static void readMessageContent(@Nullable Object value, List<ContentPart> content) {
         if (!(value instanceof List<?> entries)) {
             return;
         }
@@ -272,19 +267,11 @@ class ResponsesReader {
             if (type == null) {
                 continue;
             }
-            if ("refusal".equals(type)) {
-                // The refusal this protocol spells inside the content is kept as the member its
-                // message-level cousins travel under, so an application reads one member however
-                // the protocol chose to deliver the words — and the walk goes on to the parts
-                // beside it instead of failing on it.
-                messageExtras.put("refusal", members.get("refusal"));
-                continue;
-            }
             if (!"output_text".equals(type)) {
-                // A part type this module does not model is kept whole rather than refused: the
-                // shared model has no name for it, but its members have to arrive and go back out
-                // with the turn, as an unmodeled output item already is a level above.
-                message.part(RawPart.of(members));
+                // An entry type this module does not model — a refusal, a kind of its own — is kept
+                // whole as the entry it is: the shared model has no name for it, but its members
+                // have to arrive and go back out with the turn.
+                content.add(RawPart.of(members));
                 continue;
             }
             ProviderExtras extras = new ProviderExtras();
@@ -292,11 +279,11 @@ class ResponsesReader {
                 String name = String.valueOf(member.getKey());
                 if (!"type".equals(name) && !"text".equals(name)) {
                     // The citations and log-probabilities the entry carries belong to this text, so
-                    // they stay on the part rather than on the message the part sits in.
+                    // they stay on the part rather than on the item the part sits in.
                     extras.put(name, member.getValue());
                 }
             }
-            message.part(new TextPart(stringOf(members.get("text")), extras));
+            content.add(new TextPart(stringOf(members.get("text")), extras));
         }
     }
 
@@ -416,9 +403,15 @@ class ResponsesReader {
         // blocking response has no frames, and the fold is what makes the two answers equal.
         event.getExtras().putAll(payload);
         String fragment = stringOf(payload.get("delta"));
-        if (fragment != null) {
-            event.setDelta(delta(new TextPart(fragment)));
+        if (fragment == null) {
+            return;
         }
+        // The item a fragment belongs to rides on the part the fold reads it back from, the way a
+        // tool call's fragments keep it: text arrives in pieces, and they have to be assembled into
+        // the item they came from rather than left beside it.
+        ProviderExtras extras = new ProviderExtras();
+        streamPosition(payload, extras);
+        event.setDelta(delta(new TextPart(fragment, extras)));
     }
 
     private static void argumentsDelta(ChatStreamEvent event, ProviderExtras payload) {

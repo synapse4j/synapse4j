@@ -32,6 +32,7 @@ import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.ListPart;
 import io.github.synapse4j.data.RawPart;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
@@ -420,9 +421,10 @@ class OpenAiResponsesChatClientTest {
         ChatResponse answer = client.chat(requestWithModel());
 
         // The shared model has no part for the element, so it rides as itself, in the place it held
-        // among the content entries.
-        assertEquals(2, answer.getMessage().getParts().size());
-        RawPart kept = assertInstanceOf(RawPart.class, answer.getMessage().getParts().get(1));
+        // among the item's content entries.
+        ListPart item = assertInstanceOf(ListPart.class, answer.getMessage().getParts().get(0));
+        assertEquals(2, item.getSubParts().size());
+        RawPart kept = assertInstanceOf(RawPart.class, item.getSubParts().get(1));
         assertEquals("audio", kept.members().get("type"));
         assertEquals("a_1", kept.members().get("id"));
     }
@@ -502,21 +504,89 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void refusalKeptAsMessageMember() {
-        stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\","
-                + "\"output\":[{\"type\":\"message\",\"id\":\"msg_9\",\"status\":\"completed\","
-                + "\"content\":[{\"type\":\"refusal\",\"refusal\":\"I cannot help with that\"},"
-                + "{\"type\":\"output_text\",\"text\":\"visible\"}]}],"
-                + "\"usage\":{\"input_tokens\":7,\"output_tokens\":2}}");
+    void messageItemRoundTrips() {
+        stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":["
+                + "{\"type\":\"message\",\"id\":\"msg_1\",\"role\":\"assistant\",\"status\":\"completed\","
+                + "\"content\":[{\"type\":\"output_text\",\"text\":\"Hi there\"}]}]}");
 
-        ChatResponse response = client.chat(requestWithModel());
+        ChatResponse answer = client.chat(requestWithModel());
 
-        // The refusal is kept as the member its message-level cousins travel under, and the walk
-        // goes on to the parts beside it rather than failing on a payload the protocol sends.
-        assertEquals("I cannot help with that", response.getMessage().getExtras().get("refusal"));
-        assertEquals(1, response.getMessage().getParts().size());
-        assertEquals("visible",
-                assertInstanceOf(TextPart.class, response.getMessage().getParts().get(0)).getText());
+        // A message item is one part: its content entries are its sub-parts and its own members ride
+        // in its extras, so nothing of the item boundary is lost.
+        ListPart item = assertInstanceOf(ListPart.class, answer.getMessage().getParts().get(0));
+        assertEquals(1, answer.getMessage().getParts().size());
+        assertEquals("Hi there", assertInstanceOf(TextPart.class, item.getSubParts().get(0)).getText());
+        assertEquals("msg_1", item.getExtras().get("id"));
+        assertEquals("completed", item.getExtras().get("status"));
+
+        ChatRequest replay = requestWithModel();
+        replay.addPendingMessage(answer.getMessage());
+        stubCompletion();
+        client.chat(replay);
+
+        // And it goes back out as the one item it was, its members and its entry beside it.
+        assertEquals(List.of(Map.of("role", "assistant",
+                "content", List.of(Map.of("type", "output_text", "text", "Hi there")),
+                "id", "msg_1", "status", "completed")),
+                inputOf(parseCaptured()));
+    }
+
+    @Test
+    void twoMessageItemsStayDistinct() {
+        stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":["
+                + "{\"type\":\"message\",\"id\":\"msg_1\",\"role\":\"assistant\",\"status\":\"completed\","
+                + "\"content\":[{\"type\":\"output_text\",\"text\":\"first\"}]},"
+                + "{\"type\":\"message\",\"id\":\"msg_2\",\"role\":\"assistant\",\"status\":\"incomplete\","
+                + "\"content\":[{\"type\":\"output_text\",\"text\":\"second\"}]}]}");
+
+        ChatResponse answer = client.chat(requestWithModel());
+
+        // Two items in one turn are two parts, each keeping its own identity: nothing of one collides
+        // with the other, which is what a message-level bag could not say.
+        List<ContentPart> parts = answer.getMessage().getParts();
+        assertEquals(2, parts.size(), parts.toString());
+        ListPart first = assertInstanceOf(ListPart.class, parts.get(0));
+        ListPart second = assertInstanceOf(ListPart.class, parts.get(1));
+        assertEquals("msg_1", first.getExtras().get("id"));
+        assertEquals("msg_2", second.getExtras().get("id"));
+        assertEquals("completed", first.getExtras().get("status"));
+        assertEquals("incomplete", second.getExtras().get("status"));
+
+        ChatRequest replay = requestWithModel();
+        replay.addPendingMessage(answer.getMessage());
+        stubCompletion();
+        client.chat(replay);
+
+        // Both go back out, each as its own item.
+        List<Map<String, Object>> input = inputOf(parseCaptured());
+        assertEquals(2, input.size(), input.toString());
+        assertEquals("msg_1", input.get(0).get("id"));
+        assertEquals("msg_2", input.get(1).get("id"));
+    }
+
+    @Test
+    void unmodeledItemRoundTrips() {
+        stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":["
+                + "{\"type\":\"web_search_call\",\"id\":\"ws_1\",\"status\":\"completed\","
+                + "\"action\":{\"type\":\"search\",\"query\":\"weather\"}}]}");
+
+        ChatResponse answer = client.chat(requestWithModel());
+
+        // An item the module does not model is one part holding its members, in the place it held
+        // among the items.
+        RawPart kept = assertInstanceOf(RawPart.class, answer.getMessage().getParts().get(0));
+        assertEquals("web_search_call", kept.members().get("type"));
+        assertEquals("ws_1", kept.members().get("id"));
+
+        ChatRequest replay = requestWithModel();
+        replay.addPendingMessage(answer.getMessage());
+        stubCompletion();
+        client.chat(replay);
+
+        // And it goes back out as the item it was, every member of it.
+        assertEquals(List.of(Map.of("type", "web_search_call", "id", "ws_1", "status", "completed",
+                "action", Map.of("type", "search", "query", "weather"))),
+                inputOf(parseCaptured()));
     }
 
     @Test
@@ -538,28 +608,33 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void refusalTurnReplaysInContent() {
+    void refusalRoundTripsAsEntry() {
         stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\","
-                + "\"output\":[{\"type\":\"message\",\"id\":\"msg_9\",\"status\":\"completed\","
-                + "\"content\":[{\"type\":\"refusal\",\"refusal\":\"I cannot help with that\"}]}]}");
+                + "\"output\":[{\"type\":\"message\",\"id\":\"msg_9\",\"role\":\"assistant\","
+                + "\"status\":\"completed\","
+                + "\"content\":[{\"type\":\"refusal\",\"refusal\":\"I cannot help with that\"},"
+                + "{\"type\":\"output_text\",\"text\":\"visible\"}]}]}");
 
         ChatResponse answer = client.chat(requestWithModel());
-        assertEquals("I cannot help with that", answer.getMessage().getExtras().get("refusal"));
-        assertTrue(answer.getMessage().getParts().isEmpty());
+
+        // A refusal is an entry the module does not model, so it rides as the entry it is, beside the
+        // text, rather than being lifted onto the item.
+        ListPart item = assertInstanceOf(ListPart.class, answer.getMessage().getParts().get(0));
+        RawPart refusal = assertInstanceOf(RawPart.class, item.getSubParts().get(0));
+        assertEquals("I cannot help with that", refusal.members().get("refusal"));
+        assertEquals("visible", assertInstanceOf(TextPart.class, item.getSubParts().get(1)).getText());
 
         ChatRequest replay = requestWithModel();
         replay.addPendingMessage(answer.getMessage());
         stubCompletion();
         client.chat(replay);
 
-        // The turn survives as an item — a refusal is the only thing it carries — and the refusal
-        // goes back where this protocol spells it, inside the content, never as a member of the item.
-        List<Map<String, Object>> input = inputOf(parseCaptured());
-        assertEquals(1, input.size());
-        assertEquals("assistant", input.get(0).get("role"));
-        assertEquals(List.of(Map.of("type", "refusal", "refusal", "I cannot help with that")),
-                input.get(0).get("content"));
-        assertFalse(input.get(0).containsKey("refusal"));
+        // And the turn goes back as the item it was, the refusal back where the protocol spells it.
+        assertEquals(List.of(Map.of("role", "assistant",
+                "content", List.of(Map.of("type", "refusal", "refusal", "I cannot help with that"),
+                        Map.of("type", "output_text", "text", "visible")),
+                "id", "msg_9", "status", "completed")),
+                inputOf(parseCaptured()));
     }
 
     @Test
@@ -612,8 +687,8 @@ class OpenAiResponsesChatClientTest {
         ChatResponse aggregated = stream.aggregatedResponse();
         assertEquals(ChatRole.ASSISTANT, aggregated.getMessage().getRole());
         assertEquals(1, aggregated.getMessage().getParts().size());
-        assertEquals("Hi there",
-                assertInstanceOf(TextPart.class, aggregated.getMessage().getParts().get(0)).getText());
+        ListPart item = assertInstanceOf(ListPart.class, aggregated.getMessage().getParts().get(0));
+        assertEquals("Hi there", assertInstanceOf(TextPart.class, item.getSubParts().get(0)).getText());
 
         stubResponse(COMPLETED_RESPONSE);
         ChatResponse blocking = client.chat(requestWithModel());
@@ -657,9 +732,9 @@ class OpenAiResponsesChatClientTest {
         assertTrue(thrown.getMessage().contains("cut short"), thrown.getMessage());
         // What arrived before the cut is still the caller's: the failure reports the answer,
         // it does not discard it.
-        assertEquals("Hi",
-                assertInstanceOf(TextPart.class, stream.aggregatedResponse().getMessage().getParts().get(0))
-                        .getText());
+        ListPart item = assertInstanceOf(ListPart.class,
+                stream.aggregatedResponse().getMessage().getParts().get(0));
+        assertEquals("Hi", assertInstanceOf(TextPart.class, item.getSubParts().get(0)).getText());
     }
 
     @Test
@@ -682,9 +757,9 @@ class OpenAiResponsesChatClientTest {
         assertEquals("Hi", textOf(events.next()));
         events.next();
 
-        assertEquals("Hi",
-                assertInstanceOf(TextPart.class, stream.aggregatedResponse().getMessage().getParts().get(0))
-                        .getText());
+        ListPart item = assertInstanceOf(ListPart.class,
+                stream.aggregatedResponse().getMessage().getParts().get(0));
+        assertEquals("Hi", assertInstanceOf(TextPart.class, item.getSubParts().get(0)).getText());
     }
 
     @Test
