@@ -4,14 +4,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.Reader;
+import java.io.StringReader;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.json.BooleanJsonSchema;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonSchemaBuilder;
+import io.github.synapse4j.json.JsonSource;
 import tools.jackson.databind.exc.MismatchedInputException;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -86,8 +91,39 @@ class Synapse4jJacksonModuleTest {
         assertEquals(schema, twice.readValue(twice.writeValueAsString(schema), JsonSchema.class));
     }
 
+    @Test
+    void libraryTypesWrittenAsDocuments() {
+        ProviderExtras extras = new ProviderExtras().put("temperature", 0);
+
+        String json = mapper.writeValueAsString(new Payload(new StringReader("hello"), extras, () -> "deferred"));
+
+        assertEquals(Map.of("text", "hello", "extras", Map.of("temperature", 0), "source", "deferred"),
+                mapper.readValue(json, Map.class));
+    }
+
+    @Test
+    void readerClosedAfterWriting() {
+        AtomicBoolean closed = new AtomicBoolean();
+        Reader text = new StringReader("hello") {
+
+            @Override
+            public void close() {
+                closed.set(true);
+                super.close();
+            }
+
+        };
+
+        assertEquals("\"hello\"", mapper.writeValueAsString(text));
+        assertTrue(closed.get());
+    }
+
     /** A value carrying schemas the way a model type would: one field, and a list of them. */
     record Carries(JsonSchema schema, List<JsonSchema> more) {
+    }
+
+    /** A value carrying the other types the module binds, the way a model type would. */
+    record Payload(Reader text, ProviderExtras extras, JsonSource source) {
     }
 
     private static JsonSchema objectSchema() {

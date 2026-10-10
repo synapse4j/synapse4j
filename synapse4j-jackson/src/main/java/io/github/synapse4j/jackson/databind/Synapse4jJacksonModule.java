@@ -1,18 +1,23 @@
 package io.github.synapse4j.jackson.databind;
 
+import java.io.Reader;
+
+import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonSource;
 import tools.jackson.databind.module.SimpleModule;
 
 /**
- * Teaches a Jackson {@code JsonMapper} to read and write this library's own types as the JSON
- * documents they describe — anywhere in the object graph, a field of a record included.
+ * Teaches a Jackson {@code JsonMapper} to read and write the values this library hands it as the JSON
+ * they stand for rather than as the shape of their classes — anywhere in the object graph, a field of a
+ * record included.
  *
  * <p>
- * This is a Jackson module, not one of the victools schema-generation modules: it registers a serializer
- * and a deserializer for each type whose document form is not the shape of its class — {@link JsonSchema}
- * today, the rest as they are modelled — so such a value that sits inside something the mapper binds
- * is written and read like any other member. Add it to the mapper before the codec is built; a mapper
- * is immutable once built, so the module cannot be added later.
+ * This is a Jackson module, not one of the victools schema-generation modules: it registers the
+ * (de)serializers that carry them — a {@link JsonSchema} as the schema itself, a {@link Reader} as the
+ * string it yields, the rest as they are modelled — so a value that sits inside something the mapper
+ * binds is written and read like any other member. Add it to the mapper before the codec is built; a
+ * mapper is immutable once built, so the module cannot be added later.
  *
  * <p>
  * A type is registered under the interface it is reached by, so a {@link JsonSchema} is covered in both
@@ -37,6 +42,9 @@ public class Synapse4jJacksonModule extends SimpleModule {
         super(NAME);
         addSerializer(JsonSchema.class, new JsonSchemaSerializer());
         addDeserializer(JsonSchema.class, new JsonSchemaDeserializer());
+        addSerializer(Reader.class, new ReaderSerializer());
+        addSerializer(ProviderExtras.class, new ProviderExtrasSerializer());
+        addSerializer(JsonSource.class, new JsonSourceSerializer());
     }
 
 }
