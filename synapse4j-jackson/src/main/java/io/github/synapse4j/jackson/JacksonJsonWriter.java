@@ -10,7 +10,6 @@ import org.jspecify.annotations.Nullable;
 
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
-import io.github.synapse4j.json.AbstractJsonWriter;
 import io.github.synapse4j.json.JsonWriter;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -30,11 +29,11 @@ import tools.jackson.databind.json.JsonMapper;
  * {@link #close()} is Jackson's own "flush and release", not a stream close.
  *
  * <p>
- * The mapper is carried alongside for {@link #writeValueDirect(Object)}, the one value the tokens
- * cannot write.
+ * The mapper is carried alongside for {@link #writeValue(Object)}: a value handed over whole is written
+ * by the mapper, which decides its JSON.
  */
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-class JacksonJsonWriter extends AbstractJsonWriter {
+class JacksonJsonWriter implements JsonWriter {
 
     private final JsonGenerator generator;
 
@@ -130,7 +129,7 @@ class JacksonJsonWriter extends AbstractJsonWriter {
     }
 
     @Override
-    protected JsonWriter writeValueDirect(Object value) {
+    public JsonWriter writeValue(@Nullable Object value) {
         // The mapper writes into the open generator, so the value reaches the sink as it is
         // serialized rather than being turned into text first.
         return write(() -> jsonMapper.writeValue(generator, value));

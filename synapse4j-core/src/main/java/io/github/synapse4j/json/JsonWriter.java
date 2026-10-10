@@ -7,7 +7,6 @@ import java.math.BigDecimal;
 
 import org.jspecify.annotations.Nullable;
 
-import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.exception.SynapseIOException;
 
 /**
@@ -125,21 +124,10 @@ public interface JsonWriter extends Flushable, AutoCloseable {
     JsonWriter writeNull();
 
     /**
-     * Writes a Java value into the document: the shapes a JSON document is made of, and the types
-     * this library owns in the form they describe.
-     *
-     * <p>
-     * A map becomes an object and a list an array, and a {@link Reader} as the string it yields, so a
-     * payload larger than memory still goes out, and their members and elements are written the same
-     * way, so a type this library owns is recognized wherever it sits. A {@link ProviderExtras} is
-     * written as the object its paths describe, a {@link JsonSchema} as the document it describes. A
-     * value none of those covers is handed to the JSON library this writer came from, which decides
-     * what it becomes — a value whose fields the protocol spells differently belongs in a map instead.
-     *
-     * <p>
-     * {@link AbstractJsonWriter} implements the {@link ProviderExtras} part of this over the tokens; a
-     * {@link JsonSchema} is bound by the implementation, the way a codec binds every type it owns — an
-     * implementation that does not extend it carries the same obligation.
+     * Writes a Java value into the document, through the JSON library this writer came from: that library
+     * decides what the value becomes, and the bindings the codec added decide for the types this library
+     * owns, so such a value is written as the document it stands for wherever it sits. A value whose
+     * fields the protocol spells differently belongs in a map instead.
      *
      * @param value the value to write; {@code null} writes JSON {@code null}
      */

@@ -46,6 +46,27 @@ class JacksonJsonWriterTest {
     }
 
     @Test
+    void writesEachShapeOfValue() {
+        RecordingOutputStream sink = new RecordingOutputStream();
+
+        JsonWriter writer = codec.writer(sink);
+        writer.writeStartArray()
+                .writeValue("text")
+                .writeValue(3)
+                .writeValue(0.5)
+                .writeValue(new BigDecimal("123456789012345678901234567890.5"))
+                .writeValue(true)
+                .writeValue(List.of(1, 2))
+                .writeValue(Map.of("inner", "x"))
+                .writeValue(null)
+                .writeEndArray();
+        writer.close();
+
+        assertEquals("[\"text\",3,0.5,123456789012345678901234567890.5,true,[1,2],{\"inner\":\"x\"},null]",
+                sink.text());
+    }
+
+    @Test
     void writesValueStreamedFromReader() {
         String value = "0123456789".repeat(50_000);
         TrackingReader text = new TrackingReader(value);
