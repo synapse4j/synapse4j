@@ -12,67 +12,40 @@ import lombok.EqualsAndHashCode;
 import lombok.NonNull;
 
 /**
- * Extra, provider-specific fields attached to a single node of a request (the request itself, a
- * message, a content part or a tool declaration) and merged into the outgoing payload when the
- * request is sent.
+ * Provider-specific fields that belong to one modelled thing and are merged into the outgoing payload
+ * when the request is sent.
  *
  * <p>
- * A provider module assembles its own payload one object at a time: a map for the object a node
- * becomes, the members this module models written straight into it, and the node's bag merged over
- * them with {@link #mergeInto(Map)}. Merging is where the two meet — an entry that overlaps one of
- * the module's own replaces it, so the caller's value is the one that goes out, as one member of
- * that name rather than two; a member the bag never sets is left as the module wrote it.
- *
- * <p>
- * A value is addressed either by a path of one or more segments or by a key the caller has assembled
- * itself, and the two are the same string. Segments are joined with {@code .}, and a segment that
+ * A value is addressed by a path of one or more segments, joined with {@code .}; a segment that
  * contains {@code .} or {@code \} escapes that character with {@code \}, so a segment holding a dot
- * is written {@code a\.b}. {@link #rawMap()} hands the entries out under exactly that spelling and
- * {@link #putRaw(String, Object)} takes one back as given, which is how a caller serializes a bag
- * somewhere and restores it later.
+ * is written {@code a\.b}. A segment becomes a key of the outgoing object exactly as written: the
+ * caller spells the provider's own wire name, so nothing is renamed, case-converted or otherwise
+ * adapted, and the only structure a merge adds is the nesting the path describes.
  *
  * <p>
- * A path may address either a leaf or a whole subtree: the value is stored opaquely and never
- * inspected, so it may be a scalar, a collection or an arbitrary object to be serialized by the
- * configured JSON codec. The names inside such an object are whatever that codec produces, so a
- * value the protocol spells differently belongs in a map instead.
+ * What is stored is opaque and never inspected, so a value may be anything the configured JSON codec
+ * serializes. The names inside such a value are whatever that codec produces, so a field the protocol
+ * spells differently belongs in a map instead.
  *
  * <p>
- * Setting a path clears whatever stands in the way of it — the entries it would contain, and the
- * entry it would sit inside — so a path replaces that position in the tree, the way a map's put
- * replaces a key, rather than being refused for overlapping what is already there.
+ * An instance answers for the thing it sits on: an entry may set a member of any object that thing
+ * contributes, at any depth, until it meets a thing that carries extras of its own — there the reach
+ * ends. The outer entry may still set that member to stand in place of the whole thing, so that
+ * thing's own extras are never written; it may not set one of that thing's members, which answers for
+ * itself. Where two instances land on one node, the one applied later is the one that goes out.
  *
  * <p>
- * A path segment becomes a key of the outgoing object exactly as written: the caller spells the
- * provider's own wire name, so nothing is renamed, case-converted or otherwise adapted to the shape
- * of this library. The only structure the merge adds is the nesting the path describes.
+ * Instances are mutable, in the spirit of {@link Map}, not value objects: the caller owns one, fills
+ * it, and freezes it where the model requires. They are not thread-safe.
  *
  * <p>
- * Where the payload's own fields land is the module's business, not this bag's: which names a
- * protocol uses, and at which nesting, is the protocol's to know. A path set here addresses the same
- * tree the module writes into, so a field of the provider's that sits inside one of the module's own
- * objects is set by that path and lands there.
+ * A value is kept by reference and never copied when stored, so changing one afterwards is visible to
+ * whoever reads the instance back, serialization included; making the entries unchangeable does not
+ * make the values so.
  *
  * <p>
- * Instances are mutable: this is an accumulating bag, in the spirit of {@link Map}, not a value
- * object. The caller owns the instance and is responsible for populating it. A node that carries a
- * bag never shares it with another — each one sets its own — so content moves between bags by
- * copying ({@link #putAll(ProviderExtras)}). Instances are not thread-safe.
- *
- * <p>
- * {@link #freeze()} turns an assembled bag into a value: a copy whose entries cannot change, which
- * may be shared where a mutable one may not. The copy is shallow, because a value is arbitrary
- * application data — see the method.
- *
- * <p>
- * Values are kept by reference and are never copied when stored: mutating a stored value (a
- * collection, say) afterwards is visible to whoever reads the bag back, including the
- * serialization path.
- *
- * <p>
- * The bag is a pass-through, not a translation layer: what a module read from a provider goes back
- * to that provider under the same name, and what another provider would make of it is the
- * application's decision.
+ * It is a pass-through, not a translation layer: what arrives from a provider goes back to it under
+ * the same name, and what another provider would make of it is the application's decision.
  */
 @EqualsAndHashCode(of = "values")
 public class ProviderExtras implements Effective<ProviderExtras> {
@@ -87,13 +60,13 @@ public class ProviderExtras implements Effective<ProviderExtras> {
     private final Map<String, Object> values;
 
     /**
-     * Whether this instance is frozen. Not part of equality: a frozen bag and a mutable one holding
+     * Whether this instance is frozen. Not part of equality: a frozen instance and a mutable one holding
      * the same entries are equal.
      */
     private final boolean frozen;
 
     /**
-     * Creates an empty, mutable bag.
+     * Creates an empty, mutable instance.
      */
     public ProviderExtras() {
         this.values = new LinkedHashMap<>();
@@ -101,7 +74,7 @@ public class ProviderExtras implements Effective<ProviderExtras> {
     }
 
     /**
-     * A mutable copy of the given bag, whether or not that bag is frozen: the entries are its own,
+     * A mutable copy of the given instance, whether or not that instance is frozen: the entries are its own,
      * the values in it are the ones stored, by reference.
      */
     public ProviderExtras(ProviderExtras other) {
@@ -118,15 +91,14 @@ public class ProviderExtras implements Effective<ProviderExtras> {
     }
 
     /**
-     * Returns a frozen copy of this bag: a new instance whose entries cannot be changed, safe to
-     * share where a mutable one is not.
+     * Returns a frozen copy: a new instance whose entries cannot be changed, safe to share where a
+     * mutable one is not.
      *
      * <p>
      * The copy is shallow. The entries are copied, so a path set on this instance afterwards is
      * absent from the copy; the values in it are the ones stored, by reference, so a value the
      * caller still holds and later changes is seen through the copy too. A value is arbitrary
-     * application data, so a deep copy is not offered — the same holds for every bag in this
-     * library.
+     * application data, so a deep copy is not offered.
      *
      * <p>
      * Freezing an instance that is already frozen returns it as it is.
@@ -138,7 +110,7 @@ public class ProviderExtras implements Effective<ProviderExtras> {
     }
 
     /**
-     * A mutable copy, whether or not this bag is frozen.
+     * A mutable copy, whether or not this instance is frozen.
      */
     @Override
     public ProviderExtras copy() {
@@ -146,11 +118,11 @@ public class ProviderExtras implements Effective<ProviderExtras> {
     }
 
     /**
-     * Returns whether this bag is frozen: a frozen bag refuses every mutator and is safe to share,
-     * and freezing one again answers it as it is. A mutable bag is its opposite — the accumulating
+     * Returns whether this instance is frozen: a frozen instance refuses every mutator and is safe to share,
+     * and freezing one again answers it as it is. A mutable instance is its opposite — the accumulating
      * form a caller fills and then hands to a model constructor to freeze.
      *
-     * @return {@code true} if this bag is frozen
+     * @return {@code true} if this instance is frozen
      */
     public boolean isFrozen() {
         return frozen;
@@ -168,7 +140,7 @@ public class ProviderExtras implements Effective<ProviderExtras> {
     /**
      * Returns whether no path has been set.
      *
-     * @return {@code true} if this bag is empty
+     * @return {@code true} if this instance is empty
      */
     public boolean isEmpty() {
         return values.isEmpty();
@@ -202,7 +174,7 @@ public class ProviderExtras implements Effective<ProviderExtras> {
      * a separate entry and stays.
      *
      * @param path one or more path segments; must not be empty
-     * @return this bag
+     * @return this instance
      */
     public ProviderExtras remove(String... path) {
         values.remove(encode(path));
@@ -219,7 +191,7 @@ public class ProviderExtras implements Effective<ProviderExtras> {
      *
      * @param key   the field name; must not be {@code null} or empty
      * @param value the value; stored as-is, may be {@code null}
-     * @return this bag
+     * @return this instance
      */
     public ProviderExtras put(@NonNull String key, @Nullable Object value) {
         return putPath(value, List.of(key));
@@ -232,7 +204,7 @@ public class ProviderExtras implements Effective<ProviderExtras> {
      * @param path  the path segments; must not be {@code null} or empty, and no segment may be
      *                  {@code null} or empty
      * @param value the value; stored as-is, may be {@code null}
-     * @return this bag
+     * @return this instance
      */
     public ProviderExtras put(@NonNull List<String> path, @Nullable Object value) {
         return putPath(value, path);
@@ -249,7 +221,7 @@ public class ProviderExtras implements Effective<ProviderExtras> {
      *
      * @param key   the assembled key; must not be {@code null}
      * @param value the value; stored as-is, may be {@code null}
-     * @return this bag
+     * @return this instance
      */
     public ProviderExtras putRaw(@NonNull String key, @Nullable Object value) {
         clearAround(key);
@@ -270,11 +242,11 @@ public class ProviderExtras implements Effective<ProviderExtras> {
     }
 
     /**
-     * Merges another bag into this one. Entries of the other bag win where the paths are equal or
+     * Merges another instance into this one. Entries of the other instance win where the paths are equal or
      * overlap.
      *
-     * @param other the bag to merge in; must not be {@code null}
-     * @return this bag
+     * @param other the instance to merge in; must not be {@code null}
+     * @return this instance
      */
     public ProviderExtras putAll(@NonNull ProviderExtras other) {
         if (other == this) {
@@ -288,9 +260,9 @@ public class ProviderExtras implements Effective<ProviderExtras> {
     }
 
     /**
-     * Takes into this bag the entries {@code other} sets that this one does not: a path this bag
+     * Takes into this instance the entries {@code other} sets that this one does not: a path this instance
      * already sets, or one that sits above or below such a path, is left as it is. The mirror of
-     * {@link #putAll(ProviderExtras)}, where the other bag's entries win.
+     * {@link #putAll(ProviderExtras)}, where the other instance's entries win.
      */
     @Override
     public void fillFrom(ProviderExtras other) {
@@ -311,15 +283,15 @@ public class ProviderExtras implements Effective<ProviderExtras> {
     }
 
     /**
-     * A new mutable bag holding {@code base}'s entries with {@code overlay} merged over them —
+     * A new mutable instance holding {@code base}'s entries with {@code overlay} merged over them —
      * overlay wins where the two set the same path, as {@link #putAll(ProviderExtras)} does. The
-     * result is always a new, mutable bag and never one of the inputs, so a frozen input stays
+     * result is always a new, mutable instance and never one of the inputs, so a frozen input stays
      * frozen and the caller decides when to freeze the result; a {@code null} argument is an empty
-     * bag.
+     * instance.
      *
      * @param base    the entries to start from; {@code null} for none
      * @param overlay the entries that win where the two overlap; {@code null} for none
-     * @return a new mutable bag; never {@code null}
+     * @return a new mutable instance; never {@code null}
      */
     public static ProviderExtras merged(@Nullable ProviderExtras base, @Nullable ProviderExtras overlay) {
         ProviderExtras merged = new ProviderExtras();
@@ -348,12 +320,11 @@ public class ProviderExtras implements Effective<ProviderExtras> {
     }
 
     /**
-     * Returns this bag as a nested map, with one level per path segment.
+     * Returns this instance as a nested map, with one level per path segment.
      *
      * <p>
-     * This is the form consumed by provider adapters when merging the extras into the outgoing
-     * payload. The result is a fresh, mutable structure owned by the caller; changing the structure
-     * does not affect this instance. The values in it are the ones stored, by reference.
+     * The result is a fresh, mutable structure owned by the caller; changing the structure does not
+     * affect this instance. The values in it are the ones stored, by reference.
      *
      * @return the nested view; never {@code null}, empty if nothing is set
      */
@@ -364,22 +335,22 @@ public class ProviderExtras implements Effective<ProviderExtras> {
     }
 
     /**
-     * Merges this bag into a tree the caller already built. Each path finds its way down and sets
+     * Merges this instance into a tree the caller already built. Each path finds its way down and sets
      * itself, replacing whatever stands in the way of it: a leaf blocking the way is discarded, a
      * container on the way is walked through, the position itself is overwritten.
      *
      * <p>
-     * The bag wins everywhere it sets a path and nowhere else: a member it never sets keeps the value
+     * The instance wins everywhere it sets a path and nowhere else: a member it never sets keeps the value
      * already in the map. Paths {@code a} and {@code a.b} are distinct positions, so setting
      * {@code a} replaces that whole value, while setting {@code a.b} reaches into it and leaves its
      * other members alone.
      *
      * <p>
-     * Two bags may be merged into one map, in the order the module chooses. Each is applied over
-     * what is already there, so the one merged later is the one that goes out.
+     * Two instances may be merged into one map, one after the other. Each is applied over what is
+     * already there, so the one merged later is the one that goes out.
      *
      * @param members the tree to write into; the containers it already holds must be mutable
-     * @return this bag
+     * @return this instance
      */
     public ProviderExtras mergeInto(@NonNull Map<String, Object> members) {
         for (Map.Entry<String, Object> entry : values.entrySet()) {
