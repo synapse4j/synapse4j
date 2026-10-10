@@ -36,7 +36,7 @@ import io.github.synapse4j.http.restclient.RestClientHttpClient;
 import io.github.synapse4j.jackson.JacksonJsonCodec;
 import io.github.synapse4j.jackson.JacksonSchemaConfigBuilders;
 import io.github.synapse4j.jackson.JacksonSchemaSettings;
-import io.github.synapse4j.jackson.Synapse4jJacksonModule;
+import io.github.synapse4j.jackson.databind.Synapse4jJacksonModule;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.openai.OpenAiCompletionsChatClient;
 import io.github.synapse4j.openai.OpenAiResponsesChatClient;

@@ -1,4 +1,4 @@
-package io.github.synapse4j.jackson;
+package io.github.synapse4j.jackson.databind;
 
 import io.github.synapse4j.json.JsonSchema;
 import tools.jackson.databind.module.SimpleModule;
@@ -8,8 +8,8 @@ import tools.jackson.databind.module.SimpleModule;
  * documents they describe — anywhere in the object graph, a field of a record included.
  *
  * <p>
- * This is a Jackson module, not one of the victools modules beside it: it registers a serializer and a
- * deserializer for each type whose document form is not the shape of its class — {@link JsonSchema}
+ * This is a Jackson module, not one of the victools schema-generation modules: it registers a serializer
+ * and a deserializer for each type whose document form is not the shape of its class — {@link JsonSchema}
  * today, the rest as they are modelled — so such a value that sits inside something the mapper binds
  * is written and read like any other member. Add it to the mapper before the codec is built; a mapper
  * is immutable once built, so the module cannot be added later.

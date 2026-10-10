@@ -1,4 +1,4 @@
-package io.github.synapse4j.jackson;
+package io.github.synapse4j.jackson.databind;
 
 import io.github.synapse4j.json.JsonSchema;
 import tools.jackson.core.JsonGenerator;

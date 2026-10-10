@@ -1,4 +1,4 @@
-package io.github.synapse4j.jackson;
+package io.github.synapse4j.jackson.databind;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

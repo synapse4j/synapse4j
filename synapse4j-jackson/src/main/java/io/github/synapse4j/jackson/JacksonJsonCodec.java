@@ -9,6 +9,7 @@ import org.jspecify.annotations.Nullable;
 import com.github.victools.jsonschema.generator.SchemaGenerator;
 
 import io.github.synapse4j.exception.SynapseException;
+import io.github.synapse4j.jackson.databind.Synapse4jJacksonModule;
 import io.github.synapse4j.json.JsonCodec;
 import io.github.synapse4j.json.JsonReader;
 import io.github.synapse4j.json.JsonSchema;
