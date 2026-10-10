@@ -387,7 +387,7 @@ class ResponsesStream extends DefaultChatStream {
         return copy;
     }
 
-    /** One member a part kept in its extras, or {@code null} when it carries no bag or not that one. */
+    /** One member a part kept in its extras, or {@code null} when it carries none or not that one. */
     private static @Nullable Object extra(ContentPart part, String name) {
         ProviderExtras extras = part.getExtras();
         return extras != null ? extras.get(name) : null;

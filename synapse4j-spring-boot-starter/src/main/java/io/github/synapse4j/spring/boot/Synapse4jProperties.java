@@ -31,7 +31,7 @@ import lombok.Data;
  * {@code synapse4j.chat.options.*} is the one exception, held as a {@link ChatOptionsProperties}
  * rather than a {@link ChatOptions}: the library type cannot be bound, because its nested HTTP
  * options are types from another jar the metadata processor will not recurse into, its response
- * format carries a schema no configuration source can spell, and its {@link ProviderExtras} bag has
+ * format carries a schema no configuration source can spell, and its {@link ProviderExtras} has
  * no shape Spring can write into. The mirror restates only the bindable fields, and
  * {@link ChatOptionsProperties#toChatOptions} rebuilds the library type.
  *

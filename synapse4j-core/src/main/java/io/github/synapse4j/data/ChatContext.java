@@ -25,7 +25,7 @@ import lombok.Setter;
  *
  * <p>
  * The attributes belong to the application alone: the library never reads or writes them, and
- * nothing in them ever reaches the wire. The extras bags exist to be serialized; this map is
+ * nothing in them ever reaches the wire. The extras exist to be serialized; this map is
  * their opposite — an in-process lane for data that must not go out.
  *
  * <p>

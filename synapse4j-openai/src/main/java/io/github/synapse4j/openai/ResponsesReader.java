@@ -29,7 +29,7 @@ import io.github.synapse4j.json.JsonReader;
  * Methods are opened by the shape of what comes out of them: a whole response, the payload of one
  * stream frame, or a document that reports a failure. The document is walked token by token rather
  * than decoded into a tree: the fields this module models are mapped as they go by, the ones it does
- * not go into the extras bag of the node they belong to, under the path they came from, so a field
+ * not go into the extras of the node they belong to, under the path they came from, so a field
  * the provider adds is neither dropped nor able to break the parse, and the body is decoded once
  * instead of twice.
  *
@@ -64,7 +64,7 @@ class ResponsesReader {
 
     /**
      * Builds the shared response from the wire document the reader is positioned on. Every field
-     * this module does not model is kept rather than dropped: it goes into the extras bag of the node
+     * this module does not model is kept rather than dropped: it goes into the extras of the node
      * it belongs to, under the path it came from.
      *
      * @param reader the reader, before its first token; the caller owns it
@@ -166,7 +166,7 @@ class ResponsesReader {
         }
         if ("failed".equals(status)) {
             // A failed exchange is not an answer with an empty turn; it is the provider refusing to
-            // give one, and the detail belongs in the message rather than in an extras bag.
+            // give one, and the detail belongs in the message rather than in extras.
             throw failed(error);
         }
         response.setMessage(message.build());

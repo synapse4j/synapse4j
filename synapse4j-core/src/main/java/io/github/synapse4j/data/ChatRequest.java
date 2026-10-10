@@ -31,7 +31,7 @@ import lombok.Setter;
  * with stand.
  *
  * <p>
- * There is deliberately no bag of provider-specific fields here. The call-level escape hatches live
+ * There are deliberately no provider-specific extras here. The call-level escape hatches live
  * in {@link ChatOptions}, next to the configured defaults they override; the node-level ones live on
  * the node they belong to — a message, a part, a tool.
  */

@@ -74,7 +74,7 @@ class ResponsesWriter {
     private static final String IMAGE_TYPE_PREFIX = "image/";
 
     /**
-     * The option-bag name of the response the server already holds, when a call chains onto it.
+     * The name the options' extras carry the response under, when a call chains onto it.
      * The client writes it from an answer in {@code continueWith}; this class reads it back to
      * decide how much of the conversation still has to go out, so it lives here under one name
      * rather than being spelled twice.
@@ -148,7 +148,7 @@ class ResponsesWriter {
             document.put("stream", true);
         }
         // Null means no opinion: the member stays off the wire and the endpoint's own default —
-        // keep — stands. Written before the extras merge, so a bag that sets store itself wins
+        // keep — stands. Written before the extras merge, so an instance that sets store itself wins
         // with no special-casing here.
         putIfSet(document, STORE, config.getStoreResponses());
         // The extras of the request itself merge into the document's own members, so a path lands as
@@ -162,7 +162,7 @@ class ResponsesWriter {
      * The conversation as the array of items it goes out as, in the order the caller built them.
      *
      * <p>
-     * With a chain anchor — the application sets {@code previous_response_id} in the options bag —
+     * With a chain anchor — the application sets {@code previous_response_id} in the options' extras —
      * the server already holds the history, so only the pending messages go out. Without one the
      * whole conversation goes: the history first, then the pending.
      */
@@ -536,7 +536,7 @@ class ResponsesWriter {
      * A mode with no counterpart here is left unsent, so the call goes on with the endpoint's own
      * default; a name beside a mode that names no tool, or a missing name for the mode that needs
      * one, is the caller's own contradiction and is refused. Provider fields of the object form ride
-     * in through the options bag — a {@code tool_choice.…} path merges over what is written here.
+     * in through the options' extras — a {@code tool_choice.…} path merges over what is written here.
      */
     private static @Nullable Object toolChoice(ChatOptions options) {
         String mode = options.getToolChoice();

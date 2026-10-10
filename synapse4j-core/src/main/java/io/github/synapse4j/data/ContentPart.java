@@ -22,7 +22,7 @@ import lombok.NonNull;
  *
  * <p>
  * A part is a value: once built it never changes, so it is safe to share across calls and threads.
- * The {@link ProviderExtras} bag it carries, when it carries one, is frozen on the way in, so its
+ * The {@link ProviderExtras} it carries, when it carries one, is frozen on the way in, so its
  * entries cannot change after the part is built; the values in them are held by reference, as
  * everywhere in this library, so a value the caller still holds and later changes is seen through
  * the part too.
@@ -38,7 +38,7 @@ public abstract class ContentPart {
 
     /**
      * Provider-specific fields to merge into this part when the request is sent, frozen; {@code null}
-     * when the part carries none. A part nobody configures carries no bag at all.
+     * when the part carries none. A part nobody configures carries none at all.
      */
     private final @Nullable ProviderExtras extras;
 

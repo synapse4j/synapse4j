@@ -42,9 +42,9 @@ public class RawPart extends ContentPart {
     }
 
     /**
-     * A part kept whole, from the members already gathered in the bag this part carries — for a
-     * caller that read the element into a bag rather than a map, and has no reason to spell it out
-     * again.
+     * A part kept whole, from the members already gathered in the extras this part carries — for a
+     * caller that read the element into an instance rather than a map, and has no reason to spell it
+     * out again.
      *
      * @param members the captured element, keyed by the protocol's own member names; never
      *                    {@code null}
@@ -67,9 +67,9 @@ public class RawPart extends ContentPart {
     }
 
     private static ProviderExtras toExtras(Map<?, ?> members) {
-        ProviderExtras bag = new ProviderExtras();
-        members.forEach((name, value) -> bag.put(memberName(name), value));
-        return bag;
+        ProviderExtras extras = new ProviderExtras();
+        members.forEach((name, value) -> extras.put(memberName(name), value));
+        return extras;
     }
 
     /** The given key as the member name it has to be. */

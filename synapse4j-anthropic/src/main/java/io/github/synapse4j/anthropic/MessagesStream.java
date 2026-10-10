@@ -247,7 +247,8 @@ class MessagesStream extends DefaultChatStream {
 
         /**
          * The aggregated message as the value it now is — the parts, role and fields the fold holds.
-         * An empty bag is no bag, so the constructor leaves an unconfigured message without one.
+         * An empty ProviderExtras counts as none, so the constructor leaves an unconfigured message
+         * without one.
          */
         private void publish(ChatResponse response) {
             response.setMessage(new ChatMessage(role, null, parts, messageExtras));
@@ -412,8 +413,8 @@ class MessagesStream extends DefaultChatStream {
         }
 
         /**
-         * The two bags as one, or whichever is present when the other is not; {@code null} when
-         * neither is, so a part nobody configured carries no bag at all.
+         * The two instances as one, or whichever is present when the other is not; {@code null} when
+         * neither is, so a part nobody configured carries none at all.
          */
         private static @Nullable ProviderExtras merge(@Nullable ProviderExtras current,
                 @Nullable ProviderExtras addition) {

@@ -27,7 +27,7 @@ import lombok.ToString;
  * <p>
  * Properties of the requirement that only some protocols have go in {@code getExtras()}, like
  * every other provider-specific field. The flag that turns enforcement on is modelled rather than
- * left to the bag: every major protocol carries it in some form, so {@code getStrict()} speaks for
+ * left to the extras: every major protocol carries it in some form, so {@code getStrict()} speaks for
  * all of them and each adapter translates it.
  */
 @Getter

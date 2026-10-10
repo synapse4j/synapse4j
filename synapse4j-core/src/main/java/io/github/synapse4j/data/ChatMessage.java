@@ -22,14 +22,14 @@ import lombok.Singular;
  * model must not need a change to express something a protocol or an application already does.
  *
  * <p>
- * A message owns its {@link ProviderExtras} bag for the same reason a part does — a provider-specific
- * field belongs to the thing it applies to, not to the whole request. Each class declares its own bag
+ * A message owns its {@link ProviderExtras} for the same reason a part does — a provider-specific
+ * field belongs to the thing it applies to, not to the whole request. Each class declares its own
  * instead of inheriting one from a common base: no library surveyed models a universal node base
  * class, and the cost of not having one is a single field per class.
  *
  * <p>
  * A message is a value: once built it never changes, so it is safe to share across calls and threads.
- * Its parts and its {@link ProviderExtras} bag are frozen on the way in, and its own fields are
+ * Its parts and its {@link ProviderExtras} are frozen on the way in, and its own fields are
  * nullable the way a part's are, because the shared model assumes nothing about what a protocol
  * requires.
  */
@@ -52,7 +52,7 @@ public class ChatMessage {
 
     /**
      * Provider-specific fields to merge into this message when the request is sent, frozen; {@code null}
-     * when the message carries none. A message nobody configures carries no bag at all.
+     * when the message carries none. A message nobody configures carries none at all.
      */
     private final @Nullable ProviderExtras extras;
 
@@ -221,15 +221,15 @@ public class ChatMessage {
     public static class Builder {
 
         /**
-         * Hands this builder's extras bag to the given function and takes back the bag it returns, so
-         * a caller adjusts a bag that is already there — the one a {@code toBuilder()} carried over,
-         * say — instead of assembling a replacement by hand.
+         * Hands this builder's extras to the given function and takes back the instance it returns,
+         * so a caller adjusts an instance that is already there — the one a {@code toBuilder()}
+         * carried over, say — instead of assembling a replacement by hand.
          *
          * <p>
-         * The function receives a mutable bag: the one already here when it is mutable, otherwise a
-         * fresh copy of it, or an empty bag when there is none. It may change that instance and return
-         * it, or return one of its own. Whatever it returns becomes this builder's bag, so returning
-         * {@code null} leaves the message with none.
+         * The function receives a mutable instance: the one already here when it is mutable, otherwise
+         * a fresh copy of it, or an empty one when there is none. It may change that instance and
+         * return it, or return one of its own. Whatever it returns becomes this builder's extras, so
+         * returning {@code null} leaves the message with none.
          *
          * @param mutate the function to apply; must not be {@code null}
          * @return this builder

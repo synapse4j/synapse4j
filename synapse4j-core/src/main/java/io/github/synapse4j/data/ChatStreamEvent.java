@@ -27,7 +27,7 @@ import lombok.ToString;
  * and hands them back as they are, and an event an application keeps does not change as later frames
  * arrive. A fragment that continues a part already held is folded into a new part that takes its
  * place, never into the one an earlier frame handed out. The values inside a {@link ProviderExtras}
- * bag are held by reference, as everywhere in this library.
+ * are held by reference, as everywhere in this library.
  */
 @Getter
 @Setter

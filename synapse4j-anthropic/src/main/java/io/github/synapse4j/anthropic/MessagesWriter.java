@@ -103,7 +103,7 @@ class MessagesWriter {
         // Checked before anything is assembled: this endpoint has no server-side default for the
         // limit, so a call with no opinion on it cannot be asked at all. Refusing here names the
         // missing member, where inventing a number would send a limit the caller never chose — the
-        // caller (or a request customizer) states it, or sets it once in the options bag.
+        // caller (or a request customizer) states it, or sets it once in the options' extras.
         requireMaxTokens(options);
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("model", options.getModel());
@@ -141,7 +141,7 @@ class MessagesWriter {
      * The token limit this endpoint requires. The shared model spells a limit as an opinion —
      * {@code null} meaning "no opinion" — and every other member can be left to the provider's
      * default, but this protocol has none: the wire always needs a number. So the opinion is
-     * required here, and the options bag is the documented way to state it once for every call
+     * required here, and the options' extras are the documented way to state it once for every call
      * rather than repeating it per request.
      */
     private static void requireMaxTokens(ChatOptions options) {
@@ -155,7 +155,7 @@ class MessagesWriter {
      * The system message as the one field this protocol frames the model with. A plain text message
      * goes out as the string form; text pieces carrying fields of their own — a cache breakpoint
      * above all — take the array form, which is the only one that can hold them. The message's own
-     * extras bag has no object to merge into here, since the field's value is the text rather than
+     * extras have no object to merge into here, since the field's value is the text rather than
      * a message object, and a part with nowhere to put a field fails rather than losing it.
      */
     private static Object system(ChatMessage system) {
@@ -436,7 +436,7 @@ class MessagesWriter {
      * The model's reasoning as the {@code thinking} block it arrived as. The opaque companion the
      * provider attached — the signature that proves the block was the model's — rides in the part's
      * extras under the name the protocol spells it with, so it merges over the block and goes back
-     * exactly where it came from. An extras bag that names another block type (the safety-redacted
+     * exactly where it came from. An instance that names another block type (the safety-redacted
      * thinking this module reads into the same part) overrides the type written here, which is how
      * that block is replayed as itself.
      */
@@ -461,7 +461,7 @@ class MessagesWriter {
      * is the translation. A mode with no counterpart here is left unsent, so the call goes on with
      * the endpoint's own default; a name beside a mode that names no tool, or a missing name for the
      * mode that needs one, is the caller's own contradiction and is refused. Provider fields of the
-     * object form ride in through the options bag — a {@code tool_choice.…} path merges over what is
+     * object form ride in through the options' extras — a {@code tool_choice.…} path merges over what is
      * written here.
      */
     private static @Nullable Object toolChoice(ChatOptions options) {

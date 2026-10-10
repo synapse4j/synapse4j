@@ -26,7 +26,7 @@ import lombok.RequiredArgsConstructor;
  * Walks a protocol document from a caller-supplied {@link JsonReader} into the shared model.
  * Methods are opened by the shape of what comes out of them: a whole message, or the payload of one
  * stream frame. The document is walked token by token rather than decoded into a tree: the fields
- * this module models are mapped as they go by, the ones it does not go into the extras bag of the
+ * this module models are mapped as they go by, the ones it does not go into the extras of the
  * node they belong to, under the path they came from, so a field the provider adds is neither
  * dropped nor able to break the parse.
  *
@@ -60,7 +60,7 @@ class MessagesReader {
 
     /**
      * Builds the shared response from the wire document the reader is positioned on. Every field
-     * this module does not model is kept rather than dropped: it goes into the extras bag of the
+     * this module does not model is kept rather than dropped: it goes into the extras of the
      * node it belongs to, under the path it came from. A document without content is not an answer,
      * and is refused.
      *
@@ -256,11 +256,11 @@ class MessagesReader {
     }
 
     /**
-     * The members of a content block the part does not model, as the bag the part carries — empty
+     * The members of a content block the part does not model, as the extras the part carries — empty
      * when every member is modelled.
      *
      * @param block   the block as the wire spelled it
-     * @param modeled the member names the part models itself; they stay out of the bag
+     * @param modeled the member names the part models itself; they stay out of the extras
      */
     private static ProviderExtras restOf(Map<?, ?> block, String... modeled) {
         ProviderExtras extras = new ProviderExtras();

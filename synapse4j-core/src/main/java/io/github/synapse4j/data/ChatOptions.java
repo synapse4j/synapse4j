@@ -23,13 +23,13 @@ import lombok.ToString;
  *
  * <p>
  * A caller fills in only what this call should differ in; {@link #effective} is where it is combined
- * with the client's defaults. The two bags are the exception to the per-field story: they are never
+ * with the client's defaults. The two instances are the exception to the per-field story: they are never
  * replaced, only filled.
  *
  * <p>
  * Only knobs at least two providers agree on, and that an adapter knows how to place, belong here. A
  * field one provider alone has — its thinking budget, its cache markers — goes in the
- * {@link ProviderExtras} bag instead: modelling it as a shared knob would silently do nothing on the
+ * {@link ProviderExtras} instead: modelling it as a shared knob would silently do nothing on the
  * providers that do not have it.
  */
 @Getter

@@ -20,7 +20,7 @@ import lombok.Setter;
  * A mirror of {@link ChatOptions} rather than the library type itself, because the library type
  * cannot be bound: its nested HTTP options are types from another jar, which the metadata processor
  * does not recurse into, its response format carries a schema no configuration source can spell, and
- * its provider-extras bag has no shape Spring can write into. Only the bindable fields are restated;
+ * its extras have no shape Spring can write into. Only the bindable fields are restated;
  * {@link #toChatOptions(JsonCodec)} rebuilds the library type from them.
  *
  * <p>

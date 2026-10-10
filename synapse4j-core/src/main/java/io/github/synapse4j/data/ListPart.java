@@ -17,7 +17,7 @@ import lombok.NonNull;
  *
  * <p>
  * A part is a value: once built it never changes, so it is safe to share across calls and threads.
- * Its parts and its {@link ProviderExtras} bag are frozen on the way in.
+ * Its parts and its {@link ProviderExtras} are frozen on the way in.
  */
 @Getter
 public class ListPart extends ContentPart {

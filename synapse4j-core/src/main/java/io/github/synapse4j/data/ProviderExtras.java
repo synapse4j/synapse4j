@@ -28,11 +28,13 @@ import lombok.NonNull;
  * spells differently belongs in a map instead.
  *
  * <p>
- * An instance answers for the thing it sits on: an entry may set a member of any object that thing
- * contributes, at any depth, until it meets a thing that carries extras of its own — there the reach
- * ends. The outer entry may still set that member to stand in place of the whole thing, so that
- * thing's own extras are never written; it may not set one of that thing's members, which answers for
- * itself. Where two instances land on one node, the one applied later is the one that goes out.
+ * What a module does with an instance is its own to decide — this type neither enforces nor checks it —
+ * so what follows is advice, and every module in this library follows it. An instance answers for the
+ * thing it sits on: an entry may set a member of any object that thing contributes, at any depth, until
+ * it meets a thing that carries extras of its own, where the reach ends. The outer entry may still set
+ * that member to stand in place of the whole thing, so that thing's own extras are never written; it
+ * should not set one of that thing's members, which answers for itself. Where two instances land on one
+ * node, the one applied later is the one that goes out.
  *
  * <p>
  * Instances are mutable, in the spirit of {@link Map}, not value objects: the caller owns one, fills

@@ -373,7 +373,7 @@ class CompletionsWriter {
      * A mode with no counterpart here is left unsent, so the call goes on with the endpoint's own
      * default; a name beside a mode that names no tool, or a missing name for the mode that needs
      * one, is the caller's own contradiction and is refused. Provider fields of the object form ride
-     * in through the options bag — a {@code tool_choice.…} path merges over what is written here.
+     * in through the options' extras — a {@code tool_choice.…} path merges over what is written here.
      */
     private @Nullable Object toolChoice(ChatOptions options) {
         String mode = options.getToolChoice();

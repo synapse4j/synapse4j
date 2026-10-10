@@ -18,7 +18,7 @@ import lombok.ToString;
  * a value is the caller's to keep still.
  *
  * <p>
- * Where the adapter merges a tool's {@link ProviderExtras} bag is part of the adapter's contract;
+ * Where the adapter merges a tool's {@link ProviderExtras} is part of the adapter's contract;
  * it is the only way to reach a provider field that the wire nests deeper than the fields modelled
  * here.
  *

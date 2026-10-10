@@ -14,7 +14,7 @@ import lombok.ToString;
  * There is deliberately no knob for the members whose spelling this protocol fixes — the token
  * limit is always {@code max_tokens}, reasoning travels in blocks rather than under a configurable
  * member name — so unlike the OpenAI family configuration this one carries no field-name settings.
- * A field one request needs beyond these goes in the call's own {@code ProviderExtras} bag or
+ * A field one request needs beyond these goes in the call's own {@code ProviderExtras} or
  * headers, where every escape hatch in this library lives.
  */
 @Data
