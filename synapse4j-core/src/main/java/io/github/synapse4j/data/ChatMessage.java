@@ -162,6 +162,23 @@ public class ChatMessage {
         return walk(part -> true);
     }
 
+    /**
+     * Walks this message's parts and every part below them, opening every part, and answers the ones
+     * of the given type.
+     *
+     * <p>
+     * Every part is opened, as {@link #walk()}: a part of another type is passed over, not a place the
+     * walk stops. The type may be any kind of part — one this library defines, or one a provider or an
+     * application adds.
+     *
+     * @param type the type of part to answer; must not be {@code null}
+     * @param <T>  that type
+     * @return the parts of that type, in document order; never {@code null}
+     */
+    public <T extends ContentPart> Stream<T> walk(@NonNull Class<T> type) {
+        return walk().filter(type::isInstance).map(type::cast);
+    }
+
     private static Stream<ContentPart> walk(ContentPart part, Predicate<ContentPart> descend) {
         Stream<ContentPart> stream = Stream.of(part);
         if (!descend.test(part)) {
