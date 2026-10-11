@@ -948,7 +948,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void pathReachesIntoModelledObject() {
+    void pathStopsAtModelledObject() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -964,11 +964,26 @@ class OpenAiCompletionsChatClientTest {
         Map<String, Object> responseFormat = (Map<String, Object>) wire.get("response_format");
         @SuppressWarnings("unchecked")
         Map<String, Object> jsonSchema = (Map<String, Object>) responseFormat.get("json_schema");
-        // A path set from the request reaches into what the modelled format already carries; the
-        // members it walks past stay.
+        // The format carries extras of its own, so the request's reach ends at it: the path does not
+        // land, and the members the format models stand as this module wrote them.
         assertEquals("json_schema", responseFormat.get("type"));
         assertEquals("answer", jsonSchema.get("name"));
-        assertEquals(Boolean.TRUE, jsonSchema.get("strict"));
+        assertFalse(jsonSchema.containsKey("strict"));
+    }
+
+    @Test
+    void extrasReplaceFormatWhole() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.getOptions().getResponseFormat().setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
+        request.getOptions().getExtras().put("response_format", Map.of("type", "text"));
+
+        client.chat(request);
+
+        // The entry names the format whole, so it stands in its place rather than reaching into it.
+        Map<String, Object> wire = parseCaptured();
+        assertEquals(Map.of("type", "text"), wire.get("response_format"));
     }
 
     @Test

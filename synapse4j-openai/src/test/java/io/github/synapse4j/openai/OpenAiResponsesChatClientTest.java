@@ -323,6 +323,44 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
+    void pathStopsAtModelledFormat() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
+        format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
+        format.setName("answer");
+        request.getOptions().getExtras().put(List.of("text", "format", "strict"), true);
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> text = (Map<String, Object>) wire.get("text");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> written = (Map<String, Object>) text.get("format");
+        // The format carries extras of its own, so the request's reach ends at the text object: the
+        // path does not land, and the members the format models stand as this module wrote them.
+        assertEquals("json_schema", written.get("type"));
+        assertEquals("answer", written.get("name"));
+        assertFalse(written.containsKey("strict"));
+    }
+
+    @Test
+    void extrasReplaceTextWhole() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.getOptions().getResponseFormat().setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
+        request.getOptions().getExtras().put("text", Map.of("format", Map.of("type", "text")));
+
+        client.chat(request);
+
+        // The entry names the text object whole, so it stands in its place rather than reaching into it.
+        assertEquals(Map.of("format", Map.of("type", "text")), parseCaptured().get("text"));
+    }
+
+    @Test
     void toolCallRoundTrips() {
         stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":["
                 + "{\"type\":\"function_call\",\"id\":\"fc_1\",\"call_id\":\"call_1\","

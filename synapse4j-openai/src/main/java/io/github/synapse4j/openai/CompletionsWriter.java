@@ -93,10 +93,6 @@ class CompletionsWriter {
     private Map<String, Object> document(ChatRequest request, boolean stream) {
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("model", request.getOptions().getModel());
-        document.put("messages", messages(request));
-        if (!request.getTools().isEmpty()) {
-            document.put("tools", tools(request.getTools()));
-        }
         putIfSet(document, "tool_choice", toolChoice(request.getOptions()));
         putIfSet(document, "temperature", request.getOptions().getTemperature());
         if (!config.getMaxTokensField().isBlank()) {
@@ -104,10 +100,6 @@ class CompletionsWriter {
         }
         putIfSet(document, "top_p", request.getOptions().getTopP());
         putIfSet(document, "reasoning_effort", request.getOptions().getReasoningEffort());
-        ChatResponseFormat format = request.getOptions().getResponseFormat();
-        if (format.getType() != null || !format.getExtras().isEmpty()) {
-            document.put("response_format", responseFormat(format));
-        }
         if (stream) {
             document.put("stream", true);
             // A streamed answer reports what it consumed in a frame of its own, and only when the
@@ -117,9 +109,22 @@ class CompletionsWriter {
             document.put("stream_options", streamOptions);
         }
         // The extras of the request itself merge into the document's own members, so a path lands as
-        // a member of this object rather than a level below it. Merged last, so a path set on both
-        // sides is the caller's value that goes out.
-        request.getOptions().getExtras().mergeInto(document);
+        // a member of this object rather than a level below it. They merge before the members that
+        // carry extras of their own — the conversation, the tools, the response format: the reach of
+        // an entry ends where it meets one of those, so each goes in after the merge, unless the entry
+        // names it whole and stands in its place.
+        ProviderExtras extras = request.getOptions().getExtras();
+        extras.mergeInto(document);
+        if (!extras.contains("messages")) {
+            document.put("messages", messages(request));
+        }
+        if (!request.getTools().isEmpty() && !extras.contains("tools")) {
+            document.put("tools", tools(request.getTools()));
+        }
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
+        if ((format.getType() != null || !format.getExtras().isEmpty()) && !extras.contains("response_format")) {
+            document.put("response_format", responseFormat(format));
+        }
         return document;
     }
 
@@ -171,34 +176,30 @@ class CompletionsWriter {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("role", message.getRole());
         List<Map<String, Object>> toolCalls = new ArrayList<>();
-        if (arrayContent(message)) {
-            List<Map<String, Object>> content = new ArrayList<>();
-            for (ContentPart part : message.getParts()) {
-                if (part instanceof TextPart textPart) {
-                    Map<String, Object> text = textPart(textPart);
-                    if (text != null) {
-                        content.add(text);
-                    }
-                } else if (part instanceof MediaPart mediaPart) {
-                    content.add(mediaPart(mediaPart));
-                } else if (part instanceof ToolCallPart toolCall) {
-                    // A tool call is a member of the message rather than an entry of its content,
-                    // so it is held back and written beside the array.
-                    toolCalls.add(toolCall(toolCall));
-                } else if (part instanceof RawPart raw) {
-                    // The part goes back out as it arrived: its members were read whole off the
-                    // wire, so the protocol spells them again untouched, where this part sits.
-                    content.add(raw.members());
-                } else if (!(part instanceof ReasoningPart)) {
-                    throw unsupportedPart(part);
-                }
-            }
-            // A turn that only calls tools has nothing to put here, and the member is left out rather
-            // than sent empty — the same rule the text branch below keeps.
-            if (!content.isEmpty()) {
-                entry.put("content", content);
-            }
-        } else {
+        Object content = content(message, toolCalls);
+        writeReasoning(message, entry);
+        // The content and the tool calls carry extras of their own, so the message's extras' reach
+        // ends here: each goes in after the merge, unless the message names it whole.
+        ProviderExtras messageExtras = message.getExtras();
+        if (messageExtras != null) {
+            messageExtras.mergeInto(entry);
+        }
+        if (content != null && !namesWhole(messageExtras, "content")) {
+            entry.put("content", content);
+        }
+        if (!toolCalls.isEmpty() && !namesWhole(messageExtras, "tool_calls")) {
+            entry.put("tool_calls", toolCalls);
+        }
+        return entry;
+    }
+
+    /**
+     * The message's content as this protocol spells it — the array of parts, or the string the text
+     * parts join into — or {@code null} when it carries none. A tool call is a member of the message
+     * rather than an entry of its content, so it is collected into the given list instead.
+     */
+    private @Nullable Object content(ChatMessage message, List<Map<String, Object>> toolCalls) {
+        if (!arrayContent(message)) {
             StringBuilder text = new StringBuilder();
             for (ContentPart part : message.getParts()) {
                 if (part instanceof TextPart textPart) {
@@ -207,19 +208,32 @@ class CompletionsWriter {
                     throw unsupportedPart(part);
                 }
             }
-            if (text.length() > 0) {
-                entry.put("content", text.toString());
+            return text.length() > 0 ? text.toString() : null;
+        }
+        List<Map<String, Object>> content = new ArrayList<>();
+        for (ContentPart part : message.getParts()) {
+            if (part instanceof TextPart textPart) {
+                Map<String, Object> text = textPart(textPart);
+                if (text != null) {
+                    content.add(text);
+                }
+            } else if (part instanceof MediaPart mediaPart) {
+                content.add(mediaPart(mediaPart));
+            } else if (part instanceof ToolCallPart toolCall) {
+                // A tool call is a member of the message rather than an entry of its content, so it
+                // is held back and written beside the array.
+                toolCalls.add(toolCall(toolCall));
+            } else if (part instanceof RawPart raw) {
+                // The part goes back out as it arrived: its members were read whole off the wire, so
+                // the protocol spells them again untouched, where this part sits.
+                content.add(raw.members());
+            } else if (!(part instanceof ReasoningPart)) {
+                throw unsupportedPart(part);
             }
         }
-        if (!toolCalls.isEmpty()) {
-            entry.put("tool_calls", toolCalls);
-        }
-        writeReasoning(message, entry);
-        ProviderExtras messageExtras = message.getExtras();
-        if (messageExtras != null) {
-            messageExtras.mergeInto(entry);
-        }
-        return entry;
+        // A turn that only calls tools has nothing to put here, and the member is left out rather than
+        // sent empty — the same rule the text branch above keeps.
+        return content.isEmpty() ? null : content;
     }
 
     /**
@@ -458,6 +472,11 @@ class CompletionsWriter {
         if (value != null) {
             members.put(name, value);
         }
+    }
+
+    /** Whether the extras, if any, name this member whole — the one case where the member's own value stands. */
+    private static boolean namesWhole(@Nullable ProviderExtras extras, String member) {
+        return extras != null && extras.contains(member);
     }
 
     private String textOf(List<ContentPart> parts) {

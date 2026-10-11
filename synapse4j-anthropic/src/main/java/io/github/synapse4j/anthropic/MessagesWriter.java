@@ -107,33 +107,43 @@ class MessagesWriter {
         requireMaxTokens(options);
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("model", options.getModel());
-        ChatMessage system = request.getSystemMessage();
-        if (system != null) {
-            // The framing this protocol takes as a field of its own, outside the turn sequence and
-            // resent with every call.
-            document.put("system", system(system));
-        }
-        document.put("messages", messages(request));
-        if (!request.getTools().isEmpty()) {
-            document.put("tools", tools(request.getTools()));
-        }
         putIfSet(document, "tool_choice", toolChoice(options));
         putIfSet(document, "temperature", options.getTemperature());
         putIfSet(document, "max_tokens", options.getMaxOutputTokens());
         putIfSet(document, "top_p", options.getTopP());
-        // The reasoning level and the answer's shape are one protocol object, so they are written
-        // into one map — two members of the document would leave only the last one standing.
+        if (stream) {
+            document.put("stream", true);
+        }
+        // The reasoning level and the answer's shape are one protocol object, so they are written into
+        // one map — two members of the document would leave only the last one standing.
         Map<String, Object> outputConfig = outputConfig(request);
         if (!outputConfig.isEmpty()) {
             document.put("output_config", outputConfig);
         }
-        if (stream) {
-            document.put("stream", true);
-        }
         // The extras of the request itself merge into the document's own members, so a path lands as
-        // a member of this object rather than a level below it. Merged last, so a path set on both
-        // sides is the caller's value that goes out.
-        options.getExtras().mergeInto(document);
+        // a member of this object rather than a level below it. They merge before the members that
+        // carry extras of their own — the framing, the conversation, the tools: the reach of an entry
+        // ends where it meets one of those, so each goes in after the merge, unless the entry names it
+        // whole and stands in its place.
+        ProviderExtras extras = options.getExtras();
+        extras.mergeInto(document);
+        ChatMessage system = request.getSystemMessage();
+        if (system != null && !extras.contains("system")) {
+            // The framing this protocol takes as a field of its own, outside the turn sequence and
+            // resent with every call.
+            document.put("system", system(system));
+        }
+        if (!extras.contains("messages")) {
+            document.put("messages", messages(request));
+        }
+        if (!request.getTools().isEmpty() && !extras.contains("tools")) {
+            document.put("tools", tools(request.getTools()));
+        }
+        // The answer's shape carries extras of its own, so the request's reach ends at it: it is
+        // written again after the merge, unless the request names it whole.
+        if (outputConfig.containsKey("format") && !extras.contains("output_config", "format")) {
+            outputConfig.put("format", responseFormat(options.getResponseFormat()));
+        }
         return document;
     }
 
@@ -215,25 +225,35 @@ class MessagesWriter {
     private Map<String, Object> message(ChatMessage message) {
         Map<String, Object> entry = new LinkedHashMap<>();
         putIfSet(entry, "role", wireRole(message.getRole()));
-        if (arrayContent(message)) {
-            entry.put("content", blocks(message.getParts()));
-        } else {
-            StringBuilder text = new StringBuilder();
-            for (ContentPart part : message.getParts()) {
-                String value = ((TextPart) part).getText();
-                if (value != null) {
-                    text.append(value);
-                }
-            }
-            if (text.length() > 0) {
-                entry.put("content", text.toString());
-            }
-        }
+        Object content = content(message);
+        // The content carries extras of its own, so the message's extras' reach ends here: it goes in
+        // after the merge, unless the message names it whole.
         ProviderExtras messageExtras = message.getExtras();
         if (messageExtras != null) {
             messageExtras.mergeInto(entry);
         }
+        if (content != null && !namesWhole(messageExtras, "content")) {
+            entry.put("content", content);
+        }
         return entry;
+    }
+
+    /**
+     * The message's content as this protocol spells it — the array of blocks, or the string the text
+     * parts join into — or {@code null} when it carries none.
+     */
+    private @Nullable Object content(ChatMessage message) {
+        if (arrayContent(message)) {
+            return blocks(message.getParts());
+        }
+        StringBuilder text = new StringBuilder();
+        for (ContentPart part : message.getParts()) {
+            String value = ((TextPart) part).getText();
+            if (value != null) {
+                text.append(value);
+            }
+        }
+        return text.length() > 0 ? text.toString() : null;
     }
 
     /**
@@ -389,15 +409,20 @@ class MessagesWriter {
         Map<String, Object> block = new LinkedHashMap<>();
         block.put("type", "tool_result");
         putIfSet(block, "tool_use_id", result.getCallId());
-        block.put("content", resultContent(result.getSubParts()));
+        Object content = resultContent(result.getSubParts());
         if (result.isError()) {
             // Only a failure is stated: false is the protocol's own default, and emitting it would
             // be a value the caller never chose.
             block.put("is_error", true);
         }
+        // The content carries extras of its own when it takes the block form, so the result's extras'
+        // reach ends here: it goes in after the merge, unless the result names it whole.
         ProviderExtras resultExtras = result.getExtras();
         if (resultExtras != null) {
             resultExtras.mergeInto(block);
+        }
+        if (!namesWhole(resultExtras, "content")) {
+            block.put("content", content);
         }
         return block;
     }
@@ -573,6 +598,11 @@ class MessagesWriter {
         if (value != null) {
             members.put(name, value);
         }
+    }
+
+    /** Whether the extras, if any, name this member whole — the one case where the member's own value stands. */
+    private static boolean namesWhole(@Nullable ProviderExtras extras, String member) {
+        return extras != null && extras.contains(member);
     }
 
     private static SynapseException unsupportedPart(ContentPart part) {

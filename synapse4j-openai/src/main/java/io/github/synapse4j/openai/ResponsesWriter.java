@@ -117,15 +117,6 @@ class ResponsesWriter {
     private Map<String, Object> document(ChatRequest request, boolean stream) {
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("model", request.getOptions().getModel());
-        ChatMessage system = request.getSystemMessage();
-        if (system != null) {
-            // The framing this protocol takes as one string at the top, outside the turn sequence.
-            document.put("instructions", instructions(system));
-        }
-        document.put("input", input(request));
-        if (!request.getTools().isEmpty()) {
-            document.put("tools", tools(request.getTools()));
-        }
         putIfSet(document, "tool_choice", toolChoice(request.getOptions()));
         putIfSet(document, "temperature", request.getOptions().getTemperature());
         // The token limit goes out under the one name this protocol fixed for it, unlike the
@@ -138,12 +129,6 @@ class ResponsesWriter {
             reasoning.put("effort", request.getOptions().getReasoningEffort());
             document.put("reasoning", reasoning);
         }
-        ChatResponseFormat format = request.getOptions().getResponseFormat();
-        if (format.getType() != null || !format.getExtras().isEmpty()) {
-            Map<String, Object> text = new LinkedHashMap<>();
-            text.put("format", responseFormat(format));
-            document.put("text", text);
-        }
         if (stream) {
             document.put("stream", true);
         }
@@ -152,9 +137,29 @@ class ResponsesWriter {
         // with no special-casing here.
         putIfSet(document, STORE, config.getStoreResponses());
         // The extras of the request itself merge into the document's own members, so a path lands as
-        // a member of this object rather than a level below it. Merged last, so a path set on both
-        // sides is the caller's value that goes out.
-        request.getOptions().getExtras().mergeInto(document);
+        // a member of this object rather than a level below it. They merge before the members that
+        // carry extras of their own — the framing, the conversation, the tools, the response format:
+        // the reach of an entry ends where it meets one of those, so each goes in after the merge,
+        // unless the entry names it whole and stands in its place.
+        ProviderExtras extras = request.getOptions().getExtras();
+        extras.mergeInto(document);
+        ChatMessage system = request.getSystemMessage();
+        if (system != null && !extras.contains("instructions")) {
+            // The framing this protocol takes as one string at the top, outside the turn sequence.
+            document.put("instructions", instructions(system));
+        }
+        if (!extras.contains("input")) {
+            document.put("input", input(request));
+        }
+        if (!request.getTools().isEmpty() && !extras.contains("tools")) {
+            document.put("tools", tools(request.getTools()));
+        }
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
+        if ((format.getType() != null || !format.getExtras().isEmpty()) && !extras.contains("text")) {
+            Map<String, Object> text = new LinkedHashMap<>();
+            text.put("format", responseFormat(format));
+            document.put("text", text);
+        }
         return document;
     }
 
@@ -247,22 +252,30 @@ class ResponsesWriter {
         }
     }
 
-    /**
-     * What a message says as the item it becomes. A message that is text alone takes the plain-string
-     * content form; anything else — an image, a part carrying a field this module does not model —
-     * takes the array form, which is the only one that can hold it.
-     */
     private static Map<String, Object> messageItem(@Nullable String role, List<ContentPart> content,
             @Nullable ProviderExtras extras) {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("role", role);
-        if (arrayContent(content)) {
-            // What the assistant said is this protocol's own kind of content entry, and what anyone
-            // else says is the input kind: an assistant turn replayed as an item has to look like the
-            // item it was, or the endpoint reads it as something the model did not say.
-            String textType = ChatRole.ASSISTANT.equals(role) ? "output_text" : "input_text";
-            entry.put("content", contentEntries(content, textType));
-        } else {
+        Object contentValue = contentValue(role, content);
+        // The content carries extras of its own, so the extras' reach ends here: it goes in after the
+        // merge, unless the extras name it whole.
+        if (extras != null) {
+            extras.mergeInto(entry);
+        }
+        if (contentValue != null && !namesWhole(extras, "content")) {
+            entry.put("content", contentValue);
+        }
+        return entry;
+    }
+
+    /**
+     * What a message says as the content it becomes. A message that is text alone takes the
+     * plain-string content form; anything else — an image, a part carrying a field this module does
+     * not model — takes the array form, which is the only one that can hold it. {@code null} when the
+     * message carries nothing to put there.
+     */
+    private static @Nullable Object contentValue(@Nullable String role, List<ContentPart> content) {
+        if (!arrayContent(content)) {
             StringBuilder text = new StringBuilder();
             for (ContentPart part : content) {
                 String value = ((TextPart) part).getText();
@@ -270,14 +283,13 @@ class ResponsesWriter {
                     text.append(value);
                 }
             }
-            if (text.length() > 0) {
-                entry.put("content", text.toString());
-            }
+            return text.length() > 0 ? text.toString() : null;
         }
-        if (extras != null) {
-            extras.mergeInto(entry);
-        }
-        return entry;
+        // What the assistant said is this protocol's own kind of content entry, and what anyone else
+        // says is the input kind: an assistant turn replayed as an item has to look like the item it
+        // was, or the endpoint reads it as something the model did not say.
+        String textType = ChatRole.ASSISTANT.equals(role) ? "output_text" : "input_text";
+        return contentEntries(content, textType);
     }
 
     /**
@@ -290,10 +302,15 @@ class ResponsesWriter {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("role", role);
         String textType = ChatRole.ASSISTANT.equals(role) ? "output_text" : "input_text";
-        entry.put("content", contentEntries(part.getSubParts(), textType));
+        List<Map<String, Object>> content = contentEntries(part.getSubParts(), textType);
+        // The content carries extras of its own, so the part's extras' reach ends here: it goes in
+        // after the merge, unless the extras name it whole.
         ProviderExtras extras = part.getExtras();
         if (extras != null) {
             extras.mergeInto(entry);
+        }
+        if (!namesWhole(extras, "content")) {
+            entry.put("content", content);
         }
         return entry;
     }
@@ -425,13 +442,18 @@ class ResponsesWriter {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("type", "function_call_output");
         putIfSet(entry, "call_id", result.getCallId());
-        entry.put("output", output(result.getSubParts()));
+        Object output = output(result.getSubParts());
+        // The output carries extras of its own when it takes the entry-array form, so the extras'
+        // reach ends here: it goes in after the merges, unless an entry names it whole.
         if (messageExtras != null) {
             messageExtras.mergeInto(entry);
         }
         ProviderExtras resultExtras = result.getExtras();
         if (resultExtras != null) {
             resultExtras.mergeInto(entry);
+        }
+        if (!namesWhole(messageExtras, "output") && !namesWhole(resultExtras, "output")) {
+            entry.put("output", output);
         }
         return entry;
     }
@@ -594,6 +616,11 @@ class ResponsesWriter {
         if (value != null) {
             members.put(name, value);
         }
+    }
+
+    /** Whether the extras, if any, name this member whole — the one case where the member's own value stands. */
+    private static boolean namesWhole(@Nullable ProviderExtras extras, String member) {
+        return extras != null && extras.contains(member);
     }
 
     private static SynapseException unsupportedPart(ContentPart part) {

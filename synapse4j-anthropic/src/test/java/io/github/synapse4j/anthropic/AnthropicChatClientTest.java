@@ -435,6 +435,60 @@ class AnthropicChatClientTest {
     }
 
     @Test
+    void pathStopsAtModelledFormat() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        ChatResponseFormat format = request.getOptions().getResponseFormat();
+        format.setType(ChatResponseFormat.TYPE_JSON_SCHEMA);
+        format.setSchema(new JsonSchemaBuilder().setType("object").build());
+        request.getOptions().getExtras().put(List.of("output_config", "format", "strict"), true);
+
+        client.chat(request);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> outputConfig = (Map<String, Object>) parseCaptured().get("output_config");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> formatWire = (Map<String, Object>) outputConfig.get("format");
+        // The format carries extras of its own, so the request's reach ends at the output_config
+        // object: the path does not land, and the members the format models stand as written.
+        assertEquals("json_schema", formatWire.get("type"));
+        assertFalse(formatWire.containsKey("strict"));
+    }
+
+    @Test
+    void extrasReplaceOutputConfigWhole() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.getOptions().setReasoningEffort("high");
+        request.getOptions().getExtras().put("output_config", Map.of("effort", "low"));
+
+        client.chat(request);
+
+        // The entry names the output_config object whole, so it stands in its place rather than
+        // reaching into it.
+        assertEquals(Map.of("effort", "low"), parseCaptured().get("output_config"));
+    }
+
+    @Test
+    void extrasSetOutputConfigEffort() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.getOptions().setReasoningEffort("low");
+        request.getOptions().getExtras().put(List.of("output_config", "effort"), "high");
+
+        client.chat(request);
+
+        // The effort is a member the output_config object carries itself, not one the format answers
+        // for, so the request's reach lands here — the format is where it ends.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> outputConfig = (Map<String, Object>) parseCaptured().get("output_config");
+        assertEquals("high", outputConfig.get("effort"));
+    }
+
+    @Test
     void imageGoesAsImageBlock() {
         stubCompletion();
 
