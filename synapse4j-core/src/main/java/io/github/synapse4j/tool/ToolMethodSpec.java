@@ -27,17 +27,9 @@ import lombok.ToString;
  * somebody wrote.
  *
  * <p>
- * The Java side is what the reader settled and does not change afterwards: the class the method was
- * read from, the method, the instance it runs on, and one entry per declared parameter, in signature
- * order. The strings are written and rewritten — the annotations write them, the customizers rewrite
- * them, and the reader applies whatever defaults are left over.
- *
- * <p>
- * {@link #definition()} is where all of it is read back: it refuses a resolution that cannot become a
- * declaration, and turns one that can into the {@link ToolDefinition} the model is shown. The input
- * schema is the same split as on a {@link ToolParameterSpec} — {@link #schema} is the configuration
- * surface, text written by an annotation or a customizer, and {@link #resolvedSchema} is the
- * conclusion, the envelope put together out of the parameters' own answers.
+ * The Java side is what the reader settled and does not change afterwards; the strings are written and
+ * rewritten — the annotations write them, the customizers rewrite them, and the reader applies
+ * whatever defaults are left over.
  */
 @Getter
 @Setter

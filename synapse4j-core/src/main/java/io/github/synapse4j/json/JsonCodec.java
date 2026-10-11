@@ -7,29 +7,16 @@ import java.lang.reflect.Type;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Writes Java values as JSON text, reads JSON text back into Java values, derives the schema of the
- * JSON that crosses in either direction, and opens the writer and reader that move a document token
- * by token instead of building it.
+ * The boundary between Java values and JSON text: a value is written out and read back, the schema of
+ * the JSON that crosses either way is derived, and the writer and reader move a document token by
+ * token instead of building it.
  *
  * <p>
  * A schema has a direction, because the two directions do not always describe the same JSON. A binder
  * may write a property it cannot read back, and read one it never writes: a getter with no setter is
  * written but not read, a property marked read-only is written but never read, one marked write-only
- * is read but never written. So there are two methods, each named after the operation whose JSON it
- * describes:
- *
- * <ul>
- * <li>{@link #generateEncodeSchema(Type)} describes what {@link #encode(Object)} writes — the JSON
- * this codec hands out;</li>
- * <li>{@link #generateDecodeSchema(Type)} describes what {@link #decode(String, Type)} accepts — the
- * JSON this codec takes in.</li>
- * </ul>
- *
- * <p>
- * Which direction a caller wants follows from who produces the JSON. The decode schema is the one to
- * hand to whoever produces it — the arguments of a tool the model calls, the shape of a structured
- * answer. The encode schema describes what this codec produced, for whoever reads it: a model told
- * what a call returns, a caller shown a tool's result.
+ * is read but never written. So a schema is generated per direction, each named after the operation
+ * whose JSON it describes.
  *
  * <p>
  * A schema is worth generating only if it describes JSON the codec really moves, so one thing is what

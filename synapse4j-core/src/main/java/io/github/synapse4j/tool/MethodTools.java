@@ -16,9 +16,7 @@ import io.github.synapse4j.json.JsonCodec;
 import lombok.NonNull;
 
 /**
- * How a Java method becomes a tool: the annotated ones a class declares through {@link #from(Object)}
- * and {@link #from(Class)}, and one named by hand through {@link #of}. Each is read into a
- * {@link ToolMethodSpec}, customized, and built into a tool.
+ * How a Java method becomes a tool: the annotated ones a class declares, and one named by hand.
  *
  * <p>
  * One method becomes one tool. The signature gives the structure; the annotations write the strings
@@ -29,14 +27,10 @@ import lombok.NonNull;
  * name, a parameter by the Java parameter it was declared as.
  *
  * <p>
- * {@link #from(Object)} reads every annotated method the object has — the instance ones it runs on
- * itself, and the static ones, which need no instance — while {@link #from(Class)} reads the annotated
- * static ones, the only ones a class can supply. Visibility does not matter: a protected or private
- * declaration is read like a public one. Neither does where it sits — what the object only inherits,
- * from a superclass or an interface's default method, is read too, with an override standing in for
- * what it overrides. Abstract methods, and the synthetic and bridge methods the compiler makes, are
- * left alone. Both answers come in no particular order: the order reflection hands methods over is
- * unspecified.
+ * An annotated method is read whatever its visibility and wherever it sits: what the object only
+ * inherits, from a superclass or an interface's default method, is read too, with an override standing
+ * in for what it overrides, while abstract methods and the synthetic and bridge methods the compiler
+ * makes are left alone. The order is unspecified.
  *
  * <p>
  * The reader holds configuration, not conversations. It is not safe to share while that configuration

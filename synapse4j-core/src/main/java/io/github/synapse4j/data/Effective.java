@@ -3,10 +3,9 @@ package io.github.synapse4j.data;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A value that answers a copy of itself and takes what another instance of its declared type states:
- * what the receiver states stands, and the base fills in what it leaves unset. What counts as unset is
- * the type's own to define — typically {@code null}, an empty collection, or something it cannot
- * identify.
+ * A value that can be copied and merged with another instance of its declared type: what the receiver
+ * states stands, and the base fills in what it leaves unset. What counts as unset is the type's own to
+ * define — typically {@code null}, an empty collection, or something it cannot identify.
  *
  * <p>
  * The operation is an instance method rather than a static helper on the type because the kind has to

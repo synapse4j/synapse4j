@@ -25,10 +25,8 @@ import io.github.synapse4j.exception.SynapseIOException;
  * came from, it is not shareable.
  *
  * <p>
- * The sink belongs to the caller. {@link #flush()} pushes what is buffered into it and flushes it;
- * {@link #close()} does the same and then releases the writer's own buffers. Neither closes the
- * sink: the transport owns it, and may still have something to write or report after the document
- * is finished.
+ * The sink belongs to the caller: no method here closes it, since the transport owns it and may
+ * still have something to write or report after the document is finished.
  *
  * <p>
  * A failure of the sink is a {@link SynapseIOException} whose cause is the original

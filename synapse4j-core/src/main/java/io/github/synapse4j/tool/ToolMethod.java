@@ -15,26 +15,20 @@ import java.lang.annotation.Target;
  * an accident. An attribute supplies a default; an application may override it from its own
  * configuration; a completion step may resolve it dynamically — a SpEL expression, say. Whatever the
  * text resolves to is what configures the tool; text that resolves to blank means "nothing supplied",
- * and falls to the field's own default rule. Each field defines its own, where it is read:
- *
- * <ul>
- * <li>{@code name} blank becomes the method's own name;</li>
- * <li>{@code description} blank becomes no description;</li>
- * <li>{@code type} blank becomes the implementation the reading uses by default;</li>
- * <li>{@code schema} blank is the envelope put together from what each parameter settled on;</li>
- * <li>{@code strict} blank is left to the protocol, which is not the same as asking it not to
- * enforce: the flag is simply not sent.</li>
- * </ul>
+ * and falls to the attribute's own rule, stated where it is declared.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 @Documented
 public @interface ToolMethod {
 
-    /** The name the tool is known by. */
+    /**
+     * The name the tool is known by; blank when nothing supplied one, and the tool then goes by the
+     * method's own name.
+     */
     String name() default "";
 
-    /** What the tool does. */
+    /** What the tool does; blank when nothing supplied one, and the declaration then carries none. */
     String description() default "";
 
     /**

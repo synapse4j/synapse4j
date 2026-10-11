@@ -20,26 +20,16 @@ import lombok.NonNull;
  * pulls instead adapts on its own side, and nothing here promises how the bytes travel.
  *
  * <p>
- * {@link #writeTo(OutputStream)} may be called more than once, and every call has to produce the same
- * bytes: a request is sent again on a retry, on a redirect, and after an authentication challenge. A
- * source that can only be read once — a socket, a one-shot pipe — is therefore something the caller
- * buffers before handing it in. Calls are sequential: one call at a time, never two at once.
+ * A body is written more than once — a request is sent again on a retry, on a redirect, and after an
+ * authentication challenge — and every write has to produce the same bytes. A source that can only be
+ * read once — a socket, a one-shot pipe — is therefore something the caller buffers before handing it
+ * in. Calls are sequential: one call at a time, never two at once.
  *
  * <p>
  * A call may also be abandoned part-way: a transport that gives up on a request — the answer arrived
  * before the body was drained, the connection broke — makes the sink fail at the call's next write,
  * and a call is expected to unwind on that failure rather than try to finish writing. The next
  * attempt runs its own call, once the abandoned one has left.
- *
- * <p>
- * {@link #buffer()} is the same content where producing it would be work already done. An
- * implementation may take it instead of asking for a write, which is what keeps bytes a caller already
- * holds from being written out and read back — and it is where a length comes from when there is one:
- * the buffer knows how much it holds, while a body that can only be written is a body whose length is
- * not known until it has been.
- *
- * <p>
- * The sink belongs to the implementation, so {@link #writeTo(OutputStream)} never closes it.
  */
 @FunctionalInterface
 public interface HttpBody {
@@ -54,7 +44,8 @@ public interface HttpBody {
 
     /**
      * The body's bytes, when they are already in hand; {@code null} when writing is the only way to
-     * produce them.
+     * produce them. It is also where a length comes from when there is one: the buffer knows how much
+     * it holds, while a body that can only be written has no length until it has been.
      *
      * <p>
      * Every call answers with a fresh buffer — for a body that holds one, a duplicate of it — reading

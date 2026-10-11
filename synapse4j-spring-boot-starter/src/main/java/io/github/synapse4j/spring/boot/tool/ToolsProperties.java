@@ -13,15 +13,8 @@ import lombok.Data;
  * {@code @ToolMethod}, and what each one is configured to be.
  *
  * <p>
- * {@link #spel} decides how a method's own text is read: it turns on the resolution of expressions in it
- * — {@code #{...}} SpEL and {@code ${...}} placeholders — and is off by default, because an expression
- * reaches the application's beans, and an annotation that never meant to be one should not be read as
- * one.
- *
- * <p>
- * {@link #strict} is the one declaration attribute an application sets once for every tool. The others
- * have no application-wide meaning — a name, a description or a schema that is the same for every tool
- * describes none of them — so they are set per tool under {@link #methods}.
+ * Only {@link #strict} has an application-wide meaning; a name, a description or a schema that is the
+ * same for every tool describes none of them, so those are set per tool under {@link #methods}.
  *
  * <p>
  * A tool is configured under the name it carries before this configuration applies: the name its
@@ -34,8 +27,9 @@ import lombok.Data;
 public class ToolsProperties {
 
     /**
-     * Whether the text an annotation wrote is resolved as an expression before it configures the tool.
-     * Off by default: resolution reaches the application's beans, so it is turned on deliberately.
+     * Whether the text an annotation wrote is resolved as an expression before it configures the tool
+     * — #{...} SpEL or ${...} placeholders. Off by default: resolution reaches the application's
+     * beans, so it is turned on deliberately.
      */
     private boolean spel = false;
 

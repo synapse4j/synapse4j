@@ -20,15 +20,7 @@ import lombok.Setter;
  * A mirror of {@link ChatOptions} rather than the library type itself, because the library type
  * cannot be bound: its nested HTTP options are types from another jar, which the metadata processor
  * does not recurse into, its response format carries a schema no configuration source can spell, and
- * its extras have no shape Spring can write into. Only the bindable fields are restated;
- * {@link #toChatOptions(JsonCodec)} rebuilds the library type from them.
- *
- * <p>
- * {@code extras} is the escape hatch and binds raw keys: a key is the provider's own wire name, a
- * dotted key addressing a nested member. Values take their type from the configuration source — a
- * YAML document keeps booleans, numbers and nested objects, while a {@code .properties} file yields
- * a string for every one of them, so a non-string extra belongs in YAML. A list cannot be
- * expressed: YAML flattens it into indexed keys, which bind back as an object rather than an array.
+ * its extras have no shape Spring can write into. Only the bindable fields are restated.
  */
 @Getter
 @Setter
@@ -65,7 +57,14 @@ public class ChatOptionsProperties {
     /** Headers for every call's HTTP request. */
     private final Map<String, String> headers = new LinkedHashMap<>();
 
-    /** Provider-specific fields to merge into every call's payload, by raw wire name. */
+    /**
+     * Provider-specific fields to merge into every call's payload, by raw wire name. This is the escape
+     * hatch and binds raw keys: a key is the provider's own wire name, a dotted key addressing a nested
+     * member. Values take their type from the configuration source — a YAML document keeps booleans,
+     * numbers and nested objects, while a .properties file yields a string for every one of them, so a
+     * non-string extra belongs in YAML. A list cannot be expressed: YAML flattens it into indexed keys,
+     * which bind back as an object rather than an array.
+     */
     private final Map<String, Object> extras = new LinkedHashMap<>();
 
     /**

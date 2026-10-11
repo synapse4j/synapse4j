@@ -13,38 +13,26 @@ import io.github.synapse4j.data.ChatStreamEvent;
  * intended way to consume it — {@code break}, {@code continue} and early {@code return} work the
  * way they do in any loop, which the functional operations on a stream express only awkwardly.
  * Pulling is lazy and blocking: {@code hasNext()} waits for the next event to arrive, which is
- * also what backpressures the provider. The thread that iterates is the thread events arrive on.
+ * also what backpressures the provider, and the thread that iterates is the thread events arrive
+ * on.
  *
  * <p>
- * Each event {@code next()} hands out is also folded into an aggregated {@link ChatResponse}, so
- * the same consumption that drives a UI builds the complete answer: afterwards
- * {@link #aggregatedResponse()} carries the turn {@link ChatClient#chat} would have returned —
- * breaking out of the loop early yields the part consumed so far, never an error. Nothing is
- * buffered for this: the aggregation is the only state kept.
- *
- * <p>
- * The fold restores what the protocol carries — the message and its parts, the finish reason, the
- * counts, the ids — and it restores those the way a blocking call reads them. The provider's own
- * unmodelled members are a different matter: they are gathered from the frames that happened to
- * carry them, and the library has no knowledge of what they mean, so the extras an assembled answer
- * ends up with need not match the ones a single response would have kept.
+ * The fold is the only state kept: each event handed out is folded into an aggregated
+ * {@link ChatResponse}, so the same consumption that drives a UI builds the complete answer. It
+ * restores what the protocol carries the way a blocking call reads them; the provider's own
+ * unmodelled members are gathered from the frames that happened to carry them, so the extras an
+ * assembled answer ends up with need not match the ones a single response would have kept.
  *
  * <p>
  * One stream may cover several exchanges: a tool-calling loop's stream keeps opening the next
  * round's answer as the previous one ends, and their events arrive in one sequence — the
- * boundary is the protocol's own, and no marker is synthesized. {@link #aggregatedResponse()}
- * then reports the exchange in progress, replaced as the boundary is crossed, and what it
- * holds when the stream ends is the turn {@link ChatClient#chat} would have returned.
+ * boundary is the protocol's own, and no marker is synthesized.
  *
  * <p>
- * One pass only. {@link #iterator()} is called once — events are not buffered, so there is nothing
- * to iterate a second time — and a further call throws; iterating a stream that was closed throws
- * as well. Closing releases the connection
- * behind the stream, cancelling the response if it is still in flight; it is idempotent and safe
- * to call from any thread, and try-with-resources covers the common case. A stream that runs to
- * its end releases the same connection by itself — the moment its last event is handed out — so
- * consuming an answer completely needs no close, and a loop that breaks out early is the one that
- * does.
+ * One pass only: events are not buffered, so there is nothing to iterate a second time. A stream
+ * that runs to its end releases its connection by itself — the moment its last event is handed out
+ * — so consuming an answer completely needs no close, and a loop that breaks out early is the one
+ * that does.
  *
  * <p>
  * Applications receive implementations from {@link ChatClient#stream}. {@link DefaultChatStream}
@@ -55,7 +43,8 @@ public interface ChatStream extends Iterable<ChatStreamEvent>, AutoCloseable {
 
     /**
      * The single iterator over this stream. A second call throws {@link IllegalStateException}:
-     * events are not buffered, so there is nothing to iterate again.
+     * events are not buffered, so there is nothing to iterate again; iterating a stream that has
+     * been closed throws as well.
      */
     @Override
     Iterator<ChatStreamEvent> iterator();
@@ -64,8 +53,9 @@ public interface ChatStream extends Iterable<ChatStreamEvent>, AutoCloseable {
      * The answer assembled from every event consumed so far — the exchange in progress when
      * the stream spans several. Before consumption this carries no part of the answer yet; once the
      * loop runs to its end it is the complete one, the turn {@link ChatClient#chat} would have
-     * returned. This method never blocks and never drives consumption — it reports what the
-     * iterator has already folded.
+     * returned, while breaking out of the loop early yields the part consumed so far rather than an
+     * error. This method never blocks and never drives consumption — it reports what the iterator has
+     * already folded.
      *
      * <p>
      * The fold runs on the thread consuming the iterator, so this is read from that thread too:

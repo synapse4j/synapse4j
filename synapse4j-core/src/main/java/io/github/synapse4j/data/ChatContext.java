@@ -13,20 +13,8 @@ import lombok.Setter;
  * for the length of one exchange — where that exchange stands.
  *
  * <p>
- * The library writes every member here except the attributes. A provider-reported session id
- * is adopted into {@link #sessionId} — but only while the id is still empty, so a value the
- * application set always wins; the formats are the providers' own (a UUID, a prefixed key, a
- * cache token) and none of them is ever parsed here. {@link #request} and {@link #response}
- * record the exchange as it went out and came back, overwriting whatever an earlier call
- * left: only the current exchange is this object's business, and no history accumulates
- * here. {@link #turn} belongs to the tool-calling loop alone, which resets it at each round's
- * start; a client on its own never reads or writes it, so on a bare call whatever the
- * application set stands.
- *
- * <p>
- * The attributes belong to the application alone: the library never reads or writes them, and
- * nothing in them ever reaches the wire. The extras exist to be serialized; this map is
- * their opposite — an in-process lane for data that must not go out.
+ * The library writes every member here except the attributes, and only the current exchange is its
+ * business: no history accumulates.
  *
  * <p>
  * An instance carries one exchange at a time: the library's fields are overwritten in place,
@@ -66,8 +54,9 @@ public class ChatContext {
     private @Nullable ChatResponse response;
 
     /**
-     * The application's own entries for this conversation. Never {@code null}; the library never
-     * reads or writes it.
+     * The application's own in-process entries for this conversation, for data that must not go out.
+     * Never {@code null}; the library never reads or writes it, and nothing in it ever reaches the
+     * wire.
      */
     private final Map<String, Object> attributes = new LinkedHashMap<>();
 

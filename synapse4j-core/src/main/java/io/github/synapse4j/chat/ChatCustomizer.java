@@ -6,17 +6,14 @@ import io.github.synapse4j.data.ChatStreamEvent;
 
 /**
  * The hooks a client runs around an exchange: whatever a step needs, overridden; the rest, left
- * alone. Each hook names the step it runs at — {@link #customizeRequest} before the request goes
- * out, {@link #customizeResponse} on the way back, {@link #customizeStreamEvent} between a
- * stream's source and its fold — and does nothing unless overridden, so one instance carries the
- * steps its author cares about and is silent at the others.
+ * alone. A hook does nothing unless overridden, so one instance carries the steps its author cares
+ * about and is silent at the others.
  *
  * <p>
- * What runs when and where is the client's business. The value a hook is handed is the one the
- * client already holds — the caller's request on the way out, the exchange's answer on the way
- * back, the stream's own event in between — and a hook changes it in place. There is nothing to
- * answer: the identity the rest of the exchange relies on — the request a tool loop grows, the
- * answer the context records — is kept by construction rather than by a rule.
+ * What runs when and where is the client's business. A hook changes in place the value the client
+ * already holds, and has nothing to answer: the identity the rest of the exchange relies on — the
+ * request a tool loop grows, the answer the context records — is kept by construction rather than by
+ * a rule.
  *
  * <p>
  * An instance joins the client's chains through {@link ChatClient#addChatCustomizer(ChatCustomizer)}.

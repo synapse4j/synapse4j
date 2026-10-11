@@ -18,17 +18,6 @@ import org.springframework.stereotype.Component;
  * is left out, however many {@code @ToolMethod} methods it carries.
  *
  * <p>
- * {@link #prefix()} is written in front of the name of every tool read from that class, the ones it
- * declares and the ones it inherits alike, which is how two classes may offer tools of one name without
- * colliding. It is literal text: a separator, if one is wanted, is part of it — {@code "weather_"} names
- * a {@code forecast} method {@code weather_forecast}. Blank, the default, writes nothing.
- *
- * <p>
- * {@link #client()} names the chat client these tools belong to, by its bean name, so an application
- * with several chat clients can give each its own set; blank, the default, makes them available to
- * every chat client the application has.
- *
- * <p>
  * The prefix has two spellings — {@code @Tools("weather_")} and {@code @Tools(prefix = "weather_")} —
  * which are aliases of each other. A reader has to resolve the annotation through Spring's own
  * annotation support to see the one that was written; plain reflection reports only the member that was
@@ -44,7 +33,12 @@ public @interface Tools {
     @AliasFor("prefix")
     String value() default "";
 
-    /** The text written in front of every tool name this class declares; blank for none. */
+    /**
+     * The text written in front of every tool name read from this class — the ones it declares and the
+     * ones it inherits alike — so two classes may offer tools of one name without colliding; blank for
+     * none. It is literal text: a separator, if one is wanted, is part of it — {@code "weather_"} names
+     * a {@code forecast} method {@code weather_forecast}.
+     */
     @AliasFor("value")
     String prefix() default "";
 

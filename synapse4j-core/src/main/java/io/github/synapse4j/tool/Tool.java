@@ -12,12 +12,6 @@ import io.github.synapse4j.data.ContentPart;
  * that runs when the model calls it.
  *
  * <p>
- * {@link #definition()} is what reaches the wire — the adapters write it into the request and know
- * nothing about the rest of this interface. {@link #execute(String, ChatContext)} never leaves the
- * process: it is invoked by whatever drives the round trips, with the arguments the model produced,
- * and its answer becomes the result handed back to the model.
- *
- * <p>
  * A declaration the library must not run is the application's own to implement: this interface is
  * two methods, and carrying that on its own costs a few lines. An implementation is registered
  * once and may be shared across concurrent requests, so it holds no per-call state; everything a
