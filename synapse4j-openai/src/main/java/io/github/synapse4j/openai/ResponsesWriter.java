@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
 
@@ -24,6 +25,7 @@ import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonSource;
 import io.github.synapse4j.json.JsonWriter;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolDefinition;
@@ -40,7 +42,9 @@ import lombok.RequiredArgsConstructor;
  *
  * <p>
  * A request is assembled as the object it goes out as — one map per node, the members this module
- * models written into it with the node's extras merged over them — and written in one pass. The maps
+ * models written into it with the node's extras merged over them — and written in one pass. The
+ * conversation and the tools are the members that grow with the exchange, so they are not gathered
+ * into lists here: their entries are produced as the writer walks them, one at a time. The maps
  * hold references and a media payload stays a reader, so neither the document nor a payload is
  * materialized, and every name is a literal spelled out here — no codec's naming strategy can rename
  * one, and a member whose value is not set is never emitted. So the bytes that leave here are exactly
@@ -149,10 +153,12 @@ class ResponsesWriter {
             document.put("instructions", instructions(system));
         }
         if (!extras.contains("input")) {
-            document.put("input", input(request));
+            // Left as a source: the items are produced as the writer walks the array rather than
+            // gathered into a list first, so a conversation longer than memory still goes out.
+            document.put("input", JsonSource.of(() -> input(request)));
         }
         if (!request.getTools().isEmpty() && !extras.contains("tools")) {
-            document.put("tools", tools(request.getTools()));
+            document.put("tools", JsonSource.of(() -> tools(request.getTools())));
         }
         ChatResponseFormat format = request.getOptions().getResponseFormat();
         if ((format.getType() != null || !format.getExtras().isEmpty()) && !extras.contains("text")) {
@@ -164,24 +170,19 @@ class ResponsesWriter {
     }
 
     /**
-     * The conversation as the array of items it goes out as, in the order the caller built them.
+     * The conversation as the items it goes out as, in the order the caller built them. The items
+     * are produced as the writer walks them rather than gathered into a list first.
      *
      * <p>
      * With a chain anchor — the application sets {@code previous_response_id} in the options' extras —
      * the server already holds the history, so only the pending messages go out. Without one the
      * whole conversation goes: the history first, then the pending.
      */
-    private List<Map<String, Object>> input(ChatRequest request) {
-        List<Map<String, Object>> input = new ArrayList<>();
-        if (!request.getOptions().getExtras().contains(PREVIOUS_RESPONSE_ID)) {
-            for (ChatMessage message : request.getHistoryMessages()) {
-                addMessage(input, message);
-            }
-        }
-        for (ChatMessage message : request.getPendingMessages()) {
-            addMessage(input, message);
-        }
-        return input;
+    private Stream<Map<String, Object>> input(ChatRequest request) {
+        Stream<ChatMessage> history = request.getOptions().getExtras().contains(PREVIOUS_RESPONSE_ID)
+                ? Stream.empty()
+                : request.getHistoryMessages().stream();
+        return Stream.concat(history, request.getPendingMessages().stream()).flatMap(this::items);
     }
 
     /**
@@ -210,7 +211,7 @@ class ResponsesWriter {
         return text.toString();
     }
 
-    private void addMessage(List<Map<String, Object>> input, ChatMessage message) {
+    private Stream<Map<String, Object>> items(ChatMessage message) {
         List<ContentPart> content = new ArrayList<>();
         for (ContentPart part : message.getParts()) {
             if (part instanceof TextPart || part instanceof MediaPart) {
@@ -222,34 +223,35 @@ class ResponsesWriter {
         // which is what a turn of tool results is — has nowhere else for them to go, so the items it
         // does become carry them instead.
         ProviderExtras messageExtras = content.isEmpty() ? message.getExtras() : null;
-        boolean messageAdded = false;
-        for (ContentPart part : message.getParts()) {
+        boolean[] messageAdded = { false };
+        return message.getParts().stream().flatMap(part -> {
             if (part instanceof ListPart item) {
                 // The part holds one item whole — its content entries and its own members — so it
                 // goes back out as that item, in the place it held.
-                input.add(messageItem(item, message.getRole()));
+                return Stream.of(messageItem(item, message.getRole()));
             } else if (part instanceof RawPart raw) {
                 // A part kept whole at the top of a message is an item this module does not model:
                 // its members are the item, so they go out exactly as they were read.
-                input.add(raw.members());
+                return Stream.of(raw.members());
             } else if (part instanceof ToolCallPart call) {
-                input.add(functionCall(call, messageExtras));
+                return Stream.of(functionCall(call, messageExtras));
             } else if (part instanceof ToolResultPart result) {
-                input.add(functionCallOutput(result, messageExtras));
+                return Stream.of(functionCallOutput(result, messageExtras));
             } else if (part instanceof ReasoningPart reasoning) {
-                input.add(reasoningItem(reasoning, messageExtras));
+                return Stream.of(reasoningItem(reasoning, messageExtras));
             } else if (part instanceof TextPart || part instanceof MediaPart) {
                 // Text and images make no item of their own: they are the message's own item, which
                 // stands where the first of them sits — so a part the model wrote before it answered,
                 // its reasoning, keeps the place the turn gives it.
-                if (!messageAdded) {
-                    input.add(messageItem(message.getRole(), content, message.getExtras()));
-                    messageAdded = true;
+                if (messageAdded[0]) {
+                    return Stream.empty();
                 }
+                messageAdded[0] = true;
+                return Stream.of(messageItem(message.getRole(), content, message.getExtras()));
             } else {
                 throw unsupportedPart(part);
             }
-        }
+        });
     }
 
     private static Map<String, Object> messageItem(@Nullable String role, List<ContentPart> content,
@@ -525,12 +527,8 @@ class ResponsesWriter {
         return text.toString();
     }
 
-    private List<Map<String, Object>> tools(List<Tool> requestTools) {
-        List<Map<String, Object>> tools = new ArrayList<>();
-        for (Tool requestTool : requestTools) {
-            tools.add(tool(requestTool.definition()));
-        }
-        return tools;
+    private Stream<Map<String, Object>> tools(List<Tool> requestTools) {
+        return requestTools.stream().map(requestTool -> tool(requestTool.definition()));
     }
 
     /**

@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
 
@@ -23,6 +24,7 @@ import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonCodec;
+import io.github.synapse4j.json.JsonSource;
 import io.github.synapse4j.json.JsonWriter;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolDefinition;
@@ -38,7 +40,9 @@ import lombok.RequiredArgsConstructor;
  *
  * <p>
  * A request is assembled as the object it goes out as — one map per node, the members this module
- * models written into it with the node's extras merged over them — and written in one pass. Every
+ * models written into it with the node's extras merged over them — and written in one pass. The
+ * conversation and the tools are the members that grow with the exchange, so they are not gathered
+ * into lists here: their entries are produced as the writer walks them, one at a time. Every
  * name is a literal spelled out here, so whichever JSON library the application chose, the bytes
  * that leave are exactly this protocol's spelling, and a member whose value is not set is never
  * emitted.
@@ -134,10 +138,12 @@ class MessagesWriter {
             document.put("system", system(system));
         }
         if (!extras.contains("messages")) {
-            document.put("messages", messages(request));
+            // Left as a source: the entries are produced as the writer walks the array rather than
+            // gathered into a list first, so a conversation longer than memory still goes out.
+            document.put("messages", JsonSource.of(() -> messages(request)));
         }
         if (!request.getTools().isEmpty() && !extras.contains("tools")) {
-            document.put("tools", tools(request.getTools()));
+            document.put("tools", JsonSource.of(() -> tools(request.getTools())));
         }
         // The answer's shape carries extras of its own, so the request's reach ends at it: it is
         // written again after the merge, unless the request names it whole.
@@ -208,18 +214,14 @@ class MessagesWriter {
     }
 
     /**
-     * The conversation as the array of messages. The system message is not among them — this
-     * protocol keeps no turn for it, and the framing travels as its own field on every call.
+     * The conversation as the messages it goes out as, in the order the caller built them. The
+     * entries are produced as the writer walks them rather than gathered into a list first. The
+     * system message is not among them — this protocol keeps no turn for it, and the framing travels
+     * as its own field on every call.
      */
-    private List<Map<String, Object>> messages(ChatRequest request) {
-        List<Map<String, Object>> written = new ArrayList<>();
-        for (ChatMessage message : request.getHistoryMessages()) {
-            written.add(message(message));
-        }
-        for (ChatMessage message : request.getPendingMessages()) {
-            written.add(message(message));
-        }
-        return written;
+    private Stream<Map<String, Object>> messages(ChatRequest request) {
+        return Stream.concat(request.getHistoryMessages().stream(), request.getPendingMessages().stream())
+                .map(this::message);
     }
 
     private Map<String, Object> message(ChatMessage message) {
@@ -570,12 +572,8 @@ class MessagesWriter {
         return entry;
     }
 
-    private List<Map<String, Object>> tools(List<Tool> requestTools) {
-        List<Map<String, Object>> tools = new ArrayList<>();
-        for (Tool requestTool : requestTools) {
-            tools.add(tool(requestTool.definition()));
-        }
-        return tools;
+    private Stream<Map<String, Object>> tools(List<Tool> requestTools) {
+        return requestTools.stream().map(requestTool -> tool(requestTool.definition()));
     }
 
     /**
