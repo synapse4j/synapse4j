@@ -15,8 +15,7 @@ import lombok.NonNull;
  * The boolean form of a schema: {@code true} accepts everything, {@code false} accepts nothing.
  *
  * <p>
- * It carries no keyword, so every getter that answers for one answers empty, and it has no sub-schema,
- * so a walk visits only this node. An instance is immutable and may be shared.
+ * It carries no keyword and has no sub-schema. An instance is immutable and may be shared.
  */
 @EqualsAndHashCode
 public class BooleanJsonSchema implements JsonSchema {

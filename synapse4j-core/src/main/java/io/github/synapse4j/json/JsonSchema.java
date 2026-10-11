@@ -15,43 +15,23 @@ import lombok.NonNull;
  *
  * <p>
  * A schema is either a boolean — {@code true} accepts everything, {@code false} accepts nothing — or
- * an object carrying keywords. {@link #asBoolean()} answers which: a non-null answer is the boolean
- * form, {@code null} the object form.
+ * an object carrying keywords.
  *
  * <p>
- * This is the read side. The keywords a caller reaches for constantly have a named getter; every other
- * keyword is read through {@link #keys()} and {@link #get(String, Class)}, which together see everything
- * the node carries, modelled or not. The keyword names the getters below do not cover are still walked:
- * a keyword whose value is a sub-schema is visited and mapped like any other.
+ * This is the read side: a schema is read, never changed. It is assembled through
+ * {@link JsonSchemaBuilder} and read from then on, and a change is a new schema rather than a change to
+ * this one. A schema is a value: two schemas are equal when they carry the same content.
  *
  * <p>
- * Nothing a schema carries is lost: a keyword this interface does not name is kept as it is and read
- * through {@link #keys()} and {@link #get(String, Class)}, so a schema of any draft survives a round
- * trip. The named getters, though, are those of JSON Schema 2019-09 and later and read only that
- * spelling — where a keyword was renamed, {@link #getDefs()} answers {@code $defs} and not the older
- * {@code definitions} of draft-07 and earlier. Reading a schema of another dialect through the named
- * getters is not what this interface does; {@link #keys()} and {@link #get(String, Class)} see it all.
- *
- * <p>
- * {@link #walk()} walks the tree and lets each node be read. {@link #map(UnaryOperator)} walks
- * it and produces a new tree: the function answers which node to use, and a node it leaves unchanged is
- * shared rather than copied, so only the path to a change is rebuilt.
- *
- * <p>
- * Read-only: a schema is assembled through {@link JsonSchemaBuilder} and read from then on. The built-in
- * implementations freeze what they carry, so nothing a getter hands back can change the schema. A change
- * is a new schema rather than a change to this one — {@link #map(UnaryOperator)} produces one, sharing
- * the nodes it leaves alone.
+ * Nothing a schema carries is lost: a keyword this interface does not name is kept as it is, so a schema
+ * of any draft survives a round trip. The named readers, though, answer the spelling of JSON Schema
+ * 2019-09 and later; a schema of another dialect is read through its keywords, not through them.
  *
  * <p>
  * A schema built through {@link JsonSchemaBuilder} cannot contain itself: a node is built from nodes
  * that already exist, so a cycle is not constructible, and a recursive schema is spelled with
- * {@code $ref} instead. The interface is open, though, so an implementation that hands out itself as
- * its own sub-schema is possible; the walks of {@link #walk()} and {@link #map(UnaryOperator)}
- * do not guard against one.
- *
- * <p>
- * A schema is a value: two schemas are equal when they carry the same content.
+ * {@code $ref}. The interface is open, though, so an implementation that hands out itself as its own
+ * sub-schema is possible, and a walk does not guard against one.
  */
 public interface JsonSchema {
 

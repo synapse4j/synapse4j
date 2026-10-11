@@ -15,22 +15,9 @@ import lombok.NonNull;
  * Builds a {@link JsonSchema} in its object form.
  *
  * <p>
- * Keywords are accumulated here, keyed by their JSON name, and frozen into an immutable
- * {@link ObjectJsonSchema} by {@link #build()}. The keywords the interface names have a setter; every
- * other keyword is written with {@link #put(String, Object)}. {@link JsonSchema#keys()} on the built
- * schema enumerates what a node carries, modelled or not, so a keyword this class does not know
- * survives.
- *
- * <p>
- * A keyword is carried exactly when it was set, {@code null} and all, so a keyword whose JSON value is
- * null (such as {@code "const": null}) survives. A modelled keyword is cleared by setting it to
- * {@code null}, except the ones that take no null — the types, the properties, the required names and
- * the definitions — which refuse it; {@link #put(String, Object)} carries any keyword, null included.
- *
- * <p>
- * A keyword whose value is a sub-schema is kept as a {@link JsonSchema} (or a list or a map of them),
- * so the built schema's {@link JsonSchema#walk} and {@link JsonSchema#map} reach every sub-schema.
- * Every other value is raw JSON data.
+ * Keywords are accumulated here and frozen into an immutable {@link ObjectJsonSchema} by
+ * {@link #build()}. A keyword is carried exactly when it was set, {@code null} and all, so a keyword
+ * whose JSON value is null (such as {@code "const": null}) survives.
  *
  * <p>
  * An instance is not thread-safe while it is being assembled. Once {@link #build()} has run, the built

@@ -23,26 +23,14 @@ import lombok.NonNull;
  *
  * <p>
  * Every keyword a node carries lives in one map, keyed by its JSON name and holding the JSON data it
- * is. The keywords the interface names have a getter here; every other keyword is read with
- * {@link #get(String)}. {@link #keys()} enumerates what a node carries, modelled or not, so a keyword
- * this class does not know survives a round trip untouched.
+ * is. A keyword is carried exactly when it was set, {@code null} and all, so a keyword whose JSON value
+ * is null (such as {@code "const": null}) survives.
  *
  * <p>
- * A keyword is carried exactly when it was set, {@code null} and all, so a keyword whose JSON value is
- * null (such as {@code "const": null}) survives. Reading never sets anything: a getter answers
- * {@code null} for a keyword that was not set and leaves the node as it was.
- *
- * <p>
- * The map and every collection and map below it are frozen, so no getter can change the schema's
- * structure. A value that is neither a map nor a collection is carried as it was given: an application
+ * The map and every collection and map below it are frozen, so nothing a reader is handed can change
+ * the schema. A value that is neither a map nor a collection is carried as it was given: an application
  * that stores a mutable object as a keyword value and changes it afterwards changes what the schema
- * reads, so that value is the caller's to keep still. A node is assembled through
- * {@link JsonSchemaBuilder} and read from then on; a change is a new schema, built from the old one.
- *
- * <p>
- * A keyword whose value is a sub-schema is kept as a {@link JsonSchema} (or a collection or a map of
- * them), so {@link #walk()} and {@link #map(UnaryOperator)} reach every sub-schema. Every
- * other value is raw JSON data.
+ * reads, so that value is the caller's to keep still.
  *
  * <p>
  * The document shape — the maps, lists and scalars a JSON document is made of — is not this class's
