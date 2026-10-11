@@ -1,6 +1,5 @@
 package io.github.synapse4j.chat;
 
-import io.github.synapse4j.data.ChatMessage;
 import io.github.synapse4j.data.ChatRequest;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +27,7 @@ public class DefaultSystemMessageCustomizer implements ChatCustomizer {
     @Override
     public void customizeRequest(ChatClient client, ChatRequest request) {
         if (request.getSystemMessage() == null) {
-            request.setSystemMessage(ChatMessage.system(text));
+            request.systemMessage(text);
         }
     }
 

@@ -124,7 +124,7 @@ public class ChatRequest {
      * @return this call
      */
     public ChatRequest systemMessage(@NonNull String text) {
-        this.systemMessage = ChatMessage.system(text);
+        this.systemMessage = new ChatMessage(null, null, new TextPart(text));
         return this;
     }
 

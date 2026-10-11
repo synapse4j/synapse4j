@@ -2,6 +2,8 @@ package io.github.synapse4j.http;
 
 import org.jspecify.annotations.Nullable;
 
+import lombok.RequiredArgsConstructor;
+
 /**
  * The body-write modes this library itself supports, as values an implementation can reason about
  * rather than the strings {@link HttpOptions#getBodyWriteMode()} carries.
@@ -14,6 +16,7 @@ import org.jspecify.annotations.Nullable;
  * instead of spelling it out in every transport, and what makes a spelling that differs only in case
  * name the same mode.
  */
+@RequiredArgsConstructor
 public enum BodyWriteMode {
 
     /** The implementation picks the mode it does best; the mode {@link HttpOptions#defaults()} carries. */
@@ -30,10 +33,6 @@ public enum BodyWriteMode {
     BUFFERED("buffered");
 
     private final String value;
-
-    BodyWriteMode(String value) {
-        this.value = value;
-    }
 
     /**
      * The string this mode is carried as in {@link HttpOptions#getBodyWriteMode()}.

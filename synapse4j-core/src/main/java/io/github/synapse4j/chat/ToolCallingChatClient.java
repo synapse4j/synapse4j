@@ -176,7 +176,7 @@ public class ToolCallingChatClient extends DelegatingChatClient {
 
     /** One message answering them all: the protocols pair each result with its call by id. */
     private static ChatMessage toolResults(List<ToolResultPart> results) {
-        return new ChatMessage(ChatRole.TOOL, null, results);
+        return new ChatMessage(ChatRole.USER.value(), null, results);
     }
 
     /**

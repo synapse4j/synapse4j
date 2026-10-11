@@ -259,13 +259,17 @@ class MessagesWriter {
     }
 
     /**
-     * The role as this protocol spells it. Tool results arrive with the shared model's tool role —
-     * the tool loop builds them that way — and this protocol carries results inside a user message,
-     * since its two conversation roles leave nowhere else for them. Every other role is written as
-     * it stands: the protocol's own vocabulary is the caller's to spell.
+     * The role as this protocol spells it. This protocol has two conversation roles, so the
+     * application's own messages — the developer role — go out as the user's; a role the library
+     * does not define is written as it stands, the protocol's own vocabulary being the caller's to
+     * spell.
      */
     private static @Nullable String wireRole(@Nullable String role) {
-        return ChatRole.TOOL.equals(role) ? ChatRole.USER : role;
+        return switch (ChatRole.from(role)) {
+            case USER, ASSISTANT -> role;
+            case DEVELOPER -> ChatRole.USER.value();
+            case null -> role;
+        };
     }
 
     /**

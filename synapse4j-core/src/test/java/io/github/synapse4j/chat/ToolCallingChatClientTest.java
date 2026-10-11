@@ -61,7 +61,7 @@ class ToolCallingChatClientTest {
         // wait in the pending messages until the caller folds in the final answer.
         assertEquals(2, request.getHistoryMessages().size());
         ChatMessage results = request.getPendingMessages().get(0);
-        assertEquals(ChatRole.TOOL, results.getRole());
+        assertEquals(ChatRole.USER.value(), results.getRole());
         ToolResultPart result = (ToolResultPart) results.getParts().get(0);
         assertEquals("c1", result.getCallId());
         assertFalse(result.isError());
@@ -250,7 +250,7 @@ class ToolCallingChatClientTest {
         // results wait in the pending messages until the caller folds in the final answer.
         assertEquals(2, request.getHistoryMessages().size());
         ChatMessage results = request.getPendingMessages().get(0);
-        assertEquals(ChatRole.TOOL, results.getRole());
+        assertEquals(ChatRole.USER.value(), results.getRole());
         assertEquals("A", text((ToolResultPart) results.getParts().get(0)));
     }
 
@@ -463,7 +463,7 @@ class ToolCallingChatClientTest {
 
     private static ChatResponse toolCallResponse(String callId, String tool) {
         ChatResponse response = new ChatResponse();
-        response.setMessage(new ChatMessage(ChatRole.ASSISTANT, null, new ToolCallPart(callId, tool, "{}")));
+        response.setMessage(new ChatMessage(ChatRole.ASSISTANT.value(), null, new ToolCallPart(callId, tool, "{}")));
         return response;
     }
 

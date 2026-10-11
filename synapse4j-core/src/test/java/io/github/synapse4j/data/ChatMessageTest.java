@@ -12,7 +12,7 @@ class ChatMessageTest {
 
     @Test
     void joinsTextPartsInOrder() {
-        ChatMessage message = ChatMessage.of(ChatRole.ASSISTANT, new TextPart("Hello"),
+        ChatMessage message = ChatMessage.of(ChatRole.ASSISTANT.value(), new TextPart("Hello"),
                 new ReasoningPart("weigh it up"), new TextPart(null), new TextPart(", world"));
 
         assertEquals("Hello, world", message.getText());
@@ -21,14 +21,14 @@ class ChatMessageTest {
     @Test
     void textEmptyWithoutTextParts() {
         assertEquals("", new ChatMessage(null, null).getText());
-        assertEquals("", ChatMessage.of(ChatRole.ASSISTANT, new ReasoningPart("hmm")).getText());
+        assertEquals("", ChatMessage.of(ChatRole.ASSISTANT.value(), new ReasoningPart("hmm")).getText());
     }
 
     @Test
     void copiesPartsItIsGiven() {
         List<ContentPart> parts = new ArrayList<>(List.of(new TextPart("hello")));
 
-        ChatMessage message = new ChatMessage(ChatRole.ASSISTANT, null, parts);
+        ChatMessage message = new ChatMessage(ChatRole.ASSISTANT.value(), null, parts);
         parts.clear();
 
         assertEquals("hello", message.getText());
@@ -37,7 +37,7 @@ class ChatMessageTest {
     @Test
     void builderCollectsParts() {
         ChatMessage message = ChatMessage.builder()
-                .role(ChatRole.ASSISTANT)
+                .role(ChatRole.ASSISTANT.value())
                 .part(new TextPart("Hello"))
                 .part(new TextPart(", world"))
                 .build();
@@ -55,7 +55,7 @@ class ChatMessageTest {
     @Test
     void toBuilderKeepsExtrasFrozen() {
         ChatMessage base = ChatMessage.builder()
-                .role(ChatRole.USER)
+                .role(ChatRole.USER.value())
                 .extras(new ProviderExtras().put("vendor", "x"))
                 .build();
 
@@ -67,7 +67,7 @@ class ChatMessageTest {
     @Test
     void mapExtrasFillsEmptyBag() {
         ChatMessage message = ChatMessage.builder()
-                .role(ChatRole.USER)
+                .role(ChatRole.USER.value())
                 .mapExtras(bag -> bag.put("vendor", "x"))
                 .build();
 
@@ -77,7 +77,7 @@ class ChatMessageTest {
     @Test
     void mapExtrasExtendsCarriedBag() {
         ChatMessage base = ChatMessage.builder()
-                .role(ChatRole.USER)
+                .role(ChatRole.USER.value())
                 .extras(new ProviderExtras().put("vendor", "x"))
                 .build();
 
@@ -89,7 +89,7 @@ class ChatMessageTest {
 
     @Test
     void getTextReachesNestedParts() {
-        ChatMessage message = ChatMessage.of(ChatRole.TOOL,
+        ChatMessage message = ChatMessage.of(ChatRole.USER.value(),
                 new ToolResultPart("call_1", "weather", new TextPart("sunny")));
 
         assertEquals("sunny", message.getText());
@@ -97,7 +97,7 @@ class ChatMessageTest {
 
     @Test
     void walkRefusesSubtree() {
-        ChatMessage message = ChatMessage.of(ChatRole.ASSISTANT, new TextPart("hello"),
+        ChatMessage message = ChatMessage.of(ChatRole.ASSISTANT.value(), new TextPart("hello"),
                 new ToolResultPart("call_1", "weather", new TextPart("sunny")));
 
         assertEquals(List.of("hello", "sunny"), message.walk()

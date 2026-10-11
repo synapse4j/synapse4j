@@ -95,24 +95,13 @@ public class ChatMessage {
     }
 
     /**
-     * A message from the system saying the given text — the instructions a conversation usually opens
-     * with.
-     *
-     * @param text what the message says
-     * @return the message
-     */
-    public static ChatMessage system(@NonNull String text) {
-        return new ChatMessage(ChatRole.SYSTEM, null, new TextPart(text));
-    }
-
-    /**
      * A message from the user saying the given text — the shape most of a conversation is built from.
      *
      * @param text what the message says
      * @return the message
      */
     public static ChatMessage user(@NonNull String text) {
-        return new ChatMessage(ChatRole.USER, null, new TextPart(text));
+        return new ChatMessage(ChatRole.USER.value(), null, new TextPart(text));
     }
 
     /**
@@ -123,7 +112,18 @@ public class ChatMessage {
      * @return the message
      */
     public static ChatMessage assistant(@NonNull String text) {
-        return new ChatMessage(ChatRole.ASSISTANT, null, new TextPart(text));
+        return new ChatMessage(ChatRole.ASSISTANT.value(), null, new TextPart(text));
+    }
+
+    /**
+     * A message from the application saying the given text — the agent speaking for itself, apart
+     * from the end user.
+     *
+     * @param text what the message says
+     * @return the message
+     */
+    public static ChatMessage developer(@NonNull String text) {
+        return new ChatMessage(ChatRole.DEVELOPER.value(), null, new TextPart(text));
     }
 
     /**

@@ -143,11 +143,16 @@ class CompletionsWriter {
     private Stream<Map<String, Object>> entries(ChatRequest request) {
         Stream<ChatMessage> messages = Stream.concat(
                 request.getHistoryMessages().stream(), request.getPendingMessages().stream());
+        Stream<Map<String, Object>> entries = messages.flatMap(message -> entries(message).stream());
         ChatMessage system = request.getSystemMessage();
-        if (system != null) {
-            messages = Stream.concat(Stream.of(system), messages);
+        if (system == null) {
+            return entries;
         }
-        return messages.flatMap(message -> entries(message).stream());
+        // The system slot leads, as a message of this protocol's own: the slot — not the message —
+        // is what says it is the system's, so its role is written here rather than read off it.
+        Map<String, Object> entry = message(system);
+        entry.put("role", "system");
+        return Stream.concat(Stream.of(entry), entries);
     }
 
     private List<Map<String, Object>> entries(ChatMessage message) {

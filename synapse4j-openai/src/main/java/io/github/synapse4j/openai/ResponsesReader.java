@@ -145,7 +145,7 @@ class ResponsesReader {
     private ChatResponse readResponse(JsonReader reader) {
         ChatResponse response = new ChatResponse();
         // The turn is the model's wherever it is read from, and no item in the output has to say so.
-        ChatMessage.Builder message = ChatMessage.builder().role(ChatRole.ASSISTANT);
+        ChatMessage.Builder message = ChatMessage.builder().role(ChatRole.ASSISTANT.value());
         String status = null;
         String incompleteReason = null;
         Object error = null;

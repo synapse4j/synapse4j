@@ -290,8 +290,21 @@ class ResponsesWriter {
         // What the assistant said is this protocol's own kind of content entry, and what anyone else
         // says is the input kind: an assistant turn replayed as an item has to look like the item it
         // was, or the endpoint reads it as something the model did not say.
-        String textType = ChatRole.ASSISTANT.equals(role) ? "output_text" : "input_text";
+        String textType = textType(role);
         return contentEntries(content, textType);
+    }
+
+    /**
+     * The content-entry type a message's text takes under the given role: the model's own kind for an
+     * assistant turn, the input kind for everyone else. A role this protocol has no word for is
+     * refused — this protocol reads the role to shape its content, so it cannot leave one unread.
+     */
+    private static String textType(@Nullable String role) {
+        return switch (ChatRole.from(role)) {
+            case ASSISTANT -> "output_text";
+            case USER, DEVELOPER -> "input_text";
+            case null -> throw new SynapseException("unsupported role for OpenAI Responses: " + role);
+        };
     }
 
     /**
@@ -303,7 +316,7 @@ class ResponsesWriter {
     private static Map<String, Object> messageItem(ListPart part, @Nullable String role) {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("role", role);
-        String textType = ChatRole.ASSISTANT.equals(role) ? "output_text" : "input_text";
+        String textType = textType(role);
         List<Map<String, Object>> content = contentEntries(part.getSubParts(), textType);
         // The content carries extras of its own, so the part's extras' reach ends here: it goes in
         // after the merge, unless the extras name it whole.

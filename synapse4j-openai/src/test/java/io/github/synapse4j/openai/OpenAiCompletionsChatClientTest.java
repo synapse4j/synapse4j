@@ -146,16 +146,16 @@ class OpenAiCompletionsChatClientTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> messages = (List<Map<String, Object>>) wire.get("messages");
         assertEquals(2, messages.size());
-        assertEquals(ChatRole.SYSTEM, messages.get(0).get("role"));
+        assertEquals("system", messages.get(0).get("role"));
         // Text-only messages take the plain-string content form.
         assertEquals("You are helpful.", messages.get(0).get("content"));
-        assertEquals(ChatRole.USER, messages.get(1).get("role"));
+        assertEquals(ChatRole.USER.value(), messages.get(1).get("role"));
         assertEquals("Hello", messages.get(1).get("content"));
 
         assertEquals(1, response.getMessage().getParts().size());
         TextPart text = assertInstanceOf(TextPart.class, response.getMessage().getParts().get(0));
         assertEquals("Hi there", text.getText());
-        assertEquals(ChatRole.ASSISTANT, response.getMessage().getRole());
+        assertEquals(ChatRole.ASSISTANT.value(), response.getMessage().getRole());
         assertEquals(ChatFinishReason.STOP, response.getFinishReason());
         assertEquals("chatcmpl-1", response.getId());
         assertEquals("gpt-test", response.getModel());
@@ -462,7 +462,7 @@ class OpenAiCompletionsChatClientTest {
                         + "\"content\":[{\"type\":\"text\",\"text\":\"mixed\"}]}}]}").getBytes(UTF_8)));
 
         ChatRequest request = requestWithModel();
-        ChatMessage replay = ChatMessage.of(ChatRole.ASSISTANT, new TextPart("Earlier text"),
+        ChatMessage replay = ChatMessage.of(ChatRole.ASSISTANT.value(), new TextPart("Earlier text"),
                 new ToolCallPart("call_9", "get_weather", "{\"city\":\"Rome\"}"));
         request.addPendingMessage(replay);
 
@@ -492,7 +492,7 @@ class OpenAiCompletionsChatClientTest {
         byte[] bytes = { (byte) 0x89, 'P', 'N', 'G', 0, 1, 2, (byte) 0xff, 0x7f };
         ChatRequest request = requestWithModel();
         request.addPendingMessage(
-                ChatMessage.of(ChatRole.USER, new MediaPart("image/png", InputStreamSupplier.of(bytes))));
+                ChatMessage.of(ChatRole.USER.value(), new MediaPart("image/png", InputStreamSupplier.of(bytes))));
 
         client.chat(request);
 
@@ -517,7 +517,7 @@ class OpenAiCompletionsChatClientTest {
 
         ChatRequest request = requestWithModel();
         request.addPendingMessage(
-                ChatMessage.of(ChatRole.USER, new MediaPart("image/png", "https://example.test/cat.png")));
+                ChatMessage.of(ChatRole.USER.value(), new MediaPart("image/png", "https://example.test/cat.png")));
 
         client.chat(request);
 
@@ -536,7 +536,7 @@ class OpenAiCompletionsChatClientTest {
 
         byte[] bytes = { 1, 2, 3 };
         ChatRequest request = requestWithModel();
-        request.addPendingMessage(ChatMessage.of(ChatRole.USER, new TextPart("what is this?"),
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(), new TextPart("what is this?"),
                 new MediaPart("image/png", InputStreamSupplier.of(bytes))));
 
         client.chat(request);
@@ -557,7 +557,7 @@ class OpenAiCompletionsChatClientTest {
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
         ChatRequest request = requestWithModel();
-        request.addPendingMessage(ChatMessage.of(ChatRole.USER,
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(),
                 new MediaPart("audio/wav", InputStreamSupplier.of(new byte[] { 1 }))));
 
         assertThrows(SynapseException.class, () -> client.chat(request));
@@ -572,7 +572,7 @@ class OpenAiCompletionsChatClientTest {
 
         ChatRequest request = requestWithModel();
         request.addPendingMessage(
-                ChatMessage.of(ChatRole.USER, new MediaPart("image/png", null, null, null, null)));
+                ChatMessage.of(ChatRole.USER.value(), new MediaPart("image/png", null, null, null, null)));
 
         assertThrows(SynapseException.class, () -> client.chat(request));
     }
@@ -585,7 +585,7 @@ class OpenAiCompletionsChatClientTest {
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
         ChatRequest request = requestWithModel();
-        request.addPendingMessage(ChatMessage.of(ChatRole.USER,
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(),
                 new MediaPart(null, InputStreamSupplier.of(new byte[] { 1 }))));
 
         assertThrows(SynapseException.class, () -> client.chat(request));
@@ -599,7 +599,7 @@ class OpenAiCompletionsChatClientTest {
                         + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
 
         ChatRequest request = requestWithModel();
-        request.addPendingMessage(ChatMessage.of(ChatRole.TOOL,
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(),
                 new ToolResultPart("call_9", "get_weather", new TextPart("sunny"))));
 
         client.chat(request);
@@ -731,7 +731,7 @@ class OpenAiCompletionsChatClientTest {
 
         ChatRequest request = requestWithModel();
         request.getOptions().getExtras().put("seed", 7);
-        ChatMessage user = new ChatMessage(ChatRole.USER, null,
+        ChatMessage user = new ChatMessage(ChatRole.USER.value(), null,
                 List.of(new TextPart("Hello",
                         new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")))),
                 new ProviderExtras().put("name", "roger"));
@@ -886,7 +886,7 @@ class OpenAiCompletionsChatClientTest {
         ChatRequest request = requestWithModel();
         ToolCallPart call = new ToolCallPart("call_1", "get_weather", "{}",
                 new ProviderExtras().put(List.of("function", "provider_field"), "x"));
-        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT, call));
+        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT.value(), call));
 
         client.chat(request);
 
@@ -909,7 +909,7 @@ class OpenAiCompletionsChatClientTest {
         ChatRequest request = requestWithModel();
         MediaPart image = new MediaPart("image/png", "https://example.com/a.png", null, null,
                 new ProviderExtras().put(List.of("image_url", "detail"), "high"));
-        request.addPendingMessage(ChatMessage.of(ChatRole.USER, image));
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(), image));
 
         client.chat(request);
 
@@ -1064,7 +1064,7 @@ class OpenAiCompletionsChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        request.addPendingMessage(ChatMessage.of(ChatRole.TOOL,
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(),
                 new ToolResultPart("call_1", "get_weather", List.of(new TextPart("boom")), true)));
 
         client.chat(request);
@@ -1085,7 +1085,7 @@ class OpenAiCompletionsChatClientTest {
         ChatRequest request = requestWithModel();
         ToolResultPart part = new ToolResultPart("call_1", "get_weather", List.of(new TextPart("sunny")), false,
                 new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
-        request.addPendingMessage(ChatMessage.of(ChatRole.TOOL, part));
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(), part));
 
         client.chat(request);
 
@@ -1104,7 +1104,7 @@ class OpenAiCompletionsChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        request.addPendingMessage(ChatMessage.builder().role(ChatRole.TOOL)
+        request.addPendingMessage(ChatMessage.builder().role(ChatRole.USER.value())
                 .extras(new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")))
                 .part(new ToolResultPart("call_1", "get_weather", new TextPart("sunny")))
                 .part(new ToolResultPart("call_2", "get_time", new TextPart("noon"))).build());
@@ -1168,7 +1168,7 @@ class OpenAiCompletionsChatClientTest {
 
         ChatRequest request = requestWithModel();
         TextPart part = new TextPart("", new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
-        request.addPendingMessage(ChatMessage.of(ChatRole.USER, part));
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(), part));
 
         client.chat(request);
 
@@ -1187,7 +1187,7 @@ class OpenAiCompletionsChatClientTest {
 
         ChatRequest request = requestWithModel();
         TextPart text = new TextPart("sunny", new ProviderExtras().put("cache_control", Map.of("type", "ephemeral")));
-        request.addPendingMessage(ChatMessage.of(ChatRole.TOOL,
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(),
                 new ToolResultPart("call_1", "get_weather", text)));
 
         // The tool message's content is a plain string, so a part carrying extras would have them
@@ -1198,7 +1198,7 @@ class OpenAiCompletionsChatClientTest {
     @Test
     void unsupportedPartsFailLoudly() {
         ChatRequest request = requestWithModel();
-        request.addPendingMessage(ChatMessage.of(ChatRole.USER, new UnmodelledPart()));
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(), new UnmodelledPart()));
 
         assertThrows(SynapseException.class, () -> client.chat(request));
     }
@@ -1277,7 +1277,7 @@ class OpenAiCompletionsChatClientTest {
     void turnReasoningUnderConfiguredName() {
         ChatRequest request = requestWithModel();
         request.addPendingMessage(
-                ChatMessage.of(ChatRole.ASSISTANT, new ReasoningPart("weighing it up"), new TextPart("42")));
+                ChatMessage.of(ChatRole.ASSISTANT.value(), new ReasoningPart("weighing it up"), new TextPart("42")));
 
         // The default name, which is the one the default endpoint speaks.
         stubCompletion();
@@ -1371,7 +1371,7 @@ class OpenAiCompletionsChatClientTest {
         // One event per frame, the frame that ends the answer included.
         assertEquals(5, events.size());
         assertEquals(OpenAiEventTypes.CHUNK, events.get(0).getEventType());
-        assertEquals(ChatRole.ASSISTANT, events.get(0).getDelta().getRole());
+        assertEquals(ChatRole.ASSISTANT.value(), events.get(0).getDelta().getRole());
         // The empty fragment that opens a turn adds nothing to it.
         assertTrue(events.get(0).getDelta().getParts().isEmpty());
         assertEquals("Hi", textOf(events.get(1)));
@@ -1383,7 +1383,7 @@ class OpenAiCompletionsChatClientTest {
         assertNull(events.get(4).getDelta());
 
         ChatResponse aggregated = stream.aggregatedResponse();
-        assertEquals(ChatRole.ASSISTANT, aggregated.getMessage().getRole());
+        assertEquals(ChatRole.ASSISTANT.value(), aggregated.getMessage().getRole());
         assertEquals(1, aggregated.getMessage().getParts().size());
         assertEquals("Hi there",
                 assertInstanceOf(TextPart.class, aggregated.getMessage().getParts().get(0)).getText());
@@ -1473,7 +1473,7 @@ class OpenAiCompletionsChatClientTest {
         // matched fragments by, parked in extras where the wire first spelled it.
         ToolCallPart call = new ToolCallPart("call_1", "get_weather", "{\"city\":\"Paris\"}",
                 new ProviderExtras().put("index", 0));
-        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT, call));
+        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT.value(), call));
 
         client.chat(request);
 
@@ -1499,7 +1499,7 @@ class OpenAiCompletionsChatClientTest {
         ChatRequest request = requestWithModel();
         // A call whose members the provider left out: what is not set is not written, so nothing goes
         // out as a JSON null for the endpoint to refuse.
-        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT, new ToolCallPart(null, null, null)));
+        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT.value(), new ToolCallPart(null, null, null)));
 
         client.chat(request);
 
@@ -1510,7 +1510,7 @@ class OpenAiCompletionsChatClientTest {
     void toolCallOnlyTurnOmitsContent() {
         stubCompletion();
         ChatRequest request = requestWithModel();
-        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT,
+        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT.value(),
                 new ToolCallPart("call_1", "get_weather", "{\"city\":\"Paris\"}")));
 
         client.chat(request);

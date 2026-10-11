@@ -141,14 +141,14 @@ class AnthropicChatClientTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> messages = (List<Map<String, Object>>) wire.get("messages");
         assertEquals(1, messages.size());
-        assertEquals(ChatRole.USER, messages.get(0).get("role"));
+        assertEquals(ChatRole.USER.value(), messages.get(0).get("role"));
         // A message of text alone takes the plain-string content form.
         assertEquals("Hello", messages.get(0).get("content"));
 
         assertEquals(1, response.getMessage().getParts().size());
         TextPart text = assertInstanceOf(TextPart.class, response.getMessage().getParts().get(0));
         assertEquals("Hi there", text.getText());
-        assertEquals(ChatRole.ASSISTANT, response.getMessage().getRole());
+        assertEquals(ChatRole.ASSISTANT.value(), response.getMessage().getRole());
         assertEquals(ChatFinishReason.STOP, response.getFinishReason());
         assertEquals("msg_1", response.getId());
         assertEquals("claude-test", response.getModel());
@@ -183,7 +183,7 @@ class AnthropicChatClientTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> messages = (List<Map<String, Object>>) wire.get("messages");
         assertEquals(1, messages.size());
-        assertEquals(ChatRole.USER, messages.get(0).get("role"));
+        assertEquals(ChatRole.USER.value(), messages.get(0).get("role"));
     }
 
     @Test
@@ -296,7 +296,7 @@ class AnthropicChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ChatMessage replay = ChatMessage.of(ChatRole.ASSISTANT,
+        ChatMessage replay = ChatMessage.of(ChatRole.ASSISTANT.value(),
                 new ToolCallPart("toolu_1", "get_weather", "{\"city\":\"Paris\"}"));
         request.addPendingMessage(replay);
 
@@ -319,7 +319,7 @@ class AnthropicChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ChatMessage results = ChatMessage.of(ChatRole.TOOL,
+        ChatMessage results = ChatMessage.of(ChatRole.USER.value(),
                 new ToolResultPart("toolu_1", "get_weather", new TextPart("sunny")),
                 new ToolResultPart("toolu_2", "get_time", List.of(new TextPart("boom")), true));
         request.addPendingMessage(results);
@@ -332,7 +332,7 @@ class AnthropicChatClientTest {
         assertEquals(1, messages.size());
         // The protocol has no tool role: results travel inside a user message, all of them as
         // blocks of that one message.
-        assertEquals(ChatRole.USER, messages.get(0).get("role"));
+        assertEquals(ChatRole.USER.value(), messages.get(0).get("role"));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> content = (List<Map<String, Object>>) messages.get(0).get("content");
         assertEquals(2, content.size());
@@ -490,7 +490,7 @@ class AnthropicChatClientTest {
         stubCompletion();
 
         ChatRequest uriRequest = requestWithModel();
-        ChatMessage withUri = ChatMessage.of(ChatRole.USER,
+        ChatMessage withUri = ChatMessage.of(ChatRole.USER.value(),
                 new MediaPart("image/png", "https://example.test/cat.png"));
         uriRequest.addPendingMessage(withUri);
         client.chat(uriRequest);
@@ -503,7 +503,7 @@ class AnthropicChatClientTest {
         stubCompletion();
         byte[] bytes = { (byte) 0x89, 'P', 'N', 'G', 0, 1, 2, (byte) 0xff, 0x7f };
         ChatRequest inlineRequest = requestWithModel();
-        ChatMessage inlined = ChatMessage.of(ChatRole.USER,
+        ChatMessage inlined = ChatMessage.of(ChatRole.USER.value(),
                 new MediaPart("image/png", InputStreamSupplier.of(bytes)));
         inlineRequest.addPendingMessage(inlined);
         client.chat(inlineRequest);
@@ -521,21 +521,21 @@ class AnthropicChatClientTest {
         stubCompletion();
 
         ChatRequest audio = requestWithModel();
-        ChatMessage audioMessage = ChatMessage.of(ChatRole.USER,
+        ChatMessage audioMessage = ChatMessage.of(ChatRole.USER.value(),
                 new MediaPart("audio/wav", InputStreamSupplier.of(new byte[] { 1 })));
         audio.addPendingMessage(audioMessage);
         assertThrows(SynapseException.class, () -> client.chat(audio));
 
         stubCompletion();
         ChatRequest neither = requestWithModel();
-        ChatMessage neitherMessage = ChatMessage.of(ChatRole.USER,
+        ChatMessage neitherMessage = ChatMessage.of(ChatRole.USER.value(),
                 new MediaPart("image/png", null, null, null, null));
         neither.addPendingMessage(neitherMessage);
         assertThrows(SynapseException.class, () -> client.chat(neither));
 
         stubCompletion();
         ChatRequest untyped = requestWithModel();
-        ChatMessage untypedMessage = ChatMessage.of(ChatRole.USER,
+        ChatMessage untypedMessage = ChatMessage.of(ChatRole.USER.value(),
                 new MediaPart(null, InputStreamSupplier.of(new byte[] { 1 })));
         untyped.addPendingMessage(untypedMessage);
         assertThrows(SynapseException.class, () -> client.chat(untyped));
@@ -544,7 +544,7 @@ class AnthropicChatClientTest {
     @Test
     void unsupportedPartsFailLoudly() {
         ChatRequest request = requestWithModel();
-        ChatMessage message = ChatMessage.of(ChatRole.USER, new UnmodelledPart());
+        ChatMessage message = ChatMessage.of(ChatRole.USER.value(), new UnmodelledPart());
         request.addPendingMessage(message);
 
         assertThrows(SynapseException.class, () -> client.chat(request));
@@ -755,7 +755,7 @@ class AnthropicChatClientTest {
         assertEquals(Integer.valueOf(1), events.get(0).getUsage().getOutputTokens());
 
         ChatResponse aggregated = stream.aggregatedResponse();
-        assertEquals(ChatRole.ASSISTANT, aggregated.getMessage().getRole());
+        assertEquals(ChatRole.ASSISTANT.value(), aggregated.getMessage().getRole());
         assertEquals(1, aggregated.getMessage().getParts().size());
         assertEquals("Hi there",
                 assertInstanceOf(TextPart.class, aggregated.getMessage().getParts().get(0)).getText());
@@ -1278,7 +1278,7 @@ class AnthropicChatClientTest {
         request.getOptions().getExtras().put("temperature", 0.9);
         request.getOptions().getExtras().put("metadata", Map.of("user_id", "u-1"));
         ChatMessage user = ChatMessage.builder()
-                .role(ChatRole.USER)
+                .role(ChatRole.USER.value())
                 .extras(new ProviderExtras().put("name", "roger"))
                 .part(new TextPart("what is the weather?",
                         new ProviderExtras().put("cache_control", Map.of("type", "ephemeral"))))
@@ -1308,7 +1308,7 @@ class AnthropicChatClientTest {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
-        ChatMessage system = ChatMessage.of(ChatRole.SYSTEM, new TextPart("You are helpful.",
+        ChatMessage system = ChatMessage.of(null, new TextPart("You are helpful.",
                 new ProviderExtras().put("cache_control", Map.of("type", "ephemeral"))));
         request.setSystemMessage(system);
 

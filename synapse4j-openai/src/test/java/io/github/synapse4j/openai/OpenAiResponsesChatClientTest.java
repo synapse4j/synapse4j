@@ -123,7 +123,7 @@ class OpenAiResponsesChatClientTest {
         assertEquals("You are helpful.", wire.get("instructions"));
         List<Map<String, Object>> input = inputOf(wire);
         assertEquals(1, input.size());
-        assertEquals(ChatRole.USER, input.get(0).get("role"));
+        assertEquals(ChatRole.USER.value(), input.get(0).get("role"));
         assertEquals("Hello", input.get(0).get("content"));
     }
 
@@ -397,7 +397,7 @@ class OpenAiResponsesChatClientTest {
         // left unsent and the item is exactly what a successful result would produce. Anthropic has
         // is_error for it; this protocol does not, and nothing else would notice the decision being
         // flipped.
-        request.addPendingMessage(ChatMessage.of(ChatRole.TOOL,
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(),
                 new ToolResultPart("call_1", "get_weather", List.of(new TextPart("sunny")), true)));
 
         client.chat(request);
@@ -414,7 +414,7 @@ class OpenAiResponsesChatClientTest {
         ChatRequest request = requestWithModel();
         // A call whose members the provider left out: what is not set is not written, so nothing goes
         // out as a JSON null for the endpoint to refuse.
-        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT, new ToolCallPart(null, null, null)));
+        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT.value(), new ToolCallPart(null, null, null)));
 
         client.chat(request);
 
@@ -630,7 +630,7 @@ class OpenAiResponsesChatClientTest {
     @Test
     void reasoningItemPrecedesReplayedAnswer() {
         ChatRequest replay = requestWithModel();
-        replay.addPendingMessage(new ChatMessage(ChatRole.ASSISTANT, null,
+        replay.addPendingMessage(new ChatMessage(ChatRole.ASSISTANT.value(), null,
                 List.of(new ReasoningPart("weighing it up"), new TextPart("Hi there"))));
         stubCompletion();
 
@@ -723,7 +723,7 @@ class OpenAiResponsesChatClientTest {
         assertEquals(" there", textOf(events.get(2)));
 
         ChatResponse aggregated = stream.aggregatedResponse();
-        assertEquals(ChatRole.ASSISTANT, aggregated.getMessage().getRole());
+        assertEquals(ChatRole.ASSISTANT.value(), aggregated.getMessage().getRole());
         assertEquals(1, aggregated.getMessage().getParts().size());
         ListPart item = assertInstanceOf(ListPart.class, aggregated.getMessage().getParts().get(0));
         assertEquals("Hi there", assertInstanceOf(TextPart.class, item.getSubParts().get(0)).getText());
