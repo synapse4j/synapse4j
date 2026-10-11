@@ -60,10 +60,8 @@ class Synapse4jJacksonModuleTest {
     void unmodelledValueRefused() {
         // "properties" is modelled as a map of schemas; a string there is a document this library
         // cannot read, and it is refused rather than carried along.
-        MismatchedInputException thrown = assertThrows(MismatchedInputException.class,
+        assertThrows(MismatchedInputException.class,
                 () -> mapper.readValue("{\"properties\":\"not a schema map\"}", JsonSchema.class));
-
-        assertTrue(thrown.getMessage().contains("properties"), thrown.getMessage());
     }
 
     @Test

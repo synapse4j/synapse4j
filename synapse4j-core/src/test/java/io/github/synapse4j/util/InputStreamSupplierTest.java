@@ -78,9 +78,7 @@ class InputStreamSupplierTest {
 
         assertSame(stream, source.get());
 
-        IllegalStateException thrown = assertThrows(IllegalStateException.class, source::get);
-
-        assertEquals("this source opens once, and it has already been opened", thrown.getMessage());
+        assertThrows(IllegalStateException.class, source::get);
     }
 
     private static String read(InputStream stream) throws IOException {

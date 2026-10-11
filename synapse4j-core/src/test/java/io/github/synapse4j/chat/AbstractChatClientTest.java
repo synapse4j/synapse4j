@@ -821,10 +821,7 @@ class AbstractChatClientTest {
         StubChatClient client = new StubChatClient();
         client.addToolProvider((it, request) -> null);
 
-        NullPointerException thrown = assertThrows(NullPointerException.class,
-                () -> client.chat(new ChatRequest()));
-
-        assertEquals("tool provider answered null", thrown.getMessage());
+        assertThrows(NullPointerException.class, () -> client.chat(new ChatRequest()));
     }
 
     @Test

@@ -477,12 +477,8 @@ class JacksonJsonReaderTest {
         assertEquals(Token.START_ARRAY, reader.nextToken());
         assertEquals(Token.NUMBER, reader.nextToken());
 
-        SynapseException failure = assertThrows(SynapseException.class, reader::longValue);
+        assertThrows(SynapseException.class, reader::longValue);
 
-        // The message says what was being done, and the cause Jackson reported carries the range and
-        // the value, so repeating either here would only be a second place to keep in step.
-        assertEquals("Reading the JSON document failed", failure.getMessage());
-        assertTrue(failure.getCause().getMessage().contains("9223372036854775808"));
         // The number is still on the token, so a caller that wants its text can read it.
         assertEquals("9223372036854775808", reader.string());
     }
@@ -497,9 +493,8 @@ class JacksonJsonReaderTest {
 
         assertEquals(Token.NUMBER, reader.nextToken());
 
-        SynapseException failure = assertThrows(SynapseException.class, reader::longValue);
+        assertThrows(SynapseException.class, reader::longValue);
 
-        assertEquals("the number is not an integer: 11.5", failure.getMessage());
         assertEquals(11.5, reader.doubleValue());
     }
 

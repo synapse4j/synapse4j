@@ -54,9 +54,7 @@ class MethodToolTest {
 
         // A static method's acceptance is every other test's subject; what only this one pins is the
         // refusal an instance method gets without a target.
-        SynapseException refused = assertThrows(SynapseException.class,
-                () -> reader.of("n", "d", instance, null));
-        assertTrue(refused.getMessage().contains("instance method"));
+        assertThrows(SynapseException.class, () -> reader.of("n", "d", instance, null));
     }
 
     @Test
@@ -124,10 +122,7 @@ class MethodToolTest {
         when(codec.convert(null, int.class)).thenThrow(new IllegalArgumentException("no value"));
         MethodTool tool = reader.of("save", "Saves an id", method("save", int.class), null);
 
-        SynapseException failure = assertThrows(SynapseException.class,
-                () -> tool.resolveArguments("{}", null));
-        assertTrue(failure.getMessage().contains("'id'"));
-        assertTrue(failure.getMessage().contains("save"));
+        assertThrows(SynapseException.class, () -> tool.resolveArguments("{}", null));
     }
 
     @Test

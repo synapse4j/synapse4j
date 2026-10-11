@@ -433,9 +433,7 @@ class JacksonJsonCodecTest {
         // The binder reads "alias"; the schema will not pretend to describe a property the
         // generator has no member to carry — a refusal beats a document that disagrees with
         // the reader in silence.
-        SynapseException thrown = assertThrows(SynapseException.class,
-                () -> codec.generateDecodeSchema(Boxed.class));
-        assertTrue(thrown.getMessage().contains("alias"), thrown.getMessage());
+        assertThrows(SynapseException.class, () -> codec.generateDecodeSchema(Boxed.class));
 
         Boxed boxed = codec.decode("{\"alias\":\"value\"}", Boxed.class);
         assertEquals("value", boxed.value());

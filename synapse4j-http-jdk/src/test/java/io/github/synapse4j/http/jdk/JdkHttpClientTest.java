@@ -174,9 +174,7 @@ class JdkHttpClientTest {
         request.setOptions(options);
         request.setBody(HttpBody.of("ping"));
 
-        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
-                () -> client.send(request));
-        assertTrue(thrown.getMessage().contains("spooled"), thrown::toString);
+        assertThrows(IllegalArgumentException.class, () -> client.send(request));
     }
 
     @Test

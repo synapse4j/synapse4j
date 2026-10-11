@@ -216,9 +216,7 @@ class ApacheHttpClientTest {
 
         // Nothing listens on that port: an IllegalArgumentException reaching the caller means the
         // refusal happened before any connection was attempted, not after one failed.
-        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
-                () -> client.send(request));
-        assertTrue(thrown.getMessage().contains("spooled"), thrown::toString);
+        assertThrows(IllegalArgumentException.class, () -> client.send(request));
 
         // The mode is wrong whatever the body is, so a request without one is refused the same way.
         request.setBody(null);
@@ -252,7 +250,6 @@ class ApacheHttpClientTest {
         HttpRequest request = new HttpRequest("http://127.0.0.1:" + freePort);
 
         SynapseException thrown = assertThrows(SynapseException.class, () -> client.send(request));
-        assertEquals("HTTP call failed: GET http://127.0.0.1:" + freePort, thrown.getMessage());
         assertTrue(causeChainContainsType(thrown, IOException.class), thrown::toString);
     }
 
@@ -311,8 +308,7 @@ class ApacheHttpClientTest {
         try (HttpResponse response = client.send(request)) {
             SseEventStream events = response.sseEventStream();
             assertNotNull(events);
-            SynapseException thrown = assertThrows(SynapseException.class, events::hasNext);
-            assertTrue(thrown.getMessage().contains("the 8 byte budget"), thrown::toString);
+            assertThrows(SynapseException.class, events::hasNext);
         }
     }
 

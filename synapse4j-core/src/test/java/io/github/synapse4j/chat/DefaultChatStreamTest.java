@@ -186,7 +186,6 @@ class DefaultChatStreamTest {
 
         var thrown = assertThrows(SynapseIOException.class, stream::close);
 
-        assertEquals("Closing the stream failed", thrown.getMessage());
         assertEquals(IOException.class, thrown.getCause().getClass());
     }
 

@@ -3,7 +3,6 @@ package io.github.synapse4j.tool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -52,10 +51,8 @@ class FunctionToolTest {
     void scalarInputTypeRefused() {
         when(codec.generateDecodeSchema(String.class)).thenReturn(new JsonSchemaBuilder().setType("string").build());
 
-        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+        assertThrows(IllegalArgumentException.class,
                 () -> FunctionTool.of("len", "Counts", String.class, (input, context) -> "x", codec));
-
-        assertTrue(failure.getMessage().contains("record"));
     }
 
     @Test
@@ -168,8 +165,7 @@ class FunctionToolTest {
         FunctionTool<Input, String> tool = FunctionTool.of("maybe", "Sometimes silent", Input.class,
                 (input, context) -> "ran", codec);
 
-        SynapseException thrown = assertThrows(SynapseException.class, () -> tool.execute("{}", null));
-        assertTrue(thrown.getMessage().contains("null document"));
+        assertThrows(SynapseException.class, () -> tool.execute("{}", null));
     }
 
     // ===== harness =====

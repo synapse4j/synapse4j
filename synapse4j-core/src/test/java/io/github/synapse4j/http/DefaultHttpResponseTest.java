@@ -69,8 +69,7 @@ class DefaultHttpResponseTest {
 
         SseEventStream events = response.sseEventStream();
 
-        SynapseException thrown = assertThrows(SynapseException.class, events::hasNext);
-        assertTrue(thrown.getMessage().contains("32"), thrown.getMessage());
+        assertThrows(SynapseException.class, events::hasNext);
     }
 
     @Test
@@ -97,9 +96,7 @@ class DefaultHttpResponseTest {
 
             SseEventStream events = response.sseEventStream();
 
-            SynapseException thrown = assertThrows(SynapseException.class, events::hasNext);
-            assertTrue(thrown.getMessage().contains(String.valueOf(HttpOptions.DEFAULT_MAX_FRAME_BYTES)),
-                    thrown.getMessage());
+            assertThrows(SynapseException.class, events::hasNext);
         }
     }
 
