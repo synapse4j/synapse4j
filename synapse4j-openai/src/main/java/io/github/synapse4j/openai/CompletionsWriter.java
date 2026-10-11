@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
 
@@ -22,6 +23,7 @@ import io.github.synapse4j.data.ToolCallPart;
 import io.github.synapse4j.data.ToolResultPart;
 import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.json.JsonSchema;
+import io.github.synapse4j.json.JsonSource;
 import io.github.synapse4j.json.JsonWriter;
 import io.github.synapse4j.tool.Tool;
 import io.github.synapse4j.tool.ToolDefinition;
@@ -38,12 +40,14 @@ import lombok.RequiredArgsConstructor;
  *
  * <p>
  * A request is assembled as the object it goes out as — one map per node, the members this module
- * models written into it with the node's extras merged over them — and written in one pass. The maps
- * hold references and a media payload stays a reader, so neither the document nor a payload is
- * materialized, and every name is a literal spelled out here — no codec's naming strategy can rename
- * one, and a member whose value is not set is never emitted. So the bytes that leave here are exactly
- * the protocol's spelling whichever JSON library the application chose, and the payload is held once
- * instead of being built and then serialized.
+ * models written into it with the node's extras merged over them — and written in one pass. The
+ * conversation is the one member that grows with the exchange, so it is not gathered into a list here:
+ * its entries are produced as the writer walks them, a message at a time. The maps hold references and
+ * a media payload stays a reader, so neither the document nor a payload is materialized, and every name
+ * is a literal spelled out here — no codec's naming strategy can rename one, and a member whose value is
+ * not set is never emitted. So the bytes that leave here are exactly the protocol's spelling whichever
+ * JSON library the application chose, and the payload is held once instead of being built and then
+ * serialized.
  *
  * <p>
  * A media part is rendered as the protocol's image content: a URL the provider fetches, or the
@@ -116,10 +120,12 @@ class CompletionsWriter {
         ProviderExtras extras = request.getOptions().getExtras();
         extras.mergeInto(document);
         if (!extras.contains("messages")) {
-            document.put("messages", messages(request));
+            // Left as a source: the entries are produced as the writer walks the array rather than
+            // gathered into a list first, so a conversation longer than memory still goes out.
+            document.put("messages", JsonSource.of(() -> entries(request)));
         }
         if (!request.getTools().isEmpty() && !extras.contains("tools")) {
-            document.put("tools", tools(request.getTools()));
+            document.put("tools", JsonSource.of(() -> tools(request.getTools())));
         }
         ChatResponseFormat format = request.getOptions().getResponseFormat();
         if ((format.getType() != null || !format.getExtras().isEmpty()) && !extras.contains("response_format")) {
@@ -129,30 +135,19 @@ class CompletionsWriter {
     }
 
     /**
-     * The whole conversation as the array of messages. The system message comes first, only when
-     * this call carries one, so it keeps the place it had when the conversation was a single list.
+     * The whole conversation as the entries it goes out as, in order: the system message first, only
+     * when this call carries one, so it keeps the place it had when the conversation was a single list,
+     * then the history, then the pending messages. A message of tool results becomes one entry per
+     * result, since the protocol has no message carrying several.
      */
-    private List<Map<String, Object>> messages(ChatRequest request) {
-        List<Map<String, Object>> written = new ArrayList<>();
+    private Stream<Map<String, Object>> entries(ChatRequest request) {
+        Stream<ChatMessage> messages = Stream.concat(
+                request.getHistoryMessages().stream(), request.getPendingMessages().stream());
         ChatMessage system = request.getSystemMessage();
         if (system != null) {
-            written.addAll(entries(system));
+            messages = Stream.concat(Stream.of(system), messages);
         }
-        written.addAll(messages(request.getHistoryMessages()));
-        written.addAll(messages(request.getPendingMessages()));
-        return written;
-    }
-
-    /**
-     * One message into the array of messages. A message of tool results becomes one entry per result,
-     * since the protocol has no message carrying several.
-     */
-    private List<Map<String, Object>> messages(List<ChatMessage> messages) {
-        List<Map<String, Object>> written = new ArrayList<>();
-        for (ChatMessage message : messages) {
-            written.addAll(entries(message));
-        }
-        return written;
+        return messages.flatMap(message -> entries(message).stream());
     }
 
     private List<Map<String, Object>> entries(ChatMessage message) {
@@ -420,12 +415,8 @@ class CompletionsWriter {
         }
     }
 
-    private List<Map<String, Object>> tools(List<Tool> requestTools) {
-        List<Map<String, Object>> tools = new ArrayList<>();
-        for (Tool requestTool : requestTools) {
-            tools.add(tool(requestTool.definition()));
-        }
-        return tools;
+    private Stream<Map<String, Object>> tools(List<Tool> requestTools) {
+        return requestTools.stream().map(requestTool -> tool(requestTool.definition()));
     }
 
     private Map<String, Object> tool(ToolDefinition definition) {
