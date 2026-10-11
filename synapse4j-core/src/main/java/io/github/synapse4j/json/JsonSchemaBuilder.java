@@ -29,7 +29,7 @@ import lombok.NonNull;
  *
  * <p>
  * A keyword whose value is a sub-schema is kept as a {@link JsonSchema} (or a list or a map of them),
- * so the built schema's {@link JsonSchema#visit} and {@link JsonSchema#map} reach every sub-schema.
+ * so the built schema's {@link JsonSchema#walk} and {@link JsonSchema#map} reach every sub-schema.
  * Every other value is raw JSON data.
  *
  * <p>

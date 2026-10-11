@@ -3,8 +3,8 @@ package io.github.synapse4j.json;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
 
@@ -33,7 +33,7 @@ import lombok.NonNull;
  * getters is not what this interface does; {@link #keys()} and {@link #get(String, Class)} see it all.
  *
  * <p>
- * {@link #visit(Consumer)} walks the tree and lets each node be read. {@link #map(UnaryOperator)} walks
+ * {@link #walk()} walks the tree and lets each node be read. {@link #map(UnaryOperator)} walks
  * it and produces a new tree: the function answers which node to use, and a node it leaves unchanged is
  * shared rather than copied, so only the path to a change is rebuilt.
  *
@@ -47,7 +47,7 @@ import lombok.NonNull;
  * A schema built through {@link JsonSchemaBuilder} cannot contain itself: a node is built from nodes
  * that already exist, so a cycle is not constructible, and a recursive schema is spelled with
  * {@code $ref} instead. The interface is open, though, so an implementation that hands out itself as
- * its own sub-schema is possible; the walks of {@link #visit(Consumer)} and {@link #map(UnaryOperator)}
+ * its own sub-schema is possible; the walks of {@link #walk()} and {@link #map(UnaryOperator)}
  * do not guard against one.
  *
  * <p>
@@ -209,12 +209,12 @@ public interface JsonSchema {
      * Walks this schema and every sub-schema below it, this one first.
      *
      * <p>
-     * The visitor receives each schema and may read it. The sub-schemas of that schema are visited
-     * afterwards.
+     * Each schema is answered once per path that reaches it; the sub-schemas of a schema are answered
+     * after it, depth first.
      *
-     * @param visitor what to do with each schema; must not be {@code null}
+     * @return the schemas reached, in walk order; never {@code null}
      */
-    void visit(@NonNull Consumer<JsonSchema> visitor);
+    Stream<JsonSchema> walk();
 
     /**
      * Walks this schema and every sub-schema below it and produces a new schema.

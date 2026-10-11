@@ -159,10 +159,7 @@ class ObjectJsonSchemaTest {
                 .put("prefixItems", List.of(typed("number")))
                 .build();
 
-        List<JsonSchema> visited = new ArrayList<>();
-        schema.visit(visited::add);
-
-        assertEquals(6, visited.size());
+        assertEquals(6, schema.walk().count());
     }
 
     @Test
@@ -187,21 +184,17 @@ class ObjectJsonSchemaTest {
         assertNull(schema.get("items", JsonSchema.class));
         assertEquals(List.of(typed("string"), typed("number")), schema.getList("items", JsonSchema.class));
 
-        List<JsonSchema> visited = new ArrayList<>();
-        schema.visit(visited::add);
-
-        assertEquals(3, visited.size());
+        assertEquals(3, schema.walk().count());
     }
 
     @Test
-    void visitReachesEverySchema() {
+    void walkReachesEverySchema() {
         JsonSchema schema = new JsonSchemaBuilder()
                 .setProperties(Map.of("name", typed("string")))
                 .setItems(typed("object"))
                 .build();
 
-        List<JsonSchema> seen = new ArrayList<>();
-        schema.visit(seen::add);
+        List<JsonSchema> seen = schema.walk().toList();
 
         assertEquals(3, seen.size());
         assertEquals(schema, seen.get(0));
@@ -261,14 +254,12 @@ class ObjectJsonSchemaTest {
     }
 
     @Test
-    void sharedSubSchemaVisitedTwice() {
+    void sharedSubSchemaWalkedTwice() {
         // A node reached through two paths is walked at each of them.
         JsonSchema shared = typed("string");
         JsonSchema schema = new JsonSchemaBuilder().setProperties(Map.of("first", shared, "second", shared)).build();
 
-        List<JsonSchema> visited = new ArrayList<>();
-        schema.visit(visited::add);
-        assertEquals(List.of(schema, shared, shared), visited);
+        assertEquals(List.of(schema, shared, shared), schema.walk().toList());
     }
 
     private static JsonSchema built() {

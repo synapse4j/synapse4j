@@ -3,8 +3,8 @@ package io.github.synapse4j.json;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
 
@@ -110,8 +110,8 @@ public class BooleanJsonSchema implements JsonSchema {
     }
 
     @Override
-    public void visit(@NonNull Consumer<JsonSchema> visitor) {
-        visitor.accept(this);
+    public Stream<JsonSchema> walk() {
+        return Stream.of(this);
     }
 
     @Override

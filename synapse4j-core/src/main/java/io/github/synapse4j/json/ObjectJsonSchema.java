@@ -9,8 +9,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
 
@@ -41,7 +41,7 @@ import lombok.NonNull;
  *
  * <p>
  * A keyword whose value is a sub-schema is kept as a {@link JsonSchema} (or a collection or a map of
- * them), so {@link #visit(Consumer)} and {@link #map(UnaryOperator)} reach every sub-schema. Every
+ * them), so {@link #walk()} and {@link #map(UnaryOperator)} reach every sub-schema. Every
  * other value is raw JSON data.
  *
  * <p>
@@ -168,11 +168,8 @@ public final class ObjectJsonSchema implements JsonSchema {
     }
 
     @Override
-    public void visit(@NonNull Consumer<JsonSchema> visitor) {
-        visitor.accept(this);
-        for (JsonSchema subSchema : subSchemas()) {
-            subSchema.visit(visitor);
-        }
+    public Stream<JsonSchema> walk() {
+        return Stream.concat(Stream.of(this), subSchemas().stream().flatMap(JsonSchema::walk));
     }
 
     @Override
