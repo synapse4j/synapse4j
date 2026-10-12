@@ -3,8 +3,10 @@ package io.github.synapse4j.openai;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.BiConsumer;
@@ -150,6 +152,16 @@ class ResponsesStream extends DefaultChatStream {
 
         private final ProviderExtras extras = new ProviderExtras();
 
+        /**
+         * The item each part answers for, as the position it holds in the turn: the id the frames
+         * name it by and where it sits in the response. Kept here rather than on the part, which
+         * carries only the item's own members — which item a fragment continues is bookkeeping for
+         * the stream, and an answer must not carry it.
+         */
+        private final Map<Object, Integer> itemsById = new HashMap<>();
+
+        private final Map<Object, Integer> itemsByPosition = new HashMap<>();
+
         @Override
         public void accept(ChatResponse response, ChatStreamEvent event) {
             if (event.getId() != null) {
@@ -203,13 +215,16 @@ class ResponsesStream extends DefaultChatStream {
             }
             for (ContentPart part : delta.getParts()) {
                 if (part instanceof TextPart text) {
-                    appendText(text);
+                    appendText(text, event);
                     changed = true;
                 } else if (part instanceof ToolCallPart call) {
-                    mergeToolCall(call);
+                    mergeToolCall(call, event);
                     changed = true;
                 } else if (part instanceof ReasoningPart reasoning) {
                     appendReasoning(reasoning);
+                    changed = true;
+                } else if (part instanceof ListPart item) {
+                    openItem(item, event);
                     changed = true;
                 }
             }
@@ -224,10 +239,12 @@ class ResponsesStream extends DefaultChatStream {
          * item rather than left beside it: the assembled answer then has the shape a blocking one
          * would have given it.
          */
-        private void appendText(TextPart fragment) {
-            int index = messageItemIndex(fragment);
+        private void appendText(TextPart fragment, ChatStreamEvent event) {
+            int index = messageItemIndex(event);
             if (index < 0) {
-                parts.add(new ListPart(List.of(new TextPart(fragment.getText())), fragment.getExtras()));
+                int created = parts.size();
+                parts.add(new ListPart(List.of(new TextPart(fragment.getText()))));
+                remember(created, event, fragment);
                 return;
             }
             ListPart item = (ListPart) parts.get(index);
@@ -242,37 +259,80 @@ class ResponsesStream extends DefaultChatStream {
         }
 
         /**
+         * Places the container an opened message item becomes, remembering the item's frame identity
+         * so the fragments that follow fold into it. The container carries the item's own members;
+         * which item it is and where it sits stay here, off the answer.
+         */
+        private void openItem(ListPart item, ChatStreamEvent event) {
+            int index = indexOfItem(event.getExtras().get(ResponsesReader.ITEM_ID), ListPart.class);
+            if (index < 0) {
+                index = indexOfPosition(event.getExtras().get(ResponsesReader.OUTPUT_INDEX), ListPart.class);
+            }
+            if (index < 0) {
+                index = parts.size();
+                parts.add(item);
+            } else {
+                // A fragment opened the item before its frame arrived: what it built stays, and the
+                // members the item announces replace the empty extras it was opened with.
+                ListPart current = (ListPart) parts.get(index);
+                parts.set(index, new ListPart(current.getSubParts(), item.getExtras()));
+            }
+            remember(index, event, item);
+        }
+
+        /**
          * The message item a text fragment belongs to, as the position it occupies in the turn, or
          * {@code -1} when it opens a new one. The frame that carries a fragment names the item it
          * speaks for, and nothing else does: the shared model has no field for it, so it is read back
-         * out of the extras the fragment kept it in.
+         * from the frame the fold keeps it on.
          */
-        private int messageItemIndex(TextPart fragment) {
-            Object itemId = extra(fragment, ResponsesReader.ITEM_ID);
+        private int messageItemIndex(ChatStreamEvent event) {
+            Object itemId = event.getExtras().get(ResponsesReader.ITEM_ID);
             if (itemId != null) {
-                for (int i = 0; i < parts.size(); i++) {
-                    if (parts.get(i) instanceof ListPart item
-                            && itemId.equals(extra(item, ResponsesReader.ITEM_ID))) {
-                        return i;
-                    }
-                }
-                return -1;
+                return indexOfItem(itemId, ListPart.class);
             }
-            Object outputIndex = extra(fragment, ResponsesReader.OUTPUT_INDEX);
-            if (outputIndex != null) {
-                for (int i = 0; i < parts.size(); i++) {
-                    if (parts.get(i) instanceof ListPart item
-                            && outputIndex.equals(extra(item, ResponsesReader.OUTPUT_INDEX))) {
-                        return i;
-                    }
-                }
-                return -1;
+            Object position = event.getExtras().get(ResponsesReader.OUTPUT_INDEX);
+            if (position != null) {
+                return indexOfPosition(position, ListPart.class);
             }
             // Nothing identifies the fragment, so it continues the item that was opened last.
             if (!parts.isEmpty() && parts.get(parts.size() - 1) instanceof ListPart) {
                 return parts.size() - 1;
             }
             return -1;
+        }
+
+        /**
+         * The part an item already occupies, as the position it holds, or {@code -1} when no part of
+         * the given kind answers for it.
+         */
+        private int indexOfItem(@Nullable Object itemId, Class<? extends ContentPart> kind) {
+            Integer index = itemsById.get(itemId);
+            return index != null && kind.isInstance(parts.get(index)) ? index : -1;
+        }
+
+        private int indexOfPosition(@Nullable Object position, Class<? extends ContentPart> kind) {
+            Integer index = itemsByPosition.get(position);
+            return index != null && kind.isInstance(parts.get(index)) ? index : -1;
+        }
+
+        /**
+         * Records which item a part answers for, so the fragments that follow fold into it: the id
+         * the frame names it by and where it sits. A fragment names the item outright; the frame that
+         * opens one carries the item whole, so the item's own id is where its name is read from.
+         */
+        private void remember(int index, ChatStreamEvent event, ContentPart part) {
+            Object itemId = event.getExtras().get(ResponsesReader.ITEM_ID);
+            if (itemId == null && part.getExtras() != null) {
+                itemId = part.getExtras().get(ResponsesReader.ITEM_NAME);
+            }
+            if (itemId != null) {
+                itemsById.putIfAbsent(itemId, index);
+            }
+            Object position = event.getExtras().get(ResponsesReader.OUTPUT_INDEX);
+            if (position != null) {
+                itemsByPosition.putIfAbsent(position, index);
+            }
         }
 
         /**
@@ -293,10 +353,12 @@ class ResponsesStream extends DefaultChatStream {
          * and its arguments are then spelled by as many frames as they take, and what arrives is one
          * part carrying the whole of what the provider said about that call.
          */
-        private void mergeToolCall(ToolCallPart fragment) {
-            int index = toolCallIndex(fragment);
+        private void mergeToolCall(ToolCallPart fragment, ChatStreamEvent event) {
+            int index = toolCallIndex(event, fragment);
             if (index < 0) {
+                int created = parts.size();
                 parts.add(fragment);
+                remember(created, event, fragment);
                 return;
             }
             ToolCallPart call = (ToolCallPart) parts.get(index);
@@ -310,30 +372,22 @@ class ResponsesStream extends DefaultChatStream {
          * The call a fragment continues, as the position it occupies in the turn, or {@code -1} when
          * it opens a new one.
          */
-        private int toolCallIndex(ToolCallPart fragment) {
+        private int toolCallIndex(ChatStreamEvent event, ToolCallPart fragment) {
             // The frame that announces a call and the frames that spell its arguments carry the item
             // they belong to, and nothing else does: the shared model has no field for it, so it is
-            // read back out of the extras the fragment kept it in.
-            Object itemId = extra(fragment, ResponsesReader.ITEM_ID);
+            // read back from the frame the fold keeps it on.
+            Object itemId = event.getExtras().get(ResponsesReader.ITEM_ID);
             if (itemId != null) {
-                for (int i = 0; i < parts.size(); i++) {
-                    if (parts.get(i) instanceof ToolCallPart call
-                            && itemId.equals(extra(call, ResponsesReader.ITEM_ID))) {
-                        return i;
-                    }
-                }
-                return -1;
+                return indexOfItem(itemId, ToolCallPart.class);
             }
             // Where the item sits names it too, for an endpoint that spells its arguments without
             // saying which item they belong to: a fragment matching no announced call falls through
             // to the names below rather than opening a call of its own.
-            Object outputIndex = extra(fragment, ResponsesReader.OUTPUT_INDEX);
-            if (outputIndex != null) {
-                for (int i = 0; i < parts.size(); i++) {
-                    if (parts.get(i) instanceof ToolCallPart call
-                            && outputIndex.equals(extra(call, ResponsesReader.OUTPUT_INDEX))) {
-                        return i;
-                    }
+            Object position = event.getExtras().get(ResponsesReader.OUTPUT_INDEX);
+            if (position != null) {
+                int found = indexOfPosition(position, ToolCallPart.class);
+                if (found >= 0) {
+                    return found;
                 }
             }
             if (fragment.getCallId() != null) {
@@ -385,12 +439,6 @@ class ResponsesStream extends DefaultChatStream {
         copy.setCachedInputTokens(usage.getCachedInputTokens());
         copy.getExtras().putAll(usage.getExtras());
         return copy;
-    }
-
-    /** One member a part kept in its extras, or {@code null} when it carries none or not that one. */
-    private static @Nullable Object extra(ContentPart part, String name) {
-        ProviderExtras extras = part.getExtras();
-        return extras != null ? extras.get(name) : null;
     }
 
     /** The text as it arrives: a fragment is a piece of the value, not the value. */

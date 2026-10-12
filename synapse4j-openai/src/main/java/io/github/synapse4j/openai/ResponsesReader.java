@@ -53,14 +53,21 @@ import io.github.synapse4j.json.JsonReader;
 class ResponsesReader {
 
     /**
-     * The payload member naming the item a streamed fragment belongs to, and the name the item
-     * announces itself under. This module does not model either, so the item stays in the part's
-     * extras — and is read back from there when a fragment has to be matched to its call.
+     * The payload member naming the item a streamed frame belongs to, which is what identifies it.
+     * This module does not model it, so it rides on the event with the rest of the frame's payload,
+     * and the fold reads it back to know which item a fragment continues.
      */
     static final String ITEM_ID = "item_id";
 
-    /** The payload member naming where that item sits in the response, kept beside {@link #ITEM_ID}. */
+    /** The payload member naming where the item sits in the response, read back beside {@link #ITEM_ID}. */
     static final String OUTPUT_INDEX = "output_index";
+
+    /**
+     * The member an item names itself by, which is the same name the frames that spell it out speak
+     * for it under: the frame that opens an item carries the item whole, so its own id is there to be
+     * read where the later frames put {@link #ITEM_ID}.
+     */
+    static final String ITEM_NAME = "id";
 
     /**
      * Builds the shared response from the wire document the reader is positioned on. Every field
@@ -220,7 +227,7 @@ class ResponsesReader {
             return false;
         }
         if ("function_call".equals(type)) {
-            readFunctionCallItem(members, message);
+            message.part(functionCallItem(members));
             return true;
         }
         if ("reasoning".equals(type)) {
@@ -242,14 +249,18 @@ class ResponsesReader {
      * item's own members — its identity and status — ride in the part's extras, which is what keeps
      * a turn of two message items two items and lets each be replayed as the item it was.
      */
-    private static ListPart readMessageItem(Map<String, Object> members) {
+    private static ListPart readMessageItem(Map<?, ?> members) {
         List<ContentPart> content = new ArrayList<>();
         ProviderExtras extras = new ProviderExtras();
-        for (Map.Entry<String, Object> member : members.entrySet()) {
-            if ("content".equals(member.getKey())) {
+        for (Map.Entry<?, ?> member : members.entrySet()) {
+            String name = String.valueOf(member.getKey());
+            if ("content".equals(name)) {
                 readMessageContent(member.getValue(), content);
-            } else {
-                extras.put(member.getKey(), member.getValue());
+            } else if (!"type".equals(name)) {
+                // The kind is not a member of the part: it is gone from a whole item by the time this
+                // runs, and still there on the frame that opens one, where it says nothing the part
+                // does not already say.
+                extras.put(name, member.getValue());
             }
         }
         return new ListPart(content, extras);
@@ -287,21 +298,30 @@ class ResponsesReader {
         }
     }
 
-    /** A tool call item: this protocol keys it by {@code call_id}, and its id and status ride along. */
-    private static void readFunctionCallItem(Map<String, Object> members, ChatMessage.Builder message) {
+    /**
+     * A tool call item as the part it becomes: this protocol keys it by {@code call_id}, and its id
+     * and status ride in the part's extras. The same item arrives whole in a response and, on the
+     * streaming path, as the frame that opens it — with the arguments spelled later by fragments of
+     * their own — so both build it here.
+     */
+    private static ToolCallPart functionCallItem(Map<?, ?> members) {
         String callId = null;
         String callName = null;
         String argumentsJson = null;
         ProviderExtras extras = new ProviderExtras();
-        for (Map.Entry<String, Object> member : members.entrySet()) {
-            switch (member.getKey()) {
+        for (Map.Entry<?, ?> member : members.entrySet()) {
+            switch (String.valueOf(member.getKey())) {
                 case "call_id" -> callId = stringOf(member.getValue());
                 case "name" -> callName = stringOf(member.getValue());
                 case "arguments" -> argumentsJson = stringOf(member.getValue());
-                default -> extras.put(member.getKey(), member.getValue());
+                // The kind is not a member of the part; on the frame that opens the call it is still
+                // there, and it says nothing the part does not already say.
+                case "type" -> {
+                }
+                default -> extras.put(String.valueOf(member.getKey()), member.getValue());
             }
         }
-        message.part(new ToolCallPart(callId, callName, argumentsJson, extras));
+        return new ToolCallPart(callId, callName, argumentsJson, extras);
     }
 
     /**
@@ -398,20 +418,16 @@ class ResponsesReader {
     }
 
     private static void textDelta(ChatStreamEvent event, ProviderExtras payload) {
-        // The whole frame rides on the event — where in the stream it sat, the fragment it
-        // carried — for an application reading the stream. The answer keeps none of it: a
-        // blocking response has no frames, and the fold is what makes the two answers equal.
+        // The whole frame rides on the event — where in the stream it sat, the fragment it carried —
+        // for an application reading the stream. The answer keeps none of it: a blocking response has
+        // no frames, and the fold is what makes the two answers equal. Which item the fragment
+        // belongs to is one of those frame members, so the fold reads it there rather than here.
         event.getExtras().putAll(payload);
         String fragment = stringOf(payload.get("delta"));
         if (fragment == null) {
             return;
         }
-        // The item a fragment belongs to rides on the part the fold reads it back from, the way a
-        // tool call's fragments keep it: text arrives in pieces, and they have to be assembled into
-        // the item they came from rather than left beside it.
-        ProviderExtras extras = new ProviderExtras();
-        streamPosition(payload, extras);
-        event.setDelta(delta(new TextPart(fragment, extras)));
+        event.setDelta(delta(new TextPart(fragment)));
     }
 
     private static void argumentsDelta(ChatStreamEvent event, ProviderExtras payload) {
@@ -421,9 +437,7 @@ class ResponsesReader {
         if (fragment == null) {
             return;
         }
-        ProviderExtras extras = new ProviderExtras();
-        streamPosition(payload, extras);
-        event.setDelta(delta(new ToolCallPart(null, null, fragment, extras)));
+        event.setDelta(delta(new ToolCallPart(null, null, fragment)));
     }
 
     private static void reasoningDelta(ChatStreamEvent event, ProviderExtras payload) {
@@ -433,47 +447,32 @@ class ResponsesReader {
         if (fragment == null) {
             return;
         }
-        ProviderExtras extras = new ProviderExtras();
-        streamPosition(payload, extras);
-        event.setDelta(delta(new ReasoningPart(fragment, extras)));
+        event.setDelta(delta(new ReasoningPart(fragment)));
     }
 
     /**
-     * The item a frame announces, when it is a tool call. The call is named once, on the frame that
-     * opens it, and the frames that spell its arguments follow: the identity kept here is what ties
-     * the two together, since this module has no field for it.
+     * The item a frame opens, as the part it becomes: a message item one container, a tool call the
+     * call it is. The item names itself here — its identity and status, and, for a call, the call it
+     * is — and the frames that spell it out follow as fragments. The part carries those members, the
+     * same ones the blocking path puts there, so an answer assembled from fragments has the shape a
+     * single response would have given it; where in the stream the item sat is the fold's bookkeeping
+     * rather than the item's, and is left on the event.
      */
     private static void addedItem(ChatStreamEvent event, ProviderExtras payload) {
         // The frame belongs to the event; see textDelta.
         event.getExtras().putAll(payload);
-        if (payload.get("item") instanceof Map<?, ?> item && "function_call".equals(item.get("type"))) {
-            ProviderExtras extras = new ProviderExtras();
-            streamPosition(payload, extras);
-            // The frame that opens a call sits outside the item, so the item names itself only here —
-            // while the frames that spell its arguments name it by the very same id, which is what
-            // makes the two halves one call rather than several.
-            String itemId = stringOf(item.get("id"));
-            if (itemId != null && !extras.contains(ITEM_ID)) {
-                extras.put(ITEM_ID, itemId);
-            }
-            event.setDelta(delta(new ToolCallPart(stringOf(item.get("call_id")), stringOf(item.get("name")),
-                    null, extras)));
+        if (!(payload.get("item") instanceof Map<?, ?> item)) {
+            return;
+        }
+        String type = stringOf(item.get("type"));
+        if ("message".equals(type)) {
+            event.setDelta(delta(readMessageItem(item)));
+        } else if ("function_call".equals(type)) {
+            event.setDelta(delta(functionCallItem(item)));
         }
     }
 
-    /** Keeps the position a fragment came with on the part it produced, where the fold reads it back. */
-    private static void streamPosition(ProviderExtras payload, ProviderExtras partExtras) {
-        Object itemId = payload.get(ITEM_ID);
-        if (itemId != null) {
-            partExtras.put(ITEM_ID, itemId);
-        }
-        Object outputIndex = payload.get(OUTPUT_INDEX);
-        if (outputIndex != null) {
-            partExtras.put(OUTPUT_INDEX, outputIndex);
-        }
-    }
-
-    /** A fragment as the one-part turn it is folded through. */
+    /** A part — a fragment, or the item a frame opens — as the one-part turn it is folded through. */
     private static ChatMessage delta(ContentPart part) {
         return new ChatMessage(null, null, part);
     }

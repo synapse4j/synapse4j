@@ -772,6 +772,39 @@ class OpenAiResponsesChatClientTest {
         ListPart item = assertInstanceOf(ListPart.class,
                 stream.aggregatedResponse().getMessage().getParts().get(0));
         assertEquals("Hi", assertInstanceOf(TextPart.class, item.getSubParts().get(0)).getText());
+        // No frame opened the item, so there are no members to carry — and the frame's own
+        // bookkeeping does not stand in for them.
+        assertNull(item.getExtras());
+    }
+
+    @Test
+    void announcedItemKeepsItsMembersNotTheFrames() {
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                namedFrame(OpenAiResponsesEventTypes.OUTPUT_ITEM_ADDED,
+                        "{\"output_index\":0,\"item\":{\"id\":\"msg_1\",\"type\":\"message\","
+                                + "\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[]}}"),
+                namedFrame(OpenAiResponsesEventTypes.OUTPUT_TEXT_DELTA,
+                        "{\"item_id\":\"msg_1\",\"output_index\":0,\"delta\":\"Hi\"}"))
+                .getBytes(UTF_8)));
+
+        ChatStream stream = client.stream(requestWithModel());
+        Iterator<ChatStreamEvent> events = stream.iterator();
+        assertEquals(OpenAiResponsesEventTypes.OUTPUT_ITEM_ADDED, events.next().getEventType());
+        assertEquals("Hi", textOf(events.next()));
+
+        // A body that stops before the frame that closes the answer leaves the caller the turn the
+        // fragments built — and it carries the item's own members, not the frame's bookkeeping: what
+        // the item was called and where it sat on the wire belong to the stream, not to the answer.
+        assertThrows(SynapseException.class, events::hasNext);
+        ListPart item = assertInstanceOf(ListPart.class,
+                stream.aggregatedResponse().getMessage().getParts().get(0));
+        assertEquals("Hi", assertInstanceOf(TextPart.class, item.getSubParts().get(0)).getText());
+        assertEquals("msg_1", item.getExtras().get("id"));
+        assertEquals("in_progress", item.getExtras().get("status"));
+        assertNull(item.getExtras().get("item_id"));
+        assertNull(item.getExtras().get("output_index"));
     }
 
     @Test
