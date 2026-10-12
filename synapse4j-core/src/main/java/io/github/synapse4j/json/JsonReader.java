@@ -24,8 +24,7 @@ import io.github.synapse4j.exception.SynapseIOException;
  * not shareable.
  *
  * <p>
- * The source belongs to the caller: {@link #close()} releases the reader's own buffers and never
- * closes the source.
+ * The source belongs to the caller.
  *
  * <p>
  * A failure of the source is a {@link SynapseIOException} whose cause is the original

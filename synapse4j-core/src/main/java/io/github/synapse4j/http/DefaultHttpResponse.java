@@ -15,8 +15,7 @@ import lombok.Setter;
 
 /**
  * The default {@link HttpResponse}: status, headers and body, each handed in by the transport that
- * produced it, plus the options that were in effect for the exchange — the last one only so that
- * {@link #sseEventStream()} can frame the events with the budget the call asked for.
+ * produced it, plus the options that were in effect for the exchange.
  */
 public class DefaultHttpResponse implements HttpResponse {
 

@@ -71,8 +71,8 @@ import lombok.extern.apachecommons.CommonsLog;
  * Transport-owned behavior follows the {@code RestClient} this client was handed: redirects,
  * restricted headers and socket configuration (connect timeout, SSL, proxy) are that transport's
  * to decide, while interceptors and {@code Observation} observability configured on the client
- * apply to every request this class builds. This class holds the delegate and its own
- * {@link HttpOptions} and nothing else, and is safe to share across threads.
+ * apply to every request this class builds. This class keeps no per-call state and is safe to
+ * share across threads.
  */
 @CommonsLog
 public class RestClientHttpClient implements HttpClient {

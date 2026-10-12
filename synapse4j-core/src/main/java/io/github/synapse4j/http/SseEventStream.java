@@ -29,10 +29,6 @@ import io.github.synapse4j.exception.SynapseIOException;
  * is consumed once: the frames are not buffered, so there is nothing to iterate again.
  *
  * <p>
- * Closing the stream closes the body it was given, which is how a streaming response is cancelled.
- * It is idempotent and safe to call from any thread, including without having pulled anything.
- *
- * <p>
  * A failure of the source is a {@link SynapseIOException} whose cause is the original
  * {@link IOException}. An implementation may cap how much one frame may accumulate; crossing that
  * cap fails the read, and never truncates, since half a frame is worse than none.

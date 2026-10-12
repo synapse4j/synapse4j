@@ -27,10 +27,6 @@ import tools.jackson.databind.json.JsonMapper;
  * Internal to this module: an application gets one from {@link JacksonJsonCodec#writer} and never
  * names this class. The generator comes from a factory that leaves the sink alone, so
  * {@link #close()} is Jackson's own "flush and release", not a stream close.
- *
- * <p>
- * The mapper is carried alongside for {@link #writeValue(Object)}: a value handed over whole is written
- * by the mapper, which decides its JSON.
  */
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 class JacksonJsonWriter implements JsonWriter {

@@ -12,11 +12,7 @@ import lombok.ToString;
  * <p>
  * This is family-level configuration, shared by the chat-completions adapter and the Responses
  * adapter: both speak to the same API with the same credentials, so neither owns a config of its
- * own. {@link #maxTokensField} and {@link #reasoningField} are the chat-completions adapter's
- * conventions: the Responses protocol fixes the name of its token limit and carries reasoning in a
- * structure of its own, so that adapter reads neither. {@link #storeResponses} answers the same
- * question in reverse: {@code store} is a Responses-protocol request member the chat-completions
- * protocol has no word for, so that adapter never writes it.
+ * own.
  */
 @Data
 public class OpenAiConfig {

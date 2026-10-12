@@ -23,9 +23,8 @@ import io.github.synapse4j.tool.ToolProvider;
  * is decided by which implementation was instantiated, and never leaks through here.
  *
  * <p>
- * Both ways of answering are on this same interface and share the same request model: {@link #chat}
- * blocks until the whole answer arrives, {@link #stream} pulls it event by event and assembles the
- * same {@link ChatResponse} as it goes. Implementations must provide both.
+ * Both ways of answering are on this same interface and share the same request model;
+ * implementations must provide both.
  *
  * <p>
  * A client may also carry {@link ChatCustomizer}s: hooks that prepare every request before it is

@@ -13,8 +13,7 @@ import org.jspecify.annotations.Nullable;
  * <p>
  * The body is always a stream, for every request — streaming and non-streaming callers read the
  * same type, and buffering is a choice the caller makes by reading to the end, not a property of
- * the response. The caller's thread does the reading; {@link #close()} releases the connection and
- * cancels an in-flight body, and must be safe to call from any thread.
+ * the response. The caller's thread does the reading.
  *
  * <p>
  * The status is whatever the server returned. This type has no opinion about 4xx or 5xx and no
