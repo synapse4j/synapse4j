@@ -185,7 +185,13 @@ class ResponsesStream extends DefaultChatStream {
             // is also what keeps a kind of frame this module has never heard of from leaking its
             // payload into the answer.
             if (carriesWholeResponse(event.getEventType())) {
-                response.getExtras().putAll(event.getExtras());
+                // The response's own members are the answer's; the frame's own members — the kind of
+                // frame and its place in the stream — are the frame's, and stay on the event. An
+                // answer carrying them would be the frame leaking into it.
+                ProviderExtras carried = new ProviderExtras(event.getExtras());
+                carried.remove(ResponsesReader.FRAME_TYPE);
+                carried.remove(ResponsesReader.SEQUENCE_NUMBER);
+                response.getExtras().putAll(carried);
             }
             ChatMessage delta = event.getDelta();
             if (delta == null) {

@@ -697,7 +697,8 @@ class OpenAiResponsesChatClientTest {
                         "{\"item_id\":\"msg_1\",\"output_index\":0,\"text\":\"Hi there\","
                                 + "\"sequence_number\":4}"),
                 namedFrame(OpenAiResponsesEventTypes.COMPLETED,
-                        "{\"type\":\"response.completed\",\"response\":" + COMPLETED_RESPONSE + "}"))
+                        "{\"type\":\"response.completed\",\"sequence_number\":9,\"response\":"
+                                + COMPLETED_RESPONSE + "}"))
                 .getBytes(UTF_8)));
 
         ChatStream stream = client.stream(requestWithModel());
@@ -717,6 +718,11 @@ class OpenAiResponsesChatClientTest {
         assertEquals("msg_1", events.get(1).getExtras().get("item_id"));
         assertEquals(0, events.get(1).getExtras().get("output_index"));
         assertEquals("Hi there", events.get(3).getExtras().get("text"));
+        // The frame that carries the whole response keeps its own members too, beside the
+        // response's: an application reading the stream gets the frame as the provider sent it.
+        assertEquals("response.completed", events.get(4).getExtras().get("type"));
+        assertEquals(9, events.get(4).getExtras().get("sequence_number"));
+        assertEquals(1700000000, events.get(4).getExtras().get("created_at"));
         // The events are snapshots: the answer is assembled from copies, so a delta event an
         // application kept still carries only the fragment it delivered.
         assertEquals("Hi", textOf(events.get(1)));
@@ -739,12 +745,14 @@ class OpenAiResponsesChatClientTest {
         assertEquals(blocking.getUsage().getInputTokens(), aggregated.getUsage().getInputTokens());
         assertEquals(blocking.getUsage().getOutputTokens(), aggregated.getUsage().getOutputTokens());
         // The response's own unmodelled member reaches the answer, and the frames' bookkeeping does
-        // not: an answer carrying the item a frame spoke for, or a sequence number, would be the
-        // frame leaking into it.
+        // not: an answer carrying the kind of frame it was streamed in, the item a frame spoke for,
+        // or a sequence number, would be the frame leaking into it.
         assertEquals(1700000000, aggregated.getExtras().get("created_at"));
+        assertFalse(aggregated.getExtras().rawMap().containsKey("type"));
         assertFalse(aggregated.getExtras().rawMap().containsKey("text"));
         assertFalse(aggregated.getExtras().rawMap().containsKey("item_id"));
         assertFalse(aggregated.getExtras().rawMap().containsKey("sequence_number"));
+        assertEquals(blocking.getExtras(), aggregated.getExtras());
     }
 
     @Test

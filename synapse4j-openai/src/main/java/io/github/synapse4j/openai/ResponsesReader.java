@@ -70,6 +70,15 @@ class ResponsesReader {
     static final String ITEM_NAME = "id";
 
     /**
+     * The frame member naming the kind of frame. The protocol repeats it on the frame beside the SSE
+     * {@code event} field the frame already arrives under.
+     */
+    static final String FRAME_TYPE = "type";
+
+    /** The frame member giving the frame's place in the stream. */
+    static final String SEQUENCE_NUMBER = "sequence_number";
+
+    /**
      * Builds the shared response from the wire document the reader is positioned on. Every field
      * this module does not model is kept rather than dropped: it goes into the extras of the node
      * it belongs to, under the path it came from.
@@ -132,8 +141,12 @@ class ResponsesReader {
             case OpenAiResponsesEventTypes.ERROR -> throw streamError(payload);
             case OpenAiResponsesEventTypes.FAILED -> throw failed(payload.get("error"));
             case OpenAiResponsesEventTypes.CREATED, OpenAiResponsesEventTypes.IN_PROGRESS,
-                    OpenAiResponsesEventTypes.COMPLETED, OpenAiResponsesEventTypes.INCOMPLETE ->
+                    OpenAiResponsesEventTypes.COMPLETED, OpenAiResponsesEventTypes.INCOMPLETE -> {
+                // The frame's own members and the response's both travel on the event: an application
+                // reading the stream keeps the frame as it came, and nothing is dropped for it.
+                event.getExtras().putAll(payload);
                 carryWhole(event, whole);
+            }
             case OpenAiResponsesEventTypes.OUTPUT_TEXT_DELTA -> textDelta(event, payload);
             case OpenAiResponsesEventTypes.OUTPUT_ITEM_ADDED -> addedItem(event, payload);
             case OpenAiResponsesEventTypes.FUNCTION_CALL_ARGUMENTS_DELTA -> argumentsDelta(event, payload);

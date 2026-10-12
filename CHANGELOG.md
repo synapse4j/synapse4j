@@ -5,6 +5,7 @@ version becomes the body of the GitHub Release created when that version's tag i
 
 ## [Unreleased]
 
+- A stream frame that carries the whole Responses answer keeps the frame's own members on its event as well: the event's extras hold `type` and `sequence_number` beside the response's unmodelled fields, so an application reading the stream keeps the frame whole, where those frame members were dropped — the assembled answer still takes only the response's fields, so neither the frame's members nor the response's are lost
 - A source that answers 0 bytes fails an event stream's read: a stream that never blocks — a non-blocking channel wrapped as an `InputStream`, say — is refused by name, where the read spun on it or took it for the end of the body
 - A path segment may be empty: `ProviderExtras` and `RawPart` now hold an element whose member is named `""` — a JSON object names a member that way as readily as any other — where the path was refused and a legal document could not be kept
 - A `@ToolMethod` on a default method a sub-interface overrides is read from the sub-interface — the declaration Java itself runs — where the order the interfaces happened to be written in decided which one the tool came from
