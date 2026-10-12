@@ -191,7 +191,7 @@ public class ProviderExtras implements Effective<ProviderExtras> {
      * The key is one field name: any separator character inside it is treated literally rather than
      * as a path boundary.
      *
-     * @param key   the field name; must not be {@code null} or empty
+     * @param key   the field name; must not be {@code null}
      * @param value the value; stored as-is, may be {@code null}
      * @return this instance
      */
@@ -204,7 +204,7 @@ public class ProviderExtras implements Effective<ProviderExtras> {
      * ancestor stored as a leaf, or descendants under this path, are cleared in the same call.
      *
      * @param path  the path segments; must not be {@code null} or empty, and no segment may be
-     *                  {@code null} or empty
+     *                  {@code null}
      * @param value the value; stored as-is, may be {@code null}
      * @return this instance
      */
@@ -411,9 +411,8 @@ public class ProviderExtras implements Effective<ProviderExtras> {
         if (segment == null) {
             throw new IllegalArgumentException("path segment must not be null");
         }
-        if (segment.isEmpty()) {
-            throw new IllegalArgumentException("path segment must not be empty");
-        }
+        // An empty segment is a name like any other: JSON names a member "" as readily as "id", and
+        // an empty key decodes back to the one empty segment it came from.
         for (int i = 0; i < segment.length(); i++) {
             char c = segment.charAt(i);
             if (c == SEPARATOR || c == ESCAPE) {

@@ -152,10 +152,13 @@ class ProviderExtrasTest {
     }
 
     @Test
-    void emptyPathSegmentRejected() {
-        ProviderExtras extras = new ProviderExtras();
+    void emptySegmentKept() {
+        // A JSON object names a member "" as readily as any other, so a segment may be empty and the
+        // position it spells is one like any other.
+        ProviderExtras extras = new ProviderExtras().put(List.of("a", ""), 1);
 
-        assertThrows(IllegalArgumentException.class, () -> extras.put(List.of("a", ""), 1));
+        assertEquals(1, extras.get("a", ""));
+        assertEquals(Map.of("a", Map.of("", 1)), extras.nestedMap());
     }
 
     @Test
@@ -363,7 +366,6 @@ class ProviderExtrasTest {
 
         assertThrows(IllegalArgumentException.class, () -> extras.remove());
         assertThrows(IllegalArgumentException.class, () -> extras.remove((String[]) null));
-        assertThrows(IllegalArgumentException.class, () -> extras.remove(""));
         assertThrows(IllegalArgumentException.class, () -> extras.remove("a", null));
 
         assertEquals(1, extras.size());

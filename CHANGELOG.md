@@ -5,6 +5,7 @@ version becomes the body of the GitHub Release created when that version's tag i
 
 ## [Unreleased]
 
+- A path segment may be empty: `ProviderExtras` and `RawPart` now hold an element whose member is named `""` — a JSON object names a member that way as readily as any other — where the path was refused and a legal document could not be kept
 - A `@ToolMethod` on a default method a sub-interface overrides is read from the sub-interface — the declaration Java itself runs — where the order the interfaces happened to be written in decided which one the tool came from
 - A `ListPart` sent to a protocol that has no layer holding one part inside another goes out as the parts it holds: an OpenAI chat-completions or Anthropic Messages turn carrying a group — a turn read from another provider, say — is flattened into the content instead of refused, and the fields the group carried have no node there and do not travel
 - A streamed Responses answer keeps the item's own members and drops the frame's bookkeeping: the container a message item becomes carries the id and status the item announced, where a turn read mid-stream or cut short used to keep the frame's `item_id` and `output_index` on it — and write them back out as members of the item
