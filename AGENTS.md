@@ -147,9 +147,12 @@ one would block extension by users and providers.
   private helper whose javadoc lists what it applies earns nothing a reader of the method cannot see.
   A note that says *why* the declaration is the way it is — why a constructor is hand-written rather
   than generated, why a value is copied — is a reason, not a restatement, and earns its place.
-- **A declaration speaks for itself, and for nothing else.** A type's javadoc says what the type is —
-  why it exists, what holds of it as a whole — never a summary of what its members do; a member's promise
-  goes on the member, and a new member rarely owes the class a sentence.
+- **A declaration speaks for itself, and for other declarations not at all.** A type's javadoc says
+  what the type is — why it exists, what holds of it as a whole, what a caller does with it and can
+  rely on — never a summary of what its members do (a member's promise goes on the member, and a new
+  member rarely owes the class a sentence), and never how another type works or what another type
+  makes of this one. The caller is not another declaration: how an application uses the type, and
+  what it can expect when it does, is the type's own contract.
 - **Never let a javadoc read as a complete inventory of an open set.** The kinds a type may take, the
   values a space holds — users, providers and applications extend them, so a list in a javadoc drifts and
   a reader takes it for the whole of it. Illustrate with an example where one helps, and state the space

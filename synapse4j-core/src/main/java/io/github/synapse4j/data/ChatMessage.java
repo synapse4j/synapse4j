@@ -22,6 +22,14 @@ import lombok.Singular;
  * model must not need a change to express something a protocol or an application already does.
  *
  * <p>
+ * A message says what the turn contributes; its parts are the model's own terms for it, not the
+ * layout of any one protocol. An application assembles a message the way its own domain does, and
+ * need not know how the protocol that sends it lays a turn out: supplying the layer a protocol
+ * requires and leaving out one it has not got is the module's work. What a message says must reach
+ * the wire: a part the protocol cannot carry is refused by name rather than dropped, and
+ * {@link RawPart} is how a part the protocol does not model still goes out.
+ *
+ * <p>
  * A message owns its {@link ProviderExtras} for the same reason a part does — a provider-specific
  * field belongs to the thing it applies to, not to the whole request. Each class declares its own
  * instead of inheriting one from a common base: no library surveyed models a universal node base
