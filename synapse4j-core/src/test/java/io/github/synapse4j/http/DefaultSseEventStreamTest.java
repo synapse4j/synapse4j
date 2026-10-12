@@ -130,6 +130,28 @@ class DefaultSseEventStreamTest {
     }
 
     @Test
+    void sourceAnsweringZeroBytesFails() {
+        // A blocking stream answers a positive count or -1. One that answers 0 is a stream this reader
+        // cannot wait on — waiting would spin — so it fails the read rather than truncating the body.
+        InputStream neverBlocks = new InputStream() {
+
+            @Override
+            public int read(byte[] sink, int offset, int length) {
+                return 0;
+            }
+
+            @Override
+            public int read() {
+                return 0;
+            }
+        };
+        DefaultSseEventStream reader = new DefaultSseEventStream(neverBlocks,
+                HttpOptions.defaults().getMaxFrameBytes());
+
+        assertThrows(SynapseIOException.class, reader::hasNext);
+    }
+
+    @Test
     void closeClosesBody() throws IOException {
         TrackingStream body = new TrackingStream("data: one\n\n");
         DefaultSseEventStream reader = new DefaultSseEventStream(body, HttpOptions.defaults().getMaxFrameBytes());

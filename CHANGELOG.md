@@ -5,6 +5,7 @@ version becomes the body of the GitHub Release created when that version's tag i
 
 ## [Unreleased]
 
+- A source that answers 0 bytes fails an event stream's read: a stream that never blocks — a non-blocking channel wrapped as an `InputStream`, say — is refused by name, where the read spun on it or took it for the end of the body
 - A path segment may be empty: `ProviderExtras` and `RawPart` now hold an element whose member is named `""` — a JSON object names a member that way as readily as any other — where the path was refused and a legal document could not be kept
 - A `@ToolMethod` on a default method a sub-interface overrides is read from the sub-interface — the declaration Java itself runs — where the order the interfaces happened to be written in decided which one the tool came from
 - A `ListPart` sent to a protocol that has no layer holding one part inside another goes out as the parts it holds: an OpenAI chat-completions or Anthropic Messages turn carrying a group — a turn read from another provider, say — is flattened into the content instead of refused, and the fields the group carried have no node there and do not travel

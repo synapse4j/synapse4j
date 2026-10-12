@@ -266,14 +266,26 @@ public class DefaultSseEventStream implements SseEventStream {
 
     /**
      * The body's next bytes into the given place, an {@link IOException} from the transport travelling
-     * as the library's own rather than being left raw.
+     * as the library's own rather than being left raw. A source that answers 0 — which a blocking
+     * stream never does — fails the read instead of being waited on.
      */
     private int read(byte[] sink, int offset, int length) {
+        int count;
         try {
-            return source.read(sink, offset, length);
+            count = source.read(sink, offset, length);
         } catch (IOException failure) {
             throw new SynapseIOException("Reading the event stream failed", failure);
         }
+        // A blocking stream answers a positive count or -1; 0 would be a stream that never blocks — a
+        // non-blocking channel, say — which this reader cannot wait on. Refusing it beats spinning on
+        // it, and beats reading it as the end of the body.
+        if (count == 0) {
+            throw new SynapseIOException(
+                    "Reading the event stream failed: the source returned 0 bytes, which a blocking"
+                            + " stream does not",
+                    null);
+        }
+        return count;
     }
 
     /**
