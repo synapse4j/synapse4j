@@ -272,7 +272,7 @@ public class MethodTools {
                 if (method.isSynthetic() || method.isBridge() || Modifier.isAbstract(method.getModifiers())) {
                     continue;
                 }
-                bySignature.putIfAbsent(signature(method), method);
+                record(bySignature, method);
             }
         }
         for (Class<?> level = type; level != null && level != Object.class; level = level.getSuperclass()) {
@@ -285,18 +285,32 @@ public class MethodTools {
 
     /**
      * Reads an interface's default methods into the given map, then those its extended interfaces
-     * declare. A signature already present is left as it stands, so the most derived declaration
-     * wins.
+     * declare. Only a default method is read: one an interface merely declares has to be implemented
+     * by the class, and that implementation is what stands in for it.
      */
     private static void readDefaultMethods(Class<?> face, Map<String, Method> bySignature) {
         for (Method method : face.getDeclaredMethods()) {
             if (!method.isDefault() || method.isSynthetic() || method.isBridge()) {
                 continue;
             }
-            bySignature.putIfAbsent(signature(method), method);
+            record(bySignature, method);
         }
         for (Class<?> parent : face.getInterfaces()) {
             readDefaultMethods(parent, bySignature);
+        }
+    }
+
+    /**
+     * Records a declaration as the one for its signature, keeping the most derived: a declaration
+     * already present gives way to one from a subtype of the type it was declared in — an override
+     * standing in for what it overrides, interfaces as much as classes — and never the other way
+     * round, so the order the interfaces happen to be read in does not decide.
+     */
+    private static void record(Map<String, Method> bySignature, Method method) {
+        String key = signature(method);
+        Method earlier = bySignature.get(key);
+        if (earlier == null || earlier.getDeclaringClass().isAssignableFrom(method.getDeclaringClass())) {
+            bySignature.put(key, method);
         }
     }
 

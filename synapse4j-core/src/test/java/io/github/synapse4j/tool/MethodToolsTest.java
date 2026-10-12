@@ -157,6 +157,17 @@ class MethodToolsTest {
     }
 
     @Test
+    void subInterfaceDefaultBeatsSuperInterfaceDefault() {
+        // The sub-interface's override is what Java runs, whichever order the two are written in.
+        reader.from(new ParentFirst());
+        assertEquals(Set.of("fromDerived"), resolvedNames());
+
+        reset();
+        reader.from(new ChildFirst());
+        assertEquals(Set.of("fromDerived"), resolvedNames());
+    }
+
+    @Test
     void bridgeMethodNotSecondTool() {
         reader.from(new Narrowed());
 
@@ -334,6 +345,31 @@ class MethodToolsTest {
     }
 
     public static class Preferring extends Carrying implements Answered {
+    }
+
+    /** A default method a sub-interface overrides, which is the one Java runs. */
+    public interface ParentDefault {
+
+        @ToolMethod(name = "fromBase")
+        default String shared(String value) {
+            return value;
+        }
+    }
+
+    public interface ChildDefault extends ParentDefault {
+
+        @Override
+        @ToolMethod(name = "fromDerived")
+        default String shared(String value) {
+            return value;
+        }
+    }
+
+    /** The sub-interface written after its parent, so the order cannot decide which one is read. */
+    public static class ParentFirst implements ParentDefault, ChildDefault {
+    }
+
+    public static class ChildFirst implements ChildDefault, ParentDefault {
     }
 
     /** A generic superclass whose method a subclass narrows to one type. */
