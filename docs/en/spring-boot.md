@@ -70,16 +70,11 @@ synapse4j:
             description: The city to look up
 ```
 
-The `synapse4j.*` keys group by what they configure. The family settings — `synapse4j.openai.*`
-binds `OpenAiConfig`, `synapse4j.anthropic.*` binds `AnthropicConfig` — and the transport settings —
-`synapse4j.http-options.*` binds `HttpOptions` — sit at the root, because a capability shares them.
-The JSON implementation's settings sit under their own key — `synapse4j.jackson.*` binds
-`JacksonSchemaSettings`, the schema generator's choices — so a second implementation gets a group of
-its own. Everything only a chat call has sits together under `synapse4j.chat.*`. Each key is a field on
-the type it binds, documented there; the options group restates only the fields Spring can bind.
-`synapse4j.chat.options.extras` binds raw keys: a key is the provider's own wire name, and a dotted
-key addresses a nested member. A non-string value needs YAML — a `.properties` file yields a string
-for every value.
+The `synapse4j.*` keys group by what they configure — the library's own configuration types held in
+place rather than restated — so which key sits where is settled on `Synapse4jProperties` and the
+types it holds, and each key is a field on the type it binds. `synapse4j.chat.options.extras` binds
+raw keys: a key is the provider's own wire name, and a dotted key addresses a nested member. A
+non-string value needs YAML — a `.properties` file yields a string for every value.
 
 The tool support has its own group, `synapse4j.tools.*`, on a `ToolsProperties`; the [Tools](#tools)
 section says what each key does.
@@ -155,8 +150,10 @@ Two kinds of bean shape the auto-configured client:
 
 - **`ChatCustomizer`** beans join its per-call hooks, so they run on every call.
 - **`ChatClientCustomizer`** beans run after the `synapse4j.chat.options.*` defaults and have the
-  last word on the client's options and tools: they can replace the default options, register tools
-  or tool providers, or add a `ChatCustomizer`.
+  last word on the client's options: they can replace the default options, register tools or tool
+  providers, or add a `ChatCustomizer`. On tools the last word is the `@Tools` classes' — those are
+  registered at the end of startup and replace a tool of the same name — so a customizer's tool gives
+  way to one a marked class declares under that name.
 
 ```java
 @Bean

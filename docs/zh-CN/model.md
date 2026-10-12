@@ -20,13 +20,14 @@
 
 ## 消息
 
-一条消息有一个角色和一个内容部分列表。角色是普通字符串——`ChatRole` 给出常见的几个：`system`、
-`user`、`assistant`、`tool`——因此提供商或应用可以使用库从未听说过的角色。
+一条消息有一个角色和一个内容部分列表。角色是普通字符串——`ChatRole` 给出本库定义的那几个：`user`、
+`assistant`、`developer`——因此提供商或应用可以使用库从未听说过的角色。给模型的指令在这里不是一个
+角色：它是请求上的系统消息（见上文）。
 
 ```java
 ChatMessage.user("天空为什么是蓝色的？");          // 用户这一轮
-ChatMessage.system("用一句话回答。");              // 指令
 ChatMessage.assistant("因为散射。");               // 手写的一轮模型输出
+ChatMessage.developer("你是一个简洁的助手。");      // 应用自己发出的消息
 ```
 
 消息还可以携带一个 `id`，供你自己记录，以及提供商特有的字段。
@@ -50,10 +51,10 @@ ChatMessage.assistant("因为散射。");               // 手写的一轮模型
 是一次组装而成的——少数几个部分用 `ChatMessage.of`，更完整的用 builder：
 
 ```java
-ChatMessage.of(ChatRole.USER, new TextPart("你好"), new TextPart("，世界"));
+ChatMessage.of(ChatRole.USER.value(), new TextPart("你好"), new TextPart("，世界"));
 
 ChatMessage.builder()
-        .role(ChatRole.USER)
+        .role(ChatRole.USER.value())
         .part(new TextPart("你好"))
         .part(new TextPart("，世界"))
         .build();
@@ -78,7 +79,7 @@ ChatMessage.builder()
 
 ```java
 ChatMessage message = ChatMessage.builder()
-        .role(ChatRole.USER)
+        .role(ChatRole.USER.value())
         .part(new TextPart("你好"))
         .mapExtras(extras -> extras.putRaw("thinking.budget_tokens", 2048))
         .build();

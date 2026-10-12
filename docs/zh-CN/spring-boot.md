@@ -68,12 +68,8 @@ synapse4j:
             description: 要查询的城市
 ```
 
-`synapse4j.*` 的键按配置的内容分组。各厂商的设置——`synapse4j.openai.*` 绑定 `OpenAiConfig`，
-`synapse4j.anthropic.*` 绑定 `AnthropicConfig`——和传输层的设置——`synapse4j.http-options.*` 绑定
-`HttpOptions`——放在根上，因为同一项能力在各家之间共用这些设置。JSON 实现自己的设置放在它自己的键下
-——`synapse4j.jackson.*` 绑定 `JacksonSchemaSettings`，即 schema 生成器的各项选择——这样将来换一个
-实现就有一组自己的键。只有 chat 调用才有的东西收在 `synapse4j.chat.*` 下面。每个键都是它绑定的那个
-类型上的一个字段，含义在该类型上有文档；options 这一组只重述 Spring 能绑定的字段。
+`synapse4j.*` 的键按配置的内容分组——都是本库自己的配置类型就地持有，而不是在这里重述——因此哪个键
+放在哪里由 `Synapse4jProperties` 和它持有的类型定下，每个键都是它绑定的那个类型上的一个字段。
 `synapse4j.chat.options.extras` 按原始键绑定：键就是提供商在协议上所用的名字，点分键指向嵌套成员。
 非字符串的值需要 YAML——`.properties` 文件会把每个值都变成字符串。
 
@@ -143,8 +139,10 @@ starter 自带的步骤都是排好序的 bean；声明一个自己的 `ToolMeth
 两类 bean 塑造自动配置的客户端：
 
 - **`ChatCustomizer`** bean 加入它的每次调用钩子，因此每次调用都会运行。
-- **`ChatClientCustomizer`** bean 在 `synapse4j.chat.options.*` 默认值之后运行，对客户端的选项与
-  工具说了算：它们可以替换默认选项、注册工具或工具提供者，或添加一个 `ChatCustomizer`。
+- **`ChatClientCustomizer`** bean 在 `synapse4j.chat.options.*` 默认值之后运行，对客户端的选项说了
+  算：它们可以替换默认选项、注册工具或工具提供者，或添加一个 `ChatCustomizer`。工具上说了算的是
+  `@Tools` 那些类——它们在启动末尾注册，并按名字替换同名工具——因此 customizer 注册的工具遇到标记类
+  声明同名工具时会让位。
 
 ```java
 @Bean

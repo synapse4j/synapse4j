@@ -23,14 +23,15 @@ response, the response `headers`, and a bag of provider-specific fields.
 
 ## Messages
 
-A message has a role and a list of parts. The role is a plain string — `ChatRole` names the common
-ones, `system`, `user`, `assistant` and `tool` — so a provider or an application can use a role
-the library has never heard of.
+A message has a role and a list of parts. The role is a plain string — `ChatRole` names the ones this
+library defines, `user`, `assistant` and `developer` — so a provider or an application can use a role
+the library has never heard of. Instructions to the model are not a role here: they are the request's
+system message (see above).
 
 ```java
-ChatMessage.user("Why is the sky blue?");          // a user turn
-ChatMessage.system("Answer in one sentence.");     // instructions
-ChatMessage.assistant("Because of scattering.");   // a model turn written by hand
+ChatMessage.user("Why is the sky blue?");                // a user turn
+ChatMessage.assistant("Because of scattering.");         // a model turn written by hand
+ChatMessage.developer("You are a concise assistant.");   // the application speaking for itself
 ```
 
 A message can also carry an `id`, for your own bookkeeping, and provider-specific fields.
@@ -59,10 +60,10 @@ carries a kind of part other than text, is assembled once — `ChatMessage.of` f
 the builder for a fuller one:
 
 ```java
-ChatMessage.of(ChatRole.USER, new TextPart("Hello"), new TextPart(", world"));
+ChatMessage.of(ChatRole.USER.value(), new TextPart("Hello"), new TextPart(", world"));
 
 ChatMessage.builder()
-        .role(ChatRole.USER)
+        .role(ChatRole.USER.value())
         .part(new TextPart("Hello"))
         .part(new TextPart(", world"))
         .build();
@@ -92,7 +93,7 @@ the outgoing JSON as it stands:
 
 ```java
 ChatMessage message = ChatMessage.builder()
-        .role(ChatRole.USER)
+        .role(ChatRole.USER.value())
         .part(new TextPart("Hello"))
         .mapExtras(extras -> extras.putRaw("thinking.budget_tokens", 2048))
         .build();

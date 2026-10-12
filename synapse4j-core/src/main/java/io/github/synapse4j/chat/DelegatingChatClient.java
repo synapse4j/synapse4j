@@ -16,15 +16,14 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 /**
- * A chat client that stands in for another: every method is handed to the client it wraps, so a
- * subclass overrides only what it means to change and nothing else takes a second path.
+ * A chat client that stands in for another: everything it is asked to do is handed to the client it
+ * wraps, so a subclass overrides only what it means to change and nothing else takes a second path.
  *
  * <p>
- * Everything travels to the delegate — the two calls, the five registrations, their removals and
- * their listings, and {@link ChatClient#continueWith}. The delegate is the client that prepares
- * and sends; this one holds no defaults and runs no customizer of its own, so what a call adds to
- * the delegate applies here too. A subclass that drives several exchanges under one, or wraps a
- * step around each, overrides the calls it needs and leaves the rest here.
+ * The delegate is the client that prepares and sends; this one holds no defaults and runs no
+ * customizer of its own, so what a call adds to the delegate applies here too. A subclass that
+ * drives several exchanges under one, or wraps a step around each, overrides the calls it needs and
+ * leaves the rest here.
  */
 @RequiredArgsConstructor
 public class DelegatingChatClient implements ChatClient {

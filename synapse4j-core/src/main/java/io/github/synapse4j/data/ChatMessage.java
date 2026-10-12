@@ -45,7 +45,7 @@ import lombok.Singular;
 @Builder(builderClassName = "Builder", toBuilder = true)
 public class ChatMessage {
 
-    /** Who contributes this message: a {@link ChatRole} constant, or any other value. */
+    /** Who contributes this message: a {@link ChatRole}'s string, or any other value. */
     private final @Nullable String role;
 
     /**
@@ -67,7 +67,7 @@ public class ChatMessage {
     /**
      * A message from the given speaker, saying whatever the given parts say.
      *
-     * @param role  the {@link ChatRole} constant, or any other value; {@code null} leaves the role unset
+     * @param role  a {@link ChatRole}'s string, or any other value; {@code null} leaves the role unset
      * @param id    the application's identifier for this message, {@code null} when it has none
      * @param parts what the message contributes; none at all is allowed
      */
@@ -78,7 +78,7 @@ public class ChatMessage {
     /**
      * A message from the given speaker, saying what the given parts say.
      *
-     * @param role  the {@link ChatRole} constant, or any other value; {@code null} leaves the role unset
+     * @param role  a {@link ChatRole}'s string, or any other value; {@code null} leaves the role unset
      * @param id    the application's identifier for this message, {@code null} when it has none
      * @param parts what the message contributes; never {@code null}, empty allowed
      */
@@ -89,7 +89,7 @@ public class ChatMessage {
     /**
      * Everything a message can carry. Hand-written, because varargs cannot follow the extras.
      *
-     * @param role   the {@link ChatRole} constant, or any other value; {@code null} leaves the role unset
+     * @param role   a {@link ChatRole}'s string, or any other value; {@code null} leaves the role unset
      * @param id     the application's identifier for this message, {@code null} when it has none
      * @param parts  what the message contributes; never {@code null}, empty allowed
      * @param extras provider-specific fields, {@code null} or empty for none; frozen on the way in
@@ -137,7 +137,7 @@ public class ChatMessage {
     /**
      * A message from the given speaker, carrying the given parts.
      *
-     * @param role  the {@link ChatRole} constant, or any other value; {@code null} leaves the role unset
+     * @param role  a {@link ChatRole}'s string, or any other value; {@code null} leaves the role unset
      * @param parts what the message contributes; none at all is allowed
      * @return the message
      */

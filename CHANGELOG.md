@@ -64,6 +64,10 @@ version becomes the body of the GitHub Release created when that version's tag i
 - The starter declares a `ToolExecutor` bean — a `DefaultToolExecutor` — and hands the loop that one, so a round cap, a worker pool or a different answer to a failed call is an application bean's to set
 - `ErrorHandlers.message(prefix)` answers an exception whose message is empty, not only one that is absent, with the exception's own name, so the prefix is never left standing before nothing
 - `@Tools` is read off the class the container registers rather than off the class that declares a method: a `ToolMethodSpec` now carries that class as its `owner`, so the prefix and the client come from one class, and a tool a marked class only inherits — an interface default method included — carries that class's prefix instead of none
+- A part may hold a group of other parts: `ListPart` is an ordered group with no meaning of its own, which a protocol writes as the layer its shape has for a container and leaves out where it has none
+- `ContentPart.getParts()` is renamed `getSubParts()` — what a part holds inside it is read by that name — and `ToolResultPart`'s field and accessor `parts` follow it
+- A Responses answer is one part per output item: a `message` item becomes a single `ListPart` holding its content entries, with the item's own members — its id and status — in the part's extras, where a message-level extras bag used to sit; an item the module has no shape for is kept whole as a top-level `RawPart`, and the special case for a `refusal` entry is gone
+- Roles are a vocabulary this library defines: `ChatRole` is an enum — `USER`, `ASSISTANT` and `DEVELOPER` — with `value()` for the string and `from(String)` answering `null` for a role that is not one of them, while `ChatMessage.getRole()` stays the open string it was; `TOOL` and `SYSTEM` are gone — a tool result is a `ToolResultPart` on a user-side turn and a system message is the `ChatRequest.systemMessage` slot — and each protocol maps the built-in roles to its own, passing an unknown role through where it can and refusing it by name where it cannot
 
 ## [0.0.2] - 2026-10-01
 

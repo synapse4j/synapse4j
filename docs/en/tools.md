@@ -48,6 +48,15 @@ Tool weather = new MethodTools(codec).of("get_weather", "Get the weather", metho
 **`ManualTool`** — declaration only. Use it when you run the model's calls yourself: it carries the
 declaration and refuses to execute.
 
+**`DelegatingTool`** — a stand-in tool: it answers a declaration of its own while running the
+delegate untouched. `DelegatingTool.withInputSchema(delegate, inputSchema)` presents the delegate's
+declaration with its argument schema replaced, which is what a tool whose schema the client
+reshaped comes out as:
+
+```java
+Tool strictWeather = DelegatingTool.withInputSchema(weather, stricterSchema);
+```
+
 ## Declaring tools on your own methods
 
 `@ToolMethod` and `@ToolParam` put the declaration on the method itself, and `MethodTools` reads a

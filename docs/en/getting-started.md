@@ -115,8 +115,8 @@ System.out.println(response.getText());
 ```
 
 The answer carries the assistant's turn as a `ChatMessage` — the same class a request is built
-from. `getText()` reads it back: the message's text parts joined in order, with the reasoning and
-the other kinds left out, so it is the answer as prose.
+from. `getText()` reads it back: the message's text parts joined in order, at any depth, with the
+reasoning and the other kinds left out, so it is the answer as prose.
 
 ## 5. Continue the conversation
 

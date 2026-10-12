@@ -19,6 +19,11 @@ import lombok.ToString;
  * parts carry.
  *
  * <p>
+ * The response's own fields are the provider's word on this exchange, and none of them goes back
+ * out: a later request carries the {@link #getMessage() turn} and its parts, each part keeping its
+ * own fields, because a provider that wants its state returned asks for it there.
+ *
+ * <p>
  * Everything the provider may not report is nullable, and a field with nothing behind it stays
  * {@code null} rather than being filled with a guess.
  *
