@@ -14,6 +14,7 @@ import io.github.synapse4j.data.ChatOptions;
 import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.ListPart;
 import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.RawPart;
@@ -55,7 +56,8 @@ import lombok.RequiredArgsConstructor;
  * so the bytes are encoded as they are handed to the writer and a payload larger than memory still
  * goes out. Audio, video and documents take a different shape in this protocol and fail loudly here,
  * along with every other part type this cut does not support: a request that arrived at the provider
- * incomplete would look like success from above.
+ * incomplete would look like success from above. A group of parts has no layer of its own here, so
+ * it goes out as the parts it holds, in their place.
  *
  * <p>
  * The {@link JsonWriter} is handed in, and where its bytes go is the caller's affair — the sink,
@@ -150,34 +152,35 @@ class CompletionsWriter {
         }
         // The system slot leads, as a message of this protocol's own: the slot — not the message —
         // is what says it is the system's, so its role is written here rather than read off it.
-        Map<String, Object> entry = message(system);
+        Map<String, Object> entry = message(system, flatten(system.getParts()));
         entry.put("role", "system");
         return Stream.concat(Stream.of(entry), entries);
     }
 
     private List<Map<String, Object>> entries(ChatMessage message) {
-        boolean hasToolResult = message.getParts().stream().anyMatch(ToolResultPart.class::isInstance);
+        List<ContentPart> parts = flatten(message.getParts());
+        boolean hasToolResult = parts.stream().anyMatch(ToolResultPart.class::isInstance);
         if (!hasToolResult) {
-            return List.of(message(message));
+            return List.of(message(message, parts));
         }
-        if (!message.getParts().stream().allMatch(ToolResultPart.class::isInstance)) {
+        if (!parts.stream().allMatch(ToolResultPart.class::isInstance)) {
             throw new SynapseException("unsupported message for OpenAI: tool results mixed with other parts");
         }
         // One message becomes one entry per result, so a field set on the message goes onto every
         // entry it turns into.
         List<Map<String, Object>> entries = new ArrayList<>();
-        for (ContentPart part : message.getParts()) {
+        for (ContentPart part : parts) {
             entries.add(toolResult((ToolResultPart) part, message.getExtras()));
         }
         return entries;
     }
 
-    private Map<String, Object> message(ChatMessage message) {
+    private Map<String, Object> message(ChatMessage message, List<ContentPart> parts) {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("role", message.getRole());
         List<Map<String, Object>> toolCalls = new ArrayList<>();
-        Object content = content(message, toolCalls);
-        writeReasoning(message, entry);
+        Object content = content(parts, toolCalls);
+        writeReasoning(parts, entry);
         // The content and the tool calls carry extras of their own, so the message's extras' reach
         // ends here: each goes in after the merge, unless the message names it whole.
         ProviderExtras messageExtras = message.getExtras();
@@ -198,10 +201,10 @@ class CompletionsWriter {
      * parts join into — or {@code null} when it carries none. A tool call is a member of the message
      * rather than an entry of its content, so it is collected into the given list instead.
      */
-    private @Nullable Object content(ChatMessage message, List<Map<String, Object>> toolCalls) {
-        if (!arrayContent(message)) {
+    private @Nullable Object content(List<ContentPart> parts, List<Map<String, Object>> toolCalls) {
+        if (!arrayContent(parts)) {
             StringBuilder text = new StringBuilder();
-            for (ContentPart part : message.getParts()) {
+            for (ContentPart part : parts) {
                 if (part instanceof TextPart textPart) {
                     text.append(textPart.getText());
                 } else if (!(part instanceof ReasoningPart)) {
@@ -211,7 +214,7 @@ class CompletionsWriter {
             return text.length() > 0 ? text.toString() : null;
         }
         List<Map<String, Object>> content = new ArrayList<>();
-        for (ContentPart part : message.getParts()) {
+        for (ContentPart part : parts) {
             if (part instanceof TextPart textPart) {
                 Map<String, Object> text = textPart(textPart);
                 if (text != null) {
@@ -245,12 +248,12 @@ class CompletionsWriter {
      * Reasoning that came from another endpoint travels with its own name in extras, so it goes out
      * as it arrived — the configured name covers what this endpoint's own answers carried.
      */
-    private void writeReasoning(ChatMessage message, Map<String, Object> entry) {
+    private void writeReasoning(List<ContentPart> parts, Map<String, Object> entry) {
         if (config.getReasoningField().isBlank()) {
             return;
         }
         StringBuilder reasoning = new StringBuilder();
-        for (ContentPart part : message.getParts()) {
+        for (ContentPart part : parts) {
             if (part instanceof ReasoningPart reasoningPart && reasoningPart.getText() != null) {
                 reasoning.append(reasoningPart.getText());
             }
@@ -266,11 +269,28 @@ class CompletionsWriter {
      * module does not model forces it too — a string content cannot carry extras — but a reasoning
      * part does not: its member sits beside the content, not in it.
      */
-    private static boolean arrayContent(ChatMessage message) {
-        return message.getParts().stream().anyMatch(part -> part instanceof MediaPart
+    private static boolean arrayContent(List<ContentPart> parts) {
+        return parts.stream().anyMatch(part -> part instanceof MediaPart
                 || part instanceof ToolCallPart
                 || part instanceof RawPart
                 || (part instanceof TextPart && part.getExtras() != null && !part.getExtras().isEmpty()));
+    }
+
+    /**
+     * The message's parts with its groups flattened into them: this protocol has no layer holding one
+     * part inside another, so a group goes out as the parts it holds, in their place. The group is
+     * shape, and the shape this protocol has not got leaves no node for the fields it carried.
+     */
+    private static List<ContentPart> flatten(List<ContentPart> parts) {
+        List<ContentPart> flat = new ArrayList<>();
+        for (ContentPart part : parts) {
+            if (part instanceof ListPart group) {
+                flat.addAll(flatten(group.getSubParts()));
+            } else {
+                flat.add(part);
+            }
+        }
+        return flat;
     }
 
     /**

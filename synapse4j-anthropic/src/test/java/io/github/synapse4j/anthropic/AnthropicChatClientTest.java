@@ -32,6 +32,7 @@ import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.ListPart;
 import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.RawPart;
@@ -1379,6 +1380,28 @@ class AnthropicChatClientTest {
 
     private static void assertNoNullValues(Map<String, Object> map) {
         map.forEach((key, value) -> assertNotNull(value, "wire field '" + key + "' was serialized as null"));
+    }
+
+    @Test
+    void groupFlattensIntoContent() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.builder()
+                .role(ChatRole.USER.value())
+                .part(new TextPart("Hello"))
+                .part(new ListPart(List.of(new TextPart(", world")),
+                        new ProviderExtras().put("id", "msg_1")))
+                .build());
+
+        client.chat(request);
+
+        // This protocol has no layer holding one part inside another, so a group goes out as the
+        // parts it holds — here the two text pieces join into one string — and the fields the group
+        // carried, an identity kept from another protocol, have no node here and do not travel.
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) parseCaptured().get("messages");
+        assertEquals("Hello, world", messages.get(0).get("content"));
     }
 
     /** The content of the one message the wire carries, as the tests that send one message read it. */

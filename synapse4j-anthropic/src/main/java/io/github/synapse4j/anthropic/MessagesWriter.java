@@ -15,6 +15,7 @@ import io.github.synapse4j.data.ChatRequest;
 import io.github.synapse4j.data.ChatResponseFormat;
 import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ContentPart;
+import io.github.synapse4j.data.ListPart;
 import io.github.synapse4j.data.MediaPart;
 import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.RawPart;
@@ -59,7 +60,8 @@ import lombok.RequiredArgsConstructor;
  * have a block shape this protocol spells. A tool result answers inside a {@code user} message —
  * the protocol has no tool role — and its parts stay blocks, so a result that carries extras keeps
  * them. The model's reasoning is replayed as the {@code thinking} block it arrived as, signature
- * included, because the endpoint refuses a continuation whose thinking was lost or rewritten.
+ * included, because the endpoint refuses a continuation whose thinking was lost or rewritten. A
+ * group of parts has no block of its own here, so it goes out as the parts it holds.
  *
  * <p>
  * What the protocol cannot express fails here rather than reaching the provider half expressed: a
@@ -183,7 +185,7 @@ class MessagesWriter {
         }
         List<TextPart> textParts = new ArrayList<>();
         boolean arrayForm = false;
-        for (ContentPart part : system.getParts()) {
+        for (ContentPart part : flatten(system.getParts())) {
             if (!(part instanceof TextPart textPart)) {
                 throw new SynapseException(
                         "unsupported part type for Anthropic Messages: " + part.getClass().getSimpleName());
@@ -227,7 +229,7 @@ class MessagesWriter {
     private Map<String, Object> message(ChatMessage message) {
         Map<String, Object> entry = new LinkedHashMap<>();
         putIfSet(entry, "role", wireRole(message.getRole()));
-        Object content = content(message);
+        Object content = content(flatten(message.getParts()));
         // The content carries extras of its own, so the message's extras' reach ends here: it goes in
         // after the merge, unless the message names it whole.
         ProviderExtras messageExtras = message.getExtras();
@@ -244,12 +246,12 @@ class MessagesWriter {
      * The message's content as this protocol spells it — the array of blocks, or the string the text
      * parts join into — or {@code null} when it carries none.
      */
-    private @Nullable Object content(ChatMessage message) {
-        if (arrayContent(message)) {
-            return blocks(message.getParts());
+    private @Nullable Object content(List<ContentPart> parts) {
+        if (arrayContent(parts)) {
+            return blocks(parts);
         }
         StringBuilder text = new StringBuilder();
-        for (ContentPart part : message.getParts()) {
+        for (ContentPart part : parts) {
             String value = ((TextPart) part).getText();
             if (value != null) {
                 text.append(value);
@@ -278,10 +280,27 @@ class MessagesWriter {
      * shape a string cannot hold. A field this module does not model forces it too — a string
      * content cannot carry extras.
      */
-    private static boolean arrayContent(ChatMessage message) {
-        return message.getParts().stream()
+    private static boolean arrayContent(List<ContentPart> parts) {
+        return parts.stream()
                 .anyMatch(part -> !(part instanceof TextPart)
                         || (part.getExtras() != null && !part.getExtras().isEmpty()));
+    }
+
+    /**
+     * The message's parts with its groups flattened into them: this protocol has no layer holding one
+     * part inside another, so a group goes out as the parts it holds, in their place. The group is
+     * shape, and the shape this protocol has not got leaves no node for the fields it carried.
+     */
+    private static List<ContentPart> flatten(List<ContentPart> parts) {
+        List<ContentPart> flat = new ArrayList<>();
+        for (ContentPart part : parts) {
+            if (part instanceof ListPart group) {
+                flat.addAll(flatten(group.getSubParts()));
+            } else {
+                flat.add(part);
+            }
+        }
+        return flat;
     }
 
     /** One message's parts as the content blocks they become, in the order they were added. */
@@ -435,11 +454,12 @@ class MessagesWriter {
 
     /** What a tool answered: the text itself when the result is plain text, its blocks otherwise. */
     private static Object resultContent(List<ContentPart> parts) {
-        boolean plainText = parts.stream().allMatch(part -> part instanceof TextPart textPart
+        List<ContentPart> flat = flatten(parts);
+        boolean plainText = flat.stream().allMatch(part -> part instanceof TextPart textPart
                 && (textPart.getExtras() == null || textPart.getExtras().isEmpty()));
         if (plainText) {
             StringBuilder text = new StringBuilder();
-            for (ContentPart part : parts) {
+            for (ContentPart part : flat) {
                 String value = ((TextPart) part).getText();
                 if (value != null) {
                     text.append(value);
@@ -448,7 +468,7 @@ class MessagesWriter {
             return text.toString();
         }
         List<Map<String, Object>> blocks = new ArrayList<>();
-        for (ContentPart part : parts) {
+        for (ContentPart part : flat) {
             if (part instanceof TextPart textPart) {
                 Map<String, Object> block = textBlock(textPart);
                 if (block != null) {
