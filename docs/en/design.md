@@ -82,6 +82,13 @@ generator cannot enumerate — an interface, a type your own code settles — is
 of those would say a type that takes properties admits none. Where a schema has to be exact, compose it
 with the generator itself: [Customizing](customizing.md#the-generated-schema) shows how.
 
+Which shapes a schema is generated for is a deliberate, bounded set: the type itself, the annotations
+the generator reads, and the settings it names. It does not chase every annotation or mapper setting
+the library behind it offers — each one taken on is another thing the schema has to keep matching, and
+a schema that is honestly incomplete beats one that is subtly wrong. A type outside that set is yours
+to describe: supply the schema, and the serialization behind it where the JSON is what your code
+settles, as [Customizing](customizing.md#the-generated-schema) shows.
+
 That aim runs in a direction. The schema you hand to whoever produces JSON — the arguments of a
 tool the model calls, the shape of a structured answer — is the decode schema: what the codec is
 willing to read. The schema describing what this library produced — a model told what a call returns

@@ -134,6 +134,11 @@ one would block extension by users and providers.
 - No agent orchestration or workflow engine.
 - No conversation memory (the kind of abstraction LangChain4j's `AiService` represents).
 - No binding to a particular JSON library, HTTP client or LLM provider.
+- No attempt to describe in a schema every annotation or mapper setting a JSON library offers: a
+  schema covers the shapes the implementation models — the type itself, plus the annotations and
+  settings that implementation names — and stops there. A shape outside that is the application's to
+  describe by composing the generator; leaving it out is a boundary by design, not a defect to
+  report.
 
 ## Code conventions
 
@@ -258,8 +263,7 @@ behavior, or say in the test's name why it stands.
 ## Documentation
 
 - User-facing docs live under `docs/`, one mirrored tree per language — `docs/en/` and
-  `docs/zh-CN/` today, more as they come. English is the source of truth; a translated tree may
-  lag behind it.
+  `docs/zh-CN/` today, more as they come.
 - Every doc opens with a language switcher line linking to its counterparts in the other trees.
   `README.md` and `README.zh-CN.md` are the front doors and link into the trees.
 - Plain Markdown, rendered by GitHub. Diagrams use Mermaid. Do not add a site generator.

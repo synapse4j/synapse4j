@@ -32,9 +32,12 @@ import org.jspecify.annotations.Nullable;
  * <p>
  * Generating a schema is best-effort, because a type is not the whole story: a serializer or
  * deserializer registered for it, an annotation the implementation does not read, a feature of the
- * library it does not model — any of these can settle the JSON where the type does not. So an
- * implementation describes the types it can and no more, and a type it cannot describe faithfully is
- * the application's to describe: the application supplies that type's schema, and the serialization
+ * library it does not model — any of these can settle the JSON where the type does not. Which shapes
+ * an implementation describes is therefore a set it settles and names — the type itself, plus the
+ * annotations and settings it reads — not every one the library behind it offers: each one taken on
+ * is a promise the schema has to keep matching, so the set grows deliberately. An implementation
+ * describes the types it can and no more, and a type it cannot describe faithfully is the
+ * application's to describe: the application supplies that type's schema, and the serialization
  * behind it when the JSON is what the application settled. This interface cannot say how — the way to
  * hand an implementation a schema of your own is the implementation's to define, and is stated where
  * the implementation is.

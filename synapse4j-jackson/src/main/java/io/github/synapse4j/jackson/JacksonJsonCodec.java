@@ -38,10 +38,13 @@ import tools.jackson.databind.node.ObjectNode;
  * {@link #JacksonJsonCodec(JsonMapper.Builder, SchemaGenerator, SchemaGenerator)}.
  *
  * <p>
- * A type the generator cannot describe faithfully — its JSON settled by a serializer or deserializer,
- * its shape decided by an annotation the generator does not read — is the application's to describe,
- * and Jackson is where both halves are supplied: a serializer and deserializer on the mapper, so the
- * JSON the schema must match is the JSON the mapper moves; and a victools
+ * Beyond the mapper's answers and the annotations the generator's Jackson module reads — with
+ * {@link JacksonSchemaSettings} settling the rest — this codec deliberately does not reach: a further
+ * annotation or mapper setting taken on is one more thing the schema has to keep matching. A type the
+ * generator cannot describe faithfully — its JSON settled by a serializer or deserializer, its shape
+ * decided by an annotation the generator does not read — is the application's to describe, and
+ * Jackson is where both halves are supplied: a serializer and deserializer on the mapper, so the JSON
+ * the schema must match is the JSON the mapper moves; and a victools
  * {@link com.github.victools.jsonschema.generator.Module} of the caller's own, registering a custom
  * definition provider for that type, so its schema is the caller's rather than a guess. The module
  * goes on a builder from {@link JacksonSchemaConfigBuilders}, the serializers on the mapper's builder,
