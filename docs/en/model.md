@@ -48,7 +48,10 @@ The content of a message is a list of parts, each one of:
 - `ToolResultPart` — the answer to a tool call: the call id, the tool name, one or more parts, and
   whether the call failed;
 - `MediaPart` — a media payload, its kind named by a media type string such as `image/png`, carried
-  with a URI or a stream of bytes and an optional file name.
+  with a URI or a stream of bytes and an optional file name;
+- `ListPart` — a group of other parts, in order; a protocol that carries a container of its own uses
+  one for a message's content, and a protocol with no such layer sends the parts it holds in its
+  place.
 
 `ContentPart` is not final: a provider or an application adds a kind the library does not model by
 subclassing it. A kind a provider sends and this library has no class for — a server tool's call, a

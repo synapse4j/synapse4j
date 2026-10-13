@@ -190,7 +190,9 @@ public interface JsonSchema {
      *
      * <p>
      * Each schema is answered once per path that reaches it; the sub-schemas of a schema are answered
-     * after it, depth first.
+     * after it, depth first. The answer is a stream consumed once, and the first level is eager: this
+     * node's direct sub-schemas are gathered before the first element is answered, so pulling even one
+     * element has read this node's own keywords.
      *
      * @return the schemas reached, in walk order; never {@code null}
      */

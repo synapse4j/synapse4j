@@ -69,7 +69,7 @@ public class EncodeRequiredPropertiesModule implements Module {
         if (own != null && own.value() != JsonInclude.Include.USE_DEFAULTS) {
             return own.value();
         }
-        JsonInclude onType = SchemaTargets.of(member).getAnnotation(JsonInclude.class);
+        JsonInclude onType = SchemaTargets.classAnnotation(SchemaTargets.of(member), JsonInclude.class);
         if (onType != null && onType.value() != JsonInclude.Include.USE_DEFAULTS) {
             return onType.value();
         }

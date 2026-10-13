@@ -177,7 +177,7 @@ class CompletionsWriter {
 
     private Map<String, Object> message(ChatMessage message, List<ContentPart> parts) {
         Map<String, Object> entry = new LinkedHashMap<>();
-        entry.put("role", message.getRole());
+        putIfSet(entry, "role", message.getRole());
         List<Map<String, Object>> toolCalls = new ArrayList<>();
         Object content = content(parts, toolCalls);
         writeReasoning(parts, entry);
@@ -206,7 +206,10 @@ class CompletionsWriter {
             StringBuilder text = new StringBuilder();
             for (ContentPart part : parts) {
                 if (part instanceof TextPart textPart) {
-                    text.append(textPart.getText());
+                    // A part with no text says nothing; appending it would spell the member "null".
+                    if (textPart.getText() != null) {
+                        text.append(textPart.getText());
+                    }
                 } else if (!(part instanceof ReasoningPart)) {
                     throw unsupportedPart(part);
                 }
@@ -505,7 +508,10 @@ class CompletionsWriter {
                 throw new SynapseException(
                         "unsupported part for OpenAI: a tool result's content is a string, which cannot carry extras");
             }
-            text.append(textPart.getText());
+            // A part with no text says nothing; appending it would spell the content "null".
+            if (textPart.getText() != null) {
+                text.append(textPart.getText());
+            }
         }
         return text.toString();
     }

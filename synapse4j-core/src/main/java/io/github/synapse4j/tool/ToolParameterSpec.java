@@ -12,12 +12,9 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One declared parameter of a tool method, read: the Java side it was read from, and the values its
- * annotations wrote.
- *
- * <p>
- * A customizer sees and changes this the way it does {@link ToolMethodSpec}; see there for what that
- * means.
+ * One declared parameter of a tool method while its declaration is being settled: the Java parameter
+ * it was read from, and the strings a step has written so far. Every value lives here as a string, so
+ * a blank one says nobody supplied it.
  */
 @Getter
 @Setter
@@ -54,17 +51,16 @@ public class ToolParameterSpec {
 
     /**
      * Where this argument's value comes from when the model does not produce it; {@code null} when
-     * nothing supplies one. Written by a {@link ToolMethodSpecCustomizer}, which is how an application
-     * fills an argument that is not the model's to answer — a principal, a locale, a bean.
+     * nothing supplies one. A step writes it to fill an argument that is not the model's to answer — a
+     * principal, a locale, a bean.
      */
     private @Nullable ToolParameterValueProvider valueProvider;
 
     /**
      * The schema of this one property as the declaration carries it: {@code null} while nothing has
-     * settled it, and for a parameter that never reaches the model.
-     * {@link FinalToolMethodSpecCustomizer} settles it out of {@link #schema}, and it is how the
-     * arguments schema is put together. A customizer holding a {@link JsonSchema} in hand writes this
-     * one directly, skipping the round trip through text.
+     * settled it, and for a parameter the model does not produce. It is filled from {@link #schema},
+     * or written directly by a step holding a {@link JsonSchema} in hand, so a schema already in hand
+     * skips the round trip through text.
      */
     private @Nullable JsonSchema resolvedSchema;
 

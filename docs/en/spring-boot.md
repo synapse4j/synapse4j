@@ -138,8 +138,8 @@ SpEL and `${...}` placeholders in the annotation text, including values written 
 `strict` is the one attribute an application sets once for every tool: the value a tool falls to
 when neither its annotation nor its entry under `methods` states one. `methods` holds per-tool
 overrides keyed by the name the tool carries before configuration applies — the name its annotation
-gave it, or, when the annotation named none, the method's own name with the class's prefix in front.
-A name written in an entry does not move the entry it came from.
+gave it, or, when the annotation named none, the method's own name, with the class's prefix in front
+either way. A name written in an entry does not move the entry it came from.
 
 The starter's own steps are ordered beans; declare a `ToolMethodSpecCustomizer` of your own,
 `@Order`ed, to slot in among them.

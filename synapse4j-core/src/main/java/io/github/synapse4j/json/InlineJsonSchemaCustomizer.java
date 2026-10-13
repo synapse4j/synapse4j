@@ -4,6 +4,7 @@ import static io.github.synapse4j.json.JsonSchemaKeywords.*;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.IdentityHashMap;
@@ -39,9 +40,10 @@ import org.jspecify.annotations.Nullable;
  * reference still names, so a definition that was fully inlined is dropped.
  *
  * <p>
- * The schema handed in is untouched: an object-form schema is answered as a new one, whether or not a
- * reference was found, and a boolean one — which carries no keyword a copy could change — is answered
- * as it stands.
+ * The schema handed in is untouched: an object-form schema is answered as a new one, and a boolean one
+ * — which carries no keyword a copy could change — is answered as it stands. A node a boolean
+ * definition emptied is the one exception: with nothing left of its own, it is answered as that
+ * boolean, the shared instance included.
  */
 public class InlineJsonSchemaCustomizer implements JsonSchemaCustomizer {
 
@@ -118,14 +120,14 @@ public class InlineJsonSchemaCustomizer implements JsonSchemaCustomizer {
         }
     }
 
-    /** Inlines a keyword's value: a sub-schema, or the sub-schemas in a list or a map of them. */
+    /** Inlines a keyword's value: a sub-schema, or the sub-schemas in a collection or a map of them. */
     private static @Nullable Object inlineValue(@Nullable Object value, JsonSchema root, Set<JsonSchema> path) {
         if (value instanceof JsonSchema schema) {
             return inlineSchema(schema, root, path);
         }
-        if (value instanceof List<?> list) {
-            List<Object> inlined = new ArrayList<>(list.size());
-            for (Object element : list) {
+        if (value instanceof Collection<?> collection) {
+            List<Object> inlined = new ArrayList<>(collection.size());
+            for (Object element : collection) {
                 inlined.add(inlineValue(element, root, path));
             }
             return inlined;

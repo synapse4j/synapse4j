@@ -237,8 +237,8 @@ public class ApacheHttpClient implements HttpClient {
     /**
      * Bytes a body already holds, handed over without a copy where the entity can take them: a
      * buffer with a backing array goes out as the range it wraps, and anything else — a direct
-     * buffer, a read-only view — is copied into an array, the one copy this path makes. The
-     * buffer's position is never advanced, so a second write starts from the first byte again.
+     * buffer, a read-only view — is copied into an array, the one copy this path makes. Either way
+     * the entity is repeatable, so a retry or a redirect re-sends the same bytes.
      */
     private static HttpEntity readyBytes(ByteBuffer buffer) {
         if (buffer.hasArray()) {

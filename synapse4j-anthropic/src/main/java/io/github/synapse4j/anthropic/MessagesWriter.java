@@ -35,9 +35,9 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Writes the shared chat model as the Messages wire document. Stateless; one instance writes one
- * exchange, and it holds only what every document is written with — the application's codec, for
- * embedding schema strings and tool inputs as parsed JSON. The document being written stays an
- * argument of each call: it is the thing that varies.
+ * exchange, and it holds only what every document is written with — the application's codec, which
+ * reads a replayed tool call's arguments into the object the protocol nests them as. The document
+ * being written stays an argument of each call: it is the thing that varies.
  *
  * <p>
  * A request is assembled as the object it goes out as — one map per node, the members this module

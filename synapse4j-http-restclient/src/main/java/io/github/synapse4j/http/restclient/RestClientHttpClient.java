@@ -303,12 +303,8 @@ public class RestClientHttpClient implements HttpClient {
             // The sink is the transport's; HttpBody never closes what it is handed.
             try {
                 body.writeTo(out);
-            } catch (Exception failure) {
-                // Spring's body bridge reports every Exception from the writer to the transport, so
-                // an Exception reaches the caller as the transport's failure, unwrapped here.
-                throw failure;
             } catch (Error failure) {
-                // The same bridge catches only Exception: an Error thrown here would kill its
+                // Spring's body bridge catches only Exception: an Error thrown here would kill its
                 // writer thread without a terminal signal and leave the request waiting for a
                 // response that never comes. Hand it over as an I/O failure instead — what matters
                 // is that the call ends and the caller can see the failure.

@@ -22,7 +22,7 @@ import lombok.NonNull;
  * One method becomes one tool. The signature gives the structure; the annotations write the strings
  * they carry; the customizers this reader holds rewrite what they like afterwards, which is where a
  * name or a description from configuration enters. Nothing is filled in before them — a blank stays
- * blank, so a customizer can tell a value somebody wrote from one nobody did — and what is still
+ * blank, so what somebody wrote stays distinguishable from what nobody did — and what is still
  * blank when they are done is filled afterwards: a method that names no tool is known by its own
  * name, a parameter by the Java parameter it was declared as.
  *

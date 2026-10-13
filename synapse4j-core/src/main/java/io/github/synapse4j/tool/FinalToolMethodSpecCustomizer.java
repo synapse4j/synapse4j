@@ -56,8 +56,8 @@ public class FinalToolMethodSpecCustomizer implements ToolMethodSpecCustomizer {
     /**
      * Settles one parameter's answers, writing each into the entry it belongs to: the name after the
      * Java parameter, whether the model produces it, the schema of its property, and whether the model
-     * has to produce it — the last read off the schema just settled, so an argument's own schema is
-     * derived once.
+     * has to produce it — the last judged by the codec over a probe of the parameter's type rather than
+     * taken from the settled schema.
      *
      * <p>
      * A parameter the model does not produce settles only the first two: it has no property in the

@@ -48,9 +48,9 @@ public class ChatOptionsProperties {
     private @Nullable String toolChoiceName;
 
     /**
-     * The shape the answer should take. A mirror of {@link ChatResponseFormat}: the library type's
-     * schema is a {@link JsonSchema}, which no configuration source can spell, so it is bound as the
-     * JSON text it is and read into a schema when the options are built.
+     * The shape the answer should take. A mirror of ChatResponseFormat: the library type's schema is
+     * a JsonSchema, which no configuration source can spell, so it is bound as the JSON text it is and
+     * read into a schema when the options are built.
      */
     private final ResponseFormatProperties responseFormat = new ResponseFormatProperties();
 

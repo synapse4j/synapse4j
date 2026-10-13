@@ -8,10 +8,11 @@ import io.github.synapse4j.json.JsonSource;
 import tools.jackson.databind.module.SimpleModule;
 
 /**
- * A Jackson module that carries the values this library reads and writes through a {@code JsonMapper} as
- * the JSON each stands for rather than as the shape of its class, so a value that sits inside something
- * the mapper binds is read and written like any other member — anywhere in the object graph, a field of a
- * record included.
+ * A Jackson module that carries this library's own values through a {@code JsonMapper} as the JSON each
+ * stands for rather than as the shape of its class, so a value that sits inside something the mapper
+ * binds is written like any other member — anywhere in the object graph, a field of a record included.
+ * {@link JsonSchema} is read back the same way; the other values are written only, never bound from
+ * JSON.
  *
  * <p>
  * Add it to the mapper before the codec is built: a mapper is immutable once built, so the module cannot

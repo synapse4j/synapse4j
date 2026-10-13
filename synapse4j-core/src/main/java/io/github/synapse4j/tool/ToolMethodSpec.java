@@ -17,19 +17,16 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One method on its way to becoming a tool: the Java side it was read from, and the values its
- * annotations wrote.
+ * A method's declaration while it is being settled: the Java side it was read from, and the strings a
+ * step has written so far. Every value lives here as a string, so a blank one says nobody supplied it
+ * — the state a step has to tell from a value somebody wrote.
  *
  * <p>
- * It reads no signature and fills no default: {@link MethodTools} builds one and decides what goes
- * into it, and a {@link ToolMethodSpecCustomizer} rewrites the strings. Nothing is filled in along the
- * way, so a blank string is one nobody supplied — which is what a customizer needs to tell from a value
- * somebody wrote.
- *
- * <p>
- * The Java side is what the reader settled and does not change afterwards; the strings are written and
- * rewritten — the annotations write them, the customizers rewrite them, and the reader applies
- * whatever defaults are left over.
+ * The Java side is fixed once the spec is made: the class it belongs to, the method, the instance it
+ * runs on, and one entry per declared parameter in signature order. The strings are written and
+ * rewritten as the declaration takes shape, so a step may leave what it finds and fill only what is
+ * blank. {@link #definition()} answers the declaration the spec has come to, refusing one that cannot
+ * be built.
  */
 @Getter
 @Setter
@@ -38,11 +35,10 @@ import lombok.ToString;
 public class ToolMethodSpec {
 
     /**
-     * The class the reader was asked about, which is what this tool belongs to. Not always the one
-     * that declares the method — a reader reads what a class inherits — and not the instance's own
-     * class either, which is why the reader is handed the two apart: a bean the container wrapped in a
-     * proxy still yields the tools of the class it stands for. A resolution built without one carries
-     * the class the method is declared in.
+     * The class this tool belongs to. Not always the one that declares the method — a tool may come
+     * from a class that only inherits it — and not the instance's own class either, so a bean the
+     * container wrapped in a proxy still belongs to the class it stands for. A spec built from a
+     * method alone carries the class that method is declared in.
      */
     @NonNull
     private final Class<?> owner;
@@ -66,7 +62,7 @@ public class ToolMethodSpec {
     @NonNull
     private String type = "";
 
-    /** One entry per declared parameter, in signature order; whatever the reader found. */
+    /** One entry per declared parameter, in signature order; never {@code null}. */
     @NonNull
     private final List<ToolParameterSpec> parameters;
 
@@ -79,17 +75,16 @@ public class ToolMethodSpec {
     private String strict = "";
 
     /**
-     * Provider-specific fields of the declaration. Nothing writes one from an annotation — a
-     * {@link ToolMethodSpecCustomizer} does, out of whatever configuration it reads — so this is a
-     * value rather than text, and {@code null} means none.
+     * Provider-specific fields of the declaration. Nothing writes one from an annotation — a step
+     * does, out of whatever configuration it reads — so this is a value rather than text, and
+     * {@code null} means none.
      */
     private @Nullable ProviderExtras extras;
 
     /**
      * The declaration's input schema as it stands: {@code null} while nothing has settled it, and
-     * everything the model is shown of this tool's arguments in one value.
-     * {@link FinalToolMethodSpecCustomizer} settles it, and {@link MethodTool} reads it through
-     * {@link #definition()}.
+     * everything the model is shown of this tool's arguments in one value. {@link #definition()}
+     * refuses a spec that still carries none.
      */
     private @Nullable JsonSchema resolvedSchema;
 
@@ -121,7 +116,7 @@ public class ToolMethodSpec {
      * model does not produce with nothing to fill it.
      *
      * <p>
-     * Only the strings can be wrong, since the Java side is what the reader settled, and a blank
+     * Only the strings can be wrong, since the Java side is fixed once the spec is made, and a blank
      * description or type is an ordinary resolution rather than a failure.
      *
      * @throws SynapseException if the resolution cannot become a declaration

@@ -1,5 +1,14 @@
 package io.github.synapse4j.jackson;
 
+import java.lang.annotation.Annotation;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.jspecify.annotations.Nullable;
+
 import com.github.victools.jsonschema.generator.MemberScope;
 
 /**
@@ -25,6 +34,40 @@ final class SchemaTargets {
      */
     static Class<?> of(MemberScope<?, ?> member) {
         return member.getDeclarationDetails().getSchemaTargetType().getErasedType();
+    }
+
+    /**
+     * The given annotation as Jackson resolves it on a class: the type's own declaration when it carries
+     * one, otherwise the first type up its hierarchy that does. {@code Class.getAnnotation} reads only
+     * the type's own declaration, which is why the chain is walked here — an annotation such as
+     * {@code @JsonInclude} that the language does not inherit is still a class-level answer Jackson
+     * takes from a parent.
+     *
+     * @param <A>            the annotation type
+     * @param type           the type to read the annotation on; never {@code null}
+     * @param annotationType the annotation to read; never {@code null}
+     * @return the annotation, or {@code null} when no type up the chain carries it
+     */
+    static <A extends Annotation> @Nullable A classAnnotation(Class<?> type, Class<A> annotationType) {
+        Deque<Class<?>> pending = new ArrayDeque<>();
+        Set<Class<?>> seen = new HashSet<>();
+        pending.add(type);
+        while (!pending.isEmpty()) {
+            Class<?> current = pending.removeFirst();
+            if (!seen.add(current)) {
+                continue;
+            }
+            A annotation = current.getAnnotation(annotationType);
+            if (annotation != null) {
+                return annotation;
+            }
+            Class<?> superclass = current.getSuperclass();
+            if (superclass != null) {
+                pending.addLast(superclass);
+            }
+            Collections.addAll(pending, current.getInterfaces());
+        }
+        return null;
     }
 
 }

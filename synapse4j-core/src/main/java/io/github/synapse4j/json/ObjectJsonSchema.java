@@ -34,7 +34,7 @@ import lombok.NonNull;
  *
  * <p>
  * The document shape — the maps, lists and scalars a JSON document is made of — is not this class's
- * business: a {@link JsonCodec} reads one into a schema and writes one back.
+ * business: a node is made of schema values.
  *
  * <p>
  * This class is final: {@link #map(UnaryOperator)} answers a rewritten node with a new

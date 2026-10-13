@@ -22,11 +22,10 @@ import lombok.NonNull;
  * class holding the one act in the middle, the invoke.
  *
  * <p>
- * There is nothing to decide here. {@link MethodTools} reads a method into a {@link ToolMethodSpec}, the
- * customizers rewrite it, {@link FinalToolMethodSpecCustomizer} fills what is left blank, and this class
- * takes the result as it stands: the declaration it carries, and, per parameter, whether the model
- * produces the value or the parameter's own {@link ToolParameterValueProvider} does. A resolution still
- * carrying blanks is refused rather than quietly completed.
+ * A tool is built from a {@link ToolMethodSpec} that is already settled: the declaration the spec
+ * carries is what the model sees, and, per parameter, the spec says whether the model produces the
+ * value or the parameter's own {@link ToolParameterValueProvider} does. A spec still carrying blanks
+ * is refused at construction rather than quietly completed.
  *
  * <p>
  * Every field is final and set in the constructor, and the resolution is never written to — so an
@@ -51,15 +50,13 @@ public class MethodTool implements StagedTool {
     private final ToolDefinition definition;
 
     /**
-     * Builds this tool from a settled resolution: the declaration is the one the spec carries, and
-     * every call binds the arguments the model produces and takes the rest from the parameter's own
+     * Builds this tool from a settled spec: the declaration is the one the spec carries, and every
+     * call binds the arguments the model produces and takes the rest from the parameter's own
      * {@link ToolParameterValueProvider}.
      *
      * <p>
-     * There is nothing to settle here. The spec is the conclusion — {@link MethodTools} reads a method
-     * into one, the customizers rewrite it, {@link FinalToolMethodSpecCustomizer} fills what is left
-     * blank, and what arrives is finished. A spec that still has blanks in it is one this constructor
-     * refuses, rather than one it quietly completes.
+     * The spec has to be finished — it names the tool, names every parameter, and carries an input
+     * schema — and one still carrying blanks is refused here rather than quietly completed.
      *
      * @param spec  the resolution of the method this tool is built from; never {@code null}, and it has
      *                  to name the tool, name every one of its parameters, and carry an input schema
@@ -96,8 +93,7 @@ public class MethodTool implements StagedTool {
 
     /**
      * The value of a parameter the model does not produce: what the parameter's own
-     * {@link ToolParameterValueProvider} answers. The built-in one is settled by
-     * {@link FinalToolMethodSpecCustomizer}, which is also where an application's own arrives from.
+     * {@link ToolParameterValueProvider} answers.
      *
      * @param entry   the parameter to fill; never {@code null}
      * @param context the conversation this call belongs to; {@code null} when none was attached

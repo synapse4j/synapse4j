@@ -3,7 +3,7 @@
 [English](../en/structured-output.md) | **中文**
 
 你可以让模型以 JSON 作答，也可以让它以符合某个 schema 的 JSON 作答。schema 由你的编解码器生成，因此
-模型只能产出你的编解码器恰好能读回的 JSON。
+模型被引向你的编解码器能读回的内容——这是目标，而不是保证，两者仍可能不一致之处见[设计与取舍](design.md)。
 
 ## 生成 schema
 
@@ -47,7 +47,7 @@ options.setResponseFormat(format);
 会发出的 schema 成立：`TYPE_JSON` 下没有 schema 可强制，`strict` 根本不会发出。
 
 schema 是一个 `JsonSchema` 值，因此这里没有任何东西绑定 JSON 库：它由你选的编解码器生成，
-模型必须产出与该编解码器读回相同的形状。
+模型必须产出它描述的那个形状。
 
 ## 把答案读回来
 

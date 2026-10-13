@@ -81,13 +81,11 @@ public class Synapse4jProperties {
     private HttpClientType httpClient = HttpClientType.RESTCLIENT;
 
     /**
-     * The transport's fallback options, for what a call does not state itself.
-     *
-     * <p>
-     * {@code synapse4j.http-options.response-timeout} binds like any other {@link HttpOptions}
-     * member, but the {@code RestClient} transport has no per-request timeout to honour it: it
-     * reports the setting once and carries on, and the timeout that works is the request factory's —
-     * {@code spring.http.client.read-timeout}.
+     * The transport's fallback options, for what a call does not state itself. The
+     * synapse4j.http-options.response-timeout key binds like any other member of the library's
+     * HttpOptions, but the RestClient transport has no per-request timeout to honour it: it reports
+     * the setting once and carries on, and the timeout that works is the request factory's —
+     * spring.http.client.read-timeout.
      */
     @NestedConfigurationProperty
     private final HttpOptions httpOptions = new HttpOptions();

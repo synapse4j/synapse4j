@@ -11,10 +11,10 @@ import java.lang.annotation.Target;
  * means, and whether the model has to produce it.
  *
  * <p>
- * Every attribute is a {@code String} defaulting to {@code ""}, for the reason {@link ToolMethod} gives:
- * the text is resolved — an annotation default, an application's configuration, a dynamic expression —
- * and what it resolves to is what configures the argument; text that resolves to blank falls to the
- * attribute's own rule, stated where it is declared.
+ * Every attribute is a {@code String} defaulting to {@code ""}, and that is the configuration seam,
+ * not an accident. The text is resolved — an annotation default, an application's configuration, a
+ * dynamic expression — and what it resolves to is what configures the argument; text that resolves to
+ * blank falls to the attribute's own rule, stated where it is declared.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.PARAMETER)

@@ -25,10 +25,9 @@ import lombok.NonNull;
  * in {@link AbstractHttpChatClient}; what this class settles is the Anthropic side of it.
  *
  * <p>
- * The request is written straight into the codec's {@link JsonWriter} and the response is walked
- * token by token through its {@link JsonReader}: neither direction builds the document as a
- * structure first, and a member whose value is not set is never emitted. A field this module does
- * not model is kept in the extras of the node it came from rather than dropped.
+ * The answer is read token by token through the codec's {@link JsonReader} rather than built as a
+ * structure first, and a field this module does not model is kept in the extras of the node it came
+ * from rather than dropped.
  *
  * <p>
  * A streamed answer is the same exchange with a different response body: the request asks for it

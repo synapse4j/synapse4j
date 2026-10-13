@@ -63,8 +63,8 @@ import io.github.synapse4j.http.HttpResponse;
  * Socket-level configuration — connect timeout, executor, SSL context, proxy — lives on the JDK client
  * and is reachable through {@link #JdkHttpClient(java.net.http.HttpClient, HttpOptions)}; there is
  * deliberately no per-request equivalent, because such timers are implementation-global, never
- * per-request. This class holds its own {@link HttpOptions} and nothing else, and is safe to share
- * across threads.
+ * per-request. This class holds its delegate and its own {@link HttpOptions} and nothing else, and is
+ * safe to share across threads.
  */
 public class JdkHttpClient implements HttpClient {
 

@@ -29,9 +29,11 @@ import io.github.synapse4j.exception.SynapseIOException;
  * is consumed once: the frames are not buffered, so there is nothing to iterate again.
  *
  * <p>
- * A failure of the source is a {@link SynapseIOException} whose cause is the original
- * {@link IOException}. An implementation may cap how much one frame may accumulate; crossing that
- * cap fails the read, and never truncates, since half a frame is worse than none.
+ * A failure of the source is a {@link SynapseIOException}: the source's own {@link IOException} is
+ * carried as its cause, and a read this layer refuses itself — a source that answers no bytes at all,
+ * which a blocking stream never does — carries none. An implementation may cap how much one frame may
+ * accumulate; crossing that cap fails the read, and never truncates, since half a frame is worse than
+ * none.
  *
  * <p>
  * Applications receive implementations from the HTTP layer they chose. {@link DefaultSseEventStream}

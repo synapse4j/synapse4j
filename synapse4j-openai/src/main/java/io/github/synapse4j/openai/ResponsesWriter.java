@@ -188,11 +188,12 @@ class ResponsesWriter {
     /**
      * The system message's text as the one string this field takes. The field carries nothing
      * beside that text, so a part this protocol cannot spell there — or a field riding beside the
-     * text — fails here rather than reaching the provider half expressed.
+     * text — fails here rather than reaching the provider half expressed. A group of parts has no
+     * place of its own here either, so it goes out as the text it holds.
      */
     private static String instructions(ChatMessage system) {
         StringBuilder text = new StringBuilder();
-        for (ContentPart part : system.getParts()) {
+        for (ContentPart part : flatten(system.getParts())) {
             if (!(part instanceof TextPart textPart)) {
                 throw unsupportedPart(part);
             }
@@ -209,6 +210,22 @@ class ResponsesWriter {
                     + " instructions are a string, which cannot carry extras");
         }
         return text.toString();
+    }
+
+    /**
+     * The message's parts with its groups flattened into them: this field is one string, so a group has
+     * no node of its own and goes out as the text it holds.
+     */
+    private static List<ContentPart> flatten(List<ContentPart> parts) {
+        List<ContentPart> flat = new ArrayList<>();
+        for (ContentPart part : parts) {
+            if (part instanceof ListPart group) {
+                flat.addAll(flatten(group.getSubParts()));
+            } else {
+                flat.add(part);
+            }
+        }
+        return flat;
     }
 
     private Stream<Map<String, Object>> items(ChatMessage message) {
@@ -228,7 +245,7 @@ class ResponsesWriter {
             if (part instanceof ListPart item) {
                 // The part holds one item whole — its content entries and its own members — so it
                 // goes back out as that item, in the place it held.
-                return Stream.of(messageItem(item, message.getRole()));
+                return Stream.of(messageItem(item, message.getRole(), messageExtras));
             } else if (part instanceof RawPart raw) {
                 // A part kept whole at the top of a message is an item this module does not model:
                 // its members are the item, so they go out exactly as they were read.
@@ -257,7 +274,7 @@ class ResponsesWriter {
     private static Map<String, Object> messageItem(@Nullable String role, List<ContentPart> content,
             @Nullable ProviderExtras extras) {
         Map<String, Object> entry = new LinkedHashMap<>();
-        entry.put("role", role);
+        putIfSet(entry, "role", role);
         Object contentValue = contentValue(role, content);
         // The content carries extras of its own, so the extras' reach ends here: it goes in after the
         // merge, unless the extras name it whole.
@@ -313,18 +330,23 @@ class ResponsesWriter {
      * array form whatever it holds, because that is the form its entries were read from and the only
      * one that can carry an entry's type and the fields beside it.
      */
-    private static Map<String, Object> messageItem(ListPart part, @Nullable String role) {
+    private static Map<String, Object> messageItem(ListPart part, @Nullable String role,
+            @Nullable ProviderExtras messageExtras) {
         Map<String, Object> entry = new LinkedHashMap<>();
-        entry.put("role", role);
+        putIfSet(entry, "role", role);
         String textType = textType(role);
         List<Map<String, Object>> content = contentEntries(part.getSubParts(), textType);
-        // The content carries extras of its own, so the part's extras' reach ends here: it goes in
-        // after the merge, unless the extras name it whole.
+        // The content carries extras of its own, so the extras' reach ends here. The message's extras
+        // are merged first, the part's own after — the more specific node last; the content goes in
+        // after both, unless one of them names it whole.
+        if (messageExtras != null) {
+            messageExtras.mergeInto(entry);
+        }
         ProviderExtras extras = part.getExtras();
         if (extras != null) {
             extras.mergeInto(entry);
         }
-        if (!namesWhole(extras, "content")) {
+        if (!namesWhole(messageExtras, "content") && !namesWhole(extras, "content")) {
             entry.put("content", content);
         }
         return entry;

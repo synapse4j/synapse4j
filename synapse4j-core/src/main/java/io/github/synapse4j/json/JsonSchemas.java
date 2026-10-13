@@ -53,7 +53,8 @@ public final class JsonSchemas {
      * <p>
      * One draft-07 keyword is left out on purpose: {@code dependencies}. Its value is a schema or a list
      * of names, and each entry in its object form is too, so no one form describes it. It is carried as
-     * raw data instead — nothing is lost, but a sub-schema under it is not walked.
+     * raw data instead — nothing is lost, but a sub-schema under it is not read into a
+     * {@link JsonSchema}.
      */
     private static final Map<String, Set<Shape>> SCHEMA_KEYWORDS = Map.ofEntries(
             // still in the latest spec, 2020-12
