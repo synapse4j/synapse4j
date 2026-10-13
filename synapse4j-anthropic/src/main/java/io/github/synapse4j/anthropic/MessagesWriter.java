@@ -128,7 +128,7 @@ class MessagesWriter {
         ProviderExtras extras = options.getExtras();
         extras.mergeInto(document);
         ChatMessage system = request.getSystemMessage();
-        if (system != null && !extras.contains("system")) {
+        if (system != null && saysSomething(system) && !extras.contains("system")) {
             // The framing this protocol takes as a field of its own, outside the turn sequence and
             // resent with every call.
             document.put("system", system(system));
@@ -203,7 +203,17 @@ class MessagesWriter {
      */
     private Stream<Map<String, Object>> messages(ChatRequest request) {
         return Stream.concat(request.getHistoryMessages().stream(), request.getPendingMessages().stream())
+                .filter(MessagesWriter::saysSomething)
                 .map(this::message);
+    }
+
+    /**
+     * Whether a message contributes anything at all: a part that survives flattening, or a field of
+     * its own. One that does not is left out rather than sent as a bare turn with nothing in it.
+     */
+    private static boolean saysSomething(ChatMessage message) {
+        ProviderExtras extras = message.getExtras();
+        return !flatten(message.getParts()).isEmpty() || (extras != null && !extras.isEmpty());
     }
 
     private Map<String, Object> message(ChatMessage message) {

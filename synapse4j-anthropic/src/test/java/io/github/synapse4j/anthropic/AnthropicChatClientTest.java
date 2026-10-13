@@ -400,6 +400,35 @@ class AnthropicChatClientTest {
     }
 
     @Test
+    void emptyMessageContributesNoTurn() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value()));
+
+        client.chat(request);
+
+        // A message with nothing in it says nothing, so it is left out rather than sent as a bare
+        // turn with no content.
+        assertEquals(List.of(), parseCaptured().get("messages"));
+    }
+
+    @Test
+    void emptySystemMessageWritesNoFraming() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.setSystemMessage(ChatMessage.of(ChatRole.USER.value()));
+        request.addPendingMessage(ChatMessage.user("hi"));
+
+        client.chat(request);
+
+        // The framing is the system message's text, and a message carrying none has nothing to frame
+        // with: the field is left out rather than sent empty.
+        assertFalse(parseCaptured().containsKey("system"));
+    }
+
+    @Test
     void effortFormatShareOutputConfig() {
         stubCompletion();
 

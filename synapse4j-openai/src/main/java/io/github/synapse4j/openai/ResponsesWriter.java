@@ -148,7 +148,7 @@ class ResponsesWriter {
         ProviderExtras extras = request.getOptions().getExtras();
         extras.mergeInto(document);
         ChatMessage system = request.getSystemMessage();
-        if (system != null && !extras.contains("instructions")) {
+        if (system != null && saysSomething(system) && !extras.contains("instructions")) {
             // The framing this protocol takes as one string at the top, outside the turn sequence.
             document.put("instructions", instructions(system));
         }
@@ -657,6 +657,15 @@ class ResponsesWriter {
     /** Whether the extras, if any, name this member whole — the one case where the member's own value stands. */
     private static boolean namesWhole(@Nullable ProviderExtras extras, String member) {
         return extras != null && extras.contains(member);
+    }
+
+    /**
+     * Whether a message contributes anything at all: a part that survives flattening, or a field of
+     * its own. One that does not is left out rather than sent as framing with nothing in it.
+     */
+    private static boolean saysSomething(ChatMessage message) {
+        ProviderExtras extras = message.getExtras();
+        return !flatten(message.getParts()).isEmpty() || (extras != null && !extras.isEmpty());
     }
 
     private static SynapseException unsupportedPart(ContentPart part) {

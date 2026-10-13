@@ -426,6 +426,34 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
+    void emptyMessageContributesNoItem() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value()));
+
+        client.chat(request);
+
+        // A message with nothing in it says nothing, so it makes no item at all.
+        assertEquals(List.of(), inputOf(parseCaptured()));
+    }
+
+    @Test
+    void emptySystemMessageWritesNoInstructions() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.setSystemMessage(ChatMessage.of(ChatRole.USER.value()));
+        request.addPendingMessage(ChatMessage.user("hi"));
+
+        client.chat(request);
+
+        // The framing is the system message's text, and a message carrying none has nothing to frame
+        // with: the member is left out rather than sent empty.
+        assertFalse(parseCaptured().containsKey("instructions"));
+    }
+
+    @Test
     void functionCallOmitsUnsetMembers() {
         stubCompletion();
         ChatRequest request = requestWithModel();

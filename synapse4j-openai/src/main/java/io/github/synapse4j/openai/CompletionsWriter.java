@@ -150,15 +150,22 @@ class CompletionsWriter {
         if (system == null) {
             return entries;
         }
+        List<ContentPart> systemParts = flatten(system.getParts());
+        if (saysNothing(system, systemParts)) {
+            return entries;
+        }
         // The system slot leads, as a message of this protocol's own: the slot — not the message —
         // is what says it is the system's, so its role is written here rather than read off it.
-        Map<String, Object> entry = message(system, flatten(system.getParts()));
+        Map<String, Object> entry = message(system, systemParts);
         entry.put("role", "system");
         return Stream.concat(Stream.of(entry), entries);
     }
 
     private List<Map<String, Object>> entries(ChatMessage message) {
         List<ContentPart> parts = flatten(message.getParts());
+        if (saysNothing(message, parts)) {
+            return List.of();
+        }
         boolean hasToolResult = parts.stream().anyMatch(ToolResultPart.class::isInstance);
         if (!hasToolResult) {
             return List.of(message(message, parts));
@@ -496,6 +503,15 @@ class CompletionsWriter {
     /** Whether the extras, if any, name this member whole — the one case where the member's own value stands. */
     private static boolean namesWhole(@Nullable ProviderExtras extras, String member) {
         return extras != null && extras.contains(member);
+    }
+
+    /**
+     * Whether a message contributes nothing at all: no part that survives flattening, and no field of
+     * its own. One that does is left out rather than sent as a bare role with nothing under it.
+     */
+    private static boolean saysNothing(ChatMessage message, List<ContentPart> parts) {
+        ProviderExtras extras = message.getExtras();
+        return parts.isEmpty() && (extras == null || extras.isEmpty());
     }
 
     /**
