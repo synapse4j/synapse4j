@@ -28,7 +28,8 @@ classpath 的那个库，是 Apache HttpClient 5 本身；见[传输层](#传输
 默认接线是五个 bean，你自己声明同类型 bean 时各自让位：
 
 - **`Synapse4jJacksonModule`**——让 Boot 的 `JsonMapper` 能把 `JsonSchema` 当作它描述的那份文档来读写，
-  于是你自己序列化一个 schema，得到的就是那个 schema。它作用于编解码器所用的同一个 mapper。
+  于是你自己序列化一个 schema，得到的就是那个 schema。它作用于编解码器所用的同一个 mapper，另外还会把
+  `Reader` 写成它字符构成的字符串并关闭它——凡是你会序列化的对象图，包括你自己的类型。
 - **`JsonCodec`**——一个 `JacksonJsonCodec`。存在 Boot 自动配置的 `JsonMapper` 时就用它，因此
   `spring.jackson.*` 和每个 `JsonMapperBuilderCustomizer` 都作用于发给模型的 schema，以及模型发回
   的 JSON。

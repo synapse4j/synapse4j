@@ -104,9 +104,13 @@ framework; efficiency is why it would be better.
   other closed forms.
 - A closed form is allowed where the set is fixed by a specification and nothing extends it — the
   token kinds a JSON reader returns, for instance. Say why where it is defined.
+- A closed form is also allowed for a vocabulary the library itself defines and reasons about — the
+  roles an adapter maps by, say — as long as the value a caller writes stays open: a `String` on the
+  message, or a configuration key, with an extension seam of its own. The two are different things:
+  what the library must recognise is a fixed set, what a caller may write is not.
 - This is a deliberate exception to idiomatic Java 21. Do not "tidy up" an extensible structure into
   a `record` or an `enum`.
-- Values known to grow (role, finish reason, ...) are expressed as `String` plus `static final`
+- Values known to grow (finish reason, ...) are expressed as `String` plus `static final`
   constants.
 
 Rationale: an `enum` cannot gain values; a `record` is final and cannot carry extra fields. Either

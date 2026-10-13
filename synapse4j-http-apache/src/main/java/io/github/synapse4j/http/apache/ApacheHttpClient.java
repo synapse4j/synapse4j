@@ -61,7 +61,8 @@ import lombok.NonNull;
  * {@link BodyWriteMode#BUFFERED} trades that streaming for one copy of the body in memory gathered
  * before the call, which then carries a {@code Content-Length}. Framing is the entity's: a request
  * that carries its own {@code Content-Length} or {@code Transfer-Encoding} header alongside a body is
- * refused by HttpClient 5's protocol layer rather than reconciled here.</li>
+ * refused here as the caller's own error — an {@link IllegalArgumentException} before the call goes
+ * out — rather than reconciled, the way the other transports refuse it.</li>
  * <li>A {@link HttpOptions#getResponseTimeout() response timeout}, whether the request set it or this
  * client's own options carry it, is applied per request through HttpClient 5's {@link RequestConfig}.
  * HttpClient 5 implements it as the connection's read timeout for the whole exchange: it bounds the
@@ -207,10 +208,21 @@ public class ApacheHttpClient implements HttpClient {
     private static ClassicHttpRequest buildRequest(HttpRequest request, BodyWriteMode mode) {
         ClassicRequestBuilder builder = ClassicRequestBuilder.create(request.getMethod())
                 .setUri(request.getUrl());
-        request.getHeaders()
-                .forEach((name, values) -> values.forEach(value -> builder.addHeader(name, value)));
         @Nullable
         HttpBody body = request.getBody();
+        if (body != null) {
+            // A body's framing belongs to the transport: HttpClient 5's protocol layer would refuse
+            // the pair only after the request had gone out, so it is refused here as the caller's own
+            // error, before anything leaves — the way the other transports refuse it.
+            for (String name : request.getHeaders().keySet()) {
+                if ("content-length".equalsIgnoreCase(name) || "transfer-encoding".equalsIgnoreCase(name)) {
+                    throw new IllegalArgumentException(
+                            "a body's framing belongs to the transport: drop the request's own " + name);
+                }
+            }
+        }
+        request.getHeaders()
+                .forEach((name, values) -> values.forEach(value -> builder.addHeader(name, value)));
         if (body != null) {
             builder.setEntity(entity(request, body, mode));
         }

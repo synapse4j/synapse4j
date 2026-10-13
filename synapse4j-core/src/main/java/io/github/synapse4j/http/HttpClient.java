@@ -21,9 +21,10 @@ import io.github.synapse4j.exception.SynapseException;
  *
  * <p>
  * A body's framing — {@code Content-Length}, {@code Transfer-Encoding} — is the transport's to
- * set from the body it is about to send. A request that carries its own framing alongside a
- * body is refused rather than reconciled: each implementation answers the conflict the way the
- * HTTP library under it does, and none silently replaces what the caller wrote.
+ * set from the body it is about to send. A request that carries its own framing alongside a body
+ * is refused rather than reconciled, as the caller's own error — an
+ * {@link IllegalArgumentException} before anything goes out — and no implementation silently
+ * replaces what the caller wrote.
  *
  * <p>
  * Callers must close the returned response, typically via try-with-resources. Closing releases the

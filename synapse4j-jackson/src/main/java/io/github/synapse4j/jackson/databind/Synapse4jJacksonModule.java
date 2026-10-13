@@ -15,6 +15,11 @@ import tools.jackson.databind.module.SimpleModule;
  * JSON.
  *
  * <p>
+ * It also registers a serializer for {@link Reader}: a {@code Reader} anywhere in a graph the mapper
+ * binds — an application's own types included — is written as the JSON string its characters make,
+ * and closed once written.
+ *
+ * <p>
  * Add it to the mapper before the codec is built: a mapper is immutable once built, so the module cannot
  * be added later. Its name is its registration id, so adding it twice leaves a single registration; and
  * where an application registered a serializer of its own for a value this module covers, this module's

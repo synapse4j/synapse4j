@@ -118,9 +118,12 @@ the turn the blocking call would have returned.
 
 **Open structures.** Types that users or providers extend are not `enum`s, `record`s or `final`
 classes. An `enum` cannot gain values, and a `record` cannot carry an extra field; either would
-block the extension the model exists to allow. Values that are known to grow — a role, a finish
-reason — are strings with named constants. A closed form is used only where a specification fixes
-the set and nothing extends it.
+block the extension the model exists to allow. Values that are known to grow — a finish reason, say —
+are strings with named constants. A closed form is used where a specification fixes the set and
+nothing extends it, and where the library defines a vocabulary for its own reasoning — the roles an
+adapter maps by — so long as the value a caller writes stays open (the string on the message, the
+configuration key). The two are different: what the library must recognise is fixed, what a caller
+may write is not.
 
 **No abstraction before it is needed.** A new abstraction grows out of at least two real
 implementations, not a guess about a third.

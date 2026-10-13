@@ -62,6 +62,18 @@ public class AnthropicChatClient extends AbstractHttpChatClient<AnthropicConfig>
     }
 
     @Override
+    protected void requireCallable(ChatRequest request) {
+        super.requireCallable(request);
+        // This endpoint has no server-side default for the limit, so a call with no opinion on it
+        // cannot be asked at all. Refused here, before anything is built or sent, rather than while
+        // the body is written — which on a streamed transport is after the headers have left.
+        require(request.getOptions().getMaxOutputTokens() != null
+                || request.getOptions().getExtras().contains("max_tokens"),
+                "options.maxOutputTokens is required by the Anthropic Messages API: set it, or set the"
+                        + " options.extras member 'max_tokens'");
+    }
+
+    @Override
     protected String url(AnthropicConfig config) {
         return withoutTrailingSlash(config.getBaseUrl()) + "/v1/messages";
     }

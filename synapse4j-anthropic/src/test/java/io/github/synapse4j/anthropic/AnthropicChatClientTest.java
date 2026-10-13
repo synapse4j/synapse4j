@@ -192,10 +192,11 @@ class AnthropicChatClientTest {
         stubCompletion();
 
         // The endpoint has no server-side default for the limit, so a call with no opinion on it
-        // is refused by name rather than sent with a number nobody chose.
+        // is refused by name — as the caller's own mistake, before anything goes out — rather than
+        // sent with a number nobody chose.
         ChatRequest without = new ChatRequest();
         without.getOptions().setModel("claude-test");
-        assertThrows(SynapseException.class, () -> client.chat(without));
+        assertThrows(IllegalArgumentException.class, () -> client.chat(without));
 
         // The options bag is the documented way to state it once for every call.
         ChatRequest viaExtras = new ChatRequest();

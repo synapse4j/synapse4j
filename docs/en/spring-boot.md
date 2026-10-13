@@ -30,7 +30,8 @@ The default wiring is five beans, each backing off if you declare your own:
 
 - **`Synapse4jJacksonModule`** — teaches Boot's `JsonMapper` to read and write a `JsonSchema` as the
   document it describes, so a schema you serialize yourself comes out as the schema. It is applied
-  to the same mapper the codec is built over.
+  to the same mapper the codec is built over, and it also writes a `Reader` as the string its
+  characters make and closes it — anywhere in a graph you serialize, your own types included.
 - **`JsonCodec`** — a `JacksonJsonCodec`. It uses Boot's auto-configured `JsonMapper` when one
   exists, so `spring.jackson.*` and every `JsonMapperBuilderCustomizer` apply to the schemas sent
   to the model and to the JSON a model sends back.

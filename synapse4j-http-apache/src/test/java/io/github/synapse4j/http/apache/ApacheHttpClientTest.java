@@ -144,6 +144,19 @@ class ApacheHttpClientTest {
     }
 
     @Test
+    void requestCarryingOwnFramingRefused() {
+        // Framing belongs to the entity; HttpClient 5's protocol layer would refuse the pair only
+        // after the request had gone out, so it is refused here, before anything reaches the wire,
+        // as the caller's own error — the way the other transports refuse it.
+        HttpRequest request = new HttpRequest(baseUrl + "/chat");
+        request.setMethod(HttpRequest.POST);
+        request.getHeaders().put("Transfer-Encoding", List.of("chunked"));
+        request.setBody(HttpBody.of("{}"));
+
+        assertThrows(IllegalArgumentException.class, () -> client.send(request));
+    }
+
+    @Test
     void writtenBodyStreamed() throws Exception {
         AtomicReference<byte[]> seenBody = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> seenHeaders = new AtomicReference<>();

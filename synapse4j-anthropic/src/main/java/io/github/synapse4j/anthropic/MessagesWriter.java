@@ -66,9 +66,8 @@ import lombok.RequiredArgsConstructor;
  * <p>
  * What the protocol cannot express fails here rather than reaching the provider half expressed: a
  * part type with no block shape, media that is not an image, a response format it has no member
- * for — and, because {@code max_tokens} is required with no server-side default, a call that
- * states no limit at all. A tool-choice mode outside the set the protocol fixes is not one of
- * them: it is left unsent and the call goes on, as {@link #toolChoice} says.
+ * for. A tool-choice mode outside the set the protocol fixes is not one of them: it is left unsent
+ * and the call goes on, as {@link #toolChoice} says.
  *
  * <p>
  * The {@link JsonWriter} is handed in, and where its bytes go is the caller's affair. This class
@@ -106,11 +105,6 @@ class MessagesWriter {
     /** The whole request as the object it goes out as. */
     private Map<String, Object> document(ChatRequest request, boolean stream) {
         ChatOptions options = request.getOptions();
-        // Checked before anything is assembled: this endpoint has no server-side default for the
-        // limit, so a call with no opinion on it cannot be asked at all. Refusing here names the
-        // missing member, where inventing a number would send a limit the caller never chose — the
-        // caller (or a request customizer) states it, or sets it once in the options' extras.
-        requireMaxTokens(options);
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("model", options.getModel());
         putIfSet(document, "tool_choice", toolChoice(options));
@@ -153,20 +147,6 @@ class MessagesWriter {
             outputConfig.put("format", responseFormat(options.getResponseFormat()));
         }
         return document;
-    }
-
-    /**
-     * The token limit this endpoint requires. The shared model spells a limit as an opinion —
-     * {@code null} meaning "no opinion" — and every other member can be left to the provider's
-     * default, but this protocol has none: the wire always needs a number. So the opinion is
-     * required here, and the options' extras are the documented way to state it once for every call
-     * rather than repeating it per request.
-     */
-    private static void requireMaxTokens(ChatOptions options) {
-        if (options.getMaxOutputTokens() == null && !options.getExtras().contains("max_tokens")) {
-            throw new SynapseException("max_tokens is required by the Anthropic Messages API: set"
-                    + " options.maxOutputTokens, or options.extras member 'max_tokens'");
-        }
     }
 
     /**
