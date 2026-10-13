@@ -381,6 +381,25 @@ class AnthropicChatClientTest {
     }
 
     @Test
+    void reasoningWithNothingToSayIsLeftOut() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT.value(),
+                new ReasoningPart(null, null), new TextPart("42")));
+
+        client.chat(request);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) parseCaptured().get("messages");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> content = (List<Map<String, Object>>) messages.get(0).get("content");
+        // A reasoning part carrying neither text nor extras says nothing, so it is left out rather
+        // than going out as a bare thinking block the endpoint has no use for.
+        assertEquals(List.of(Map.of("type", "text", "text", "42")), content);
+    }
+
+    @Test
     void effortFormatShareOutputConfig() {
         stubCompletion();
 

@@ -26,8 +26,9 @@ import lombok.Singular;
  * layout of any one protocol. An application assembles a message the way its own domain does, and
  * need not know how the protocol that sends it lays a turn out: supplying the layer a protocol
  * requires and leaving out one it has not got is the module's work. What a message says must reach
- * the wire: a part the protocol cannot carry is refused by name rather than dropped, and
- * {@link RawPart} is how a part the protocol does not model still goes out.
+ * the wire: a part the protocol cannot carry is refused by name rather than dropped, a part that says
+ * nothing at all is left out because there is nothing of it to lose, and {@link RawPart} is how a
+ * part the protocol does not model still goes out.
  *
  * <p>
  * A message owns its {@link ProviderExtras} for the same reason a part does — a provider-specific

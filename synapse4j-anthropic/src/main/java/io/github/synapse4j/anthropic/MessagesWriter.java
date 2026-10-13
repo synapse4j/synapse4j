@@ -299,7 +299,10 @@ class MessagesWriter {
             } else if (part instanceof ToolResultPart toolResult) {
                 blocks.add(toolResult(toolResult));
             } else if (part instanceof ReasoningPart reasoning) {
-                blocks.add(thinking(reasoning));
+                Map<String, Object> block = thinking(reasoning);
+                if (block != null) {
+                    blocks.add(block);
+                }
             } else if (part instanceof RawPart raw) {
                 // The block goes back out as it arrived: its members were read whole off the wire,
                 // so the protocol spells them again untouched, in the place this part holds.
@@ -464,20 +467,25 @@ class MessagesWriter {
     }
 
     /**
-     * The model's reasoning as the {@code thinking} block it arrived as. The opaque companion the
-     * provider attached — the signature that proves the block was the model's — rides in the part's
-     * extras under the name the protocol spells it with, so it merges over the block and goes back
-     * exactly where it came from. An instance that names another block type (the safety-redacted
-     * thinking this module reads into the same part) overrides the type written here, which is how
-     * that block is replayed as itself.
+     * The model's reasoning as the {@code thinking} block it arrived as, or {@code null} when it
+     * carries neither text nor extras — a part with nothing to say, which the protocol has no place
+     * for. The opaque companion the provider attached — the signature that proves the block was the
+     * model's — rides in the part's extras under the name the protocol spells it with, so it merges
+     * over the block and goes back exactly where it came from. An instance that names another block
+     * type (the safety-redacted thinking this module reads into the same part) overrides the type
+     * written here, which is how that block is replayed as itself.
      */
-    private static Map<String, Object> thinking(ReasoningPart part) {
+    private static @Nullable Map<String, Object> thinking(ReasoningPart part) {
+        boolean hasText = part.getText() != null && !part.getText().isEmpty();
+        ProviderExtras partExtras = part.getExtras();
+        if (!hasText && (partExtras == null || partExtras.isEmpty())) {
+            return null;
+        }
         Map<String, Object> block = new LinkedHashMap<>();
         block.put("type", "thinking");
-        if (part.getText() != null) {
+        if (hasText) {
             block.put("thinking", part.getText());
         }
-        ProviderExtras partExtras = part.getExtras();
         if (partExtras != null) {
             partExtras.mergeInto(block);
         }
