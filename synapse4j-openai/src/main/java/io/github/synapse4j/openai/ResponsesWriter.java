@@ -498,14 +498,17 @@ class ResponsesWriter {
     /**
      * What a tool answered, as the protocol takes it: the text itself when the result is text alone,
      * and an array of content entries otherwise — a result that carried an image has nowhere to go
-     * inside a string.
+     * inside a string. A group among the result's parts goes out as the parts it holds: this
+     * protocol has no layer to hold one part inside another, so the group is shape rather than a
+     * node of its own.
      */
     private static Object output(List<ContentPart> parts) {
-        if (parts.stream().allMatch(TextPart.class::isInstance)) {
-            return textOf(parts);
+        List<ContentPart> flat = flatten(parts);
+        if (flat.stream().allMatch(TextPart.class::isInstance)) {
+            return textOf(flat);
         }
         List<Map<String, Object>> content = new ArrayList<>();
-        for (ContentPart part : parts) {
+        for (ContentPart part : flat) {
             if (part instanceof TextPart textPart) {
                 // A tool's answer is input the caller's side produced, not something the model said.
                 Map<String, Object> text = textEntry(textPart, "input_text");

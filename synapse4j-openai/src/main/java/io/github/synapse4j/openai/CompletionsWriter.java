@@ -498,9 +498,14 @@ class CompletionsWriter {
         return extras != null && extras.contains(member);
     }
 
+    /**
+     * The text a tool result's parts say, as the one string this protocol takes there. A group of
+     * parts goes out as the parts it holds — this protocol has no layer to hold one part inside
+     * another, so the group is shape rather than a node of its own.
+     */
     private String textOf(List<ContentPart> parts) {
         StringBuilder text = new StringBuilder();
-        for (ContentPart part : parts) {
+        for (ContentPart part : flatten(parts)) {
             if (!(part instanceof TextPart textPart)) {
                 throw unsupportedPart(part);
             }

@@ -409,6 +409,23 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
+    void toolResultGroupFlattensLikeAMessage() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(),
+                new ToolResultPart("call_1", "get_weather",
+                        new ListPart(new TextPart("sun"), new TextPart("ny")))));
+
+        client.chat(request);
+
+        // A group inside a tool result goes out as the parts it holds, exactly as one at the top of
+        // a message does: this protocol has no layer to hold one part inside another.
+        assertEquals(List.of(Map.of("type", "function_call_output", "call_id", "call_1", "output", "sunny")),
+                inputOf(parseCaptured()));
+    }
+
+    @Test
     void functionCallOmitsUnsetMembers() {
         stubCompletion();
         ChatRequest request = requestWithModel();

@@ -637,6 +637,28 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
+    void toolResultGroupFlattensLikeAMessage() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","
+                        + "\"content\":\"ok\"}}]}").getBytes(UTF_8)));
+
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(),
+                new ToolResultPart("call_9", "get_weather",
+                        new ListPart(new TextPart("sun"), new TextPart("ny")))));
+
+        client.chat(request);
+
+        Map<String, Object> wire = parseCaptured();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) wire.get("messages");
+        // A group inside a tool result goes out as the parts it holds, exactly as one at the top of
+        // a message does: this protocol has no layer to hold one part inside another.
+        assertEquals("sunny", messages.get(0).get("content"));
+    }
+
+    @Test
     void jsonSchemaFormatNestsSchema() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
