@@ -87,8 +87,8 @@ Every attribute is optional, and what is left out is left alone:
 
 - `@ToolMethod.name` falls back to the method's name, `description` to no description, and `type` to
   the implementation the reading uses by default.
-- `@ToolParam.name` keeps the name the compiler recorded for it — worth a `-parameters` flag in your
-  build, since without it the compiler records none and the argument schema grows properties called
+- `@ToolParam.name` falls back to the name the compiler recorded for it — worth a `-parameters` flag in
+  your build, since without it the compiler records none and the argument schema grows properties called
   `arg0`. `description` falls to no description.
 - `required` and `fromModel` are judged from the parameter itself: a value the codec makes optional (an
   `Optional`, say) is not required, and a `ChatContext` parameter is filled from the conversation

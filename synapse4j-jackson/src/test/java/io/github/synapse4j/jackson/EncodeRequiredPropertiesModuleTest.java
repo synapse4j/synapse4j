@@ -71,6 +71,14 @@ class EncodeRequiredPropertiesModuleTest {
     }
 
     @Test
+    void parentInclusionAnswersInheritedMember() {
+        // The inclusion is the parent's and the subclass that does the writing carries none, so the
+        // answer has to be read up the hierarchy: a subclass read as carrying no inclusion would
+        // demand a null the writer never produces.
+        assertEquals(List.of(), SchemaFixtures.required(generate(Inheriting.class, SchemaFixtures.MAPPER)));
+    }
+
+    @Test
     void customInclusionNotAlwaysWritten() {
         // A value filter decides per value, so the property may be left out of what is written.
         assertEquals(List.of(), SchemaFixtures.required(generate(Filtered.class, SchemaFixtures.MAPPER)));
@@ -98,6 +106,17 @@ class EncodeRequiredPropertiesModuleTest {
     /** Where the subclass does the writing, and so brings the inclusion that applies. */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     static class Narrowing extends Parent {
+    }
+
+    /** Where the parent declares the inclusion that applies to the member the subclass writes. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    static class OmittingParent {
+
+        public String maybeNull;
+    }
+
+    /** Where the subclass does the writing and carries no inclusion of its own. */
+    static class Inheriting extends OmittingParent {
     }
 
     /** A property whose inclusion a filter decides rather than a fixed rule. */

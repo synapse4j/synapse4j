@@ -272,10 +272,17 @@ class JacksonSchemaConfigBuildersTest {
 
             assertEquals(sampleKitchen(), other.decode(EVERYTHING, Kitchen.class), mapper.toString());
 
-            JsonSchema schema = other.generateEncodeSchema(Kitchen.class);
             List<String> written = keysOf(other.encode(sampleKitchenWithNullOptional()));
-            assertTrue(schema.getProperties().keySet().containsAll(written), written.toString());
-            schema.getRequired().forEach(required -> assertTrue(written.contains(required), required));
+
+            JsonSchema encode = other.generateEncodeSchema(Kitchen.class);
+            assertTrue(encode.getProperties().keySet().containsAll(written), written.toString());
+            encode.getRequired().forEach(required -> assertTrue(written.contains(required), required));
+
+            // The decode schema has to describe every property the mapper writes and demand nothing
+            // the writer leaves out: a document the codec itself produced is one it has to admit.
+            JsonSchema decode = other.generateDecodeSchema(Kitchen.class);
+            assertTrue(decode.getProperties().keySet().containsAll(written), written.toString());
+            decode.getRequired().forEach(required -> assertTrue(written.contains(required), required));
         }
 
         // An inclusion setting that may leave a value out takes that property out of required.

@@ -232,8 +232,9 @@ ChatResponse response = client.chat(structured);
 Person person = codec.decode(response.getText(), Person.class);
 ```
 
-The schema is a `JsonSchema` produced by your codec, so the model is constrained to exactly the
-JSON your codec reads back — no second library, no hand-written schema.
+The schema is a `JsonSchema` produced by your codec, so the model is pointed at what your codec reads
+back — the aim rather than a guarantee, and [Design and trade-offs](design.md) says where the two can
+still disagree. No second library, no hand-written schema.
 
 ## Where to go next
 

@@ -16,19 +16,19 @@ import lombok.Data;
 @Data
 public class ToolParameterProperties {
 
-    /** The property name this argument goes by; {@code @ToolParam#name()}. */
+    /** The property name this argument goes by; @ToolParam#name(). */
     private @Nullable String name;
 
-    /** What this argument means; {@code @ToolParam#description()}. */
+    /** What this argument means; @ToolParam#description(). */
     private @Nullable String description;
 
-    /** Whether the model has to produce it; {@code @ToolParam#required()}. */
+    /** Whether the model has to produce it; @ToolParam#required(). */
     private @Nullable String required;
 
-    /** Whether the model produces it at all; {@code @ToolParam#fromModel()}. */
+    /** Whether the model produces it at all; @ToolParam#fromModel(). */
     private @Nullable String fromModel;
 
-    /** The schema of this one property as a JSON document; {@code @ToolParam#schema()}. */
+    /** The schema of this one property as a JSON document; @ToolParam#schema(). */
     private @Nullable String schema;
 
 }

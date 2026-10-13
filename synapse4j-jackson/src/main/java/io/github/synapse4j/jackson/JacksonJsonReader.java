@@ -60,10 +60,8 @@ class JacksonJsonReader extends AbstractJsonReader {
      * that promises this library's own.
      */
     static JacksonJsonReader open(JsonFactory factory, InputStream in) {
-        return Objects.requireNonNull(
-                translate("Opening the JSON reader failed",
-                        () -> new JacksonJsonReader(factory.createParser(ObjectReadContext.empty(), in))),
-                "opening a reader answers one");
+        return translate("Opening the JSON reader failed",
+                () -> new JacksonJsonReader(factory.createParser(ObjectReadContext.empty(), in)));
     }
 
     @Override
@@ -200,9 +198,10 @@ class JacksonJsonReader extends AbstractJsonReader {
     /**
      * Runs one read, translating Jackson's own failures into this library's: an I/O failure into a
      * {@link SynapseIOException}, anything else into a {@link SynapseException}, each under the
-     * given message.
+     * given message. The answer's nullness is the supplier's, so a read whose supplier always
+     * answers is not checked again for a null it cannot produce.
      */
-    private static <T> @Nullable T translate(String message, Supplier<T> read) {
+    private static <T> T translate(String message, Supplier<T> read) {
         try {
             return read.get();
         } catch (JacksonIOException failure) {

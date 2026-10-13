@@ -76,7 +76,7 @@ List<Tool> tools = new MethodTools(codec).from(service);
 每个属性都可选，没写的就不动：
 
 - `@ToolMethod.name` 留空就用方法名，`description` 留空就没有描述，`type` 留空就用读取时默认的实现。
-- `@ToolParam.name` 沿用编译器为它记下的名字——值得在构建里开 `-parameters`，不开的话编译器什么都不记，
+- `@ToolParam.name` 留空就用编译器为它记下的名字——值得在构建里开 `-parameters`，不开的话编译器什么都不记，
   入参 schema 里就会冒出叫 `arg0` 的属性。`description` 留空就是没有描述。
 - `required` 和 `fromModel` 由参数自身判断：编解码器认为可选的值（比如 `Optional`）不是必填的，
   `ChatContext` 类型的参数由对话填充，而不是由模型产出。写上其中之一即可覆盖这一判断。

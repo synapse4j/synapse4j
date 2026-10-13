@@ -92,8 +92,8 @@ public class Synapse4jProperties {
 
     /**
      * The Jackson implementation's settings: which of the schema generator's recommended choices to
-     * apply and which to leave out. Held as the library's own {@link JacksonSchemaSettings}, whose
-     * defaults are the recommended choices. Grouped under the implementation's own key, so a second
+     * apply and which to leave out. Held as the library's own JacksonSchemaSettings, whose defaults
+     * are the recommended choices. Grouped under the implementation's own key, so a second
      * implementation — a different JSON library — gets a group of its own.
      */
     @NestedConfigurationProperty

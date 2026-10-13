@@ -20,30 +20,29 @@ import lombok.Data;
 @Data
 public class ToolMethodProperties {
 
-    /** The name the model calls the tool by; {@code @ToolMethod#name()}. */
+    /** The name the model calls the tool by; @ToolMethod#name(). */
     private @Nullable String name;
 
-    /** What the tool does; {@code @ToolMethod#description()}. */
+    /** What the tool does; @ToolMethod#description(). */
     private @Nullable String description;
 
-    /** Which implementation builds this tool; {@code @ToolMethod#type()}. */
+    /** Which implementation builds this tool; @ToolMethod#type(). */
     private @Nullable String type;
 
-    /** The whole input schema as a JSON document; {@code @ToolMethod#schema()}. */
+    /** The whole input schema as a JSON document; @ToolMethod#schema(). */
     private @Nullable String schema;
 
     /**
-     * Whether the provider must enforce the schema; {@code @ToolMethod#strict()}. Written, it replaces
-     * the annotation's; unset, the annotation's stands, and where that too states none it falls to
-     * {@link ToolsProperties#getStrict()} and then to the protocol.
+     * Whether the provider must enforce the schema; @ToolMethod#strict(). Written, it replaces the
+     * annotation's; unset, the annotation's stands, and where that too states none it falls to the
+     * tools' own strict setting and then to the protocol.
      */
     private @Nullable String strict;
 
     /**
      * Provider-specific fields to merge into the tool declaration, by raw wire name — the form
-     * {@link io.github.synapse4j.data.ProviderExtras#putRaw(String, Object)} takes. A dotted key
-     * addresses a nested member; a value takes its type from the configuration source, so a non-string
-     * extra belongs in YAML.
+     * ProviderExtras.putRaw takes. A dotted key addresses a nested member; a value takes its type
+     * from the configuration source, so a non-string extra belongs in YAML.
      */
     private final Map<String, Object> extras = new LinkedHashMap<>();
 

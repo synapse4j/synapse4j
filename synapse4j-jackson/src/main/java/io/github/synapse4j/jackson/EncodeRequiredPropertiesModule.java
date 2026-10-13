@@ -17,8 +17,7 @@ import tools.jackson.databind.json.JsonMapper;
  * The answer reads a property's own inclusion, which {@link #isAlwaysWritten} holds, and falls back to
  * what the class it is written as asks for and then to the mapper's default when the property carries
  * none. A setting that omits values leaves a primitive alone, which can be neither null nor empty, while
- * a setting that omits defaults takes a primitive with it. A member an annotation demands is demanded
- * all the same, by the Jackson module rather than here.
+ * a setting that omits defaults takes a primitive with it.
  */
 @RequiredArgsConstructor
 public class EncodeRequiredPropertiesModule implements Module {

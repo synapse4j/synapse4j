@@ -217,8 +217,8 @@ ChatResponse response = client.chat(structured);
 Person person = codec.decode(response.getText(), Person.class);
 ```
 
-schema 是由你的编解码器产出的 `JsonSchema` 值，因此模型只能产出你的编解码器恰好能读回的那份 JSON
-——不用第二个库，也不用手写 schema。
+schema 是由你的编解码器产出的 `JsonSchema` 值，模型因此被引向你的编解码器能读回的内容；这只是目标，
+两者仍可能不一致，具体见[设计与取舍](design.md)。不用第二个库，也不用手写 schema。
 
 ## 下一步
 
