@@ -628,6 +628,50 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
+    void typelessItemWritesNoType() {
+        stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":["
+                + "{\"id\":\"ws_1\",\"status\":\"completed\"}]}");
+
+        ChatResponse answer = client.chat(requestWithModel());
+
+        // An item that never spelled a type is kept whole, and the discriminator it never carried is
+        // not invented as a null member of the kept item.
+        RawPart kept = assertInstanceOf(RawPart.class, answer.getMessage().getParts().get(0));
+        assertFalse(kept.members().containsKey("type"));
+
+        ChatRequest replay = requestWithModel();
+        replay.addPendingMessage(answer.getMessage());
+        stubCompletion();
+        client.chat(replay);
+
+        // And it goes back out as it arrived, with no type member.
+        assertEquals(List.of(Map.of("id", "ws_1", "status", "completed")), inputOf(parseCaptured()));
+    }
+
+    @Test
+    void nonListContentKeptWhole() {
+        stubResponse("{\"id\":\"resp_1\",\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":["
+                + "{\"type\":\"message\",\"id\":\"msg_1\",\"role\":\"assistant\",\"status\":\"completed\","
+                + "\"content\":\"plain text\"}]}");
+
+        ChatResponse answer = client.chat(requestWithModel());
+
+        // A content member that is not the entry array this module models is kept whole under its own
+        // name, rather than dropped from the item.
+        ListPart item = assertInstanceOf(ListPart.class, answer.getMessage().getParts().get(0));
+        assertEquals("plain text", item.getExtras().get("content"));
+
+        ChatRequest replay = requestWithModel();
+        replay.addPendingMessage(answer.getMessage());
+        stubCompletion();
+        client.chat(replay);
+
+        // And it goes back out as the value it was, in the place the protocol spells it.
+        assertEquals(List.of(Map.of("role", "assistant", "content", "plain text",
+                "id", "msg_1", "status", "completed")), inputOf(parseCaptured()));
+    }
+
+    @Test
     void reasoningItemPrecedesReplayedAnswer() {
         ChatRequest replay = requestWithModel();
         replay.addPendingMessage(new ChatMessage(ChatRole.ASSISTANT.value(), null,

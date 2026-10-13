@@ -251,7 +251,11 @@ class ResponsesReader {
         // whole as a part of the turn, in the place it held: the shared model has no name for it,
         // but its words still have to arrive and go back out with the turn.
         Map<String, Object> whole = new LinkedHashMap<>();
-        whole.put("type", type);
+        if (type != null) {
+            // The discriminator is not a member of the part when the item never spelled one: a null
+            // here would go back out as `"type": null`, which the wire never carried.
+            whole.put("type", type);
+        }
         whole.putAll(members);
         message.part(RawPart.of(whole));
         return false;
@@ -268,7 +272,12 @@ class ResponsesReader {
         for (Map.Entry<?, ?> member : members.entrySet()) {
             String name = String.valueOf(member.getKey());
             if ("content".equals(name)) {
-                readMessageContent(member.getValue(), content);
+                if (!readMessageContent(member.getValue(), content)) {
+                    // A content member of another shape than the entry array this module models is
+                    // kept whole under its own name: the shared model has no place for it, but the
+                    // value has to arrive and go back out with the item.
+                    extras.put(name, member.getValue());
+                }
             } else if (!"type".equals(name)) {
                 // The kind is not a member of the part: it is gone from a whole item by the time this
                 // runs, and still there on the frame that opens one, where it says nothing the part
@@ -279,9 +288,15 @@ class ResponsesReader {
         return new ListPart(content, extras);
     }
 
-    private static void readMessageContent(@Nullable Object value, List<ContentPart> content) {
+    /**
+     * Reads a message item's content entries into the given list.
+     *
+     * @return whether the value was the entry array this module models; a value of another shape is
+     *         not read here, so the caller keeps it whole rather than losing it
+     */
+    private static boolean readMessageContent(@Nullable Object value, List<ContentPart> content) {
         if (!(value instanceof List<?> entries)) {
-            return;
+            return false;
         }
         for (Object entry : entries) {
             if (!(entry instanceof Map<?, ?> members)) {
@@ -309,6 +324,7 @@ class ResponsesReader {
             }
             content.add(new TextPart(stringOf(members.get("text")), extras));
         }
+        return true;
     }
 
     /**

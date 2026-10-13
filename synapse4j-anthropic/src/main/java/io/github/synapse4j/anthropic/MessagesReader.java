@@ -1,7 +1,10 @@
 package io.github.synapse4j.anthropic;
 
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import org.jspecify.annotations.Nullable;
 
@@ -217,10 +220,12 @@ class MessagesReader {
 
     /**
      * One content block as the part it becomes, or {@code null} when this module has no part for
-     * the block's type. Everything the part does not model moves into its extras under the name it
+     * the block's type. Everything the part does not take moves into its extras under the name it
      * came in, so a field the provider adds to a block rides with that block alone — and for the
      * reasoning blocks the extras are also where the opaque companions live, keyed by the protocol's
-     * spelling so they go back exactly as they arrived.
+     * spelling so they go back exactly as they arrived. A member the part models but could not read
+     * — present as some other type than the field takes — is not taken either: its raw value stays
+     * in the extras rather than being lost with the null field beside it.
      */
     private @Nullable ContentPart partOf(Map<?, ?> block) {
         if (!(block.get("type") instanceof String type)) {
@@ -228,26 +233,43 @@ class MessagesReader {
         }
         switch (type) {
             case "text" -> {
-                return new TextPart(stringOf(block.get("text")), restOf(block, "type", "text"));
+                Object text = block.get("text");
+                Set<String> taken = modeled("type");
+                if (stringOf(text) != null) {
+                    taken.add("text");
+                }
+                return new TextPart(stringOf(text), restOf(block, taken));
             }
             case "tool_use" -> {
                 Object input = block.get("input");
                 // The wire carries the arguments as an object; the shared model keeps them as
                 // the JSON text they spell, so the codec the application chose writes them out.
                 String argumentsJson = input != null ? codec.encode(input) : null;
+                Set<String> taken = modeled("type", "input");
+                if (stringOf(block.get("id")) != null) {
+                    taken.add("id");
+                }
+                if (stringOf(block.get("name")) != null) {
+                    taken.add("name");
+                }
                 return new ToolCallPart(stringOf(block.get("id")), stringOf(block.get("name")), argumentsJson,
-                        restOf(block, "type", "id", "name", "input"));
+                        restOf(block, taken));
             }
             case "thinking" -> {
                 // The signature stays out of the part's fields and lands in its extras: the shared
                 // model attaches no typed field to reasoning, and the next turn needs this one back.
-                return new ReasoningPart(stringOf(block.get("thinking")), restOf(block, "type", "thinking"));
+                Object thinking = block.get("thinking");
+                Set<String> taken = modeled("type");
+                if (stringOf(thinking) != null) {
+                    taken.add("thinking");
+                }
+                return new ReasoningPart(stringOf(thinking), restOf(block, taken));
             }
             case "redacted_thinking" -> {
                 // Safety-redacted reasoning with nothing readable in it. The whole block — its type
                 // included — rides in the part's extras, so the writer can spell the block back as
                 // itself: the endpoint refuses a continuation whose thinking blocks were lost.
-                return new ReasoningPart(null, restOf(block));
+                return new ReasoningPart(null, restOf(block, modeled()));
             }
             default -> {
                 return null;
@@ -255,24 +277,23 @@ class MessagesReader {
         }
     }
 
+    /** The names a part took into its fields, as the set {@link #restOf} leaves out of the extras. */
+    private static Set<String> modeled(String... names) {
+        return new LinkedHashSet<>(List.of(names));
+    }
+
     /**
-     * The members of a content block the part does not model, as the extras the part carries — empty
-     * when every member is modelled.
+     * The members of a content block the part did not take, as the extras the part carries — empty
+     * when every member was read into a field.
      *
-     * @param block   the block as the wire spelled it
-     * @param modeled the member names the part models itself; they stay out of the extras
+     * @param block the block as the wire spelled it
+     * @param taken the member names the part took into its fields; they stay out of the extras
      */
-    private static ProviderExtras restOf(Map<?, ?> block, String... modeled) {
+    private static ProviderExtras restOf(Map<?, ?> block, Set<String> taken) {
         ProviderExtras extras = new ProviderExtras();
         for (Map.Entry<?, ?> member : block.entrySet()) {
             String key = String.valueOf(member.getKey());
-            boolean taken = false;
-            for (String name : modeled) {
-                if (name.equals(key)) {
-                    taken = true;
-                }
-            }
-            if (!taken) {
+            if (!taken.contains(key)) {
                 extras.put(key, member.getValue());
             }
         }

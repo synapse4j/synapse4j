@@ -656,6 +656,30 @@ class AnthropicChatClientTest {
     }
 
     @Test
+    void nonStringTextKeptRaw() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(message("\"msg_5\"",
+                "[{\"type\":\"text\",\"text\":123}]",
+                "end_turn", "\"usage\":{\"input_tokens\":7,\"output_tokens\":2}").getBytes(UTF_8)));
+
+        ChatResponse response = client.chat(requestWithModel());
+
+        // The block's text is present but not the string the field takes, so the part reads none of
+        // it: the raw value stays in the extras rather than vanishing with the null field beside it.
+        TextPart part = assertInstanceOf(TextPart.class, response.getMessage().getParts().get(0));
+        assertNull(part.getText());
+        assertEquals(123, part.getExtras().get("text"));
+
+        // And the block goes back out exactly as it arrived.
+        stubCompletion();
+        ChatRequest next = requestWithModel();
+        client.continueWith(next, response);
+        client.chat(next);
+
+        assertEquals(List.of(Map.of("type", "text", "text", 123)), contentOf(parseCaptured()));
+    }
+
+    @Test
     void serverToolsBlockReplayedWhole() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(message("\"msg_5\"",
