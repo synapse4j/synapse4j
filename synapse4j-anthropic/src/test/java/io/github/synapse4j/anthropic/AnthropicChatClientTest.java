@@ -1165,6 +1165,31 @@ class AnthropicChatClientTest {
     }
 
     @Test
+    void unknownFrameKeepsItsMessageMember() {
+        stub.canned.setStatusCode(200);
+        stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
+        stub.canned.setBody(new ByteArrayInputStream(sse(
+                "message_start",
+                "{\"type\":\"message_start\",\"message\":{\"id\":\"msg_9\",\"type\":\"message\","
+                        + "\"role\":\"assistant\",\"content\":[],\"model\":\"claude-test\","
+                        + "\"stop_reason\":null,\"stop_sequence\":null,"
+                        + "\"usage\":{\"input_tokens\":5,\"output_tokens\":1}}}",
+                "ping",
+                "{\"type\":\"ping\",\"message\":{\"id\":\"msg_9\"}}",
+                "message_stop",
+                "{\"type\":\"message_stop\"}")
+                .getBytes(UTF_8)));
+
+        Iterator<ChatStreamEvent> events = client.stream(requestWithModel()).iterator();
+        assertEquals(AnthropicEventTypes.MESSAGE_START, events.next().getEventType());
+        ChatStreamEvent ping = events.next();
+        assertEquals("ping", ping.getEventType());
+        // A frame that does not open the answer keeps a member of that name like any other: it stays
+        // on the event, where reading it as the answer would have dropped it with the answer.
+        assertEquals(Map.of("id", "msg_9"), ping.getExtras().get("message"));
+    }
+
+    @Test
     void refusedStreamReleasesResponse() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));

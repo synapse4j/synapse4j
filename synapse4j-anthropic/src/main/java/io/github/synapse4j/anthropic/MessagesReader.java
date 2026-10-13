@@ -110,9 +110,12 @@ class MessagesReader {
                 index = (int) reader.longValue();
                 continue;
             }
-            if ("message".equals(field) && reader.token() == JsonReader.Token.START_OBJECT) {
+            if ("message".equals(field) && reader.token() == JsonReader.Token.START_OBJECT
+                    && opensAnswer(eventName, type)) {
                 // The frame that opens the answer carries the message document whole, so it goes
-                // through the same walk a blocking response does.
+                // through the same walk a blocking response does. Any other frame's member of that
+                // name is a member like any other: it goes to the extras below rather than being
+                // read as the answer and lost with it.
                 whole = readMessage(reader);
                 continue;
             }
@@ -148,6 +151,17 @@ class MessagesReader {
             default -> carryRest(event, payload);
         }
         return event;
+    }
+
+    /**
+     * Whether this frame is the one that opens the answer, which is the only kind whose
+     * {@code message} member is the answer itself. The SSE frame's own name settles it where the
+     * frame carried one, and the payload's {@code type} otherwise — but only where that was read
+     * before the member it settles, since a frame spelling neither leaves the member where it
+     * belongs: among the rest of the frame's fields.
+     */
+    private static boolean opensAnswer(@Nullable String eventName, @Nullable String type) {
+        return AnthropicEventTypes.MESSAGE_START.equals(eventName != null ? eventName : type);
     }
 
     /**
