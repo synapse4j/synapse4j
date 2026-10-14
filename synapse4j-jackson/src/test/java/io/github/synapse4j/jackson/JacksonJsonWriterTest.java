@@ -3,6 +3,7 @@ package io.github.synapse4j.jackson;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -18,9 +19,11 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonSchemaBuilder;
+import io.github.synapse4j.json.JsonSource;
 import io.github.synapse4j.json.JsonWriter;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -108,6 +111,20 @@ class JacksonJsonWriterTest {
         // The read's failure is what surfaces; the close's rides with it instead of replacing it.
         assertArrayEquals(new Throwable[] { closeFailure }, thrown.getSuppressed());
         assertEquals("read failed", thrown.getCause().getMessage());
+    }
+
+    @Test
+    void ownFailureSurvivesJacksonWrapping() {
+        SynapseException refusal = new SynapseException("the refusal");
+        JsonSource source = () -> {
+            throw refusal;
+        };
+
+        JsonWriter writer = codec.writer(new ByteArrayOutputStream());
+
+        // A failure the library raised while writing reaches the caller as itself: Jackson wraps what
+        // escapes a serializer, and the wrapper must not stand in for the reason.
+        assertSame(refusal, assertThrows(SynapseException.class, () -> writer.writeValue(Map.of("lazy", source))));
     }
 
     @Test
