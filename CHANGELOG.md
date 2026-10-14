@@ -3,6 +3,8 @@
 Notable changes to this project are recorded here, newest section first. The section for a
 version becomes the body of the GitHub Release created when that version's tag is pushed.
 
+## [Unreleased]
+
 ## [0.0.3] - 2026-10-14
 
 - `AbstractJsonWriter` is gone — the public core base class that wrote a whole value in place of a `JsonWriter` implementation's tokens; a `JsonWriter` implementation now writes a whole value itself, so the dispatch of this library's own types sits with the JSON module rather than in core
