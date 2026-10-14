@@ -526,14 +526,14 @@ class ResponsesWriter {
 
     /**
      * What a tool answered, as the protocol takes it: the text itself when the result is text alone,
-     * and an array of content entries otherwise — a result that carried an image has nowhere to go
-     * inside a string. A group among the result's parts goes out as the parts it holds: this
-     * protocol has no layer to hold one part inside another, so the group is shape rather than a
-     * node of its own.
+     * and an array of content entries otherwise — a result that carried an image, or a field of its
+     * own, has nowhere to go inside a string. A group among the result's parts goes out as the parts
+     * it holds: this protocol has no layer to hold one part inside another, so the group is shape
+     * rather than a node of its own.
      */
     private static Object output(List<ContentPart> parts) {
         List<ContentPart> flat = flatten(parts);
-        if (flat.stream().allMatch(TextPart.class::isInstance)) {
+        if (flat.stream().allMatch(ResponsesWriter::plainText)) {
             return textOf(flat);
         }
         List<Map<String, Object>> content = new ArrayList<>();
@@ -551,6 +551,11 @@ class ResponsesWriter {
             }
         }
         return content;
+    }
+
+    /** Whether a part is text the string form can carry: a text part with no field of its own. */
+    private static boolean plainText(ContentPart part) {
+        return part instanceof TextPart text && (text.getExtras() == null || text.getExtras().isEmpty());
     }
 
     /**
@@ -584,17 +589,14 @@ class ResponsesWriter {
         return entry;
     }
 
+    /**
+     * The text the parts say, joined: what the string form of a tool's answer holds. The parts are
+     * text alone, which the caller has established, and one that says nothing adds nothing.
+     */
     private static String textOf(List<ContentPart> parts) {
         StringBuilder text = new StringBuilder();
         for (ContentPart part : parts) {
-            if (!(part instanceof TextPart textPart)) {
-                throw unsupportedPart(part);
-            }
-            if (textPart.getExtras() != null && !textPart.getExtras().isEmpty()) {
-                throw new SynapseException("unsupported part for OpenAI Responses:"
-                        + " a tool result's content is a string, which cannot carry extras");
-            }
-            if (textPart.getText() != null) {
+            if (part instanceof TextPart textPart && textPart.getText() != null) {
                 text.append(textPart.getText());
             }
         }

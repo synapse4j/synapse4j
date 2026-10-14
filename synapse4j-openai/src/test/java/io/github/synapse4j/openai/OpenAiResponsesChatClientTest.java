@@ -427,6 +427,24 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
+    void toolResultFieldsTakeArray() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(),
+                new ToolResultPart("call_1", "get_weather",
+                        new TextPart("sunny", new ProviderExtras().put("note", "n")))));
+
+        client.chat(request);
+
+        // A string cannot carry a field of its own, so the answer takes the entry array — the other
+        // form this protocol takes a tool's answer in.
+        assertEquals(List.of(Map.of("type", "function_call_output", "call_id", "call_1", "output",
+                List.of(Map.of("type", "input_text", "text", "sunny", "note", "n")))),
+                inputOf(parseCaptured()));
+    }
+
+    @Test
     void emptyMessageContributesNoItem() {
         stubCompletion();
 
