@@ -236,6 +236,9 @@ class ResponsesReader {
             }
         }
         if ("message".equals(type)) {
+            // The kind rides with the item's own members: it is optional on the wire, so a part read
+            // from an item that spelled it goes back out as the item it was.
+            members.put("type", type);
             message.part(readMessageItem(members));
             return false;
         }
@@ -263,8 +266,9 @@ class ResponsesReader {
 
     /**
      * A message item as the one part it becomes: what it says are the part's sub-parts, and the
-     * item's own members — its identity and status — ride in the part's extras, which is what keeps
-     * a turn of two message items two items and lets each be replayed as the item it was.
+     * item's own members — the kind it is, its identity and status — ride in the part's extras, which
+     * is what keeps a turn of two message items two items and lets each be replayed as the item it
+     * was.
      */
     private static ListPart readMessageItem(Map<?, ?> members) {
         List<ContentPart> content = new ArrayList<>();
@@ -278,10 +282,10 @@ class ResponsesReader {
                     // value has to arrive and go back out with the item.
                     extras.put(name, member.getValue());
                 }
-            } else if (!"type".equals(name)) {
-                // The kind is not a member of the part: it is gone from a whole item by the time this
-                // runs, and still there on the frame that opens one, where it says nothing the part
-                // does not already say.
+            } else {
+                // The item's own members ride in the extras under the names they came with, the kind
+                // included: it is optional on the wire, so an item that spelled it goes back out
+                // spelling it, and one that left it out goes back out without it.
                 extras.put(name, member.getValue());
             }
         }

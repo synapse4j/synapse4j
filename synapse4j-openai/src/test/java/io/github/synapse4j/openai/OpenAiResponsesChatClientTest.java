@@ -591,7 +591,7 @@ class OpenAiResponsesChatClientTest {
 
         // The turn goes back as the item it was, the element read whole included, in the place it
         // held — or the provider is told a turn that never happened.
-        assertEquals(List.of(Map.of("role", "assistant",
+        assertEquals(List.of(Map.of("type", "message", "role", "assistant",
                 "content", List.of(Map.of("type", "output_text", "text", "visible"),
                         Map.of("type", "audio", "id", "a_1")),
                 "id", "msg_1", "status", "completed")),
@@ -665,6 +665,7 @@ class OpenAiResponsesChatClientTest {
         assertEquals("Hi there", assertInstanceOf(TextPart.class, item.getSubParts().get(0)).getText());
         assertEquals("msg_1", item.getExtras().get("id"));
         assertEquals("completed", item.getExtras().get("status"));
+        assertEquals("message", item.getExtras().get("type"));
 
         ChatRequest replay = requestWithModel();
         replay.addPendingMessage(answer.getMessage());
@@ -672,7 +673,7 @@ class OpenAiResponsesChatClientTest {
         client.chat(replay);
 
         // And it goes back out as the one item it was, its members and its entry beside it.
-        assertEquals(List.of(Map.of("role", "assistant",
+        assertEquals(List.of(Map.of("type", "message", "role", "assistant",
                 "content", List.of(Map.of("type", "output_text", "text", "Hi there")),
                 "id", "msg_1", "status", "completed")),
                 inputOf(parseCaptured()));
@@ -776,7 +777,7 @@ class OpenAiResponsesChatClientTest {
         client.chat(replay);
 
         // And it goes back out as the value it was, in the place the protocol spells it.
-        assertEquals(List.of(Map.of("role", "assistant", "content", "plain text",
+        assertEquals(List.of(Map.of("type", "message", "role", "assistant", "content", "plain text",
                 "id", "msg_1", "status", "completed")), inputOf(parseCaptured()));
     }
 
@@ -821,7 +822,7 @@ class OpenAiResponsesChatClientTest {
         client.chat(replay);
 
         // And the turn goes back as the item it was, the refusal back where the protocol spells it.
-        assertEquals(List.of(Map.of("role", "assistant",
+        assertEquals(List.of(Map.of("type", "message", "role", "assistant",
                 "content", List.of(Map.of("type", "refusal", "refusal", "I cannot help with that"),
                         Map.of("type", "output_text", "text", "visible")),
                 "id", "msg_9", "status", "completed")),
@@ -964,6 +965,7 @@ class OpenAiResponsesChatClientTest {
         assertEquals("Hi", assertInstanceOf(TextPart.class, item.getSubParts().get(0)).getText());
         assertEquals("msg_1", item.getExtras().get("id"));
         assertEquals("in_progress", item.getExtras().get("status"));
+        assertEquals("message", item.getExtras().get("type"));
         assertNull(item.getExtras().get("item_id"));
         assertNull(item.getExtras().get("output_index"));
     }
