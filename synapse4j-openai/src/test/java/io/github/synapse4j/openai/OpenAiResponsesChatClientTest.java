@@ -486,6 +486,21 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
+    void unknownRoleRefusedBothForms() {
+        stubCompletion();
+
+        ChatRequest textOnly = requestWithModel();
+        textOnly.addPendingMessage(ChatMessage.of("nonsense", new TextPart("hi")));
+        assertThrows(SynapseException.class, () -> client.chat(textOnly));
+
+        stubCompletion();
+        ChatRequest withEntries = requestWithModel();
+        withEntries.addPendingMessage(ChatMessage.of("nonsense",
+                new TextPart("hi", new ProviderExtras().put("k", "v"))));
+        assertThrows(SynapseException.class, () -> client.chat(withEntries));
+    }
+
+    @Test
     void fieldsOnlyMessageBecomesItem() {
         stubCompletion();
 

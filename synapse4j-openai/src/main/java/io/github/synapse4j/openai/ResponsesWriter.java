@@ -311,7 +311,9 @@ class ResponsesWriter {
      * What a message says as the content it becomes. A message that is text alone takes the
      * plain-string content form; anything else — an image, a part carrying a field this module does
      * not model — takes the array form, which is the only one that can hold it. {@code null} when the
-     * message carries nothing to put there.
+     * message carries nothing to put there. A role this protocol has no word for is refused whichever
+     * form the content takes: the string form shapes nothing by it, but the role still has to be one
+     * this protocol can read.
      */
     private static @Nullable Object contentValue(@Nullable String role, List<ContentPart> content) {
         if (!arrayContent(content)) {
@@ -322,7 +324,11 @@ class ResponsesWriter {
                     text.append(value);
                 }
             }
-            return text.length() > 0 ? text.toString() : null;
+            if (text.length() == 0) {
+                return null;
+            }
+            textType(role);
+            return text.toString();
         }
         // What the assistant said is this protocol's own kind of content entry, and what anyone else
         // says is the input kind: an assistant turn replayed as an item has to look like the item it
