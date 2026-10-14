@@ -59,6 +59,14 @@ public class ToolsProcessor implements SmartInitializingSingleton {
     public void afterSingletonsInstantiated() {
         Map<String, List<Tool>> byClient = toolsByClient();
         Map<String, ChatClient> clients = beanFactory.getBeansOfType(ChatClient.class);
+        // This is checked before anything is registered, so a failure leaves no log line saying a
+        // registration happened.
+        byClient.keySet().stream()
+                .filter(name -> !name.isEmpty() && !clients.containsKey(name))
+                .findFirst()
+                .ifPresent(name -> {
+                    throw new SynapseException("no chat client bean named '" + name + "', which a @Tools class names");
+                });
         List<Tool> shared = byClient.getOrDefault("", List.of());
         clients.forEach((name, client) -> {
             List<Tool> tools = new ArrayList<>(shared);
@@ -67,12 +75,6 @@ public class ToolsProcessor implements SmartInitializingSingleton {
             tools.forEach(client::addDefaultTool);
             log.info("Registered " + tools.size() + " tool(s) on chat client '" + name + "'");
         });
-        byClient.keySet().stream()
-                .filter(name -> !name.isEmpty() && !clients.containsKey(name))
-                .findFirst()
-                .ifPresent(name -> {
-                    throw new SynapseException("no chat client bean named '" + name + "', which a @Tools class names");
-                });
     }
 
     /**

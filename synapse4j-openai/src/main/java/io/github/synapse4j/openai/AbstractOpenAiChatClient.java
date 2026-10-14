@@ -143,17 +143,7 @@ public abstract class AbstractOpenAiChatClient extends AbstractHttpChatClient<Op
                 default -> reader.skipValue();
             }
         }
-        StringBuilder detail = new StringBuilder();
-        if (message != null) {
-            detail.append(": ").append(message);
-        }
-        if (type != null) {
-            detail.append(" [").append(type).append(']');
-        }
-        if (code != null) {
-            detail.append(" (").append(code).append(')');
-        }
-        return detail.toString();
+        return OpenAiError.detail(message, type, code);
     }
 
     /**

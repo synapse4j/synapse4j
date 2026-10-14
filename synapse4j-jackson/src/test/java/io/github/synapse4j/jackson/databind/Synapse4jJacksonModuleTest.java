@@ -1,9 +1,11 @@
 package io.github.synapse4j.jackson.databind;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.List;
@@ -114,6 +116,29 @@ class Synapse4jJacksonModuleTest {
 
         assertEquals("\"hello\"", mapper.writeValueAsString(text));
         assertTrue(closed.get());
+    }
+
+    @Test
+    void writeFailureKeepsCloseSuppressed() {
+        IOException closeFailure = new IOException("close failed");
+        Reader text = new Reader() {
+
+            @Override
+            public int read(char[] buffer, int offset, int length) throws IOException {
+                throw new IOException("read failed");
+            }
+
+            @Override
+            public void close() throws IOException {
+                throw closeFailure;
+            }
+
+        };
+
+        Exception thrown = assertThrows(Exception.class, () -> mapper.writeValueAsString(text));
+
+        // The read's failure is what surfaces; the close's rides with it instead of replacing it.
+        assertArrayEquals(new Throwable[] { closeFailure }, thrown.getSuppressed());
     }
 
     /** A value carrying schemas the way a model type would: one field, and a list of them. */

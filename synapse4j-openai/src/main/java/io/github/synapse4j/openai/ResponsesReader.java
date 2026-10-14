@@ -531,27 +531,15 @@ class ResponsesReader {
     }
 
     /**
-     * The detail an error object spells out — {@code ": message [type] (code)}, only the members it
-     * has.
+     * The detail an error object spells out, or the value's own text when it is not an object at all:
+     * a refused call reports an object, and nothing promises the shape of what else may arrive.
      */
     private static String errorDetail(@Nullable Object error) {
         if (!(error instanceof Map<?, ?> members)) {
             return error == null ? "" : ": " + error;
         }
-        String message = stringOf(members.get("message"));
-        String type = stringOf(members.get("type"));
-        String code = stringOf(members.get("code"));
-        StringBuilder detail = new StringBuilder();
-        if (message != null) {
-            detail.append(": ").append(message);
-        }
-        if (type != null) {
-            detail.append(" [").append(type).append(']');
-        }
-        if (code != null) {
-            detail.append(" (").append(code).append(')');
-        }
-        return detail.toString();
+        return OpenAiError.detail(stringOf(members.get("message")), stringOf(members.get("type")),
+                stringOf(members.get("code")));
     }
 
     /**

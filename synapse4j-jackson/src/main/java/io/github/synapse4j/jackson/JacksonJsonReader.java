@@ -10,16 +10,13 @@ import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 import io.github.synapse4j.exception.SynapseException;
-import io.github.synapse4j.exception.SynapseIOException;
 import io.github.synapse4j.json.AbstractJsonReader;
 import io.github.synapse4j.json.JsonReader;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
-import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.JsonToken;
 import tools.jackson.core.ObjectReadContext;
-import tools.jackson.core.exc.JacksonIOException;
 import tools.jackson.core.json.JsonFactory;
 
 /**
@@ -60,7 +57,7 @@ class JacksonJsonReader extends AbstractJsonReader {
      * that promises this library's own.
      */
     static JacksonJsonReader open(JsonFactory factory, InputStream in) {
-        return translate("Opening the JSON reader failed",
+        return JacksonFailures.translate("Opening the JSON reader failed",
                 () -> new JacksonJsonReader(factory.createParser(ObjectReadContext.empty(), in)));
     }
 
@@ -176,7 +173,7 @@ class JacksonJsonReader extends AbstractJsonReader {
     }
 
     private <T> @Nullable T read(Supplier<T> read) {
-        return translate("Reading the JSON document failed", read);
+        return JacksonFailures.translate("Reading the JSON document failed", read);
     }
 
     /**
@@ -193,22 +190,6 @@ class JacksonJsonReader extends AbstractJsonReader {
             read.run();
             return null;
         });
-    }
-
-    /**
-     * Runs one read, translating Jackson's own failures into this library's: an I/O failure into a
-     * {@link SynapseIOException}, anything else into a {@link SynapseException}, each under the
-     * given message. The answer's nullness is the supplier's, so a read whose supplier always
-     * answers is not checked again for a null it cannot produce.
-     */
-    private static <T> T translate(String message, Supplier<T> read) {
-        try {
-            return read.get();
-        } catch (JacksonIOException failure) {
-            throw new SynapseIOException(message, failure.getCause());
-        } catch (JacksonException failure) {
-            throw new SynapseException(message, failure);
-        }
     }
 
 }

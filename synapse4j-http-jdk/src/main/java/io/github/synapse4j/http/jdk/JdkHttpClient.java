@@ -9,7 +9,6 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Objects;
 import java.util.concurrent.Flow;
 
 import org.jspecify.annotations.Nullable;
@@ -22,6 +21,7 @@ import io.github.synapse4j.http.HttpClient;
 import io.github.synapse4j.http.HttpOptions;
 import io.github.synapse4j.http.HttpRequest;
 import io.github.synapse4j.http.HttpResponse;
+import lombok.NonNull;
 
 /**
  * The {@link HttpClient} SPI implemented on the JDK's {@code java.net.http.HttpClient}, adding no
@@ -104,8 +104,8 @@ public class JdkHttpClient implements HttpClient {
      * @param delegate the JDK client to send through; never {@code null}
      * @param options  the options to fall back to, or {@code null} for the standard ones
      */
-    public JdkHttpClient(java.net.http.HttpClient delegate, @Nullable HttpOptions options) {
-        this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
+    public JdkHttpClient(@NonNull java.net.http.HttpClient delegate, @Nullable HttpOptions options) {
+        this.delegate = delegate;
         this.options = HttpOptions.effective(options, HttpOptions.defaults());
     }
 

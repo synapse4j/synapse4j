@@ -329,7 +329,8 @@ class ResponsesWriter {
         return switch (ChatRole.from(role)) {
             case ASSISTANT -> "output_text";
             case USER, DEVELOPER -> "input_text";
-            case null -> throw new SynapseException("unsupported role for OpenAI Responses: " + role);
+            case null -> throw new SynapseException("unsupported role for OpenAI Responses: "
+                    + (role == null ? "the role is unset" : role));
         };
     }
 

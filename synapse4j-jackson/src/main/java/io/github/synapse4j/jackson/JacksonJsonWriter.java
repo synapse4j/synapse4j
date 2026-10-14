@@ -4,19 +4,15 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.util.function.Supplier;
 
 import org.jspecify.annotations.Nullable;
 
-import io.github.synapse4j.exception.SynapseException;
 import io.github.synapse4j.exception.SynapseIOException;
 import io.github.synapse4j.json.JsonWriter;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
-import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.ObjectWriteContext;
-import tools.jackson.core.exc.JacksonIOException;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -45,7 +41,7 @@ class JacksonJsonWriter implements JsonWriter {
      * library's own.
      */
     static JacksonJsonWriter open(JsonFactory factory, JsonMapper mapper, OutputStream out) {
-        return translate("Opening the JSON writer failed",
+        return JacksonFailures.translate("Opening the JSON writer failed",
                 () -> new JacksonJsonWriter(factory.createGenerator(ObjectWriteContext.empty(), out), mapper));
     }
 
@@ -81,15 +77,23 @@ class JacksonJsonWriter implements JsonWriter {
 
     @Override
     public JsonWriter writeString(Reader text) {
+        Throwable writeFailure = null;
         try {
             // A negative length is Jackson's "read the reader to its end"; it does not close the
             // reader, so this method does — also when the write fails, see the interface contract.
             return write(() -> generator.writeString(text, -1));
+        } catch (RuntimeException | Error failure) {
+            writeFailure = failure;
+            throw failure;
         } finally {
             try {
                 text.close();
-            } catch (IOException failure) {
-                throw new SynapseIOException("Closing the string source failed", failure);
+            } catch (IOException closeFailure) {
+                if (writeFailure == null) {
+                    throw new SynapseIOException("Closing the string source failed", closeFailure);
+                }
+                // A failing close must not replace the failure that came first: it rides with it.
+                writeFailure.addSuppressed(closeFailure);
             }
         }
     }
@@ -142,25 +146,10 @@ class JacksonJsonWriter implements JsonWriter {
     }
 
     private JsonWriter write(Runnable write) {
-        return translate("Writing the JSON document failed", () -> {
+        return JacksonFailures.translate("Writing the JSON document failed", () -> {
             write.run();
             return this;
         });
-    }
-
-    /**
-     * Runs one write, translating Jackson's own failures into this library's: an I/O failure into
-     * a {@link SynapseIOException}, anything else into a {@link SynapseException}, each under the
-     * given message.
-     */
-    private static <T> T translate(String message, Supplier<T> write) {
-        try {
-            return write.get();
-        } catch (JacksonIOException failure) {
-            throw new SynapseIOException(message, failure.getCause());
-        } catch (JacksonException failure) {
-            throw new SynapseException(message, failure);
-        }
     }
 
 }

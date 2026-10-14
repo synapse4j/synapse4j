@@ -1,11 +1,14 @@
 package io.github.synapse4j.jackson;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.Reader;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -15,6 +18,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import io.github.synapse4j.data.ProviderExtras;
+import io.github.synapse4j.exception.SynapseIOException;
 import io.github.synapse4j.json.JsonSchema;
 import io.github.synapse4j.json.JsonSchemaBuilder;
 import io.github.synapse4j.json.JsonWriter;
@@ -78,6 +82,32 @@ class JacksonJsonWriterTest {
 
         assertEquals("{\"payload\":\"" + value + "\"}", sink.text());
         assertTrue(text.closed);
+    }
+
+    @Test
+    void writeFailureKeepsCloseSuppressed() {
+        IOException closeFailure = new IOException("close failed");
+        Reader text = new Reader() {
+
+            @Override
+            public int read(char[] buffer, int offset, int length) throws IOException {
+                throw new IOException("read failed");
+            }
+
+            @Override
+            public void close() throws IOException {
+                throw closeFailure;
+            }
+
+        };
+
+        JsonWriter writer = codec.writer(new ByteArrayOutputStream());
+
+        SynapseIOException thrown = assertThrows(SynapseIOException.class, () -> writer.writeString(text));
+
+        // The read's failure is what surfaces; the close's rides with it instead of replacing it.
+        assertArrayEquals(new Throwable[] { closeFailure }, thrown.getSuppressed());
+        assertEquals("read failed", thrown.getCause().getMessage());
     }
 
     @Test

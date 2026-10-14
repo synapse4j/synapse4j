@@ -69,9 +69,10 @@ public class ChatRequest {
     private @Nullable ChatContext context;
 
     /**
-     * A copy of another call: the same messages and tools in this copy's own lists, the same system
-     * slot, and a copy of its options, so a change here leaves the original alone. The context is the
-     * exception — one object both calls point at, so a change to it is a change to both.
+     * A copy of another call: this copy's own lists, holding the same messages and tools, and a copy
+     * of its options — so adding or removing an entry, or changing a setting, leaves the original
+     * alone. What the copy shares by reference is the entries themselves, the system message and the
+     * context: changing one of those is a change to both calls.
      */
     public ChatRequest(ChatRequest other) {
         this.systemMessage = other.systemMessage;

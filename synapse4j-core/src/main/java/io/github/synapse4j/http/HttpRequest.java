@@ -32,7 +32,8 @@ public class HttpRequest {
     public static final String HEAD = "HEAD";
     public static final String PATCH = "PATCH";
 
-    /** The HTTP method; {@link #GET} until a caller sets another. */
+    /** The HTTP method; {@link #GET} until a caller sets another. Never {@code null}. */
+    @NonNull
     private String method = GET;
 
     /** The request target, e.g. {@code "https://api.example.com/v1/chat"}. */
