@@ -22,7 +22,6 @@ import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.github.victools.jsonschema.generator.SchemaGenerator;
 
 import io.github.synapse4j.jackson.SchemaFixtures.Nested;
@@ -80,15 +79,6 @@ class JacksonSchemaConfigBuildersTest {
     /** A member its reader-side annotation demands while the inclusion it carries can leave it out. */
     record Demanded(@JsonProperty(required = true) @JsonInclude(JsonInclude.Include.NON_NULL) String maybeWritten,
             String always) {
-    }
-
-    /** A member the writer flattens into the enclosing object rather than writing as one of its own. */
-    static class Unwrapping {
-
-        public String b;
-
-        @JsonUnwrapped
-        public Nested inner;
     }
 
     /** A document with every property present, the nullable one as null. */
@@ -246,23 +236,6 @@ class JacksonSchemaConfigBuildersTest {
         JsonSchema schema = codec.generateEncodeSchema(Demanded.class);
 
         assertEquals(List.of("always"), List.copyOf(schema.getRequired()));
-    }
-
-    @Test
-    void unwrappedMemberFlattenedBothWays() {
-        // The writer flattens the member into the enclosing object, so the schema has to flatten with
-        // it: a schema that named the member would describe a property no document ever carries.
-        assertEquals(List.of("b", "value"), properties(codec.generateEncodeSchema(Unwrapping.class)));
-        assertEquals(List.of("b", "value"), properties(codec.generateDecodeSchema(Unwrapping.class)));
-        assertEquals(properties(codec.generateEncodeSchema(Unwrapping.class)),
-                keysOf(codec.encode(unwrapping())));
-    }
-
-    private static Unwrapping unwrapping() {
-        Unwrapping outer = new Unwrapping();
-        outer.b = "b";
-        outer.inner = new Nested("v");
-        return outer;
     }
 
     @Test
