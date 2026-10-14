@@ -414,6 +414,36 @@ class AnthropicChatClientTest {
     }
 
     @Test
+    void emptyTextContributesNoTurn() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(), new TextPart("")));
+
+        client.chat(request);
+
+        // A part that says nothing leaves the message with nothing to contribute, so the whole turn
+        // is left out rather than sent as a bare role.
+        assertEquals(List.of(), parseCaptured().get("messages"));
+    }
+
+    @Test
+    void unreadableRoleKeptOnMessage() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"id\":\"msg_0\",\"type\":\"message\",\"role\":123,\"model\":\"claude-test\","
+                        + "\"content\":[{\"type\":\"text\",\"text\":\"ok\"}],\"stop_reason\":\"end_turn\"}")
+                        .getBytes(UTF_8)));
+
+        ChatResponse response = client.chat(requestWithModel());
+
+        // A role of another shape than the string the field takes is kept on the message rather than
+        // dropped, as every other unreadable member is.
+        assertNull(response.getMessage().getRole());
+        assertTrue(response.getMessage().getExtras().contains("role"));
+    }
+
+    @Test
     void emptySystemMessageWritesNoFraming() {
         stubCompletion();
 

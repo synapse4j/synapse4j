@@ -673,6 +673,33 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
+    void emptyTextContributesNoEntry() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(), new TextPart("")));
+
+        client.chat(request);
+
+        // A part that says nothing leaves the message with nothing to contribute, so it is left out
+        // rather than sent as a bare role this protocol has no content for.
+        assertEquals(List.of(), parseCaptured().get("messages"));
+    }
+
+    @Test
+    void unreadableRoleKeptOnMessage() {
+        stub.canned.setStatusCode(200);
+        stub.canned.setBody(new ByteArrayInputStream(
+                ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":"
+                        + "{\"role\":123,\"content\":\"ok\"}}]}").getBytes(UTF_8)));
+
+        ChatResponse response = client.chat(requestWithModel());
+
+        assertNull(response.getMessage().getRole());
+        assertTrue(response.getMessage().getExtras().contains("role"));
+    }
+
+    @Test
     void emptySystemMessageContributesNoEntry() {
         stubCompletion();
 

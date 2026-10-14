@@ -181,7 +181,15 @@ class MessagesReader {
             switch (field) {
                 case "id" -> response.setId(reader.string());
                 case "model" -> response.setModel(reader.string());
-                case "role" -> message.role(reader.string());
+                case "role" -> {
+                    if (reader.token() == JsonReader.Token.STRING) {
+                        message.role(reader.string());
+                    } else {
+                        // A role of another shape than the string the field takes is kept under its
+                        // own name rather than dropped, as every other unreadable member is.
+                        message.mapExtras(extras -> extras.put("role", reader.captureValue()));
+                    }
+                }
                 case "content" -> {
                     readContent(reader, message);
                     contentRead = true;

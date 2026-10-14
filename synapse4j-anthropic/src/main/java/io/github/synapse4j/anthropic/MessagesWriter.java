@@ -208,12 +208,27 @@ class MessagesWriter {
     }
 
     /**
-     * Whether a message contributes anything at all: a part that survives flattening, or a field of
-     * its own. One that does not is left out rather than sent as a bare turn with nothing in it.
+     * Whether a message contributes anything at all: a part that becomes a block, or a field of its
+     * own. One that does not is left out rather than sent as a bare turn with nothing in it.
      */
     private static boolean saysSomething(ChatMessage message) {
         ProviderExtras extras = message.getExtras();
-        return !flatten(message.getParts()).isEmpty() || (extras != null && !extras.isEmpty());
+        return (extras != null && !extras.isEmpty())
+                || flatten(message.getParts()).stream().anyMatch(MessagesWriter::saysSomething);
+    }
+
+    /**
+     * Whether a part becomes a block: a text or reasoning part carrying neither text nor a field of
+     * its own says nothing, and the protocol has no place for it.
+     */
+    private static boolean saysSomething(ContentPart part) {
+        if (part instanceof TextPart text) {
+            return textBlock(text) != null;
+        }
+        if (part instanceof ReasoningPart reasoning) {
+            return thinking(reasoning) != null;
+        }
+        return true;
     }
 
     private Map<String, Object> message(ChatMessage message) {

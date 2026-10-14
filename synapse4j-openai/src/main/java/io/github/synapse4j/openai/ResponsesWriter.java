@@ -234,9 +234,8 @@ class ResponsesWriter {
             // own, which belong to it and have nowhere else to go, so it becomes the one item that
             // holds them.
             ProviderExtras own = message.getExtras();
-            return own == null
-                    ? Stream.empty()
-                    : Stream.of(messageItem(message.getRole(), List.of(), own));
+            Map<String, Object> item = own == null ? null : messageItem(message.getRole(), List.of(), own);
+            return item == null ? Stream.empty() : Stream.of(item);
         }
         List<ContentPart> content = new ArrayList<>();
         for (ContentPart part : message.getParts()) {
@@ -257,14 +256,21 @@ class ResponsesWriter {
                 return Stream.of(messageItem(item, message.getRole(), messageExtras));
             } else if (part instanceof RawPart raw) {
                 // A part kept whole at the top of a message is an item this module does not model:
-                // its members are the item, so they go out exactly as they were read.
-                return Stream.of(raw.members());
+                // its members are the item, so they go out as they were read, with the message's own
+                // fields merged in beside them.
+                Map<String, Object> item = new LinkedHashMap<>();
+                if (messageExtras != null) {
+                    messageExtras.mergeInto(item);
+                }
+                item.putAll(raw.members());
+                return Stream.of(item);
             } else if (part instanceof ToolCallPart call) {
                 return Stream.of(functionCall(call, messageExtras));
             } else if (part instanceof ToolResultPart result) {
                 return Stream.of(functionCallOutput(result, messageExtras));
             } else if (part instanceof ReasoningPart reasoning) {
-                return Stream.of(reasoningItem(reasoning, messageExtras));
+                Map<String, Object> item = reasoningItem(reasoning, messageExtras);
+                return item == null ? Stream.empty() : Stream.of(item);
             } else if (part instanceof TextPart || part instanceof MediaPart) {
                 // Text and images make no item of their own: they are the message's own item, which
                 // stands where the first of them sits — so a part the model wrote before it answered,
@@ -273,18 +279,23 @@ class ResponsesWriter {
                     return Stream.empty();
                 }
                 messageAdded[0] = true;
-                return Stream.of(messageItem(message.getRole(), content, message.getExtras()));
+                Map<String, Object> item = messageItem(message.getRole(), content, message.getExtras());
+                return item == null ? Stream.empty() : Stream.of(item);
             } else {
                 throw unsupportedPart(part);
             }
         });
     }
 
-    private static Map<String, Object> messageItem(@Nullable String role, List<ContentPart> content,
+    private static @Nullable Map<String, Object> messageItem(@Nullable String role, List<ContentPart> content,
             @Nullable ProviderExtras extras) {
+        Object contentValue = contentValue(role, content);
+        if (contentValue == null && (extras == null || extras.isEmpty())) {
+            // Nothing but the role is not a turn, and this protocol has no place for one.
+            return null;
+        }
         Map<String, Object> entry = new LinkedHashMap<>();
         putIfSet(entry, "role", role);
-        Object contentValue = contentValue(role, content);
         // The content carries extras of its own, so the extras' reach ends here: it goes in after the
         // merge, unless the extras name it whole.
         if (extras != null) {
@@ -410,7 +421,7 @@ class ResponsesWriter {
      */
     private static @Nullable Map<String, Object> textEntry(TextPart part, String type) {
         boolean hasText = part.getText() != null && !part.getText().isEmpty();
-        if (!hasText && (part.getExtras() == null || part.getExtras().isEmpty())) {
+        if (saysNothing(part.getText(), part.getExtras())) {
             return null;
         }
         Map<String, Object> entry = new LinkedHashMap<>();
@@ -535,14 +546,21 @@ class ResponsesWriter {
     }
 
     /**
-     * The reasoning as the item it becomes: this protocol keeps the summary beside the answer rather
-     * than inside it, and carries the opaque companion that proves the reasoning came from the model
-     * — both of which have to go back on the next turn for the model to accept its own turn.
+     * The reasoning as the item it becomes, or {@code null} when it carries neither text nor a field
+     * of its own and the message has nothing to put there either: this protocol keeps the summary
+     * beside the answer rather than inside it, and carries the opaque companion that proves the
+     * reasoning came from the model — both of which have to go back on the next turn for the model to
+     * accept its own turn.
      */
-    private static Map<String, Object> reasoningItem(ReasoningPart part, @Nullable ProviderExtras messageExtras) {
+    private static @Nullable Map<String, Object> reasoningItem(ReasoningPart part,
+            @Nullable ProviderExtras messageExtras) {
+        boolean hasText = part.getText() != null && !part.getText().isEmpty();
+        if (saysNothing(part.getText(), part.getExtras()) && (messageExtras == null || messageExtras.isEmpty())) {
+            return null;
+        }
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("type", "reasoning");
-        if (part.getText() != null) {
+        if (hasText) {
             Map<String, Object> summary = new LinkedHashMap<>();
             summary.put("type", "summary_text");
             summary.put("text", part.getText());
@@ -670,12 +688,32 @@ class ResponsesWriter {
     }
 
     /**
-     * Whether a message contributes anything at all: a part that survives flattening, or a field of
-     * its own. One that does not is left out rather than sent as framing with nothing in it.
+     * Whether a message contributes anything at all: a part that becomes an item, or a field of its
+     * own. One that does not is left out rather than sent as framing with nothing in it.
      */
     private static boolean saysSomething(ChatMessage message) {
         ProviderExtras extras = message.getExtras();
-        return !flatten(message.getParts()).isEmpty() || (extras != null && !extras.isEmpty());
+        return (extras != null && !extras.isEmpty())
+                || flatten(message.getParts()).stream().anyMatch(ResponsesWriter::saysSomething);
+    }
+
+    /**
+     * Whether a part becomes an item: a text or reasoning part carrying neither text nor a field of
+     * its own says nothing, and every other part is an item of its own.
+     */
+    private static boolean saysSomething(ContentPart part) {
+        if (part instanceof TextPart text) {
+            return !saysNothing(text.getText(), text.getExtras());
+        }
+        if (part instanceof ReasoningPart reasoning) {
+            return !saysNothing(reasoning.getText(), reasoning.getExtras());
+        }
+        return true;
+    }
+
+    /** Whether a text or reasoning part says nothing: no text and no field of its own. */
+    private static boolean saysNothing(@Nullable String text, @Nullable ProviderExtras extras) {
+        return (text == null || text.isEmpty()) && (extras == null || extras.isEmpty());
     }
 
     private static SynapseException unsupportedPart(ContentPart part) {

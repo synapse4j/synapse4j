@@ -506,12 +506,29 @@ class CompletionsWriter {
     }
 
     /**
-     * Whether a message contributes nothing at all: no part that survives flattening, and no field of
+     * Whether a message contributes nothing at all: no part that becomes a member, and no field of
      * its own. One that does is left out rather than sent as a bare role with nothing under it.
      */
-    private static boolean saysNothing(ChatMessage message, List<ContentPart> parts) {
+    private boolean saysNothing(ChatMessage message, List<ContentPart> parts) {
         ProviderExtras extras = message.getExtras();
-        return parts.isEmpty() && (extras == null || extras.isEmpty());
+        return (extras == null || extras.isEmpty())
+                && parts.stream().noneMatch(this::saysSomething);
+    }
+
+    /**
+     * Whether a part becomes a member: a text part carrying neither text nor a field of its own says
+     * nothing, and a reasoning part says something only where this endpoint is configured to carry
+     * reasoning and the part has text to put there.
+     */
+    private boolean saysSomething(ContentPart part) {
+        if (part instanceof TextPart text) {
+            return textPart(text) != null;
+        }
+        if (part instanceof ReasoningPart reasoning) {
+            return !config.getReasoningField().isBlank()
+                    && reasoning.getText() != null && !reasoning.getText().isEmpty();
+        }
+        return true;
     }
 
     /**

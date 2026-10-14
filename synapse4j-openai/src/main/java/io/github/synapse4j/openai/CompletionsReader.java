@@ -141,7 +141,15 @@ class CompletionsReader {
                 continue;
             }
             switch (field) {
-                case "role" -> message.role(reader.string());
+                case "role" -> {
+                    if (reader.token() == JsonReader.Token.STRING) {
+                        message.role(reader.string());
+                    } else {
+                        // A role of another shape than the string the field takes is kept under its
+                        // own name rather than dropped, as every other unreadable member is.
+                        extras.put("role", reader.captureValue());
+                    }
+                }
                 case "content" -> readContent(reader, message, extras);
                 case "tool_calls" -> readToolCalls(reader, message);
                 default -> extras.put(field, reader.captureValue());

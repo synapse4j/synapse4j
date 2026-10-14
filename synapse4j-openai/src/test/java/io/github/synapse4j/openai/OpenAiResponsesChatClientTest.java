@@ -440,6 +440,52 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
+    void emptyTextContributesNoItem() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.of(ChatRole.USER.value(), new TextPart("")));
+
+        client.chat(request);
+
+        // Text that says nothing leaves the message with nothing to contribute, so it makes no item.
+        assertEquals(List.of(), inputOf(parseCaptured()));
+    }
+
+    @Test
+    void emptyReasoningMakesNoItem() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.of(ChatRole.ASSISTANT.value(),
+                new ReasoningPart(null, null), new TextPart("42")));
+
+        client.chat(request);
+
+        // Reasoning carrying neither text nor a field of its own is no item, so only the text goes out.
+        assertEquals(List.of(Map.of("role", "assistant", "content", "42")), inputOf(parseCaptured()));
+    }
+
+    @Test
+    void keptPartCarriesMessageFields() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.builder()
+                .role(ChatRole.USER.value())
+                .part(RawPart.of(Map.of("type", "web_search_call", "id", "ws_1")))
+                .extras(new ProviderExtras().put("option", "o"))
+                .build());
+
+        client.chat(request);
+
+        // The message's own fields have nowhere else to go, so the item its kept-whole part becomes
+        // carries them beside the part's members.
+        assertEquals(List.of(Map.of("type", "web_search_call", "id", "ws_1", "option", "o")),
+                inputOf(parseCaptured()));
+    }
+
+    @Test
     void emptyMessageWithFieldsOfItsOwnStillBecomesAnItem() {
         stubCompletion();
 
