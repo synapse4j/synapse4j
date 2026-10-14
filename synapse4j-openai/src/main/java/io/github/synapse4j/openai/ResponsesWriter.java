@@ -229,6 +229,15 @@ class ResponsesWriter {
     }
 
     private Stream<Map<String, Object>> items(ChatMessage message) {
+        if (message.getParts().isEmpty()) {
+            // A message with nothing in it makes no item at all — unless it carries fields of its
+            // own, which belong to it and have nowhere else to go, so it becomes the one item that
+            // holds them.
+            ProviderExtras own = message.getExtras();
+            return own == null
+                    ? Stream.empty()
+                    : Stream.of(messageItem(message.getRole(), List.of(), own));
+        }
         List<ContentPart> content = new ArrayList<>();
         for (ContentPart part : message.getParts()) {
             if (part instanceof TextPart || part instanceof MediaPart) {

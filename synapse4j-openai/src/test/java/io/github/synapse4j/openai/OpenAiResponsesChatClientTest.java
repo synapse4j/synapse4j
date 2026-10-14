@@ -33,6 +33,7 @@ import io.github.synapse4j.data.ChatRole;
 import io.github.synapse4j.data.ChatStreamEvent;
 import io.github.synapse4j.data.ContentPart;
 import io.github.synapse4j.data.ListPart;
+import io.github.synapse4j.data.ProviderExtras;
 import io.github.synapse4j.data.RawPart;
 import io.github.synapse4j.data.ReasoningPart;
 import io.github.synapse4j.data.TextPart;
@@ -436,6 +437,23 @@ class OpenAiResponsesChatClientTest {
 
         // A message with nothing in it says nothing, so it makes no item at all.
         assertEquals(List.of(), inputOf(parseCaptured()));
+    }
+
+    @Test
+    void emptyMessageWithFieldsOfItsOwnStillBecomesAnItem() {
+        stubCompletion();
+
+        ChatRequest request = requestWithModel();
+        request.addPendingMessage(ChatMessage.builder()
+                .role(ChatRole.USER.value())
+                .extras(new ProviderExtras().put("option", "o"))
+                .build());
+
+        client.chat(request);
+
+        // The fields belong to this message and have nowhere else to go, so it becomes the one item
+        // that carries them even with nothing else in it.
+        assertEquals(List.of(Map.of("role", "user", "option", "o")), inputOf(parseCaptured()));
     }
 
     @Test
