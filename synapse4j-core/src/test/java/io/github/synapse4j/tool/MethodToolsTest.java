@@ -365,10 +365,17 @@ class MethodToolsTest {
         }
     }
 
-    /** The sub-interface written after its parent, so the order cannot decide which one is read. */
+    /**
+     * The sub-interface written after its parent, so the order cannot decide which one is read. The
+     * parent is named as well on purpose — the point is that Java's most-specific rule, not the
+     * order written here, is what a reader has to follow.
+     */
+    @SuppressWarnings("RedundantSuperinterface")
     public static class ParentFirst implements ParentDefault, ChildDefault {
     }
 
+    /** The same two, the other way round. */
+    @SuppressWarnings("RedundantSuperinterface")
     public static class ChildFirst implements ChildDefault, ParentDefault {
     }
 
