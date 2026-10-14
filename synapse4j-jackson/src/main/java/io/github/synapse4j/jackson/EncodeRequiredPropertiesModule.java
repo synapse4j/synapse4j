@@ -57,8 +57,14 @@ public class EncodeRequiredPropertiesModule implements Module {
 
     /**
      * The inclusion this property is written by: what it says itself, then what the class it is written
-     * as says, then the mapper's default — the order Jackson resolves them in, where {@code USE_DEFAULTS}
-     * asks for the next one down rather than naming an inclusion of its own.
+     * as says, then the mapper's default, where {@code USE_DEFAULTS} asks for the next one down rather
+     * than naming an inclusion of its own.
+     *
+     * <p>
+     * The property's own answer is read off the member the generator is describing — the field's own
+     * setting, or the getter's where the field carries none — rather than by merging a field with the
+     * getter over it the way Jackson does, so a property whose two members each carry one is not
+     * described the way writing would treat it.
      *
      * @param member the property being described; must not be {@code null}
      * @return the inclusion writing applies to it; never {@code null}
