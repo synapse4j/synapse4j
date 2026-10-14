@@ -637,7 +637,7 @@ class OpenAiCompletionsChatClientTest {
     }
 
     @Test
-    void toolResultGroupFlattensLikeAMessage() {
+    void toolResultGroupFlattens() {
         stub.canned.setStatusCode(200);
         stub.canned.setBody(new ByteArrayInputStream(
                 ("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\","

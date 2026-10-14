@@ -410,7 +410,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void toolResultGroupFlattensLikeAMessage() {
+    void toolResultGroupFlattens() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -486,7 +486,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void emptyMessageWithFieldsOfItsOwnStillBecomesAnItem() {
+    void fieldsOnlyMessageBecomesItem() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -503,7 +503,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void emptySystemMessageWritesNoInstructions() {
+    void emptySystemWritesNoInstructions() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -939,7 +939,7 @@ class OpenAiResponsesChatClientTest {
     }
 
     @Test
-    void announcedItemKeepsItsMembersNotTheFrames() {
+    void announcedItemKeepsItsMembers() {
         stub.canned.setStatusCode(200);
         stub.canned.getHeaders().putAll(Map.of("Content-Type", List.of("text/event-stream")));
         stub.canned.setBody(new ByteArrayInputStream(sse(

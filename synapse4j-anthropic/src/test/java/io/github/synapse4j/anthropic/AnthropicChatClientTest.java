@@ -381,7 +381,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void reasoningWithNothingToSayIsLeftOut() {
+    void emptyReasoningIsLeftOut() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
@@ -444,7 +444,7 @@ class AnthropicChatClientTest {
     }
 
     @Test
-    void emptySystemMessageWritesNoFraming() {
+    void emptySystemWritesNoFraming() {
         stubCompletion();
 
         ChatRequest request = requestWithModel();
