@@ -301,8 +301,10 @@ class ResponsesWriter {
         if (extras != null) {
             extras.mergeInto(entry);
         }
-        if (contentValue != null && !namesWhole(extras, "content")) {
-            entry.put("content", contentValue);
+        if (!namesWhole(extras, "content")) {
+            // Content is required of a message item, so a message whose parts say nothing still writes
+            // it — the empty string — rather than going out without a member the protocol demands.
+            entry.put("content", contentValue != null ? contentValue : "");
         }
         return entry;
     }

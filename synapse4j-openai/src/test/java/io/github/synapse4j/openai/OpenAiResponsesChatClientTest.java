@@ -513,8 +513,9 @@ class OpenAiResponsesChatClientTest {
         client.chat(request);
 
         // The fields belong to this message and have nowhere else to go, so it becomes the one item
-        // that carries them even with nothing else in it.
-        assertEquals(List.of(Map.of("role", "user", "option", "o")), inputOf(parseCaptured()));
+        // that carries them even with nothing else in it — with the content the protocol demands of a
+        // message item, empty here.
+        assertEquals(List.of(Map.of("role", "user", "option", "o", "content", "")), inputOf(parseCaptured()));
     }
 
     @Test
